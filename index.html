@@ -68,6 +68,10 @@
   .login-error{color:var(--danger);font-size:.82rem;margin-top:14px;min-height:1em;}
   .login-hint{color:var(--ink-soft);font-size:.78rem;margin-top:18px;}
   #app{display:none;max-width:860px;margin:0 auto;padding:24px 16px 80px;}
+  /* Personeelsplanning (rooster) heeft veel kolommen naast elkaar nodig -- op dat tabblad
+     mag de pagina de volle breedte van het scherm gebruiken i.p.v. de smalle 860px die voor
+     het werfverslag-formulier bedoeld is. */
+  #app.app-wide{max-width:1600px;}
   header.top{
     display:flex;align-items:center;justify-content:space-between;
     margin-bottom:16px;flex-wrap:wrap;gap:10px;
@@ -1548,7 +1552,7 @@
   // persoon zelf mag zien.
   const APP_MODE = (window.CASNAP_APP_MODE || 'full'); // 'full' | 'werf' | 'planning'
   const ALL_TABS = ['verslag', 'verslagen', 'actiepunten', 'planning', 'inzet', 'projecten', 'bedrijf'];
-  const PLANNING_TABS = ['inzet'];
+  const PLANNING_TABS = ['inzet', 'bedrijf'];
   const WERF_TABS = ALL_TABS.filter(t => t !== 'inzet');
   function tabsForAppMode(){
     if(APP_MODE === 'planning') return PLANNING_TABS;
@@ -2479,6 +2483,7 @@
     if(!tab) return; // geen enkel tabblad toegelaten -- zie #no-access-screen (applyAccessRestrictions())
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
     document.querySelectorAll('.tab-section').forEach(s => s.classList.toggle('active', s.id === 'tab-' + tab));
+    el('app').classList.toggle('app-wide', tab === 'inzet');
     if(tab === 'verslagen') refreshVerslagenList();
     if(tab === 'actiepunten') refreshActiepunten();
     if(tab === 'planning') refreshPlanning();
