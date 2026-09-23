@@ -286,6 +286,9 @@
     position:fixed;top:14px;right:14px;background:var(--ink);color:#fff;padding:9px 16px;
     border-radius:8px;font-size:.85rem;opacity:0;transform:translateY(-8px);transition:.25s;pointer-events:none;
     z-index:150;
+    /* max-width/white-space (2026-09-23): een echte Supabase-foutmelding (zie
+       renderCadosInstellingenBlock() verderop) is vaak langer dan de gewone korte statuszinnetjes. */
+    max-width:420px;white-space:normal;line-height:1.4;
   }
   .status-msg.show{opacity:1;transform:translateY(0);}
   .hidden-input{display:none;}
@@ -730,7 +733,9 @@
   .ip-status-options{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
   .ip-status-opt{border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-size:.8rem;cursor:pointer;text-align:left;background:var(--card);}
   .ip-proj-search{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:6px;font-size:.85rem;margin-bottom:8px;font-family:inherit;box-sizing:border-box;}
-  .ip-proj-list{max-height:180px;overflow-y:auto;border:1px solid var(--line);border-radius:6px;}
+  .ip-proj-list{max-height:340px;overflow-y:auto;border:1px solid var(--line);border-radius:6px;}
+  .ip-vrije-taak-wrap{display:flex;gap:6px;margin:6px 0 2px;}
+  .ip-vrije-taak-wrap input{flex:1;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-size:.85rem;font-family:inherit;box-sizing:border-box;}
   .ip-proj-opt{padding:9px 10px;font-size:.82rem;cursor:pointer;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:8px;}
   .ip-proj-opt:last-child{border-bottom:none;}
   .ip-proj-opt:hover{background:var(--bg);}
@@ -784,6 +789,7 @@
   .tl-access-row label.chk, .bu-access-row label.chk{display:flex;align-items:center;gap:4px;font-size:.78rem;color:var(--ink-soft);white-space:nowrap;}
 
   .ip-chip-mini.ip-voorstel{border:1px dashed var(--danger) !important;background:repeating-linear-gradient(45deg, rgba(192,57,43,.06), rgba(192,57,43,.06) 6px, transparent 6px, transparent 12px);}
+  .ip-chip-mini[data-voorstel-confirm]{cursor:pointer;}
   .ip-voorstel-label{display:inline-block;font-size:.6rem;background:var(--danger);color:#fff;padding:1px 6px;border-radius:8px;margin-left:5px;vertical-align:middle;}
   .ip-voorstel-note{font-size:.74rem;color:var(--danger);margin-top:4px;}
 
@@ -1322,6 +1328,7 @@
            weer te geven" -- zelfde functie als de bestaande "→"-knop bovenaan (#ip-next-week),
            enkel handig als je onderaan een lang rooster staat zonder terug naar boven te scrollen. -->
       <div class="row-actions" style="justify-content:center;margin-top:10px;">
+        <button type="button" class="btn btn-ghost" id="ip-prev-week-bottom">&larr; Vorige week</button>
         <button type="button" class="btn btn-ghost" id="ip-next-week-bottom">Volgende week &rarr;</button>
       </div>
     </section>
@@ -1448,13 +1455,18 @@
 
       <h4>Nieuwe afspraak toevoegen</h4>
       <div class="ip-status-options" id="ip-status-options"></div>
+      <button type="button" class="ip-status-opt" id="ip-vrije-taak-toggle" style="width:100%;margin-top:6px;">➕ Vrije taak (zonder project)</button>
+      <div class="ip-vrije-taak-wrap" id="ip-vrije-taak-wrap" style="display:none;">
+        <input type="text" id="ip-vrije-taak-input" placeholder="bv. Magazijn opruimen">
+        <button type="button" class="btn btn-secondary btn-sm" id="ip-vrije-taak-add">Toevoegen</button>
+      </div>
       <div style="height:10px;"></div>
       <input type="text" class="ip-proj-search" id="ip-proj-search" placeholder="…of zoek een project">
       <div class="ip-proj-list" id="ip-proj-select-list"></div>
       <div id="ip-panel-open-ap"></div>
     </div>
     <div class="ip-panel-foot">
-      <button class="btn btn-ghost btn-sm" id="ip-clear-slot" type="button">Wis alle afspraken</button>
+      <button class="btn btn-ghost btn-sm" id="ip-clear-slot" type="button">Wis</button>
       <button class="btn btn-secondary btn-sm" id="ip-close-panel" type="button" style="margin-left:auto;">Sluiten</button>
     </div>
   </div>
@@ -1833,7 +1845,11 @@
   background:var(--teal-dim);color:var(--teal);margin-left:6px;font-weight:600;}
 #cados-app #toast{position:fixed;bottom:20px;right:20px;background:var(--panel);color:#fff;padding:11px 17px;
   border-radius:var(--radius);font-size:13px;opacity:0;transform:translateY(8px);transition:.25s;
-  pointer-events:none;z-index:50;box-shadow:var(--shadow-lg);}
+  pointer-events:none;z-index:50;box-shadow:var(--shadow-lg);
+  /* max-width/white-space (2026-09-23): een echte Supabase-foutmelding (zie flushSave() hierboven)
+     kan een pak langer zijn dan de vroegere korte statuszinnetjes -- zonder deze regel liep zo'n
+     bericht gewoon van het scherm af i.p.v. netjes af te breken. */
+  max-width:420px;white-space:normal;line-height:1.4;}
 #cados-app #toast.show{opacity:1;transform:translateY(0);}
 @media(max-width:860px){
 #cados-app .field-grid{grid-template-columns:1fr;}
@@ -2677,6 +2693,12 @@ const TABS = [
   {grp:"Elektro", id:"zekeringen", label:"Zekeringen"},
   {grp:"Elektro", id:"interlex", label:"Rijgklemmen", toggle:"interlex"},
   {grp:"Elektro", id:"driverkast", label:"Driverkast", toggle:"driverkast"},
+  // Verhuisd hierheen vanuit het CaDos-instellingen-blokje op de Projecten-pagina (2026-09-23, op
+  // vraag van Peter: "Dit mag direct in CaDos zitten, niet in de project fiche. Omdat je de
+  // project fiche invult bij aanvang, kamers komen pas later"). Geen `toggle`: kamers/verdiepingen
+  // zijn basisgegevens die overal in CaDos gebruikt worden (zie dl-*-kamers datalists), dus deze
+  // tab is altijd zichtbaar, net als "Zekeringen".
+  {grp:"Elektro", id:"kamers", label:"Kamers & verdiepingen"},
   {grp:"Data & sturing", id:"data", label:"Data", toggle:"data"},
   {grp:"Data & sturing", id:"verlichting", label:"Verlichting 230V", toggle:"verlichting"},
   {grp:"Data & sturing", id:"knoppen", label:"Knoppen", toggle:"knoppen"},
@@ -3107,15 +3129,21 @@ async function flushSave(){
     await window.dbSaveCadosDossier(currentProjectId, state);
   }catch(e){
     console.error('CaDos: dossier bewaren mislukt', e);
-    toast('⚠️ Bewaren mislukt -- controleer je internetverbinding');
+    // De echte foutmelding (bv. een RLS-/rechtenfout van Supabase) er nu gewoon bij tonen
+    // (2026-09-23, n.a.v. Peter: "Bewaren mislukt" zonder duidelijke oorzaak) -- i.p.v. enkel de
+    // vage "controleer je internetverbinding", die de indruk gaf dat het aan de verbinding lag
+    // terwijl het meestal een databank-/rechtenprobleem is. Zo hoeft niemand nog de
+    // browserconsole te openen om te weten wat er precies misging. Langer zichtbaar (6s i.p.v.
+    // 1.8s) zodat er tijd is om zo'n langere foutmelding te lezen/overtypen.
+    toast('⚠️ Bewaren mislukt: ' + (e && e.message ? e.message : 'controleer je internetverbinding'), 6000);
   }
 }
 window.addEventListener('beforeunload', () => { if(__cadosSaveDirty) flushSave(); });
-function toast(msg){
+function toast(msg, duration){
   const t=document.getElementById("toast");
   t.textContent=msg; t.classList.add("show");
   clearTimeout(toast._h);
-  toast._h=setTimeout(()=>t.classList.remove("show"),1800);
+  toast._h=setTimeout(()=>t.classList.remove("show"), duration || 1800);
 }
 
 /* =========================================================================
@@ -10222,6 +10250,79 @@ function renderSimpleList(cfg){
 }
 
 /* =========================================================================
+   TAB: Kamers & verdiepingen — verhuisd hierheen vanuit het CaDos-
+   instellingen-blokje op de Projecten-pagina (2026-09-23, op vraag van
+   Peter: "Dit mag direct in CaDos zitten, niet in de project fiche. Omdat
+   je de project fiche invult bij aanvang, kamers komen pas later"). Werkt
+   rechtstreeks op state.kamers/state.verdiepingen (dit CaDos-dossier zelf),
+   dezelfde velden als voorheen op de Projecten-pagina, gewoon een andere
+   plek + CaDos's eigen save()/selectTab() i.p.v. de aparte gedebouncete
+   save van dat Projecten-pagina-blokje.
+   ========================================================================= */
+function renderKamersVerdiepingenTab(){
+  const wrap = el(`<div class="panel" id="panel-kamers">
+    ${panelHeadHtml(
+      "Kamers & verdiepingen",
+      "Basisgegevens van dit project, gebruikt in de Ruimte-lijst van Driverkast en de ETS-adresindeling.",
+      `Kamers worden overal in CaDos voorgesteld waar je een locatie kan intikken (bv. Zekeringkast, Driverkast, Rijgklemmen). Verdiepingen bepalen de code (bv. "V1") die in de ETS-adresindeling gebruikt wordt.`
+    )}
+    <div class="builder-layout">
+      <div class="card"><div class="card-head"><h3>Kamers</h3></div><div class="card-body">
+        <div id="kamersRows"></div>
+        <button class="addbtn" id="kamerAddBtn">+ kamer toevoegen</button>
+      </div></div>
+      <div class="card"><div class="card-head"><h3>Verdiepingen</h3></div><div class="card-body">
+        <div id="verdiepingenRows"></div>
+        <button class="addbtn" id="verdiepingAddBtn">+ verdieping toevoegen</button>
+      </div></div>
+    </div>
+  </div>`);
+  wireHintToggle(wrap);
+
+  const kamersBox = wrap.querySelector('#kamersRows');
+  function renderKamersRows(){
+    kamersBox.innerHTML = '';
+    if(!Array.isArray(state.kamers)) state.kamers = [];
+    state.kamers.forEach((k, idx) => {
+      const row = el(`<div class="klem-zijde">
+        <input type="text" value="${escapeHtml(k)}" placeholder="Kamernaam" style="flex:1;">
+        <button class="rowdel" title="verwijderen">✕</button>
+      </div>`);
+      row.querySelector('input').addEventListener('input', e => { state.kamers[idx] = e.target.value; save(); });
+      row.querySelector('.rowdel').addEventListener('click', () => { state.kamers.splice(idx, 1); save(); renderKamersRows(); });
+      kamersBox.appendChild(row);
+    });
+  }
+  renderKamersRows();
+  wrap.querySelector('#kamerAddBtn').addEventListener('click', () => { state.kamers.push(''); save(); renderKamersRows(); });
+
+  const verdBox = wrap.querySelector('#verdiepingenRows');
+  function renderVerdiepingenRows(){
+    verdBox.innerHTML = '';
+    if(!Array.isArray(state.verdiepingen)) state.verdiepingen = [];
+    state.verdiepingen.forEach((v, idx) => {
+      const row = el(`<div class="klem-zijde">
+        <input type="text" class="vd-code" value="${escapeHtml(v.code)}" placeholder="Code (bv. V1)" style="max-width:110px;">
+        <input type="text" class="vd-label" value="${escapeHtml(v.label)}" placeholder="Naam (bv. Verdieping 1)" style="flex:1;">
+        <button class="btn small ghost vd-up" title="omhoog">▲</button>
+        <button class="btn small ghost vd-down" title="omlaag">▼</button>
+        <button class="rowdel vd-del" title="verwijderen">✕</button>
+      </div>`);
+      row.querySelector('.vd-code').addEventListener('input', e => { v.code = e.target.value; save(); });
+      row.querySelector('.vd-label').addEventListener('input', e => { v.label = e.target.value; save(); });
+      row.querySelector('.vd-up').addEventListener('click', () => { if(idx > 0){ state.verdiepingen.splice(idx, 1); state.verdiepingen.splice(idx - 1, 0, v); save(); renderVerdiepingenRows(); } });
+      row.querySelector('.vd-down').addEventListener('click', () => { if(idx < state.verdiepingen.length - 1){ state.verdiepingen.splice(idx, 1); state.verdiepingen.splice(idx + 1, 0, v); save(); renderVerdiepingenRows(); } });
+      row.querySelector('.vd-del').addEventListener('click', () => { state.verdiepingen.splice(idx, 1); save(); renderVerdiepingenRows(); });
+      verdBox.appendChild(row);
+    });
+  }
+  renderVerdiepingenRows();
+  wrap.querySelector('#verdiepingAddBtn').addEventListener('click', () => { state.verdiepingen.push({ code: '', label: '' }); save(); renderVerdiepingenRows(); });
+
+  return wrap;
+}
+
+/* =========================================================================
    TAB: Rijgklemmen — één doorlopende lijst, met bovenaan een Enkel/Dubbel-
    keuze die voor de hele lijst geldt. Enkel = één draad per klem, Dubbel =
    een onder- én bovenzijde per klem (zoals de oude vaste Interlex-indeling).
@@ -10714,6 +10815,7 @@ const RENDERERS = {
   werfverslagen: renderWerfverslagenTab,
   zekeringen: renderZekeringen,
   driverkast: renderDriverkast,
+  kamers: renderKamersVerdiepingenTab,
   data: renderPatchkast,
   verlichting: renderVerlichting,
   knoppen: renderKnoppen,
@@ -11280,6 +11382,8 @@ window.CaDosApp = {
     return ALL_TABS;
   }
   function tabsForPersonAccess(){
+    // 'geen' (Onderaannemer, 2026-09-23): geen enkel tabblad toegankelijk.
+    if(state.access === 'geen') return [];
     return state.access === 'planning' ? PLANNING_TABS : ALL_TABS;
   }
   // De doorsnede van beide -- bv. een "enkel planning"-persoon die per ongeluk de Werf-app opent
@@ -11395,7 +11499,9 @@ window.CaDosApp = {
     return 'uid-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
   }
   // ---- Personeelsplanning (2026-09-08): rollen/statussen voor het rooster-tabblad ----
-  const IP_ROLES = ['Technieker', 'Service technieker', 'Programmeur', 'Bureau', 'Flexi', 'Onderaannemer'];
+  // Volgorde op vraag van Peter (2026-09-23): "Bij type in personeel naast technieker ook
+  // Programmeur" -- Programmeur staat daarom meteen na Technieker.
+  const IP_ROLES = ['Technieker', 'Programmeur', 'Service technieker', 'Bureau', 'Flexi', 'Onderaannemer'];
   // Sentinel-"persoon" voor de projectinschatting (2026-09-20, ronde 24): een dag die op de
   // Inschatting-tijdlijn wordt aangeklikt, wordt gewoon een heel normale planning_items-rij, enkel
   // met deze magische naam i.p.v. een echte medewerker -- zo is er GEEN nieuwe SQL-kolom/tabel
@@ -11503,12 +11609,12 @@ window.CaDosApp = {
   }
   el('choice-modal').addEventListener('click', (e) => { if(e.target.id === 'choice-modal') closeChoiceModal(); });
 
-  function showStatus(msg){
+  function showStatus(msg, duration){
     const s = el('status-msg');
     s.textContent = msg;
     s.classList.add('show');
     clearTimeout(showStatus._t);
-    showStatus._t = setTimeout(()=>s.classList.remove('show'), 2600);
+    showStatus._t = setTimeout(()=>s.classList.remove('show'), duration || 2600);
   }
 
   // File System Access API: enkel nog gebruikt voor "Exporteer PDF" om desgewenst
@@ -12288,7 +12394,12 @@ window.CaDosApp = {
       // Toegangsniveau van de ingelogde gebruiker bepalen -- moet ná renderCompany() (hierboven)
       // gebeuren, want die normaliseert app_toegang/is_planner op elk team_leden-/bureau-object.
       state.currentPerson = getCurrentUserPerson();
-      state.access = (state.currentPerson && state.currentPerson.app_toegang === 'planning') ? 'planning' : 'volledig';
+      // 'geen' (Onderaannemer, 2026-09-23): expliciet géén toegang, i.t.t. de standaard 'volledig'
+      // die gold zolang app_toegang niets bijzonders zei.
+      state.access = !state.currentPerson ? 'volledig'
+        : state.currentPerson.app_toegang === 'geen' ? 'geen'
+        : state.currentPerson.app_toegang === 'planning' ? 'planning'
+        : 'volledig';
       applyAccessRestrictions();
     }catch(err){
       console.error(err);
@@ -12458,10 +12569,13 @@ window.CaDosApp = {
     // in dat balkje dat relevant is, dus dan weg (2026-09-23).
     const werfSubbar = el('werf-subbar');
     if(werfSubbar) werfSubbar.style.display = WERF_GROUP_TABS.includes(tab) ? '' : 'none';
-    // 'cados' krijgt dezelfde volle-breedte-behandeling als 'inzet' (2026-09-22): CaDos heeft
-    // zelf meerkolommige tabellen/paneellayouts die weinig hebben aan de smalle 860px-cap die voor
-    // het werfverslag-formulier bedoeld is.
-    el('app').classList.toggle('app-wide', tab === 'inzet' || tab === 'cados');
+    // Alle tabbladen krijgen voortaan dezelfde volle-breedte-behandeling (2026-09-23, op vraag van
+    // Peter: "Bij werfverslag, Projecten en bedrijfsgegevens is het scherm veel smaller dan bij
+    // planning en dossier. Kun je dit allemaal gelijk maken? Maar dat dit op GSM scherm smal
+    // blijft" -- #app.app-wide gebruikt calc(100vw - 24px), dus op een smal GSM-scherm blijft dit
+    // vanzelf smal; enkel op grotere schermen wordt de vaste 860px-cap losgelaten). Voorheen enkel
+    // 'inzet'/'cados', wat de scheve breedtes tussen tabbladen veroorzaakte die Peter meldde.
+    el('app').classList.add('app-wide');
     // Titel boven in aanpassen (2026-09-22, op vraag van Peter: "staat als titel Werfverslag
     // maken, maar ook bij planning, dit moet aangepast worden naar Planning opmaken") -- reageert
     // op het actieve tabblad, dus dit werkt zowel in de losse Planning-app (planning.html, waar
@@ -12558,6 +12672,11 @@ window.CaDosApp = {
     // rooster tellen pas definitief mee nadat een "planner" ze bevestigt. Standaard "volledig" /
     // geen planner, zodat bestaande gebruikers ongewijzigd toegang houden tenzij je dit hier expliciet aanpast.
     if(!person.app_toegang) person.app_toegang = 'volledig';
+    // Onderaannemers krijgen nooit app-/planningtoegang (2026-09-23, op vraag van Peter: "Hier ook
+    // keuze Personeel of onderaannemer: Die hebben geen rechten in de planning") -- afgedwongen bij
+    // elke render, ook voor al langer bestaande rijen waar de rol pas achteraf op Onderaannemer werd
+    // gezet.
+    if(person.rol === 'Onderaannemer') person.app_toegang = 'geen';
     if(person.is_planner == null) person.is_planner = false;
     if(person.volgorde === undefined) person.volgorde = null;
     const wrapper = document.createDocumentFragment();
@@ -12579,7 +12698,10 @@ window.CaDosApp = {
     const rolSelect = document.createElement('select');
     rolSelect.className = 'ip-p-rol';
     rolSelect.innerHTML = IP_ROLES.map(r => `<option value="${r}" ${person.rol === r ? 'selected' : ''}>${r}</option>`).join('');
-    rolSelect.addEventListener('change', e => { person.rol = e.target.value; });
+    rolSelect.addEventListener('change', e => {
+      person.rol = e.target.value;
+      updateAccessRowForRol();
+    });
     const teamSelect = document.createElement('select');
     teamSelect.className = 'ip-p-team';
     teamSelect.innerHTML = `<option value="TECH" ${person.planning_team==='TECH'?'selected':''}>Tech</option><option value="BUREAU" ${person.planning_team==='BUREAU'?'selected':''}>Bureau</option>`;
@@ -12624,7 +12746,33 @@ window.CaDosApp = {
     plannerLabel.querySelector('input').addEventListener('change', e => { person.is_planner = e.target.checked; });
     accessRow.appendChild(accessSelect);
     accessRow.appendChild(plannerLabel);
+    // Hint die de toegangskeuze vervangt zodra de rol "Onderaannemer" is (zie updateAccessRowForRol
+    // hieronder) -- op vraag van Peter: "Die hebben geen rechten in de planning".
+    const accessOaHint = document.createElement('p');
+    accessOaHint.className = 'ip-oa-access-hint';
+    accessOaHint.style.cssText = 'font-size:.78rem;color:var(--ink-soft);margin:4px 0 0;';
+    accessOaHint.textContent = 'Onderaannemers krijgen geen app-/planningtoegang.';
+    accessOaHint.style.display = 'none';
     wrapper.appendChild(accessRow);
+    wrapper.appendChild(accessOaHint);
+
+    // Onderaannemers krijgen nooit toegang: de toegangskeuze wordt dan verborgen (en de hint
+    // hierboven getoond), en app_toegang staat vast op 'geen' (zie ook hierboven bij het
+    // initialiseren van deze rij). Bij een andere rol dan Onderaannemer wordt de gewone
+    // toegangskeuze terug getoond; stond app_toegang nog op 'geen' (dus kwam van Onderaannemer),
+    // dan valt dit terug op 'volledig' zodat de persoon niet per ongeluk toegangsloos blijft.
+    function updateAccessRowForRol(){
+      const isOa = person.rol === 'Onderaannemer';
+      accessRow.style.display = isOa ? 'none' : '';
+      accessOaHint.style.display = isOa ? '' : 'none';
+      if(isOa){
+        person.app_toegang = 'geen';
+      } else if(person.app_toegang === 'geen'){
+        person.app_toegang = 'volledig';
+        accessSelect.value = 'volledig';
+      }
+    }
+    updateAccessRowForRol();
 
     return wrapper;
   }
@@ -13307,7 +13455,7 @@ window.CaDosApp = {
           </div>
           ${p.id ? `
           <div class="field cados-inst-block">
-            <label>⚡ CaDos — projectinstellingen <span class="hint">(basisgegevens, onderdelen, kamers &amp; verdiepingen van het Elektro/Domotica-dossier van dit project)</span></label>
+            <label>⚡ CaDos — projectinstellingen <span class="hint">(aanvullende gegevens en onderdelen van het Elektro/Domotica-dossier van dit project — projectnaam/adres/klant/werfleider komen automatisch over van hierboven; kamers &amp; verdiepingen vul je in CaDos zelf aan, want die zijn meestal pas later gekend)</span></label>
             <div class="cados-inst-body"><p class="hint">Laden…</p></div>
           </div>
           ` : ''}
@@ -13381,7 +13529,7 @@ window.CaDosApp = {
           // CaDos-instellingen-blokje (2026-09-23, zie renderCadosInstellingenBlock() verderop in
           // dit script) -- enkel voor al-opgeslagen projecten (heeft een project_id nodig).
           const instBox = row.querySelector('.cados-inst-body');
-          if(instBox) renderCadosInstellingenBlock(instBox, p.id);
+          if(instBox) renderCadosInstellingenBlock(instBox, p.id, p);
         }
 
         row.querySelector('.p-naam').value = p.naam;
@@ -13484,6 +13632,24 @@ window.CaDosApp = {
     renderVListProjectFilter();
   }
 
+  // Project/Adres/Klant/Contactpersoon van het CaDos-dossier automatisch afleiden uit het project
+  // zelf (2026-09-23, op vraag van Peter: "CasDos zaken die al in de basisgegeven van het project
+  // te vinden zijn niet nogmaal in vullen aub.") -- i.p.v. deze 4 velden nog een keer apart te
+  // laten intikken in het CaDos-instellingen-blokje hieronder. Retourneert of er effectief iets
+  // veranderde, zodat de aanroeper enkel dan een (nieuwe) save hoeft in te plannen.
+  function syncCadosBasisvelden(dossier, p){
+    const i = dossier.instellingen;
+    const nieuw = {
+      project: p.naam || '',
+      adres: p.locatie || '',
+      klant: p.klant || '',
+      contact: p.werfleider_naam || '',
+    };
+    let changed = false;
+    Object.keys(nieuw).forEach(key => { if(i[key] !== nieuw[key]){ i[key] = nieuw[key]; changed = true; } });
+    return changed;
+  }
+
   // ===================== CaDos-instellingen op de Projecten-pagina (2026-09-23) =====================
   // Op vraag van Peter: "Instellingen zou dan ook beter verhuizen naar de algemene project pagina
   // van het bijhorende project." Dit blokje werkt rechtstreeks op het bewaarde CaDos-dossier-JSON
@@ -13493,7 +13659,14 @@ window.CaDosApp = {
   // tabblad (gestuurd door de aparte, globale projectkiezer bovenaan de header) in de war kan
   // sturen als het toevallig een ANDER project toont dan het project dat je hier op de
   // Projecten-pagina aan het uitklappen bent. Bewaart gedebouncet (700ms), net als CaDos zelf.
-  async function renderCadosInstellingenBlock(container, projectId){
+  //
+  // Herzien 2026-09-23 (op vraag van Peter):
+  // - Project/Adres/Klant/Contactpersoon staan hier niet meer apart (zie syncCadosBasisvelden()
+  //   hierboven) -- die komen nu automatisch over van het project zelf.
+  // - Kamers/Verdiepingen zijn verhuisd naar CaDos zelf (nieuwe tab "Kamers & verdiepingen", zie
+  //   renderKamersVerdiepingenTab() in het CaDos-script) -- "Omdat je de project fiche invult bij
+  //   aanvang, kamers komen pas later".
+  async function renderCadosInstellingenBlock(container, projectId, project){
     container.innerHTML = '<p class="hint">Laden…</p>';
     if(!window.CaDosApp || !window.CaDosApp.blankState || !window.CaDosApp.migrate){
       container.innerHTML = '<p class="hint">CaDos-module nog niet geladen.</p>';
@@ -13504,6 +13677,14 @@ window.CaDosApp = {
       const row = await window.dbGetCadosDossier(projectId);
       const parsed = (row && row.data) ? row.data : {};
       dossier = window.CaDosApp.migrate(Object.assign(window.CaDosApp.blankState(), parsed));
+      // migrate()/blankState() hierboven kunnen dossier.armaturen/driver vullen met de vestigiale
+      // standaardcatalogus uit blankState() (bedoeld voor een gloednieuw, nog nooit bewaard
+      // dossier) -- die mag hier NOOIT in bewaard worden voor een dossier dat ze nooit had, want
+      // dan raakt de gedeelde Catalogus (zie migreerArmaturenDriversNaarCatalogus hieronder)
+      // vervuild met ~30 fabrieksstandaarden. Enkel overnemen wat er ECHT al stond; anders expliciet
+      // schrappen zodat een latere save() dit nooit per ongeluk meestuurt.
+      if(parsed.armaturen !== undefined) dossier.armaturen = parsed.armaturen; else delete dossier.armaturen;
+      if(parsed.driver !== undefined) dossier.driver = parsed.driver; else delete dossier.driver;
     }catch(err){
       container.innerHTML = '<p class="hint">Kon CaDos-instellingen niet laden: ' + escapeHtml(err.message || String(err)) + '</p>';
       return;
@@ -13511,18 +13692,28 @@ window.CaDosApp = {
 
     let saveTimer = null;
     function scheduleSave(){
+      // Basisvelden (project/adres/klant/contact) vlak vóór elke save nog eens gelijktrekken met
+      // het project, voor het geval het projectrecord zelf ondertussen elders gewijzigd werd.
+      if(project) syncCadosBasisvelden(dossier, project);
       clearTimeout(saveTimer);
       saveTimer = setTimeout(() => {
         window.dbSaveCadosDossier(projectId, dossier).catch(err => {
           console.error('CaDos-instellingen bewaren mislukt', err);
-          showStatus('⚠️ CaDos-instellingen bewaren mislukt');
+          // Echte foutmelding erbij tonen (zelfde reden als bij flushSave() in het CaDos-script
+          // zelf) -- zo hoeft niemand de browserconsole te openen om te weten wat er misging.
+          showStatus('⚠️ CaDos-instellingen bewaren mislukt: ' + (err && err.message ? err.message : '(onbekende fout)'), 6000);
         });
       }, 700);
     }
+    // Basisvelden meteen bij het openen al gelijktrekken (zie syncCadosBasisvelden() hierboven) --
+    // enkel een save inplannen als er ook echt iets veranderde, anders krijg je een "bewaren"-
+    // statusje bij elk project dat je gewoon uitklapt.
+    if(project && syncCadosBasisvelden(dossier, project)) scheduleSave();
 
     const i = dossier.instellingen;
+    // Project/Adres/Klant/Contactpersoon staan hier bewust niet meer bij -- zie
+    // syncCadosBasisvelden() hierboven, die komen nu automatisch over van het project zelf.
     const fields = [
-      ['project', 'Project'], ['adres', 'Adres'], ['klant', 'Klant'], ['contact', 'Contactpersoon'],
       ['datum', 'Datum', 'date'], ['referentie', 'Referentie'], ['installateur', 'Installateur'],
     ];
     container.innerHTML = `
@@ -13536,16 +13727,6 @@ window.CaDosApp = {
       <div class="cados-inst-sub">
         <h4>Onderdelen van dit project <span class="hint">— enkel wat aangevinkt is, verschijnt als tabblad in CaDos</span></h4>
         <div class="cados-inst-toggles"></div>
-      </div>
-      <div class="cados-inst-sub">
-        <h4>Kamers <span class="hint">— gebruikt in de Ruimte-lijst van Driverkast</span></h4>
-        <div class="cados-inst-rows ci-kamers"></div>
-        <button type="button" class="btn btn-ghost btn-sm ci-kamer-add">+ kamer toevoegen</button>
-      </div>
-      <div class="cados-inst-sub">
-        <h4>Verdiepingen <span class="hint">— gebruikt voor de ETS-adresindeling</span></h4>
-        <div class="cados-inst-rows ci-verdiepingen"></div>
-        <button type="button" class="btn btn-ghost btn-sm ci-verdieping-add">+ verdieping toevoegen</button>
       </div>
     `;
 
@@ -13569,43 +13750,6 @@ window.CaDosApp = {
       rowEl.querySelector('input').addEventListener('change', e => { dossier.modules[t.key] = e.target.checked; scheduleSave(); });
       togglesBox.appendChild(rowEl);
     });
-
-    const kamersBox = container.querySelector('.ci-kamers');
-    function renderKamersBlock(){
-      kamersBox.innerHTML = '';
-      dossier.kamers.forEach((k, idx) => {
-        const kr = document.createElement('div');
-        kr.className = 'cados-inst-row';
-        kr.innerHTML = `<input type="text" value="${escapeHtml(k)}" placeholder="Kamernaam"><button type="button" class="btn btn-ghost btn-sm">✕</button>`;
-        kr.querySelector('input').addEventListener('input', e => { dossier.kamers[idx] = e.target.value; scheduleSave(); });
-        kr.querySelector('button').addEventListener('click', () => { dossier.kamers.splice(idx, 1); scheduleSave(); renderKamersBlock(); });
-        kamersBox.appendChild(kr);
-      });
-    }
-    renderKamersBlock();
-    container.querySelector('.ci-kamer-add').addEventListener('click', () => { dossier.kamers.push(''); scheduleSave(); renderKamersBlock(); });
-
-    const verdBox = container.querySelector('.ci-verdiepingen');
-    function renderVerdiepingenBlock(){
-      verdBox.innerHTML = '';
-      dossier.verdiepingen.forEach((v, idx) => {
-        const vr = document.createElement('div');
-        vr.className = 'cados-inst-row cados-inst-row-verdieping';
-        vr.innerHTML = `<input type="text" class="vd-code" value="${escapeHtml(v.code)}" placeholder="Code (bv. V1)">
-          <input type="text" class="vd-label" value="${escapeHtml(v.label)}" placeholder="Naam (bv. Verdieping 1)">
-          <button type="button" class="btn btn-ghost btn-sm vd-up" title="omhoog">▲</button>
-          <button type="button" class="btn btn-ghost btn-sm vd-down" title="omlaag">▼</button>
-          <button type="button" class="btn btn-ghost btn-sm vd-del" title="verwijderen">✕</button>`;
-        vr.querySelector('.vd-code').addEventListener('input', e => { v.code = e.target.value; scheduleSave(); });
-        vr.querySelector('.vd-label').addEventListener('input', e => { v.label = e.target.value; scheduleSave(); });
-        vr.querySelector('.vd-up').addEventListener('click', () => { if(idx > 0){ dossier.verdiepingen.splice(idx, 1); dossier.verdiepingen.splice(idx - 1, 0, v); scheduleSave(); renderVerdiepingenBlock(); } });
-        vr.querySelector('.vd-down').addEventListener('click', () => { if(idx < dossier.verdiepingen.length - 1){ dossier.verdiepingen.splice(idx, 1); dossier.verdiepingen.splice(idx + 1, 0, v); scheduleSave(); renderVerdiepingenBlock(); } });
-        vr.querySelector('.vd-del').addEventListener('click', () => { dossier.verdiepingen.splice(idx, 1); scheduleSave(); renderVerdiepingenBlock(); });
-        verdBox.appendChild(vr);
-      });
-    }
-    renderVerdiepingenBlock();
-    container.querySelector('.ci-verdieping-add').addEventListener('click', () => { dossier.verdiepingen.push({ code: '', label: '' }); scheduleSave(); renderVerdiepingenBlock(); });
   }
 
   // ===================== Gedeelde Catalogus: armaturen/drivers (2026-09-23) =====================
@@ -17141,9 +17285,14 @@ window.CaDosApp = {
       // bevestigd, enkel expliciet `false` is een openstaand voorstel.
       const voorstel = en.bevestigd === false;
       const voorstelLabel = voorstel ? '<span class="ip-voorstel-label">voorstel</span>' : '';
+      // Een voorstel dat al aan deze specifieke persoon toegewezen is (i.t.t. een "ghost"-voorstel
+      // hierboven, dat nog aan niemand hangt) mag je ook rechtstreeks in het rooster bevestigen door
+      // erop te klikken -- zie [data-voorstel-confirm] bij de click-listener op #ip-grid hieronder.
+      // Op vraag van Peter: "In het planningsbord graag op voorstel kunnen klikken".
+      const voorstelAttr = voorstel ? ` data-voorstel-confirm="${en.id}" title="Voorstel -- klik om te bevestigen"` : '';
       if(en.type === 'status'){
         const st = IP_STATUSES.find(s => s.key === en.status) || { cls: '', label: en.status };
-        return `<div class="ip-chip-mini ${st.cls} ${voorstel ? 'ip-voorstel' : ''} ${ipPinnedClass(en.id)}">${escapeHtml(st.label)}${voorstelLabel}${ipChipActionsHtml(en.id)}</div>`;
+        return `<div class="ip-chip-mini ${st.cls} ${voorstel ? 'ip-voorstel' : ''} ${ipPinnedClass(en.id)}"${voorstelAttr}>${escapeHtml(st.label)}${voorstelLabel}${ipChipActionsHtml(en.id)}</div>`;
       }
       const proj = ipProjectById(en.project_id);
       // Vrije taak zonder project (2026-09-22, op vraag van Peter): en.project_id is dan null en
@@ -17153,7 +17302,7 @@ window.CaDosApp = {
       const mismatch = proj && proj.protocol && !ipProjectDayHasSkillCoverage(en.project_id, dateISO);
       const apInfo = proj ? state.openApByProject[String(proj.id)] : null;
       const apBadge = apInfo && apInfo.count ? `<span class="ip-ap-badge" title="${apInfo.count} open actiepunt${apInfo.count===1?'':'en'}">${apInfo.count}</span>` : '';
-      return `<div class="ip-chip-mini ip-status-project ${mismatch ? 'ip-mismatch' : ''} ${voorstel ? 'ip-voorstel' : ''} ${ipPinnedClass(en.id)}">${mismatch ? '⚠ ' : ''}${naamLabel}${proj && proj.protocol ? ` · ${escapeHtml(proj.protocol)}` : ''}${apBadge}${voorstelLabel}${ipChipActionsHtml(en.id)}</div>`;
+      return `<div class="ip-chip-mini ip-status-project ${mismatch ? 'ip-mismatch' : ''} ${voorstel ? 'ip-voorstel' : ''} ${ipPinnedClass(en.id)}"${voorstelAttr}>${mismatch ? '⚠ ' : ''}${naamLabel}${proj && proj.protocol ? ` · ${escapeHtml(proj.protocol)}` : ''}${apBadge}${voorstelLabel}${ipChipActionsHtml(en.id)}</div>`;
     }).join('');
   }
 
@@ -17177,32 +17326,14 @@ window.CaDosApp = {
     const days = [...Array(14)].map((_, i) => ipAddDays(state.ip.weekStart, i));
     el('ip-grid-empty-hint').style.display = people.length ? 'none' : 'block';
 
-    // Detecteer volledig identieke werkweken (ma-vr) per persoon, om tot 1 blok samen te voegen.
+    // Vroeger werd een volledig identieke werkweek (ma-vr) per persoon samengevoegd tot 1
+    // rowspan-blok. Op vraag van Peter (2026-09-23): "Kopieer naar ganse week: Graag elke dag
+    // inplannen. Zodat toch nog iets kan wijzigen" -- die samenvoeging maakte de individuele dagen
+    // binnen het blok niet meer apart klikbaar/aanpasbaar, wat net zijn "Kopieer naar rest van
+    // week" nuttig had moeten maken. rowspanStart/skip blijven hieronder bewust altijd leeg, zodat
+    // elke dag steeds als eigen, individueel bewerkbare cel gerenderd wordt (zie ipCellInner()).
     const rowspanStart = {};
     const skip = new Set();
-    [0, 1].forEach(wi => {
-      const weekDates = days.slice(wi * 7, wi * 7 + 7);
-      const weekdayDates = weekDates.filter(d => !ipIsWeekend(d));
-      if(weekdayDates.length !== 5) return;
-      people.forEach(p => {
-        const entriesList = weekdayDates.map(d => ipEntriesFor(p.naam, ipIso(d)));
-        const allSingle = entriesList.every(arr => arr.length === 1);
-        if(!allSingle) return;
-        // Een voorstel (nog niet bevestigd) en een al bevestigde afspraak tellen bewust NIET als
-        // "hetzelfde" -- anders zou een openstaand voorstel onopgemerkt mee samengevoegd worden met
-        // reeds bevestigde dagen in de weergave. Vrije taken (2026-09-22, project_id is dan null)
-        // tellen enkel als "hetzelfde" bij exact dezelfde omschrijving, anders zouden twee losse
-        // vrije taken zonder project per ongeluk als 1 week-blok samengevoegd worden.
-        const sameKey = en => (en.type === 'status' ? ('status:' + en.status) : ('project:' + en.project_id + (en.project_id == null ? ':' + (en.omschrijving || '') : ''))) + '__' + (en.bevestigd === false ? 'voorstel' : 'bevestigd');
-        const firstKey = sameKey(entriesList[0][0]);
-        const allSame = entriesList.every(arr => sameKey(arr[0]) === firstKey);
-        if(!allSame) return;
-        const first = entriesList[0][0];
-        const dates = weekdayDates.map(ipIso);
-        rowspanStart[p.naam + '__' + dates[0]] = { type: first.type, status: first.status, project_id: first.project_id, omschrijving: first.omschrijving, bevestigd: first.bevestigd, dates };
-        dates.slice(1).forEach(dISO => skip.add(p.naam + '__' + dISO));
-      });
-    });
 
     // "Nog toe te wijzen"-voorstellen (2026-09-20, ronde 24; herzien 2026-09-22 op vraag van Peter)
     // staan sinds deze herziening niet meer in een aparte kolom, maar rechtstreeks als doorzichtig
@@ -17479,6 +17610,8 @@ window.CaDosApp = {
     const d = new Date(dateISO + 'T00:00:00');
     el('ip-panel-date').textContent = d.toLocaleDateString('nl-BE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
     el('ip-status-options').innerHTML = IP_STATUSES.map(s => `<button type="button" class="ip-status-opt ${s.cls}" data-status="${s.key}">${s.label}</button>`).join('');
+    el('ip-vrije-taak-wrap').style.display = 'none';
+    el('ip-vrije-taak-input').value = '';
     el('ip-proj-search').value = '';
     renderIpProjSelectList('');
     renderIpEntryList();
@@ -17566,11 +17699,12 @@ window.CaDosApp = {
     }).join('');
   }
 
-  async function ipAddEntry(type, value){
+  async function ipAddEntry(type, value, omschrijving){
     const ctx = state.ip.panelCtx;
     if(!ctx) return;
     const fields = Object.assign({ persoon_naam: ctx.naam, datum: ctx.dateISO, type }, ipPendingFieldsForNewEntry());
-    if(type === 'status') fields.status = value; else fields.project_id = value;
+    if(type === 'status') fields.status = value;
+    else { fields.project_id = value; if(omschrijving) fields.omschrijving = omschrijving; }
     try{
       const row = await dbInsertPlanningItem(fields);
       state.planningItems.push(row);
@@ -17812,6 +17946,10 @@ window.CaDosApp = {
   // Duplicaat van de "→"-knop, onderaan het rooster (2026-09-22, op vraag van Peter) -- gewoon een
   // klik op de bestaande knop simuleren zodat er maar 1 plek is met de eigenlijke logica.
   el('ip-next-week-bottom').addEventListener('click', () => { el('ip-next-week').click(); });
+  // Idem voor "← Vorige week" (2026-09-23, op vraag van Peter: "Als ik volgende week aanklik,
+  // graag ook bovenaan Vorige week" -- hier meteen ook onderaan toegevoegd, naast de bestaande
+  // "Volgende week"-knop).
+  el('ip-prev-week-bottom').addEventListener('click', () => { el('ip-prev-week').click(); });
   el('ip-grid').addEventListener('click', e => {
     // 📌/📋/🗑️-icoontjes op een afspraak zelf (2026-09-23, zie ipChipActionsHtml() hierboven) --
     // altijd als eerste afgehandeld, vóór de ghost-/td-afhandeling hieronder.
@@ -17846,6 +17984,15 @@ window.CaDosApp = {
       if(ghostTd) ipConfirmInschattingEntry(ghost.dataset.ghostEntry, ghostTd.dataset.person);
       return;
     }
+    // Een voorstel dat al aan deze persoon hangt (zie [data-voorstel-confirm] in ipCellInner())
+    // rechtstreeks bevestigen door er in het rooster zelf op te klikken -- enkel voor een planner;
+    // een niet-planner ziet gewoon het normale zijpaneel (met de voorstel-melding erin), zoals
+    // voorheen. Op vraag van Peter: "In het planningsbord graag op voorstel kunnen klikken".
+    const voorstelChip = e.target.closest('[data-voorstel-confirm]');
+    if(voorstelChip && ipIsPlanner()){
+      ipConfirmEntry(voorstelChip.dataset.voorstelConfirm);
+      return;
+    }
     const td = e.target.closest('td.ip-slot'); if(!td) return;
     // Doelvakje voor een lopende "vastpinnen"/"kopiëren"-actie (zie hierboven) -- i.p.v. het
     // normale zijpaneel te openen, meteen verplaatsen/kopiëren naar dit vakje.
@@ -17861,6 +18008,27 @@ window.CaDosApp = {
     const btn = e.target.closest('.ip-status-opt'); if(!btn) return;
     ipAddEntry('status', btn.dataset.status);
   });
+  // "Vrije taak (zonder project)" rechtstreeks vanuit het dagpaneel (2026-09-23, op vraag van
+  // Peter: "Afspraak in de planning die niet aan een project is gekoppeld, is nog niet
+  // beschikbaar. Best een vakje daarvoor voorzien") -- hergebruikt dezelfde data-vorm
+  // (project_id: null + omschrijving) als de al bestaande vrije-taak-optie op het Inschatting-
+  // subtabblad, dus geen nieuwe SQL-kolom nodig.
+  el('ip-vrije-taak-toggle').addEventListener('click', () => {
+    const wrap = el('ip-vrije-taak-wrap');
+    const opening = wrap.style.display === 'none';
+    wrap.style.display = opening ? 'flex' : 'none';
+    if(opening) el('ip-vrije-taak-input').focus();
+  });
+  function submitIpVrijeTaak(){
+    const input = el('ip-vrije-taak-input');
+    const tekst = input.value.trim();
+    if(!tekst){ input.focus(); return; }
+    ipAddEntry('project', null, tekst);
+    input.value = '';
+    el('ip-vrije-taak-wrap').style.display = 'none';
+  }
+  el('ip-vrije-taak-add').addEventListener('click', submitIpVrijeTaak);
+  el('ip-vrije-taak-input').addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); submitIpVrijeTaak(); } });
   el('ip-proj-search').addEventListener('input', e => renderIpProjSelectList(e.target.value));
   el('ip-proj-select-list').addEventListener('click', e => {
     const opt = e.target.closest('.ip-proj-opt[data-proj]'); if(!opt) return;
