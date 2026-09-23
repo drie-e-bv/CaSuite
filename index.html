@@ -90,8 +90,15 @@
     border:1px solid var(--line);flex:none;display:none;
   }
   .brand-logo.has-logo{display:block;}
-  .user-bar{display:flex;align-items:center;gap:10px;font-size:.82rem;color:var(--ink-soft);}
+  .user-bar{display:flex;align-items:center;gap:10px;font-size:.82rem;color:var(--ink-soft);flex-wrap:wrap;}
   .user-bar .user-email{font-weight:600;color:var(--ink);}
+  .global-project-picker{display:flex;align-items:center;gap:6px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:5px 10px;}
+  .global-project-picker label{font-size:.74rem;font-weight:600;color:var(--ink-soft);white-space:nowrap;}
+  .global-project-picker select{border:none;background:transparent;font-size:.82rem;font-weight:600;color:var(--ink);cursor:pointer;max-width:200px;}
+  .global-project-picker select:focus{outline:none;}
+  @media (max-width:720px){
+    .global-project-picker select{max-width:120px;}
+  }
   .logo-preview-lg{
     width:160px;height:100px;border-radius:8px;border:1px dashed var(--line);background:#fff center/contain no-repeat;
     display:flex;align-items:center;justify-content:center;color:var(--ink-soft);font-size:.75rem;text-align:center;
@@ -103,6 +110,16 @@
     cursor:pointer;border-bottom:2.5px solid transparent;margin-bottom:-1px;
   }
   nav.tabs button.active{color:var(--accent);border-bottom-color:var(--accent);}
+  /* Onderbalkje voor de Werfverslag-groep (2026-09-23) -- zelfde pilvormige patroon als
+     .ip-subtabs bij Personeelsplanning (zie verderop), bewust een ANDERE, iets minder
+     prominente stijl dan de hoofdbalk hierboven (geen accentkleur/onderlijn-tabs), zodat het
+     duidelijk als "niveau 2" oogt. */
+  .tabs-secondary{display:flex;gap:2px;background:var(--bg);border:1px solid var(--line);padding:3px;border-radius:8px;margin-bottom:18px;width:fit-content;flex-wrap:wrap;}
+  .tabs-secondary .tab-btn{
+    border:none;background:transparent;padding:8px 14px;font-size:.85rem;font-weight:600;color:var(--ink-soft);
+    cursor:pointer;border-radius:6px;margin-bottom:0;
+  }
+  .tabs-secondary .tab-btn.active{background:var(--accent);color:#fff;border-bottom-color:transparent;}
   .tab-section{display:none;}
   .tab-section.active{display:block;}
   .card{
@@ -348,6 +365,30 @@
   }
   .contact-checklist .cc-item input{width:auto;flex:none;}
   .contact-checklist .cc-role{color:var(--ink-soft);font-size:.8rem;}
+  /* CaDos-instellingen-blokje op de Projecten-pagina (2026-09-23) -- zie
+     renderCadosInstellingenBlock() in index.html. Herhaalt bewust dezelfde stijl als CaDos'
+     eigen (onder #cados-app geschoolde) .module-toggles/.module-toggle-row, want dit blokje
+     staat buiten #cados-app en kan die regels dus niet hergebruiken. */
+  .cados-inst-block{border-top:1px solid var(--line);padding-top:14px;margin-top:4px;}
+  .cados-inst-block > label{font-weight:700;}
+  .cados-inst-sub{margin-top:14px;}
+  .cados-inst-sub h4{margin:0 0 8px;font-size:.88rem;font-weight:700;}
+  .cados-inst-sub h4 .hint{font-weight:400;}
+  .cados-inst-toggles{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px 16px;}
+  .cados-inst-toggle-row{display:flex;align-items:center;gap:8px;font-size:.85rem;padding:4px 0;cursor:pointer;}
+  .cados-inst-toggle-row input{width:auto;}
+  .cados-inst-row{display:flex;gap:8px;margin-bottom:6px;}
+  .cados-inst-row-verdieping input.vd-code{max-width:110px;}
+  .cados-inst-row-verdieping{align-items:center;}
+  .cados-inst-fields{margin-bottom:12px;}
+  /* Gedeelde Catalogus-modal (2026-09-23) -- zie openCatalogusModal() in index.html. */
+  .catalogus-tabs{display:flex;gap:6px;margin:12px 0;border-bottom:1px solid var(--line);}
+  .catalogus-tab-btn{
+    border:none;background:none;padding:8px 4px;margin-right:14px;font-size:.88rem;font-weight:600;
+    color:var(--ink-soft);cursor:pointer;border-bottom:2px solid transparent;
+  }
+  .catalogus-tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
+  .catalog-table td input, .catalog-table td select{padding:6px 8px;font-size:.85rem;}
   .verslag-filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;align-items:flex-end;}
   .verslag-filters .field{margin-bottom:0;flex:1;min-width:160px;}
   .verslagen-table{width:100%;border-collapse:collapse;font-size:.88rem;}
@@ -419,12 +460,21 @@
   .inschat-week-label{width:74px;flex:none;font-size:.72rem;color:var(--ink-soft);padding-top:8px;}
   .inschat-day{
     width:52px;flex:none;text-align:center;border:1px solid #dfe3e8;border-radius:6px;padding:5px 2px;
-    font-size:.72rem;cursor:pointer;background:#fff;color:var(--ink-soft);user-select:none;
+    font-size:.72rem;cursor:pointer;background:#fff;color:var(--ink-soft);user-select:none;position:relative;
   }
   .inschat-day .d-num{display:block;font-weight:700;font-size:.82rem;color:var(--ink);}
   .inschat-day.weekend{background:#f4f5f7;color:#b7bcc4;}
   .inschat-day.selected{background:#fde9dd;border-color:#d9531e;color:#d9531e;}
   .inschat-day.selected .d-num{color:#d9531e;}
+  /* ✓ bevestigen (sneltoets: V, terwijl je erover zweeft) / 🗑️ verwijderen -- enkel bij hover op
+     een al geselecteerde dag (2026-09-23, op vraag van Peter), zie renderIpInschattingTab(). */
+  .inschat-day-actions{position:absolute;top:-6px;right:-6px;display:flex;gap:2px;opacity:0;pointer-events:none;transition:opacity .12s;}
+  .inschat-day.selected:hover .inschat-day-actions{opacity:1;pointer-events:auto;}
+  .inschat-day-icon{border:none;background:#fff;border-radius:50%;width:17px;height:17px;font-size:10px;
+    line-height:17px;text-align:center;cursor:pointer;padding:0;box-shadow:0 1px 3px rgba(0,0,0,.25);}
+  .inschat-day-icon:hover{transform:scale(1.15);}
+  .inschat-day-icon[data-inschat-action="confirm"]{color:var(--green, #1a8a4c);}
+  .inschat-day-icon[data-inschat-action="delete"]{color:var(--danger, #c0392b);}
   .ip-inschat-timeline-disabled{opacity:.5;pointer-events:none;}
   /* "Nog toe te wijzen"-pseudokolom in het Rooster (2026-09-20, ronde 24) -- ongebruikt sinds
      2026-09-22 (zie ipCellInner()/.ip-ghost-voorstel hieronder), klassen bewust laten staan i.p.v.
@@ -518,6 +568,9 @@
     nav.tabs{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
     nav.tabs::-webkit-scrollbar{display:none;}
     nav.tabs button{padding:9px 12px;font-size:.82rem;white-space:nowrap;flex:none;}
+    .tabs-secondary{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;max-width:100%;}
+    .tabs-secondary::-webkit-scrollbar{display:none;}
+    .tabs-secondary .tab-btn{white-space:nowrap;flex:none;}
     /* Voorkomt dat iOS Safari automatisch inzoomt bij het focussen van een invoerveld
        (gebeurt standaard bij een lettergrootte kleiner dan 16px) */
     input[type=text],input[type=url],input[type=date],input[type=number],select,textarea{
@@ -622,7 +675,18 @@
   td.ip-slot.ip-weekend{background:#eef0f3;}
   td.ip-slot.ip-merged{background:#fbfcfe;vertical-align:middle;}
   .ip-cellwrap{display:flex;flex-direction:column;gap:3px;min-height:32px;}
-  .ip-chip-mini{border-radius:4px;padding:5px 8px;font-size:.78rem;line-height:1.35;}
+  .ip-chip-mini{border-radius:4px;padding:5px 8px;font-size:.78rem;line-height:1.35;position:relative;}
+  /* 📌 vastpinnen (verplaatsen) / 📋 kopiëren / 🗑️ verwijderen -- enkel zichtbaar bij hover op
+     de afspraak zelf (2026-09-23, op vraag van Peter), zie ipChipActionsHtml()/ipCellInner(). */
+  .ip-chip-actions{position:absolute;top:2px;right:2px;display:flex;gap:2px;opacity:0;pointer-events:none;transition:opacity .12s;}
+  .ip-chip-mini:hover .ip-chip-actions{opacity:1;pointer-events:auto;}
+  .ip-chip-icon{border:none;background:rgba(255,255,255,.92);border-radius:3px;width:16px;height:16px;font-size:10px;
+    line-height:16px;text-align:center;cursor:pointer;padding:0;box-shadow:0 1px 2px rgba(0,0,0,.18);}
+  .ip-chip-icon:hover{background:#fff;transform:scale(1.1);}
+  /* Zolang er een afspraak "vastgepind" (verplaatsen) of gekopieerd staat te worden, wachtend op
+     een klik op het doelvakje. */
+  .ip-chip-mini.ip-pinned{outline:2px solid var(--accent);outline-offset:1px;}
+  td.ip-slot.ip-drop-hint{cursor:copy;background:var(--accent-soft);}
   .ip-chip-mini.ip-placeholder{border:1px dashed var(--line);color:var(--ink-soft);opacity:0;text-align:center;}
   td.ip-slot:hover .ip-chip-mini.ip-placeholder{opacity:1;}
   .ip-chip-mini.ip-muted{opacity:.75;font-style:italic;}
@@ -810,6 +874,20 @@
            website die alles toont (zelfde map/repo, dus een gewone relatieve link volstaat). -->
       <a class="btn btn-ghost btn-sm" id="btn-go-home" href="./index.html" style="display:none;" title="Terug naar de volledige CaSuite-website">← Hoofdsite</a>
       <button class="btn btn-ghost btn-sm" id="btn-global-search" type="button" title="Overal zoeken (projecten, verslagen, actiepunten, planning)">🔍 Zoeken</button>
+      <!-- Gedeelde Catalogus armaturen/drivers (2026-09-23, op vraag van Peter: "Best aparte
+           pagina te starten vanaf knop in de buurt van uitloggen/zoeken") -- zie
+           openCatalogusModal()/#catalogus-modal verderop in index.html. Zelfde zichtbaarheids-
+           voorwaarde als de projectkiezer hiernaast (enkel relevant als CaDos/Werfverslag
+           toegankelijk is), zie applyAccessRestrictions(). -->
+      <button class="btn btn-ghost btn-sm" id="btn-catalogus" type="button" style="display:none;" title="Gedeelde catalogus van armaturen en drivers, over alle projecten heen">📚 Catalogus</button>
+      <!-- Eén centrale projectkeuze (2026-09-23, zie state.globalProjectId hierboven in het script)
+           -- vast bovenaan in de header, naast "Uitloggen", ongeacht welk tabblad je bekijkt.
+           Enkel zichtbaar als deze app-installatie überhaupt een tabblad toont dat er iets mee
+           doet (Dossier/Werfverslag) -- zie applyAccessRestrictions(). -->
+      <div class="global-project-picker" id="global-project-picker" style="display:none;">
+        <label for="global-project-select">Project</label>
+        <select id="global-project-select"><option value="">— geen project gekozen —</option></select>
+      </div>
       <span class="user-email" id="user-email"></span>
       <button class="btn btn-ghost btn-sm" id="btn-logout" type="button">Uitloggen</button>
     </div>
@@ -820,15 +898,30 @@
     <button type="button" class="btn btn-secondary btn-sm" id="btn-sync-now" style="display:none;">Nu synchroniseren</button>
   </div>
 
+  <!-- Twee niveaus (2026-09-23, op vraag van Peter: "ik vind dat er op de index te veel zaken
+       staan. Dan enkel de hoofdapps, projecten en bedrijfgegevens. Alles die van de afzonderlijke
+       app is komt in balkje eronder" + "Werfverslag - Planning - Dossier - Projecten -
+       Bedrijfsgegevens wil ik enkel zien") -- de hoofdbalk toont voortaan max. 5 knoppen (de
+       "hoofdapps" + Projecten + Bedrijfsgegevens), en Werfverslag/Verslagen/Actiepunten/Planning
+       (het projectplanning-tabblad, niet te verwarren met Personeelsplanning) zitten samen onder
+       de ene "Werfverslag"-hoofdknop, met hun eigen balkje eronder zodra die groep actief is --
+       zelfde visuele patroon als de bestaande .ip-subtabs bij Personeelsplanning. Dit past NIETS
+       aan de onderliggende .tab-section-routing of allowedTabs()-logica aan (zie switchTab()
+       hieronder in het script): enkel de knoppen zelf zijn herschikt/hernoemd, met dezelfde
+       data-tab-waarden als voorheen, dus toegangsbeperkingen (applyAccessRestrictions()) blijven
+       vanzelf correct werken. -->
   <nav class="tabs">
+    <button class="tab-btn nav-group-btn active" data-tab="verslag" type="button">Werfverslag</button>
+    <button class="tab-btn" data-tab="inzet" type="button">Planning</button>
+    <button class="tab-btn" data-tab="cados" type="button">Dossier</button>
+    <button class="tab-btn" data-tab="projecten" type="button">Projecten</button>
+    <button class="tab-btn" data-tab="bedrijf" type="button">Bedrijfsgegevens</button>
+  </nav>
+  <nav class="tabs-secondary" id="werf-subbar">
     <button class="tab-btn active" data-tab="verslag" type="button">Werfverslag</button>
     <button class="tab-btn" data-tab="verslagen" type="button">Verslagen</button>
     <button class="tab-btn" data-tab="actiepunten" type="button">Actiepunten</button>
     <button class="tab-btn" data-tab="planning" type="button">Planning</button>
-    <button class="tab-btn" data-tab="inzet" type="button">Personeelsplanning</button>
-    <button class="tab-btn" data-tab="projecten" type="button">Projecten &amp; SharePoint</button>
-    <button class="tab-btn" data-tab="bedrijf" type="button">Bedrijfsgegevens</button>
-    <button class="tab-btn" data-tab="cados" type="button">CaDos</button>
   </nav>
 
   <!-- ===================== TAB: WERFVERSLAG ===================== -->
@@ -1493,15 +1586,16 @@
        teal) zijn herleid naar CaSnap-blauw/-groen, zie de #cados-app-variabelen in de <style> hieronder. -->
   <section class="tab-section" id="tab-cados">
 
-    <section class="card">
+    <!-- Op vraag van Peter (2026-09-23): "we verliezen heel veel scherm door die balk om het
+         project te kiezen" -- de eigen projectkiezer die hier voorheen altijd stond (ook nog
+         boven een al geladen dossier) is vervangen door de ene centrale projectkeuze bovenaan in
+         de header (zie #global-project-picker). Deze kaart met hint blijft enkel staan/zichtbaar
+         zolang er nog GEEN project gekozen is -- zodra er wel één gekozen is, verdwijnt ze
+         volledig (zie refreshCadosTab()/loadCadosDossier() hieronder), zodat het dossier zelf
+         meteen alle beschikbare ruimte krijgt. -->
+    <section class="card" id="cados-project-hint-card">
       <h2>CaDos — Elektro &amp; Domotica</h2>
-      <div class="field">
-        <label id="cados-project-label" for="cados-project-select">Project</label>
-        <select id="cados-project-select">
-          <option value="">— kies een project —</option>
-        </select>
-      </div>
-      <p class="empty-hint" id="cados-project-hint">Kies hierboven een project om het CaDos-dossier van dat project te openen (of aan te maken als het nog niet bestaat).</p>
+      <p class="empty-hint" id="cados-project-hint">Kies bovenaan in de balk (naast "Uitloggen") een project om het CaDos-dossier van dat project te openen (of aan te maken als het nog niet bestaat).</p>
     </section>
 
     <div id="cados-app-wrap" style="display:none;">
@@ -1700,6 +1794,19 @@
 #cados-app .oplevering-voortgang-balk{width:100%;height:10px;background:var(--line-soft);border-radius:6px;overflow:hidden;}
 #cados-app .oplevering-voortgang-vulling{height:100%;background:var(--teal);transition:width .2s;}
 #cados-app .module-toggle-row input{width:auto;}
+/* Op vraag van Peter (2026-09-23): "in Cados is er nog wel een algemeen probleem met de layout"
+   -- ALLE tabellen in CaDos (class="grid", ~18 stuks: driverkast-overzicht, zekeringen,
+   verlichting, kringen, muziek, ...) stonden helemaal door elkaar, want CaSnap zelf heeft ook al
+   een (heel andere) klasse ".grid" (zie regel ~127: "display:grid;grid-template-columns:1fr 1fr"
+   -- een 2-koloms formuliergrid, niets met tabellen te maken). Omdat er voor CaDos's eigen
+   table.grid nergens een expliciete "display"-waarde stond, "won" CaSnap's ".grid{display:grid}"
+   gewoon (dezelfde specificiteit als de regels hieronder was niet het probleem, "display" werd
+   simpelweg nergens anders gezet) -- <table class="grid"><thead>...</thead><tbody>...</tbody></table>
+   werd zo als CSS-grid met 2 kolommen behandeld, met thead/tbody elk als 1 kolom naast elkaar i.p.v.
+   als normale tabel-rijen onder elkaar. Vandaar hier alsnog expliciet "display:table" (plus de
+   width/border-collapse die de oorspronkelijke standalone CaDos-tool hier ook had staan, maar die
+   bij het samenvoegen in CaSnap verloren was gegaan). */
+#cados-app table.grid{display:table;width:100%;border-collapse:collapse;}
 #cados-app table.grid th{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-faint);
   text-align:left;padding:8px 9px;border-bottom:1.5px solid var(--line);font-weight:700;}
 #cados-app table.grid td{padding:6px 9px;border-bottom:1px solid var(--line-soft);vertical-align:middle;}
@@ -2555,12 +2662,19 @@ function computeDriverCodes(){
   return codes;
 }
 
+// TABS-volgorde herzien (2026-09-23, op vraag van Peter, letterlijk):
+// "Rijgklemmen knop mag naast de zekeringen knop komen en voor driverkast. is direct met elkaar
+// verbonden." -> interlex verhuisd naar net na zekeringen, voor driverkast.
+// "Instellingen zou dan ook beter verhuizen naar de algemene project pagina" -> instellingen-tab
+// geschrapt (zie renderExportTab() hierboven; het overblijvende exportgedeelte kreeg een eigen
+// kleine tab "export", zie onderaan deze lijst).
+// "Werfverslagen mag samen met Oplevering helemaal naar achter verplaatst worden" -> beide samen
+// naar het einde van de lijst.
+// "Catalogus van drivers en armaturen hoeft niet in het project bewaard te zijn" -> armaturen/
+// driver-tabs geschrapt, zie de gedeelde Catalogus-knop in de CaSnap-header i.p.v. hier.
 const TABS = [
-  {grp:"Project", id:"instellingen", label:"Instellingen"},
-  // Nieuw (2026-09-22, later die dag, op vraag van Peter): overzicht van de gekoppelde
-  // werfverslagen (uit CaSnap zelf) van dit project, met een knop om er eentje te openen.
-  {grp:"Project", id:"werfverslagen", label:"Werfverslagen"},
   {grp:"Elektro", id:"zekeringen", label:"Zekeringen"},
+  {grp:"Elektro", id:"interlex", label:"Rijgklemmen", toggle:"interlex"},
   {grp:"Elektro", id:"driverkast", label:"Driverkast", toggle:"driverkast"},
   {grp:"Data & sturing", id:"data", label:"Data", toggle:"data"},
   {grp:"Data & sturing", id:"verlichting", label:"Verlichting 230V", toggle:"verlichting"},
@@ -2571,15 +2685,17 @@ const TABS = [
   {grp:"Beveiliging", id:"camerabewaking", label:"Camerabewaking", toggle:"camerabewaking"},
   {grp:"Project", id:"domotica-overzicht", label:"Domotica overzicht"},
   {grp:"Project", id:"ets-voorbereiding", label:"ETS voorbereiding"},
-  {grp:"Project", id:"oplevering", label:"Oplevering"},
   {grp:"Elektro", id:"laadpalen", label:"Laadpalen", toggle:"laadpalen"},
   {grp:"Elektro", id:"zonnepanelen", label:"Zonnepanelen", toggle:"zonnepanelen"},
   {grp:"Beveiliging", id:"toegangscontrole", label:"Toegangscontrole", toggle:"toegangscontrole"},
   {grp:"Beveiliging", id:"alarm", label:"Alarm", toggle:"alarm"},
-  {grp:"Domotica", id:"interlex", label:"Rijgklemmen", toggle:"interlex"},
-  {grp:"Catalogus", id:"armaturen", label:"Armaturen"},
-  {grp:"Catalogus", id:"driver", label:"Drivers"},
+  {grp:"Project", id:"export", label:"Export"},
+  {grp:"Project", id:"werfverslagen", label:"Werfverslagen"},
+  {grp:"Project", id:"oplevering", label:"Oplevering"},
 ];
+// Vaste, altijd-geldige eerste tab (nooit achter een toggle) -- gebruikt als veilige terugval
+// overal waar vroeger "instellingen" stond (die tab bestaat niet meer, zie hierboven).
+const DEFAULT_TAB = TABS[0].id;
 // Onderdelen die je per project kan aan/uitvinken op Instellingen — een
 // project dat enkel een zekeringkast nodig heeft, hoeft de rest niet te zien
 // of in te vullen. Zekeringen/Instellingen/de catalogi blijven altijd zichtbaar.
@@ -2655,9 +2771,21 @@ async function loadForProject(projectId){
     console.error('CaDos: dossier laden mislukt', e);
     toast('⚠️ Dossier laden mislukt -- controleer je internetverbinding');
   }
+  // Armaturen/drivers komen voortaan uit de gedeelde Catalogus i.p.v. uit het dossier van dit
+  // project zelf (2026-09-23, zie de toelichting bij het geschrapte renderArmaturen()/
+  // renderDriverCatalog() hierboven) -- overschrijft telkens vers bij het laden, zodat een
+  // wijziging in de Catalogus (via de CaSnap-header) meteen meekomt zodra je een project
+  // (her)opent. Bij een laadfout blijft gewoon de standaardlijst uit blankState() staan, zodat
+  // de Driverkast in elk geval bruikbaar blijft.
+  try{
+    if(window.dbListCatalogArmaturen) state.armaturen = await window.dbListCatalogArmaturen();
+    if(window.dbListCatalogDrivers) state.driver = await window.dbListCatalogDrivers();
+  }catch(e){
+    console.error('CaDos: gedeelde catalogus laden mislukt', e);
+  }
   buildNav();
   updateTopbar();
-  selectTab('instellingen');
+  selectTab(DEFAULT_TAB);
 }
 function migrate(s){
   // Zekeringkast: oudere versie was één vaste kast (s.zekeringen = {maat,
@@ -3270,37 +3398,23 @@ function exportVolledigDossier(){
   setTimeout(cleanup, 5000);
 }
 
-function renderInstellingen(){
-  const i = state.instellingen;
-  const wrap = el(`<div class="panel" id="panel-instellingen">
+// renderInstellingen() (2026-09-23, op vraag van Peter: "Instellingen zou dan ook beter
+// verhuizen naar de algemene project pagina van het bijhorende project") is opgesplitst:
+// basisvelden + module-toggles + Kamers/Verdiepingen zijn verhuisd naar een nieuw blokje op het
+// buitenste CaSnap-tabblad "Projecten" (zie renderCadosInstellingenBlock() in het buitenste
+// script, index.html) -- dat werkt rechtstreeks op het bewaarde dossier-JSON via
+// window.dbGetCadosDossier/dbSaveCadosDossier + window.CaDosApp.blankState/migrate, dus zonder
+// deze CaDos-IIFE's eigen `state` aan te raken. Enkel het "Volledig dossier"-exportgedeelte kan
+// niet mee verhuizen (hangt onlosmakelijk vast aan CaDos' eigen renderfuncties zoals
+// exportVolledigDossier/computeKringCodes/de .pe-page-opbouw hieronder) en blijft daarom hier
+// staan als een kleine, aparte tab "Export".
+function renderExportTab(){
+  const wrap = el(`<div class="panel" id="panel-export">
     <div class="panel-head">
-      <h2>Algemene projectgegevens</h2>
-      <p>Deze gegevens verschijnen bovenaan elk tabblad en op de afdruk.</p>
-    </div>
-    <div class="card"><div class="card-body">
-      <div class="field-grid" id="instFields"></div>
-    </div></div>
-    <div class="card">
-      <div class="card-head"><h3>Onderdelen van dit project</h3><span class="hint">enkel wat u aanvinkt, verschijnt als tabblad</span></div>
-      <div class="card-body">
-        <p class="hint" style="margin:0 0 10px;">Heeft dit project bijvoorbeeld enkel een zekeringkast nodig? Vink dan de rest gewoon uit — die tabbladen verdwijnen dan (met hun data intact) en hoeven niet ingevuld te worden. Later alsnog nodig? Gewoon terug aanvinken.</p>
-        <div id="moduleToggles" class="module-toggles"></div>
-      </div>
+      <h2>Volledig dossier exporteren</h2>
+      <p>Alle ingevulde tabbladen in één doorlopende export. Algemene projectgegevens, onderdelen, kamers en verdiepingen stel je in bij dit project op het tabblad "Projecten" van CaSnap.</p>
     </div>
     <div class="card">
-      <div class="card-head"><h3>Kamers</h3><span class="hint">gebruikt in de Ruimte-lijst van Driverkast</span></div>
-      <div class="card-body"><div id="kamersList"></div>
-        <button class="addbtn" id="addKamer">+ kamer toevoegen</button>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-head"><h3>Verdiepingen</h3><span class="hint">de omvang van het huis — gebruikt voor de ETS-adresindeling</span></div>
-      <div class="card-body"><div id="verdiepingenList"></div>
-        <button class="addbtn" id="addVerdieping">+ verdieping toevoegen</button>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-head"><h3>Volledig dossier</h3><span class="hint">alle ingevulde tabbladen in één PDF</span></div>
       <div class="card-body">
         <p class="hint" style="margin:0 0 10px;">Bundelt alle ingevulde tabbladen in één doorlopende export — lege tabbladen worden gewoon overgeslagen.</p>
         <button class="btn" id="exportVolledig">Exporteer alles (PDF)</button>
@@ -3368,95 +3482,10 @@ function renderInstellingen(){
     checklijstBox.querySelectorAll(".exp-lijst").forEach(cb=> cb.checked=true);
   });
   wrap.querySelector("#exportSelectie").addEventListener("click", ()=> exportMetSelectie(huidigeSelectie()));
-
-  const fields = [
-    ["project","Project"], ["adres","Adres"], ["klant","Klant"], ["contact","Contactpersoon"],
-    ["datum","Datum","date"], ["referentie","Referentie"], ["installateur","Installateur"],
-  ];
-  const fg = wrap.querySelector("#instFields");
-  fields.forEach(([key,label,type])=>{
-    const f = el(`<div class="field"><label>${label}</label>
-      <input type="${type||'text'}" value="${escapeHtml(i[key])}"></div>`);
-    f.querySelector("input").addEventListener("input", e=>{ i[key]=e.target.value; save(); });
-    fg.appendChild(f);
-  });
-
-  const spanField = el(`<div class="field"><label>Type spanning</label>
-    <select><option value="">—</option><option ${i.spanning==="Mono"?"selected":""}>Mono</option>
-    <option ${i.spanning==="3F"?"selected":""}>3F</option><option ${i.spanning==="3F+N"?"selected":""}>3F+N</option></select></div>`);
-  spanField.querySelector("select").addEventListener("change", e=>{ i.spanning=e.target.value; save(); });
-  fg.appendChild(spanField);
-
-  const opm = el(`<div class="field wide"><label>Opmerkingen</label><textarea rows="3">${escapeHtml(i.opmerkingen)}</textarea></div>`);
-  opm.querySelector("textarea").addEventListener("input", e=>{ i.opmerkingen=e.target.value; save(); });
-  fg.appendChild(opm);
-
-  renderKamers(wrap);
-  wrap.querySelector("#addKamer").addEventListener("click", ()=>{
-    state.kamers.push(""); save(); renderKamers(wrap);
-  });
-  renderVerdiepingen(wrap);
-  wrap.querySelector("#addVerdieping").addEventListener("click", ()=>{
-    state.verdiepingen.push({code:"", label:""}); save(); renderVerdiepingen(wrap);
-  });
   wrap.querySelector("#exportVolledig").addEventListener("click", exportVolledigDossier);
   wrap.querySelector("#exportExcel").addEventListener("click", exportAllesAlsExcel);
-  renderModuleToggles(wrap);
 
   return wrap;
-}
-function renderModuleToggles(wrap){
-  const box = wrap.querySelector("#moduleToggles");
-  box.innerHTML = "";
-  MODULE_TOGGLES.forEach(t=>{
-    const row = el(`<label class="module-toggle-row">
-      <input type="checkbox" ${state.modules[t.key]?"checked":""}>
-      <span>${escapeHtml(t.label)}</span>
-    </label>`);
-    row.querySelector("input").addEventListener("change", e=>{
-      state.modules[t.key] = e.target.checked;
-      save();
-      buildNav();
-      // Stond de gebruiker net op een tabblad dat nu verdwijnt, veilig
-      // terugvallen op Instellingen i.p.v. een onzichtbaar tabblad tonen.
-      if(!e.target.checked && currentTab===t.key) selectTab("instellingen");
-    });
-    box.appendChild(row);
-  });
-}
-function renderKamers(wrap){
-  const box = wrap.querySelector("#kamersList");
-  box.innerHTML="";
-  state.kamers.forEach((k,idx)=>{
-    const row = el(`<div style="display:flex;gap:8px;margin-bottom:6px;">
-      <input value="${escapeHtml(k)}" placeholder="Kamernaam">
-      <button class="rowdel" title="verwijderen">✕</button></div>`);
-    row.querySelector("input").addEventListener("input", e=>{ state.kamers[idx]=e.target.value; save(); refreshDriverkastDatalists(); });
-    row.querySelector("button").addEventListener("click", ()=>{ state.kamers.splice(idx,1); save(); renderKamers(wrap); refreshDriverkastDatalists(); });
-    box.appendChild(row);
-  });
-}
-function renderVerdiepingen(wrap){
-  const box = wrap.querySelector("#verdiepingenList");
-  box.innerHTML="";
-  state.verdiepingen.forEach((v,idx)=>{
-    const row = el(`<div style="display:flex;gap:8px;margin-bottom:6px;align-items:center;">
-      <input class="vd-code" value="${escapeHtml(v.code)}" placeholder="Code (bv. V1)" style="max-width:110px;">
-      <input class="vd-label" value="${escapeHtml(v.label)}" placeholder="Naam (bv. Verdieping 1)">
-      <button class="rb-up" title="omhoog">▲</button>
-      <button class="rb-down" title="omlaag">▼</button>
-      <button class="rowdel" title="verwijderen">✕</button></div>`);
-    row.querySelector(".vd-code").addEventListener("input", e=>{ v.code=e.target.value; save(); });
-    row.querySelector(".vd-label").addEventListener("input", e=>{ v.label=e.target.value; save(); });
-    row.querySelector(".rb-up").addEventListener("click", ()=>{
-      if(idx>0){ state.verdiepingen.splice(idx,1); state.verdiepingen.splice(idx-1,0,v); save(); renderVerdiepingen(wrap); }
-    });
-    row.querySelector(".rb-down").addEventListener("click", ()=>{
-      if(idx<state.verdiepingen.length-1){ state.verdiepingen.splice(idx,1); state.verdiepingen.splice(idx+1,0,v); save(); renderVerdiepingen(wrap); }
-    });
-    row.querySelector(".rowdel").addEventListener("click", ()=>{ state.verdiepingen.splice(idx,1); save(); renderVerdiepingen(wrap); });
-    box.appendChild(row);
-  });
 }
 
 /* =========================================================================
@@ -10610,79 +10639,18 @@ function countUsage(naam, categorie){
   });
   return n;
 }
-function renderArmaturen(){
-  const wrap = el(`<div class="panel" id="panel-armaturen">
-    <div class="panel-head"><h2>Catalogus — armaturen</h2><p>Wordt gebruikt als kies-lijst in de Driverkast. Zelf uit te breiden.</p></div>
-    <div class="card"><div class="card-body" style="padding:0;">
-      <table class="grid"><thead><tr><th>Omschrijving</th><th style="width:100px;">Wattage</th><th style="width:110px;">Info</th><th style="width:80px;">Gebruikt</th><th style="width:36px;"></th></tr></thead>
-      <tbody id="armBody"></tbody></table>
-    </div></div>
-    <button class="addbtn" id="armAdd">+ armatuur toevoegen</button>
-  </div>`);
-  const tbody = wrap.querySelector("#armBody");
-  function rebuild(){
-    tbody.innerHTML="";
-    state.armaturen.forEach((a,idx)=>{
-      const tr = el(`<tr>
-        <td><input value="${escapeHtml(a.naam)}"></td>
-        <td><input type="number" step="0.1" value="${escapeHtml(a.wattage)}"></td>
-        <td><input value="${escapeHtml(a.info)}" placeholder="bv. 350mA"></td>
-        <td class="computed">${countUsage(a.naam,"Armatuur")}×</td>
-        <td><button class="rowdel">✕</button></td>
-      </tr>`);
-      const [naamI,wattI,infoI] = tr.querySelectorAll("input");
-      naamI.addEventListener("input", e=>{a.naam=e.target.value; save(); refreshDriverkastDatalists();});
-      wattI.addEventListener("input", e=>{a.wattage=parseFloat(e.target.value)||0; save();});
-      infoI.addEventListener("input", e=>{a.info=e.target.value; save();});
-      tr.querySelector(".rowdel").addEventListener("click", ()=>{ state.armaturen.splice(idx,1); save(); rebuild(); refreshDriverkastDatalists(); });
-      tbody.appendChild(tr);
-    });
-  }
-  rebuild();
-  wrap.querySelector("#armAdd").addEventListener("click", ()=>{
-    state.armaturen.push({naam:"Nieuw armatuur",wattage:0,info:""}); save(); rebuild(); refreshDriverkastDatalists();
-  });
-  return wrap;
-}
-function renderDriverCatalog(){
-  const wrap = el(`<div class="panel" id="panel-driver">
-    <div class="panel-head"><h2>Catalogus — drivers</h2><p>Bepaalt welke driver automatisch voorgesteld wordt op basis van wattage, info en sturing.</p></div>
-    <div class="card"><div class="card-body" style="padding:0;overflow-x:auto;">
-      <table class="grid" style="min-width:760px;"><thead><tr><th>Driver</th><th style="width:80px;">Min W</th><th style="width:80px;">Max W</th><th style="width:100px;">Info</th><th style="width:90px;">Sturing</th><th style="width:80px;">Gebruikt</th><th style="width:36px;"></th></tr></thead>
-      <tbody id="drvBody"></tbody></table>
-    </div></div>
-    <button class="addbtn" id="drvAdd">+ driver toevoegen</button>
-  </div>`);
-  const tbody = wrap.querySelector("#drvBody");
-  function rebuild(){
-    tbody.innerHTML="";
-    state.driver.forEach((d,idx)=>{
-      const tr = el(`<tr>
-        <td><input value="${escapeHtml(d.naam)}"></td>
-        <td><input type="number" step="0.1" value="${escapeHtml(d.min)}"></td>
-        <td><input type="number" step="0.1" value="${escapeHtml(d.max)}"></td>
-        <td><input value="${escapeHtml(d.info)}"></td>
-        <td><select><option ${d.sturing==="DALI"?"selected":""}>DALI</option><option ${d.sturing==="PUSH"?"selected":""}>PUSH</option></select></td>
-        <td class="computed">${countUsage(d.naam,"Driver")}×</td>
-        <td><button class="rowdel">✕</button></td>
-      </tr>`);
-      const [naamI,minI,maxI,infoI] = tr.querySelectorAll("input");
-      const sturingSel = tr.querySelector("select");
-      naamI.addEventListener("input", e=>{d.naam=e.target.value; save();});
-      minI.addEventListener("input", e=>{d.min=parseFloat(e.target.value)||0; save();});
-      maxI.addEventListener("input", e=>{d.max=parseFloat(e.target.value)||0; save();});
-      infoI.addEventListener("input", e=>{d.info=e.target.value; save();});
-      sturingSel.addEventListener("change", e=>{d.sturing=e.target.value; save();});
-      tr.querySelector(".rowdel").addEventListener("click", ()=>{ state.driver.splice(idx,1); save(); rebuild(); });
-      tbody.appendChild(tr);
-    });
-  }
-  rebuild();
-  wrap.querySelector("#drvAdd").addEventListener("click", ()=>{
-    state.driver.push({naam:"Nieuwe driver",min:0,max:0,info:"",sturing:"DALI"}); save(); rebuild();
-  });
-  return wrap;
-}
+// renderArmaturen()/renderDriverCatalog() (de per-project Armaturen/Drivers-tabbladen) zijn
+// geschrapt (2026-09-23, op vraag van Peter: "Catalogus van drivers en armaturen hoeft niet in
+// het project bewaard te zijn, maar is beter een centraal punt... zodat wanneer deze zijn
+// aangemaakt in project A deze ook in B kunnen gebruikt worden") -- de armaturen/drivers-catalogus
+// is voortaan gedeeld over alle projecten via de nieuwe tabellen elektro_catalogus_armaturen/
+// elektro_catalogus_drivers, beheerd via de nieuwe "📚 Catalogus"-knop in de CaSnap-header (zie
+// renderCatalogusModal() in het buitenste script, index.html) i.p.v. hier per project. state.
+// armaturen/state.driver (hierboven, in blankState()/migrate()) blijven puur als *leesbare
+// kopie* bestaan -- loadForProject() hieronder overschrijft ze telkens vers met de gedeelde
+// catalogus (via window.dbListCatalogArmaturen/dbListCatalogDrivers) zodra een project geladen
+// wordt, zodat de bestaande lookups (armatuurLookup/driverLookup/datalists) ongewijzigd verder
+// werken.
 
 /* =========================================================================
    NAV / BOOT
@@ -10741,7 +10709,7 @@ function renderWerfverslagenTab(){
 }
 
 const RENDERERS = {
-  instellingen: renderInstellingen,
+  export: renderExportTab,
   werfverslagen: renderWerfverslagenTab,
   zekeringen: renderZekeringen,
   driverkast: renderDriverkast,
@@ -10760,19 +10728,18 @@ const RENDERERS = {
   toegangscontrole: ()=>renderSimpleList({id:"toegangscontrole",title:"Toegangscontrole",desc:"Vaste nummering (T-reeks).",codes:TOEGANG_CODES,placeholder:"bv. Voordeur badge-lezer",nextCode:(n)=> (n+1)+"T"}),
   alarm: renderAlarmTab,
   interlex: renderRijgklemmen,
-  armaturen: renderArmaturen,
-  driver: renderDriverCatalog,
 };
 
+// Op vraag van Peter (2026-09-23): "de tussentitels op de hoofdbalk: Project, Elektro, data &
+// Sturing, beveiliging, ... mogen weg, hebben geen meerwaarde en maken de balk alleen maar
+// drukker" -- de kleine hoofdletter-labeltjes (.grp-label) die hier voorheen vóór elke nieuwe
+// groep (t.grp) werden ingevoegd, zijn geschrapt. t.grp zelf (op elk TABS-item hierboven) blijft
+// gewoon bestaan -- puur intern nog gebruikt om de tabs zelf in een logische volgorde te
+// groeperen, niet meer om iets te tonen.
 function buildNav(){
   const nav = document.getElementById("tabbar");
   nav.innerHTML = "";
-  let lastGrp=null;
   TABS.filter(t=> !t.toggle || state.modules[t.toggle]).forEach(t=>{
-    if(t.grp!==lastGrp){
-      nav.appendChild(el(`<span class="grp-label">${t.grp}</span>`));
-      lastGrp=t.grp;
-    }
     const btn = el(`<button data-id="${t.id}">${t.label}</button>`);
     btn.addEventListener("click", ()=>selectTab(t.id));
     nav.appendChild(btn);
@@ -10857,12 +10824,19 @@ function selectTab(id){
 }
 
 document.getElementById("btnPrint").addEventListener("click", ()=>window.print());
-document.getElementById("btnNew").addEventListener("click", ()=>{
+document.getElementById("btnNew").addEventListener("click", async ()=>{
   if(!currentProjectId){ toast('Kies eerst een project.'); return; }
   if(confirm("Het CaDos-dossier van dit project volledig leegmaken? Dit kan niet ongedaan gemaakt worden.")){
     state = blankState();
+    // Zie loadForProject() hierboven: armaturen/driver komen uit de gedeelde Catalogus, niet uit
+    // de (nu weer lege) standaardlijst van blankState().
+    try{
+      if(window.dbListCatalogArmaturen) state.armaturen = await window.dbListCatalogArmaturen();
+      if(window.dbListCatalogDrivers) state.driver = await window.dbListCatalogDrivers();
+    }catch(e){ console.error('CaDos: gedeelde catalogus laden mislukt', e); }
     save();
-    selectTab(currentTab||"instellingen");
+    buildNav();
+    selectTab(DEFAULT_TAB);
     toast("Dossier leeggemaakt");
   }
 });
@@ -10908,13 +10882,22 @@ document.getElementById("fileImport").addEventListener("change", (e)=>{
       let raw = reader.result;
       if(typeof raw === "string" && raw.charCodeAt(0) === 0xFEFF) raw = raw.slice(1);
       const parsed = JSON.parse(raw);
-      state = Object.assign(blankState(), parsed);
+      // migrate() erbij (2026-09-23, op vraag van Peter: import van een echte oude standalone-
+      // CaDos-projectfiche gaf nog steeds een leesfout, ook na de BOM-fix hierboven) -- een écht
+      // oud bestand gebruikt nog het vroegere datamodel (bv. zekeringen = {maat, rijen, ...}
+      // i.p.v. het huidige zekeringen = {kasten:[...]}). Zonder migrate() overschrijft
+      // Object.assign() zo'n veld gewoon met de oude vorm, en crasht het scherm zodra het
+      // probeert te tekenen -- wat via deze try/catch dezelfde (misleidende) "kon niet lezen"-
+      // melding gaf, ook al was het bestand zelf perfect geldige JSON. loadForProject() hierboven
+      // riep migrate() altijd al aan; de import deed dat nooit.
+      state = migrate(Object.assign(blankState(), parsed));
       save();
-      selectTab(currentTab||"instellingen");
+      buildNav();
+      selectTab(currentTab||DEFAULT_TAB);
       toast("Project geïmporteerd");
     }catch(err){
       console.error("CaDos: projectfiche-JSON kon niet gelezen worden", err);
-      alert("Kon dit bestand niet lezen als projectfiche-JSON.");
+      alert("Kon dit bestand niet lezen als projectfiche-JSON. (Technische foutmelding staat in de browserconsole.)");
     }
   };
   reader.readAsText(file);
@@ -11060,14 +11043,26 @@ function wireGlobalSearch(){
 
 buildNav();
 updateTopbar();
-selectTab("instellingen");
+selectTab(DEFAULT_TAB);
 wireGlobalSearch();
 
 // Toegangspunt voor het buitenste CaSnap-script (zie de "CaDos"-tab / project-kiezer in
 // index.html) -- 2026-09-22, samenvoeging CaDos in CaSnap.
+// blankState/migrate/MODULE_TOGGLES erbij (2026-09-23, op vraag van Peter: "Instellingen zou dan
+// ook beter verhuizen naar de algemene project pagina van het bijhorende project") -- het nieuwe
+// Projecten-tabblad-blokje (renderCadosInstellingenBlock() in het buitenste script) heeft deze
+// nodig om een dossier veilig in te laden/aan te vullen (blankState + migrate) en dezelfde
+// onderdelen-lijst te tonen als CaDos zelf, ZONDER deze CaDos-IIFE's eigen singleton `state`/
+// `currentProjectId` aan te raken -- dat blokje werkt op zijn eigen, aparte kopie van het
+// dossier-JSON (rechtstreeks via window.dbGetCadosDossier/dbSaveCadosDossier), dus er is geen
+// risico dat het per ongeluk het project overschrijft dat op dit moment in het CaDos-tabblad zelf
+// open staat (die twee kunnen best een ander project zijn).
 window.CaDosApp = {
   loadForProject,
-  hasProjectLoaded: () => !!currentProjectId
+  hasProjectLoaded: () => !!currentProjectId,
+  blankState,
+  migrate,
+  MODULE_TOGGLES
 };
 
 })();
@@ -11197,6 +11192,38 @@ window.CaDosApp = {
   </div>
 </div>
 
+<!-- Gedeelde Catalogus: armaturen/drivers (2026-09-23, op vraag van Peter, zie
+     openCatalogusModal() verderop in dit script) -->
+<div class="modal-overlay" id="catalogus-modal" style="display:none;">
+  <div class="modal-box" style="max-width:860px;">
+    <h2>📚 Catalogus — armaturen &amp; drivers</h2>
+    <p class="hint">Gedeeld over alle projecten: wat je hier toevoegt of aanpast, kies je meteen ook in de Driverkast van elk project.</p>
+    <p class="hint" id="catalogus-migrate-hint" style="display:none;font-weight:600;"></p>
+    <div class="catalogus-tabs">
+      <button type="button" class="catalogus-tab-btn active" data-sub="armaturen">Armaturen</button>
+      <button type="button" class="catalogus-tab-btn" data-sub="drivers">Drivers</button>
+    </div>
+    <div id="catalogus-armaturen-sub" style="max-height:52vh;overflow-y:auto;">
+      <table class="verslagen-table catalog-table">
+        <thead><tr><th>Omschrijving</th><th style="width:110px;">Wattage</th><th style="width:160px;">Info</th><th style="width:44px;"></th></tr></thead>
+        <tbody id="catalogus-arm-body"></tbody>
+      </table>
+      <button class="add-item-btn" id="catalogus-arm-add" type="button">+ armatuur toevoegen</button>
+    </div>
+    <div id="catalogus-drivers-sub" style="display:none;max-height:52vh;overflow-y:auto;">
+      <table class="verslagen-table catalog-table">
+        <thead><tr><th>Driver</th><th style="width:90px;">Min W</th><th style="width:90px;">Max W</th><th style="width:140px;">Info</th><th style="width:110px;">Sturing</th><th style="width:44px;"></th></tr></thead>
+        <tbody id="catalogus-drv-body"></tbody>
+      </table>
+      <button class="add-item-btn" id="catalogus-drv-add" type="button">+ driver toevoegen</button>
+    </div>
+    <div class="modal-actions" style="justify-content:space-between;">
+      <button class="btn btn-ghost btn-sm" id="catalogus-resync" type="button">🔄 Opnieuw samenvoegen vanuit projecten</button>
+      <button class="btn btn-ghost" id="catalogus-close" type="button">Sluiten</button>
+    </div>
+  </div>
+</div>
+
 <div class="status-msg" id="status-msg"></div>
 
 <script>
@@ -11239,6 +11266,12 @@ window.CaDosApp = {
   // vraag als hierboven): CaDos toont ook deze twee gedeelde tabbladen, zelfde patroon als Werf/
   // Planning, maar nooit een knop naar de andere losse apps.
   const CADOS_TABS = ['cados', 'projecten', 'bedrijf'];
+  // De 4 tabbladen die samen onder de "Werfverslag"-hoofdknop in de tabbalk zitten (2026-09-23,
+  // zie de nav.tabs/.tabs-secondary-toelichting bij de HTML hierboven) -- gebruikt door
+  // switchTab() om (a) de hoofdknop "actief" te tonen zolang je op één van deze 4 zit, en (b) het
+  // onderbalkje (#werf-subbar) enkel dán te tonen. Raakt niet aan ALL_TABS/WERF_TABS/enz.
+  // hierboven, dat blijft de (ongewijzigde) bron van waarheid voor toegang/zichtbaarheid.
+  const WERF_GROUP_TABS = ['verslag', 'verslagen', 'actiepunten', 'planning'];
   function tabsForAppMode(){
     if(APP_MODE === 'planning') return PLANNING_TABS;
     if(APP_MODE === 'werf') return WERF_TABS;
@@ -11281,6 +11314,14 @@ window.CaDosApp = {
     projects: [],
     nextProjectId: 1,
     activeProjectId: null,
+    // Eén centrale projectkeuze bovenaan in de header (2026-09-23, op vraag van Peter: "Kunnen we
+    // project niet bovenaan kiezen die dan voor alles telt (uitgezonderd planning)?"), i.p.v. de
+    // grote, ruimte-innemende projectbalk die voorheen los bovenaan het Dossier(CaDos)-tabblad
+    // stond. Stuurt: (a) welk CaDos-dossier op het Dossier-tabblad geladen is, en (b) het
+    // vooringevulde project bij het starten van een NIEUW werfverslag (blijft daar gewoon
+    // aanpasbaar). Raakt bewust NIET aan de eigen "alle projecten"-filters van Verslagen/
+    // Actiepunten (die tonen net vaak meerdere projecten tegelijk) en niet aan Personeelsplanning.
+    globalProjectId: null,
     currentVerslagId: null,
     standVanZaken: [], // "Stand van zaken per vakgebied" -- {vakgebied, tekst}, zie ArchiSnapper-voorbeeldverslag (2026-08-21)
     verslagenList: [],
@@ -11310,7 +11351,13 @@ window.CaDosApp = {
       // Inschatting: voor wie is deze inschatting? (2026-09-23, op vraag van Peter: "bovenaan alle
       // collega's met vinkje voor wie deze inschatting is") -- namen van de aangevinkte collega's,
       // zie renderIpInschattingColleagues()/ipToggleInschattingDag() hieronder.
-      inschatColleagues: new Set()
+      inschatColleagues: new Set(),
+      // "Vastpinnen om te verplaatsen" / "kopiëren" vanuit het rooster zelf (2026-09-23, op vraag
+      // van Peter: "bij de planning graag het pin icoon of kopieer icoon zichtbaar maken wanneer
+      // je op een ingeplande afspraak gaat staan") -- {entryId, mode:'pin'|'copy'} zolang er op
+      // een 📌/📋-icoontje geklikt is en er nog op een doelvakje geklikt moet worden, anders null.
+      // Zie ipCellInner() (icoontjes per afspraak) en de click-afhandeling op #ip-grid hieronder.
+      pendingAction: null
     },
     offlineQueue: [],
     verslagType: 'werf', // 'werf' | 'telefoon' -- zie de verslagtype-toggle bovenaan het formulier
@@ -11697,6 +11744,114 @@ window.CaDosApp = {
   // aanroepen zonder dat er iets van CaDos zelf hoeft te veranderen.
   window.dbGetCadosDossier = dbGetCadosDossier;
   window.dbSaveCadosDossier = dbSaveCadosDossier;
+
+  // ===== Gedeelde Catalogus: armaturen/drivers (2026-09-23) =====
+  // Op vraag van Peter: "Catalogus van drivers en armaturen hoeft niet in het project bewaard te
+  // zijn, maar is beter een centraal punt. Zodat wanneer deze zijn aangemaakt in project A deze
+  // ook in B kunnen gebruikt worden." -- 2 nieuwe, gedeelde tabellen (elektro_catalogus_armaturen/
+  // elektro_catalogus_drivers, zie de SQL-migratie in casentis-todo-en-ai-voorstellen.md) i.p.v.
+  // de vroegere per-project armaturen/driver-lijst in het CaDos-dossier zelf. Op window gezet om
+  // dezelfde reden als dbGetCadosDossier/dbSaveCadosDossier hierboven: het CaDos-IIFE heeft
+  // dbListCatalogArmaturen/dbListCatalogDrivers nodig (zie loadForProject() daar), en de nieuwe
+  // "📚 Catalogus"-knop hieronder in dit script gebruikt alle acht.
+  // Eenmalige samenvoeging (2026-09-23, expliciete keuze van Peter via een AskUserQuestion:
+  // "Alles nu samenvoegen in de nieuwe Catalogus", i.p.v. de optie om bestaande per-project
+  // gegevens gewoon te laten staan) -- leest ALLE project_elektro_dossiers-rijen, haalt hun
+  // (voorheen per-project) armaturen/driver-lijst eruit, en voegt ze -- ontdubbeld op naam,
+  // hoofdletterongevoelig -- samen in de nieuwe gedeelde tabellen.
+  async function migreerArmaturenDriversNaarCatalogus(){
+    const { data: dossiers, error } = await sb.from('project_elektro_dossiers').select('data');
+    if(error) throw error;
+    const armatenByNaam = new Map();
+    const driversByNaam = new Map();
+    (dossiers || []).forEach(row => {
+      const d = row.data || {};
+      (Array.isArray(d.armaturen) ? d.armaturen : []).forEach(a => {
+        const naam = ((a && a.naam) || '').trim();
+        if(!naam || armatenByNaam.has(naam.toLowerCase())) return;
+        armatenByNaam.set(naam.toLowerCase(), { naam, wattage: a.wattage || 0, info: a.info || '' });
+      });
+      (Array.isArray(d.driver) ? d.driver : []).forEach(dr => {
+        const naam = ((dr && dr.naam) || '').trim();
+        if(!naam || driversByNaam.has(naam.toLowerCase())) return;
+        driversByNaam.set(naam.toLowerCase(), { naam, min: dr.min || 0, max: dr.max || 0, sturing: dr.sturing || 'DALI', info: dr.info || '' });
+      });
+    });
+    for(const row of armatenByNaam.values()){
+      const { error: e1 } = await sb.from('elektro_catalogus_armaturen').upsert(row, { onConflict: 'naam' });
+      if(e1) throw e1;
+    }
+    for(const row of driversByNaam.values()){
+      const { error: e2 } = await sb.from('elektro_catalogus_drivers').upsert(row, { onConflict: 'naam' });
+      if(e2) throw e2;
+    }
+    return { armaturen: armatenByNaam.size, drivers: driversByNaam.size };
+  }
+  // Draagt de eenmalige samenvoeging hierboven automatisch bij het EERSTE contact met de
+  // Catalogus, van welke kant dan ook (CaDos zelf via loadForProject(), of de Catalogus-modal
+  // hieronder) -- zonder dit zou een project dat je opent VOORDAT je ooit de Catalogus-knop
+  // aanklikte, een lege armaturen/drivers-lijst te zien krijgen (de gedeelde tabellen bestaan dan
+  // nog, maar zijn nog leeg). __catalogMigratiePromise zorgt dat dit maar 1x werkelijk draait,
+  // ook als loadForProject() en de Catalogus-modal het min of meer tegelijk aanroepen.
+  let __catalogMigratiePromise = null;
+  let __catalogMigratieResultaat = null;
+  function ensureCatalogusGemigreerd(){
+    if(!__catalogMigratiePromise){
+      __catalogMigratiePromise = (async () => {
+        try{
+          const [a, d] = await Promise.all([
+            sb.from('elektro_catalogus_armaturen').select('id'),
+            sb.from('elektro_catalogus_drivers').select('id')
+          ]);
+          if((a.data || []).length === 0 && (d.data || []).length === 0){
+            __catalogMigratieResultaat = await migreerArmaturenDriversNaarCatalogus();
+          }
+        }catch(e){ console.error('Catalogus: automatische samenvoeging mislukt', e); }
+      })();
+    }
+    return __catalogMigratiePromise;
+  }
+  async function dbListCatalogArmaturen(){
+    await ensureCatalogusGemigreerd();
+    const { data, error } = await sb.from('elektro_catalogus_armaturen').select('*').order('naam', { ascending: true });
+    if(error) throw error;
+    return data || [];
+  }
+  async function dbAddCatalogArmatuur(fields){
+    const { data, error } = await sb.from('elektro_catalogus_armaturen').insert(fields).select().single();
+    if(error) throw error;
+    return data;
+  }
+  async function dbUpdateCatalogArmatuur(id, fields){
+    const { error } = await sb.from('elektro_catalogus_armaturen').update(fields).eq('id', id);
+    if(error) throw error;
+  }
+  async function dbDeleteCatalogArmatuur(id){
+    const { error } = await sb.from('elektro_catalogus_armaturen').delete().eq('id', id);
+    if(error) throw error;
+  }
+  async function dbListCatalogDrivers(){
+    await ensureCatalogusGemigreerd();
+    const { data, error } = await sb.from('elektro_catalogus_drivers').select('*').order('naam', { ascending: true });
+    if(error) throw error;
+    return data || [];
+  }
+  async function dbAddCatalogDriver(fields){
+    const { data, error } = await sb.from('elektro_catalogus_drivers').insert(fields).select().single();
+    if(error) throw error;
+    return data;
+  }
+  async function dbUpdateCatalogDriver(id, fields){
+    const { error } = await sb.from('elektro_catalogus_drivers').update(fields).eq('id', id);
+    if(error) throw error;
+  }
+  async function dbDeleteCatalogDriver(id){
+    const { error } = await sb.from('elektro_catalogus_drivers').delete().eq('id', id);
+    if(error) throw error;
+  }
+  window.dbListCatalogArmaturen = dbListCatalogArmaturen;
+  window.dbListCatalogDrivers = dbListCatalogDrivers;
+
   // Nieuw (2026-09-22, later die dag): het CaDos-tabblad "Werfverslagen" toont de gekoppelde
   // werfverslagen van het geopende project en laat je er eentje openen (springt dan naar het
   // gewone Werfverslag-tabblad, precies zoals "Openen" op de Verslagen-lijst). Bestaande
@@ -12156,6 +12311,15 @@ window.CaDosApp = {
     const isPlanner = !!(state.currentPerson && state.currentPerson.is_planner);
     const confirmTabBtn = el('ip-subtab-bevestigen');
     if(confirmTabBtn) confirmTabBtn.style.display = isPlanner ? '' : 'none';
+    // De centrale projectkeuze in de header heeft enkel nut als er ook een tabblad bereikbaar is
+    // dat er iets mee doet (Dossier/Werfverslag) -- bv. in de losse Planning-app (planning.html)
+    // of voor een "enkel planning"-persoon is ze zinloos, dus dan verbergen.
+    const projectPicker = el('global-project-picker');
+    if(projectPicker) projectPicker.style.display = (allowed.includes('cados') || allowed.includes('verslag')) ? '' : 'none';
+    // Catalogus-knop (2026-09-23): relevant zodra CaDos zelf (Driverkast) of de Projecten-pagina
+    // (het nieuwe CaDos-instellingen-blokje) bereikbaar is.
+    const catalogusBtn = el('btn-catalogus');
+    if(catalogusBtn) catalogusBtn.style.display = (allowed.includes('cados') || allowed.includes('projecten')) ? '' : 'none';
 
     // Randgeval: iemand met "enkel planning"-toegang die per ongeluk (of via een gedeelde link)
     // de Werf-app opent, of omgekeerd -- de doorsnede is dan leeg. Duidelijke melding i.p.v. een
@@ -12216,57 +12380,61 @@ window.CaDosApp = {
     btn.addEventListener('click', () => switchTab(btn.dataset.tab));
   });
 
-  // ---------- CaDos-tabblad (samengevoegd 2026-09-22): projectkiezer boven het gewrapte
-  // CaDos-paneel. Zelfde "kies een actief project"-patroon als elders (bv. Inschatting), maar
-  // hier bepaalt de keuze meteen WELK dossier het gewrapte CaDos-script laadt (window.CaDosApp,
-  // zie het IIFE in de tab-sectie zelf). ----------
-  let cadosCurrentProjectId = '';
-  function renderCadosProjectSelect(){
-    const sel = el('cados-project-select');
+  // ---------- Eén centrale projectkeuze bovenaan in de header (2026-09-23) ----------
+  // Vervangt de vroegere, aparte "kies een project"-balk die enkel boven het Dossier(CaDos)-
+  // tabblad stond (zie de toelichting bij state.globalProjectId hierboven). Stuurt nu WELK
+  // CaDos-dossier het gewrapte CaDos-script laadt (window.CaDosApp, zie het IIFE in de
+  // tab-sectie zelf) én het vooringevulde project bij "Nieuw verslag" (zie btn-new-verslag
+  // hieronder in dit bestand).
+  function renderGlobalProjectPicker(){
+    const sel = el('global-project-select');
     const current = sel.value;
-    sel.innerHTML = '<option value="">— kies een project —</option>' +
-      state.projects.filter(p => p.id && p.actief !== false)
+    sel.innerHTML = '<option value="">— geen project gekozen —</option>' +
+      state.projects.filter(p => p.id && (p.actief !== false || p.id === state.globalProjectId))
         .slice().sort((a, b) => (a.naam || '').localeCompare(b.naam || ''))
         .map(p => `<option value="${p.id}">${escapeHtml(p.naam || '(naamloos)')}</option>`).join('');
-    if(Array.from(sel.options).some(o => o.value === current)) sel.value = current;
+    sel.value = (state.globalProjectId && Array.from(sel.options).some(o => o.value === state.globalProjectId))
+      ? state.globalProjectId : current;
   }
-  function refreshCadosTab(){
-    renderCadosProjectSelect();
-    const sel = el('cados-project-select');
-    const hint = el('cados-project-hint');
-    const wrap = el('cados-app-wrap');
-    if(sel.value){
-      wrap.style.display = '';
-      hint.style.display = 'none';
-    } else {
-      wrap.style.display = 'none';
-      hint.style.display = '';
-      hint.textContent = 'Kies hierboven een project om het CaDos-dossier van dat project te openen (of aan te maken als het nog niet bestaat).';
-    }
-  }
-  el('cados-project-select').addEventListener('change', async (e) => {
-    const projectId = e.target.value;
+  el('global-project-select').addEventListener('change', (e) => {
+    state.globalProjectId = e.target.value || null;
+    const activeSection = document.querySelector('.tab-section.active');
+    const activeTab = activeSection ? activeSection.id.replace('tab-', '') : '';
+    if(activeTab === 'cados') loadCadosDossier(state.globalProjectId || '');
+  });
+
+  // ---------- Dossier(CaDos)-tabblad (samengevoegd 2026-09-22) ----------
+  let cadosCurrentProjectId = '';
+  let cadosLoadToken = 0; // voorkomt een race als iemand snel na elkaar van project wisselt
+  async function loadCadosDossier(projectId){
     cadosCurrentProjectId = projectId;
-    const wrap = el('cados-app-wrap');
+    const myToken = ++cadosLoadToken;
+    const card = el('cados-project-hint-card');
     const hint = el('cados-project-hint');
+    const wrap = el('cados-app-wrap');
     if(!projectId){
+      card.style.display = '';
       wrap.style.display = 'none';
-      hint.style.display = '';
-      hint.textContent = 'Kies hierboven een project om het CaDos-dossier van dat project te openen (of aan te maken als het nog niet bestaat).';
+      hint.textContent = 'Kies bovenaan in de balk (naast "Uitloggen") een project om het CaDos-dossier van dat project te openen (of aan te maken als het nog niet bestaat).';
       return;
     }
-    hint.style.display = '';
+    card.style.display = '';
     hint.textContent = 'Dossier laden…';
     wrap.style.display = 'none';
     if(window.CaDosApp && window.CaDosApp.loadForProject){
       await window.CaDosApp.loadForProject(projectId);
     }
     // Nog steeds hetzelfde project gekozen? (voorkomt een race als iemand snel na elkaar wisselt)
-    if(el('cados-project-select').value === projectId){
-      hint.style.display = 'none';
+    if(myToken === cadosLoadToken && (state.globalProjectId || '') === projectId){
+      card.style.display = 'none';
       wrap.style.display = '';
     }
-  });
+  }
+  function refreshCadosTab(){
+    const projectId = state.globalProjectId || '';
+    if(projectId === cadosCurrentProjectId) return; // al geladen (of al leeg), niets te doen
+    loadCadosDossier(projectId);
+  }
 
   function switchTab(tab){
     // Extra veiligheid boven op het verbergen van de tabknoppen zelf (applyAccessRestrictions()) --
@@ -12275,8 +12443,20 @@ window.CaDosApp = {
     const allowed = allowedTabs();
     if(!allowed.includes(tab)) tab = allowed[0];
     if(!tab) return; // geen enkel tabblad toegelaten -- zie #no-access-screen (applyAccessRestrictions())
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+    // De hoofdknop "Werfverslag" (.nav-group-btn, data-tab="verslag") moet ook "actief" ogen
+    // zolang je op één van de 4 tabbladen uit die groep zit (WERF_GROUP_TABS hierboven), niet
+    // enkel op het letterlijke "verslag"-tabblad zelf -- alle andere tab-knoppen (inclusief de
+    // "Werfverslag"-knop IN het onderbalkje zelf) blijven gewoon op letterlijke match werken.
+    document.querySelectorAll('.tab-btn').forEach(b => {
+      const isGroupBtn = b.classList.contains('nav-group-btn') && b.dataset.tab === 'verslag';
+      b.classList.toggle('active', isGroupBtn ? WERF_GROUP_TABS.includes(tab) : b.dataset.tab === tab);
+    });
     document.querySelectorAll('.tab-section').forEach(s => s.classList.toggle('active', s.id === 'tab-' + tab));
+    // Onderbalkje (#werf-subbar) enkel tonen als je op één van de 4 Werfverslag-groepstabbladen
+    // zit -- op alle andere tabbladen (Planning/Dossier/Projecten/Bedrijfsgegevens) staat er niets
+    // in dat balkje dat relevant is, dus dan weg (2026-09-23).
+    const werfSubbar = el('werf-subbar');
+    if(werfSubbar) werfSubbar.style.display = WERF_GROUP_TABS.includes(tab) ? '' : 'none';
     // 'cados' krijgt dezelfde volle-breedte-behandeling als 'inzet' (2026-09-22): CaDos heeft
     // zelf meerkolommige tabellen/paneellayouts die weinig hebben aan de smalle 860px-cap die voor
     // het werfverslag-formulier bedoeld is.
@@ -13124,6 +13304,12 @@ window.CaDosApp = {
             <div class="contact-rows"></div>
             <button type="button" class="btn btn-ghost btn-sm p-contact-add">+ Contactpersoon toevoegen</button>
           </div>
+          ${p.id ? `
+          <div class="field cados-inst-block">
+            <label>⚡ CaDos — projectinstellingen <span class="hint">(basisgegevens, onderdelen, kamers &amp; verdiepingen van het Elektro/Domotica-dossier van dit project)</span></label>
+            <div class="cados-inst-body"><p class="hint">Laden…</p></div>
+          </div>
+          ` : ''}
           <div class="row-actions">
             <button type="button" class="btn btn-ghost btn-sm p-remove">Verwijderen</button>
             <button type="button" class="btn btn-secondary btn-sm p-save">Opslaan</button>
@@ -13190,6 +13376,11 @@ window.CaDosApp = {
             });
             pinInput.addEventListener('keydown', e => { if(e.key === 'Enter') pinAddBtn.click(); });
           }
+
+          // CaDos-instellingen-blokje (2026-09-23, zie renderCadosInstellingenBlock() verderop in
+          // dit script) -- enkel voor al-opgeslagen projecten (heeft een project_id nodig).
+          const instBox = row.querySelector('.cados-inst-body');
+          if(instBox) renderCadosInstellingenBlock(instBox, p.id);
         }
 
         row.querySelector('.p-naam').value = p.naam;
@@ -13290,6 +13481,260 @@ window.CaDosApp = {
     renderActiveProjectDropdown();
     renderSharePointBanner();
     renderVListProjectFilter();
+  }
+
+  // ===================== CaDos-instellingen op de Projecten-pagina (2026-09-23) =====================
+  // Op vraag van Peter: "Instellingen zou dan ook beter verhuizen naar de algemene project pagina
+  // van het bijhorende project." Dit blokje werkt rechtstreeks op het bewaarde CaDos-dossier-JSON
+  // van dit project via window.dbGetCadosDossier/dbSaveCadosDossier + window.CaDosApp.blankState/
+  // migrate -- BEWUST zonder het CaDos-IIFE zelf (window.CaDosApp.loadForProject) aan te spreken,
+  // want dat zou diens eigen singleton `state`/`currentProjectId` overschrijven, wat het CaDos-
+  // tabblad (gestuurd door de aparte, globale projectkiezer bovenaan de header) in de war kan
+  // sturen als het toevallig een ANDER project toont dan het project dat je hier op de
+  // Projecten-pagina aan het uitklappen bent. Bewaart gedebouncet (700ms), net als CaDos zelf.
+  async function renderCadosInstellingenBlock(container, projectId){
+    container.innerHTML = '<p class="hint">Laden…</p>';
+    if(!window.CaDosApp || !window.CaDosApp.blankState || !window.CaDosApp.migrate){
+      container.innerHTML = '<p class="hint">CaDos-module nog niet geladen.</p>';
+      return;
+    }
+    let dossier;
+    try{
+      const row = await window.dbGetCadosDossier(projectId);
+      const parsed = (row && row.data) ? row.data : {};
+      dossier = window.CaDosApp.migrate(Object.assign(window.CaDosApp.blankState(), parsed));
+    }catch(err){
+      container.innerHTML = '<p class="hint">Kon CaDos-instellingen niet laden: ' + escapeHtml(err.message || String(err)) + '</p>';
+      return;
+    }
+
+    let saveTimer = null;
+    function scheduleSave(){
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => {
+        window.dbSaveCadosDossier(projectId, dossier).catch(err => {
+          console.error('CaDos-instellingen bewaren mislukt', err);
+          showStatus('⚠️ CaDos-instellingen bewaren mislukt');
+        });
+      }, 700);
+    }
+
+    const i = dossier.instellingen;
+    const fields = [
+      ['project', 'Project'], ['adres', 'Adres'], ['klant', 'Klant'], ['contact', 'Contactpersoon'],
+      ['datum', 'Datum', 'date'], ['referentie', 'Referentie'], ['installateur', 'Installateur'],
+    ];
+    container.innerHTML = `
+      <div class="grid cados-inst-fields">
+        ${fields.map(([key, label, type]) => `<div class="field"><label>${escapeHtml(label)}</label><input type="${type || 'text'}" class="ci-f" data-key="${key}"></div>`).join('')}
+        <div class="field"><label>Type spanning</label>
+          <select class="ci-spanning"><option value="">—</option><option value="Mono">Mono</option><option value="3F">3F</option><option value="3F+N">3F+N</option></select>
+        </div>
+      </div>
+      <div class="field"><label>Opmerkingen</label><textarea class="ci-opmerkingen" rows="2"></textarea></div>
+      <div class="cados-inst-sub">
+        <h4>Onderdelen van dit project <span class="hint">— enkel wat aangevinkt is, verschijnt als tabblad in CaDos</span></h4>
+        <div class="cados-inst-toggles"></div>
+      </div>
+      <div class="cados-inst-sub">
+        <h4>Kamers <span class="hint">— gebruikt in de Ruimte-lijst van Driverkast</span></h4>
+        <div class="cados-inst-rows ci-kamers"></div>
+        <button type="button" class="btn btn-ghost btn-sm ci-kamer-add">+ kamer toevoegen</button>
+      </div>
+      <div class="cados-inst-sub">
+        <h4>Verdiepingen <span class="hint">— gebruikt voor de ETS-adresindeling</span></h4>
+        <div class="cados-inst-rows ci-verdiepingen"></div>
+        <button type="button" class="btn btn-ghost btn-sm ci-verdieping-add">+ verdieping toevoegen</button>
+      </div>
+    `;
+
+    fields.forEach(([key]) => {
+      const input = container.querySelector(`.ci-f[data-key="${key}"]`);
+      input.value = i[key] || '';
+      input.addEventListener('input', e => { i[key] = e.target.value; scheduleSave(); });
+    });
+    const spanSel = container.querySelector('.ci-spanning');
+    spanSel.value = i.spanning || '';
+    spanSel.addEventListener('change', e => { i.spanning = e.target.value; scheduleSave(); });
+    const opmEl = container.querySelector('.ci-opmerkingen');
+    opmEl.value = i.opmerkingen || '';
+    opmEl.addEventListener('input', e => { i.opmerkingen = e.target.value; scheduleSave(); });
+
+    const togglesBox = container.querySelector('.cados-inst-toggles');
+    (window.CaDosApp.MODULE_TOGGLES || []).forEach(t => {
+      const rowEl = document.createElement('label');
+      rowEl.className = 'cados-inst-toggle-row';
+      rowEl.innerHTML = `<input type="checkbox"${dossier.modules[t.key] ? ' checked' : ''}><span>${escapeHtml(t.label)}</span>`;
+      rowEl.querySelector('input').addEventListener('change', e => { dossier.modules[t.key] = e.target.checked; scheduleSave(); });
+      togglesBox.appendChild(rowEl);
+    });
+
+    const kamersBox = container.querySelector('.ci-kamers');
+    function renderKamersBlock(){
+      kamersBox.innerHTML = '';
+      dossier.kamers.forEach((k, idx) => {
+        const kr = document.createElement('div');
+        kr.className = 'cados-inst-row';
+        kr.innerHTML = `<input type="text" value="${escapeHtml(k)}" placeholder="Kamernaam"><button type="button" class="btn btn-ghost btn-sm">✕</button>`;
+        kr.querySelector('input').addEventListener('input', e => { dossier.kamers[idx] = e.target.value; scheduleSave(); });
+        kr.querySelector('button').addEventListener('click', () => { dossier.kamers.splice(idx, 1); scheduleSave(); renderKamersBlock(); });
+        kamersBox.appendChild(kr);
+      });
+    }
+    renderKamersBlock();
+    container.querySelector('.ci-kamer-add').addEventListener('click', () => { dossier.kamers.push(''); scheduleSave(); renderKamersBlock(); });
+
+    const verdBox = container.querySelector('.ci-verdiepingen');
+    function renderVerdiepingenBlock(){
+      verdBox.innerHTML = '';
+      dossier.verdiepingen.forEach((v, idx) => {
+        const vr = document.createElement('div');
+        vr.className = 'cados-inst-row cados-inst-row-verdieping';
+        vr.innerHTML = `<input type="text" class="vd-code" value="${escapeHtml(v.code)}" placeholder="Code (bv. V1)">
+          <input type="text" class="vd-label" value="${escapeHtml(v.label)}" placeholder="Naam (bv. Verdieping 1)">
+          <button type="button" class="btn btn-ghost btn-sm vd-up" title="omhoog">▲</button>
+          <button type="button" class="btn btn-ghost btn-sm vd-down" title="omlaag">▼</button>
+          <button type="button" class="btn btn-ghost btn-sm vd-del" title="verwijderen">✕</button>`;
+        vr.querySelector('.vd-code').addEventListener('input', e => { v.code = e.target.value; scheduleSave(); });
+        vr.querySelector('.vd-label').addEventListener('input', e => { v.label = e.target.value; scheduleSave(); });
+        vr.querySelector('.vd-up').addEventListener('click', () => { if(idx > 0){ dossier.verdiepingen.splice(idx, 1); dossier.verdiepingen.splice(idx - 1, 0, v); scheduleSave(); renderVerdiepingenBlock(); } });
+        vr.querySelector('.vd-down').addEventListener('click', () => { if(idx < dossier.verdiepingen.length - 1){ dossier.verdiepingen.splice(idx, 1); dossier.verdiepingen.splice(idx + 1, 0, v); scheduleSave(); renderVerdiepingenBlock(); } });
+        vr.querySelector('.vd-del').addEventListener('click', () => { dossier.verdiepingen.splice(idx, 1); scheduleSave(); renderVerdiepingenBlock(); });
+        verdBox.appendChild(vr);
+      });
+    }
+    renderVerdiepingenBlock();
+    container.querySelector('.ci-verdieping-add').addEventListener('click', () => { dossier.verdiepingen.push({ code: '', label: '' }); scheduleSave(); renderVerdiepingenBlock(); });
+  }
+
+  // ===================== Gedeelde Catalogus: armaturen/drivers (2026-09-23) =====================
+  // Op vraag van Peter: "Catalogus van drivers en armaturen hoeft niet in het project bewaard te
+  // zijn, maar is beter een centraal punt... Best aparte pagina te starten vanaf knop in de buurt
+  // van uitloggen/zoeken --> Catalogus met daaronder beide zaken." Nieuwe modal, geopend via de
+  // "📚 Catalogus"-knop in de header (zie #btn-catalogus hieronder), met 2 subtabbladen. Draait op
+  // de nieuwe gedeelde tabellen (dbListCatalogArmaturen/dbAddCatalogArmatuur/... hierboven) i.p.v.
+  // op een per-project dossier.
+  let catalogusData = { armaturen: [], drivers: [] };
+  let catalogusSub = 'armaturen';
+  async function openCatalogusModal(){
+    el('catalogus-modal').style.display = 'flex';
+    el('catalogus-migrate-hint').style.display = 'none';
+    // De eenmalige samenvoeging (migreerArmaturenDriversNaarCatalogus, via
+    // ensureCatalogusGemigreerd hierboven) gebeurt intern al zodra dbListCatalogArmaturen/
+    // dbListCatalogDrivers voor het EERST aangeroepen worden -- ongeacht of dat hier gebeurt of
+    // al eerder gebeurde (bv. omdat het CaDos-tabblad al een project laadde vóór de Catalogus
+    // ooit geopend werd). __catalogMigratieResultaat is dan gezet als er effectief iets
+    // samengevoegd is; blijft null bij een latere, "gewone" opening van de Catalogus.
+    await reloadCatalogusData();
+    if(__catalogMigratieResultaat && (__catalogMigratieResultaat.armaturen || __catalogMigratieResultaat.drivers)){
+      el('catalogus-migrate-hint').textContent = `✅ ${__catalogMigratieResultaat.armaturen} armatu(u)r(en) en ${__catalogMigratieResultaat.drivers} driver(s) samengevoegd vanuit je bestaande projecten.`;
+      el('catalogus-migrate-hint').style.display = 'block';
+      // Enkel tonen bij de allereerste gelegenheid die de samenvoeging effectief zag gebeuren
+      // (kan de Catalogus-modal zelf zijn, of -- als CaDos al eerder een project laadde -- pas een
+      // latere opening ervan) -- niet bij elke volgende keer dat de modal binnen dezelfde
+      // paginasessie geopend wordt.
+      __catalogMigratieResultaat = null;
+    }
+    renderCatalogusSub();
+  }
+  async function reloadCatalogusData(){
+    try{
+      const [armaturen, drivers] = await Promise.all([dbListCatalogArmaturen(), dbListCatalogDrivers()]);
+      catalogusData = { armaturen, drivers };
+    }catch(err){
+      console.error('Catalogus laden mislukt:', err);
+      alert('Kon de Catalogus niet laden: ' + err.message);
+    }
+  }
+  function renderCatalogusSub(){
+    el('catalogus-armaturen-sub').style.display = catalogusSub === 'armaturen' ? '' : 'none';
+    el('catalogus-drivers-sub').style.display = catalogusSub === 'drivers' ? '' : 'none';
+    document.querySelectorAll('.catalogus-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.sub === catalogusSub));
+    renderCatalogusArmatenTable();
+    renderCatalogusDriversTable();
+  }
+  function renderCatalogusArmatenTable(){
+    const tbody = el('catalogus-arm-body');
+    tbody.innerHTML = '';
+    if(!catalogusData.armaturen.length){
+      tbody.innerHTML = '<tr class="emptyrow"><td colspan="4">Nog geen armaturen in de Catalogus.</td></tr>';
+      return;
+    }
+    catalogusData.armaturen.forEach(a => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td data-label="Omschrijving"><input type="text" class="ca-naam"></td>
+        <td data-label="Wattage"><input type="number" step="0.1" class="ca-wattage"></td>
+        <td data-label="Info"><input type="text" class="ca-info" placeholder="bv. 350mA"></td>
+        <td data-label=""><button type="button" class="btn btn-ghost btn-sm ca-del" title="Verwijderen">✕</button></td>
+      `;
+      tr.querySelector('.ca-naam').value = a.naam || '';
+      tr.querySelector('.ca-wattage').value = a.wattage || 0;
+      tr.querySelector('.ca-info').value = a.info || '';
+      tr.querySelector('.ca-naam').addEventListener('change', e => { a.naam = e.target.value; dbUpdateCatalogArmatuur(a.id, { naam: a.naam }).catch(err => alert('Kon niet bewaren: ' + err.message)); });
+      tr.querySelector('.ca-wattage').addEventListener('input', e => { a.wattage = parseFloat(e.target.value) || 0; dbUpdateCatalogArmatuur(a.id, { wattage: a.wattage }).catch(err => alert('Kon niet bewaren: ' + err.message)); });
+      tr.querySelector('.ca-info').addEventListener('input', e => { a.info = e.target.value; dbUpdateCatalogArmatuur(a.id, { info: a.info }).catch(err => alert('Kon niet bewaren: ' + err.message)); });
+      tr.querySelector('.ca-del').addEventListener('click', () => {
+        if(!confirm(`"${a.naam}" verwijderen uit de Catalogus? Projecten die deze armatuur al gebruiken, behouden hun eigen kopie in de Driverkast.`)) return;
+        dbDeleteCatalogArmatuur(a.id).then(() => { catalogusData.armaturen = catalogusData.armaturen.filter(x => x.id !== a.id); renderCatalogusArmatenTable(); }).catch(err => alert('Kon niet verwijderen: ' + err.message));
+      });
+      tbody.appendChild(tr);
+    });
+  }
+  function renderCatalogusDriversTable(){
+    const tbody = el('catalogus-drv-body');
+    tbody.innerHTML = '';
+    if(!catalogusData.drivers.length){
+      tbody.innerHTML = '<tr class="emptyrow"><td colspan="6">Nog geen drivers in de Catalogus.</td></tr>';
+      return;
+    }
+    catalogusData.drivers.forEach(d => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td data-label="Driver"><input type="text" class="cd-naam"></td>
+        <td data-label="Min W"><input type="number" step="0.1" class="cd-min"></td>
+        <td data-label="Max W"><input type="number" step="0.1" class="cd-max"></td>
+        <td data-label="Info"><input type="text" class="cd-info"></td>
+        <td data-label="Sturing"><select class="cd-sturing"><option value="DALI">DALI</option><option value="PUSH">PUSH</option></select></td>
+        <td data-label=""><button type="button" class="btn btn-ghost btn-sm cd-del" title="Verwijderen">✕</button></td>
+      `;
+      tr.querySelector('.cd-naam').value = d.naam || '';
+      tr.querySelector('.cd-min').value = d.min || 0;
+      tr.querySelector('.cd-max').value = d.max || 0;
+      tr.querySelector('.cd-info').value = d.info || '';
+      tr.querySelector('.cd-sturing').value = d.sturing || 'DALI';
+      tr.querySelector('.cd-naam').addEventListener('change', e => { d.naam = e.target.value; dbUpdateCatalogDriver(d.id, { naam: d.naam }).catch(err => alert('Kon niet bewaren: ' + err.message)); });
+      tr.querySelector('.cd-min').addEventListener('input', e => { d.min = parseFloat(e.target.value) || 0; dbUpdateCatalogDriver(d.id, { min: d.min }).catch(err => alert('Kon niet bewaren: ' + err.message)); });
+      tr.querySelector('.cd-max').addEventListener('input', e => { d.max = parseFloat(e.target.value) || 0; dbUpdateCatalogDriver(d.id, { max: d.max }).catch(err => alert('Kon niet bewaren: ' + err.message)); });
+      tr.querySelector('.cd-info').addEventListener('input', e => { d.info = e.target.value; dbUpdateCatalogDriver(d.id, { info: d.info }).catch(err => alert('Kon niet bewaren: ' + err.message)); });
+      tr.querySelector('.cd-sturing').addEventListener('change', e => { d.sturing = e.target.value; dbUpdateCatalogDriver(d.id, { sturing: d.sturing }).catch(err => alert('Kon niet bewaren: ' + err.message)); });
+      tr.querySelector('.cd-del').addEventListener('click', () => {
+        if(!confirm(`"${d.naam}" verwijderen uit de Catalogus? Projecten die deze driver al gebruiken, behouden hun eigen kopie in de Driverkast.`)) return;
+        dbDeleteCatalogDriver(d.id).then(() => { catalogusData.drivers = catalogusData.drivers.filter(x => x.id !== d.id); renderCatalogusDriversTable(); }).catch(err => alert('Kon niet verwijderen: ' + err.message));
+      });
+      tbody.appendChild(tr);
+    });
+  }
+  if(el('btn-catalogus')){
+    el('btn-catalogus').addEventListener('click', openCatalogusModal);
+    el('catalogus-close').addEventListener('click', () => { el('catalogus-modal').style.display = 'none'; });
+    el('catalogus-modal').addEventListener('click', e => { if(e.target.id === 'catalogus-modal') el('catalogus-modal').style.display = 'none'; });
+    document.querySelectorAll('.catalogus-tab-btn').forEach(b => b.addEventListener('click', () => { catalogusSub = b.dataset.sub; renderCatalogusSub(); }));
+    el('catalogus-arm-add').addEventListener('click', () => {
+      dbAddCatalogArmatuur({ naam: 'Nieuw armatuur', wattage: 0, info: '' }).then(row => { catalogusData.armaturen.push(row); renderCatalogusArmatenTable(); }).catch(err => alert('Kon niet toevoegen: ' + err.message));
+    });
+    el('catalogus-drv-add').addEventListener('click', () => {
+      dbAddCatalogDriver({ naam: 'Nieuwe driver', min: 0, max: 0, info: '', sturing: 'DALI' }).then(row => { catalogusData.drivers.push(row); renderCatalogusDriversTable(); }).catch(err => alert('Kon niet toevoegen: ' + err.message));
+    });
+    el('catalogus-resync').addEventListener('click', async () => {
+      if(!confirm('Opnieuw alle armaturen/drivers uit je projecten samenvoegen in de Catalogus? Bestaande Catalogus-items blijven staan; enkel nieuwe (nog niet aanwezige) namen worden toegevoegd.')) return;
+      try{
+        const res = await migreerArmaturenDriversNaarCatalogus();
+        await reloadCatalogusData();
+        renderCatalogusSub();
+        showStatus(`${res.armaturen} armatu(u)r(en) en ${res.drivers} driver(s) verwerkt.`);
+      }catch(err){ alert('Samenvoegen mislukt: ' + err.message); }
+    });
   }
 
   // ===================== Eén tijdlijn per project (2026-09-20, ronde 24, feature 8) =====================
@@ -13444,6 +13889,10 @@ window.CaDosApp = {
         sel.appendChild(o);
       });
     if(Array.from(sel.options).some(o => o.value === current)) sel.value = current;
+    // De centrale projectkeuze bovenaan in de header put uit dezelfde state.projects-lijst, dus
+    // hier meteen mee verversen (2026-09-23) -- voorkomt dat elk van de call-sites van deze
+    // functie hierboven in het bestand apart renderGlobalProjectPicker() moet aanroepen.
+    renderGlobalProjectPicker();
   }
 
   // Openstaande actiepunten van het vorige verslag van hetzelfde project overnemen in een NIEUW
@@ -14647,6 +15096,19 @@ window.CaDosApp = {
       if(!confirm('Huidig verslag in het formulier verlaten zonder op te slaan?')) return;
     }
     resetVerslagEditor();
+    // Op vraag van Peter (2026-09-23): het bovenaan in de header gekozen project meteen
+    // vooringevuld laten staan bij het starten van een nieuw werfverslag -- blijft hier gewoon
+    // aanpasbaar/leegmaakbaar in het formulier zelf, net als voorheen bij een manuele keuze.
+    if(state.globalProjectId){
+      // f-actief-project gebruikt projectKey() ("db-<id>") als option-waarde, niet het kale
+      // project-id zoals de header-picker -- vandaar hier expliciet omgezet.
+      const key = 'db-' + state.globalProjectId;
+      const sel = el('f-actief-project');
+      if(Array.from(sel.options).some(o => o.value === key)){
+        sel.value = key;
+        sel.dispatchEvent(new Event('change'));
+      }
+    }
     showStatus('Nieuw, leeg verslag gestart');
   });
   el('btn-delete-verslag').addEventListener('click', () => {
@@ -16430,6 +16892,27 @@ window.CaDosApp = {
     }catch(err){ alert('Kon inschatting niet bewaren: ' + err.message); }
   }
 
+  // ✓ bevestigen vanuit de Inschatting-tijdlijn zelf (2026-09-23, op vraag van Peter: sneltoets
+  // "V" en het ✓-icoontje bij hover op een al-geselecteerde dag) -- bevestigt in één klik de
+  // voorstellen van ALLE aangevinkte collega's op die dag (elk hun eigen rij, zie
+  // ipInschattingEntriesForColleague()), zonder eerst naar het Rooster/zijpaneel te moeten.
+  async function ipConfirmInschattingDag(projectId, dateISO, omschrijving){
+    const colleagues = [...state.ip.inschatColleagues];
+    if(colleagues.length === 0) return;
+    const entries = colleagues.flatMap(naam => ipInschattingEntriesForColleague(projectId, dateISO, omschrijving, naam));
+    const teBevestigen = entries.filter(en => en.bevestigd === false);
+    if(teBevestigen.length === 0){ showStatus('Al bevestigd'); return; }
+    try{
+      for(const en of teBevestigen){
+        await dbUpdatePlanningItem(en.id, { bevestigd: true });
+        en.bevestigd = true;
+      }
+      renderIpGrid();
+      renderIpConfirmTab();
+      showStatus(`${teBevestigen.length} voorstel${teBevestigen.length === 1 ? '' : 'len'} bevestigd`);
+    }catch(err){ alert('Kon niet bevestigen: ' + err.message); }
+  }
+
   function renderIpInschattingProjectSelect(){
     const sel = el('ip-inschat-project');
     const current = sel.value;
@@ -16476,7 +16959,14 @@ window.CaDosApp = {
         const holiday = ipIsHoliday(dISO);
         const selected = ipInschattingDayFullySelected(projectId, dISO, omschrijving);
         if(selected) selectedCount++;
-        html += `<div class="inschat-day ${weekend || holiday ? 'weekend' : ''} ${selected ? 'selected' : ''}" data-inschat-date="${dISO}" title="${ipDowLabel(day)} ${ipDateLabel(day)}"><span class="d-num">${day.getDate()}</span>${ipDowLabel(day)}</div>`;
+        // ✓ bevestigen / 🗑️ verwijderen bij hover (2026-09-23, op vraag van Peter) -- enkel zinvol
+        // op een dag die al volledig geselecteerd is (anders staat er niets om te bevestigen/
+        // verwijderen); zie ipConfirmInschattingDag() en de click-/keydown-afhandeling hieronder.
+        const dayIcons = selected ? `<span class="inschat-day-actions">
+          <button type="button" class="inschat-day-icon" data-inschat-action="confirm" title="Bevestigen voor de aangevinkte collega's (sneltoets: V, terwijl je hier met je muis op staat)">✓</button>
+          <button type="button" class="inschat-day-icon" data-inschat-action="delete" title="Verwijderen">🗑️</button>
+        </span>` : '';
+        html += `<div class="inschat-day ${weekend || holiday ? 'weekend' : ''} ${selected ? 'selected' : ''}" data-inschat-date="${dISO}" title="${ipDowLabel(day)} ${ipDateLabel(day)}"><span class="d-num">${day.getDate()}</span>${ipDowLabel(day)}${dayIcons}</div>`;
       }
       html += `</div>`;
     }
@@ -16492,13 +16982,48 @@ window.CaDosApp = {
   el('ip-inschat-weken').addEventListener('change', renderIpInschattingTab);
   el('ip-inschat-vrij-omschrijving').addEventListener('input', renderIpInschattingTab);
   el('ip-inschat-timeline').addEventListener('click', e => {
-    const dayEl = e.target.closest('[data-inschat-date]'); if(!dayEl) return;
     const projectId = el('ip-inschat-project').value;
     if(!projectId) return;
     const isVrij = projectId === IP_VRIJE_TAAK_VALUE;
     const omschrijving = isVrij ? el('ip-inschat-vrij-omschrijving').value.trim() : '';
     if(isVrij && !omschrijving) return;
+    // ✓/🗑️-icoontjes (2026-09-23, zie renderIpInschattingTab() hierboven) -- altijd als eerste
+    // afgehandeld, vóór de gewone dag-toggle hieronder.
+    const iconBtn = e.target.closest('.inschat-day-icon');
+    if(iconBtn){
+      e.stopPropagation();
+      const dayEl = iconBtn.closest('[data-inschat-date]'); if(!dayEl) return;
+      if(iconBtn.dataset.inschatAction === 'confirm'){
+        ipConfirmInschattingDag(projectId, dayEl.dataset.inschatDate, omschrijving);
+      } else {
+        ipToggleInschattingDag(projectId, dayEl.dataset.inschatDate, dayEl, omschrijving);
+      }
+      return;
+    }
+    const dayEl = e.target.closest('[data-inschat-date]'); if(!dayEl) return;
     ipToggleInschattingDag(projectId, dayEl.dataset.inschatDate, dayEl, omschrijving);
+  });
+  // Sneltoets "V" = bevestigen, enkel terwijl de muis op een al-geselecteerde inschattingsdag
+  // staat (2026-09-23, op vraag van Peter: "bij inschatting 2 sneltoetsen: V om te bevestigen...
+  // Enkel wanneer uw pijl op het vakje gaat staan") -- het 🗑️-icoontje hierboven dekt het
+  // "verwijderen"-deel van die vraag al (zelfde prullenbak-icoon als in het algemene rooster).
+  let ipHoveredInschatDay = null;
+  el('ip-inschat-timeline').addEventListener('mouseover', e => {
+    ipHoveredInschatDay = e.target.closest('.inschat-day.selected');
+  });
+  el('ip-inschat-timeline').addEventListener('mouseout', e => {
+    if(e.target.closest('.inschat-day')) ipHoveredInschatDay = null;
+  });
+  document.addEventListener('keydown', e => {
+    if(!ipHoveredInschatDay) return;
+    if((e.key || '').toLowerCase() !== 'v') return;
+    const activeTag = document.activeElement && document.activeElement.tagName;
+    if(activeTag === 'INPUT' || activeTag === 'TEXTAREA' || activeTag === 'SELECT') return; // niet botsen met typen
+    const projectId = el('ip-inschat-project').value;
+    if(!projectId) return;
+    const isVrij = projectId === IP_VRIJE_TAAK_VALUE;
+    const omschrijving = isVrij ? el('ip-inschat-vrij-omschrijving').value.trim() : '';
+    ipConfirmInschattingDag(projectId, ipHoveredInschatDay.dataset.inschatDate, omschrijving);
   });
   // OK-knop (2026-09-22, op vraag van Peter): terug naar het Rooster-subtabblad. Simuleert een klik
   // op de bestaande Rooster-subtab-knop zodat alle bestaande subtab-wissellogica (active-classes,
@@ -16567,6 +17092,22 @@ window.CaDosApp = {
     el('ip-week-range').textContent = ipDateLabel(state.ip.weekStart) + ' – ' + ipDateLabel(end) + ' ' + end.getFullYear();
   }
 
+  // Op vraag van Peter (2026-09-23): "bij de planning graag het pin icoon of kopieer icoon
+  // zichtbaar maken wanneer je op een ingeplande afspraak gaat staan. Pin om daarna te
+  // verplaatsen. Kopieer om te kopieren naar een andere dag of persoon. Ook prullenbak om snel te
+  // verwijderen." -- verschijnen enkel bij hover (zie .ip-chip-actions-CSS), afgehandeld in de
+  // click-listener op #ip-grid hieronder (📌/📋 zetten state.ip.pendingAction, waarna de
+  // eerstvolgende klik op een ander vakje de afspraak verplaatst/kopieert; 🗑️ verwijdert meteen).
+  function ipChipActionsHtml(entryId){
+    return `<span class="ip-chip-actions">
+      <button type="button" class="ip-chip-icon" data-action="pin" data-entry="${entryId}" title="Vastpinnen om te verplaatsen — klik daarna op het doelvakje (andere dag/persoon)">📌</button>
+      <button type="button" class="ip-chip-icon" data-action="copy" data-entry="${entryId}" title="Kopiëren — klik daarna op het doelvakje (andere dag/persoon)">📋</button>
+      <button type="button" class="ip-chip-icon" data-action="delete" data-entry="${entryId}" title="Verwijderen">🗑️</button>
+    </span>`;
+  }
+  function ipPinnedClass(entryId){
+    return (state.ip.pendingAction && String(state.ip.pendingAction.entryId) === String(entryId)) ? 'ip-pinned' : '';
+  }
   function ipCellInner(naam, dateISO, weekend, holiday){
     const entries = ipEntriesFor(naam, dateISO);
     if(entries.length === 0){
@@ -16601,7 +17142,7 @@ window.CaDosApp = {
       const voorstelLabel = voorstel ? '<span class="ip-voorstel-label">voorstel</span>' : '';
       if(en.type === 'status'){
         const st = IP_STATUSES.find(s => s.key === en.status) || { cls: '', label: en.status };
-        return `<div class="ip-chip-mini ${st.cls} ${voorstel ? 'ip-voorstel' : ''}">${escapeHtml(st.label)}${voorstelLabel}</div>`;
+        return `<div class="ip-chip-mini ${st.cls} ${voorstel ? 'ip-voorstel' : ''} ${ipPinnedClass(en.id)}">${escapeHtml(st.label)}${voorstelLabel}${ipChipActionsHtml(en.id)}</div>`;
       }
       const proj = ipProjectById(en.project_id);
       // Vrije taak zonder project (2026-09-22, op vraag van Peter): en.project_id is dan null en
@@ -16611,7 +17152,7 @@ window.CaDosApp = {
       const mismatch = proj && proj.protocol && !ipProjectDayHasSkillCoverage(en.project_id, dateISO);
       const apInfo = proj ? state.openApByProject[String(proj.id)] : null;
       const apBadge = apInfo && apInfo.count ? `<span class="ip-ap-badge" title="${apInfo.count} open actiepunt${apInfo.count===1?'':'en'}">${apInfo.count}</span>` : '';
-      return `<div class="ip-chip-mini ip-status-project ${mismatch ? 'ip-mismatch' : ''} ${voorstel ? 'ip-voorstel' : ''}">${mismatch ? '⚠ ' : ''}${naamLabel}${proj && proj.protocol ? ` · ${escapeHtml(proj.protocol)}` : ''}${apBadge}${voorstelLabel}</div>`;
+      return `<div class="ip-chip-mini ip-status-project ${mismatch ? 'ip-mismatch' : ''} ${voorstel ? 'ip-voorstel' : ''} ${ipPinnedClass(en.id)}">${mismatch ? '⚠ ' : ''}${naamLabel}${proj && proj.protocol ? ` · ${escapeHtml(proj.protocol)}` : ''}${apBadge}${voorstelLabel}${ipChipActionsHtml(en.id)}</div>`;
     }).join('');
   }
 
@@ -17104,6 +17645,34 @@ window.CaDosApp = {
     try{ const row = await dbInsertPlanningItem(fields); state.planningItems.push(row); renderIpGrid(); renderIpCapacityTab(); renderIpConfirmTab(); }
     catch(err){ alert('Kon niet kopiëren: ' + err.message); }
   }
+  // 📌 vastpinnen (verplaatsen) / 📋 kopiëren vanuit het rooster zelf (2026-09-23, zie
+  // ipChipActionsHtml()/state.ip.pendingAction hierboven en de click-afhandeling op #ip-grid
+  // hieronder) -- werkt, anders dan ipCopyEntryToPerson() hierboven, rechtstreeks op entryId
+  // zonder een geopend zijpaneel nodig te hebben, en laat ook de DATUM wijzigen (niet enkel de
+  // persoon), want het doelvakje kan een andere dag/persoon-combinatie zijn.
+  async function ipMoveOrCopyEntry(entryId, targetNaam, targetDateISO, mode){
+    const original = state.planningItems.find(en => String(en.id) === String(entryId));
+    if(!original || !targetNaam || !targetDateISO) return;
+    if(mode === 'pin'){
+      try{
+        await dbUpdatePlanningItem(entryId, { persoon_naam: targetNaam, datum: targetDateISO });
+        original.persoon_naam = targetNaam;
+        original.datum = targetDateISO;
+        renderIpGrid(); renderIpCapacityTab(); renderIpEntryList(); renderIpConfirmTab();
+        showStatus('Afspraak verplaatst');
+      }catch(err){ alert('Kon niet verplaatsen: ' + err.message); }
+    } else {
+      const fields = Object.assign({ persoon_naam: targetNaam, datum: targetDateISO, type: original.type }, ipPendingFieldsForNewEntry());
+      if(original.type === 'status') fields.status = original.status;
+      else { fields.project_id = original.project_id; if(original.omschrijving) fields.omschrijving = original.omschrijving; }
+      try{
+        const row = await dbInsertPlanningItem(fields);
+        state.planningItems.push(row);
+        renderIpGrid(); renderIpCapacityTab(); renderIpEntryList(); renderIpConfirmTab();
+        showStatus('Afspraak gekopieerd');
+      }catch(err){ alert('Kon niet kopiëren: ' + err.message); }
+    }
+  }
 
   // ---- "Te bevestigen"-overzicht (voorstellen van "enkel planning"-gebruikers) ----
   // Toont alle nog niet bevestigde afspraken (over alle personen/dagen heen), zodat een planner
@@ -17243,6 +17812,30 @@ window.CaDosApp = {
   // klik op de bestaande knop simuleren zodat er maar 1 plek is met de eigenlijke logica.
   el('ip-next-week-bottom').addEventListener('click', () => { el('ip-next-week').click(); });
   el('ip-grid').addEventListener('click', e => {
+    // 📌/📋/🗑️-icoontjes op een afspraak zelf (2026-09-23, zie ipChipActionsHtml() hierboven) --
+    // altijd als eerste afgehandeld, vóór de ghost-/td-afhandeling hieronder.
+    const actionBtn = e.target.closest('.ip-chip-icon');
+    if(actionBtn){
+      e.stopPropagation();
+      const entryId = actionBtn.dataset.entry;
+      const action = actionBtn.dataset.action;
+      if(action === 'delete'){
+        if(confirm('Deze afspraak verwijderen?')) ipDeleteEntry(entryId);
+        return;
+      }
+      // pin (verplaatsen) of copy (kopiëren): nogmaals op hetzelfde icoontje van dezelfde afspraak
+      // klikken annuleert; anders (opnieuw) "vastpinnen" en wachten op een klik op het doelvakje
+      // (zie de td.ip-slot-afhandeling hieronder).
+      const already = state.ip.pendingAction && String(state.ip.pendingAction.entryId) === String(entryId) && state.ip.pendingAction.mode === action;
+      state.ip.pendingAction = already ? null : { entryId, mode: action };
+      renderIpGrid();
+      if(state.ip.pendingAction){
+        showStatus(action === 'pin'
+          ? 'Klik nu op het doelvakje (andere dag/persoon) om deze afspraak te verplaatsen — of klik nogmaals op 📌 om te annuleren.'
+          : 'Klik nu op het doelvakje (andere dag/persoon) om deze afspraak naartoe te kopiëren — of klik nogmaals op 📋 om te annuleren.');
+      }
+      return;
+    }
     // Doorzichtig "voorstel"-vakje (2026-09-22, herzien op vraag van Peter, zie ipCellInner()):
     // klikken bevestigt het meteen aan de persoon van dat vakje, i.p.v. het normale zijpaneel te
     // openen -- vandaar de vroege return hier, vóór de gewone td.ip-slot-afhandeling.
@@ -17253,6 +17846,14 @@ window.CaDosApp = {
       return;
     }
     const td = e.target.closest('td.ip-slot'); if(!td) return;
+    // Doelvakje voor een lopende "vastpinnen"/"kopiëren"-actie (zie hierboven) -- i.p.v. het
+    // normale zijpaneel te openen, meteen verplaatsen/kopiëren naar dit vakje.
+    if(state.ip.pendingAction){
+      const { entryId, mode } = state.ip.pendingAction;
+      state.ip.pendingAction = null;
+      ipMoveOrCopyEntry(entryId, td.dataset.person, td.dataset.date, mode);
+      return;
+    }
     openIpPanel(td.dataset.person, td.dataset.date);
   });
   el('ip-status-options').addEventListener('click', e => {
