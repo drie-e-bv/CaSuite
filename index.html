@@ -425,6 +425,7 @@
   .inschat-day.weekend{background:#f4f5f7;color:#b7bcc4;}
   .inschat-day.selected{background:#fde9dd;border-color:#d9531e;color:#d9531e;}
   .inschat-day.selected .d-num{color:#d9531e;}
+  .ip-inschat-timeline-disabled{opacity:.5;pointer-events:none;}
   /* "Nog toe te wijzen"-pseudokolom in het Rooster (2026-09-20, ronde 24) -- ongebruikt sinds
      2026-09-22 (zie ipCellInner()/.ip-ghost-voorstel hieronder), klassen bewust laten staan i.p.v.
      verwijderen (geen enkele HTML gebruikt ze nog, dus geen risico). */
@@ -594,6 +595,11 @@
   .ip-role-filter{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;}
   .ip-role-chip{border:1px solid var(--line);background:var(--card);border-radius:20px;padding:5px 12px;font-size:.78rem;cursor:pointer;color:var(--ink-soft);}
   .ip-role-chip.on{background:var(--ink);color:#fff;border-color:var(--ink);}
+  /* "Voor wie is deze inschatting?" -- collega-vinkjes boven de Inschatting-tijdlijn (2026-09-23) */
+  .ip-inschat-colleague{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--card);
+    border-radius:20px;padding:5px 12px 5px 8px;font-size:.78rem;cursor:pointer;color:var(--ink-soft);}
+  .ip-inschat-colleague input{margin:0;cursor:pointer;}
+  .ip-inschat-colleague.on{background:var(--accent-soft);border-color:var(--accent);color:var(--ink);}
 
   .ip-grid-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--card);}
   /* Rooster breder/leesbaarder (2026-09-22, op vraag van Peter: "het rooster moet breder, zodat de
@@ -1269,7 +1275,15 @@
          wijzen"-kolom helemaal rechts in het Rooster (zie renderIpGrid). Bevestigen = in het
          Rooster zelf zo'n dag toewijzen aan een echte medewerker. -->
     <section class="ip-subview" id="ipsub-inschatting">
-      <p class="hint">Kies een project en klik de dagen aan die je op basis van de offerte inschat. Ze verschijnen meteen, doorschijnend, in de kolom "Nog toe te wijzen" helemaal rechts in het Rooster — bevestigen doe je daar, door zo'n dag aan een echte medewerker toe te wijzen.</p>
+      <p class="hint">Kies een project, vink hieronder aan voor wie deze inschatting is, en klik dan de dagen aan die je op basis van de offerte inschat. Ze verschijnen meteen, doorschijnend, in het rooster van elke aangevinkte collega — bevestigen doe je daar, per persoon.</p>
+      <!-- "Voor wie is deze inschatting?" (2026-09-23, op vraag van Peter: "bovenaan alle collega's
+           met vinkje voor wie deze inschatting is") -- verplicht minstens 1 aan te vinken vóór er
+           dagen aangeklikt kunnen worden op de tijdlijn. Elke aangevinkte collega krijgt zijn eigen
+           doorzichtig voorstel (zie ipToggleInschattingDag()/renderIpInschattingColleagues()). -->
+      <div class="field">
+        <label>Voor wie is deze inschatting?</label>
+        <div id="ip-inschat-colleagues" class="ip-role-filter"></div>
+      </div>
       <div class="row-actions" style="justify-content:flex-start;flex-wrap:wrap;">
         <div class="field" style="max-width:320px;">
           <label>Project</label>
@@ -1530,7 +1544,7 @@
 /* CaDos (Elektro/Domotica) -- kleuren geschaald naar #cados-app (2026-09-22, samenvoeging met
    CaSnap). --bg/--ink/--line/--danger/--radius bestaan bewust NIET meer hier: CSS custom
    properties erven automatisch naar beneden, dus die 5 vallen terug op CaSnap's eigen :root-
-   waarden (zelfde stijl als de rest van de app). --copper*/--teal* (CaDos' eigen accentkleuren)
+   waarden (zelfde stijl als de rest van de app). --copper- en --teal-variabelen (CaDos' eigen accentkleuren)
    waren eerst herleid naar CaSnap-blauw/-groen, maar zijn op 2026-09-22 (later die dag, op
    vraag van Peter) terug naar een eigen kleuridentiteit gebracht: een gedempt groen, afgeleid
    uit het CaDos-logo, maar minder fel dan de felgroene tinten in dat logo zelf -- zelfde aanpak
@@ -10887,12 +10901,21 @@ document.getElementById("fileImport").addEventListener("change", (e)=>{
   const reader = new FileReader();
   reader.onload = ()=>{
     try{
-      const parsed = JSON.parse(reader.result);
+      // Oudere JSON-exports (bv. bewaard/geopend via Kladblok op Windows) beginnen soms met een
+      // onzichtbaar BOM-teken (﻿) -- dat laat JSON.parse() mislukken terwijl het bestand
+      // verder prima geldig is. Dat teken hier gewoon wegknippen als het er staat (2026-09-23, op
+      // vraag van Peter: import van een oude standalone-CaDos-projectfiche gaf een leesfout).
+      let raw = reader.result;
+      if(typeof raw === "string" && raw.charCodeAt(0) === 0xFEFF) raw = raw.slice(1);
+      const parsed = JSON.parse(raw);
       state = Object.assign(blankState(), parsed);
       save();
       selectTab(currentTab||"instellingen");
       toast("Project geïmporteerd");
-    }catch(err){ alert("Kon dit bestand niet lezen als projectfiche-JSON."); }
+    }catch(err){
+      console.error("CaDos: projectfiche-JSON kon niet gelezen worden", err);
+      alert("Kon dit bestand niet lezen als projectfiche-JSON.");
+    }
   };
   reader.readAsText(file);
   e.target.value="";
@@ -11203,13 +11226,19 @@ window.CaDosApp = {
   // Op vraag van Peter (2026-09-22): "op de site van planning zou ook Projecten & sharepoint en
   // Bedrijfsgegevens moeten zichtbaar worden" -- 'bedrijf' stond hier al, 'projecten' toegevoegd.
   const PLANNING_TABS = ['inzet', 'projecten', 'bedrijf'];
-  const WERF_TABS = ALL_TABS.filter(t => t !== 'inzet');
+  // 'cados' bewust NIET in WERF_TABS (2026-09-23, op vraag van Peter: elke losse app toont enkel
+  // haar EIGEN tabblad(en) + Projecten & SharePoint + Bedrijfsgegevens + "Hoofdsite"-knop, nooit
+  // een knop om rechtstreeks naar een ANDERE losse app te switchen -- CaDos heeft intussen zijn
+  // eigen cados.html, dus die knop hoort hier niet meer thuis).
+  const WERF_TABS = ALL_TABS.filter(t => t !== 'inzet' && t !== 'cados');
   // Eigen installeerbare "CaDos"-app (2026-09-23, op vraag van Peter: "Is er geen html voor
   // cados?"), naast de al bestaande Werf-/Planning-apps -- cados.html (zie build-apps.js) toont
   // enkel het CaDos-tabblad, met zijn eigen naam/icoon/favicon voor een eigen homescherm-
   // snelkoppeling. Slaat de opstart-keuze automatisch over (zelfde als werf.html/planning.html),
-  // want er is toch maar 1 tabblad te kiezen.
-  const CADOS_TABS = ['cados'];
+  // want er is toch maar 1 tabblad te kiezen. 'projecten'/'bedrijf' toegevoegd (2026-09-23, zelfde
+  // vraag als hierboven): CaDos toont ook deze twee gedeelde tabbladen, zelfde patroon als Werf/
+  // Planning, maar nooit een knop naar de andere losse apps.
+  const CADOS_TABS = ['cados', 'projecten', 'bedrijf'];
   function tabsForAppMode(){
     if(APP_MODE === 'planning') return PLANNING_TABS;
     if(APP_MODE === 'werf') return WERF_TABS;
@@ -11277,7 +11306,11 @@ window.CaDosApp = {
       selectedRoles: new Set(),
       showOA: false,
       panelCtx: null, // {persoonNaam, datumISO}
-      subview: 'rooster'
+      subview: 'rooster',
+      // Inschatting: voor wie is deze inschatting? (2026-09-23, op vraag van Peter: "bovenaan alle
+      // collega's met vinkje voor wie deze inschatting is") -- namen van de aangevinkte collega's,
+      // zie renderIpInschattingColleagues()/ipToggleInschattingDag() hieronder.
+      inschatColleagues: new Set()
     },
     offlineQueue: [],
     verslagType: 'werf', // 'werf' | 'telefoon' -- zie de verslagtype-toggle bovenaan het formulier
@@ -16312,36 +16345,85 @@ window.CaDosApp = {
   // `projectId` is ofwel een echt project-id, ofwel IP_VRIJE_TAAK_VALUE -- in dat laatste geval
   // wordt op `omschrijving` gematcht i.p.v. op project_id (die is dan altijd null, meerdere losse
   // vrije taken moeten elkaar niet als "dezelfde dag" beschouwen).
-  function ipInschattingEntriesFor(projectId, dateISO, omschrijving){
-    if(projectId === IP_VRIJE_TAAK_VALUE){
-      return state.planningItems.filter(it => it.persoon_naam === IP_UNASSIGNED_NAME && it.project_id == null && (it.omschrijving || '') === (omschrijving || '') && it.datum === dateISO);
-    }
-    return state.planningItems.filter(it => it.persoon_naam === IP_UNASSIGNED_NAME && String(it.project_id) === String(projectId) && it.datum === dateISO);
-  }
+  // Historisch (t/m ronde 29): een inschatting kreeg een gedeelde, niet-toegewezen rij (sentinel
+  // "persoon" IP_UNASSIGNED_NAME) die als doorzichtig "voorstel" verscheen in de LEGE cel van
+  // elke medewerker, tot iemand ze in het Rooster aan een echte persoon toewees. Bestaande rijen
+  // van vóór ronde 30 gebruiken deze sentinel nog steeds en blijven zo werken (zie
+  // ipAllUnassignedEntriesFor()/de ghost-weergave in ipCellInner) -- enkel NIEUWE inschattingen
+  // worden voortaan meteen per aangevinkte collega aangemaakt (zie hieronder).
   function ipAllUnassignedEntriesFor(dateISO){
     return state.planningItems.filter(it => it.persoon_naam === IP_UNASSIGNED_NAME && it.datum === dateISO);
   }
+  // Inschatting per collega (2026-09-23, op vraag van Peter: "bovenaan alle collega's met vinkje
+  // voor wie deze inschatting is") -- ipInschattingEntriesForColleague() zoekt de rij van 1
+  // specifieke, aangevinkte collega (i.p.v. de vroegere gedeelde sentinel-rij hierboven).
+  function ipInschattingEntriesForColleague(projectId, dateISO, omschrijving, naam){
+    if(projectId === IP_VRIJE_TAAK_VALUE){
+      return state.planningItems.filter(it => it.persoon_naam === naam && it.project_id == null && (it.omschrijving || '') === (omschrijving || '') && it.datum === dateISO);
+    }
+    return state.planningItems.filter(it => it.persoon_naam === naam && String(it.project_id) === String(projectId) && it.datum === dateISO);
+  }
+  // Een dag telt in de tijdlijn als "geselecteerd" zodra ALLE momenteel aangevinkte collega's al
+  // een voorstel hebben die dag -- vink je nadien nog een collega extra aan, dan tonen eerder al
+  // volledig geselecteerde dagen zich weer als "niet volledig" tot je ze ook voor die nieuwe
+  // collega aanklikt (ipToggleInschattingDag() vult dan enkel de ontbrekende collega's aan, en
+  // laat bestaande voorstellen van de anderen met rust).
+  function ipInschattingDayFullySelected(projectId, dateISO, omschrijving){
+    const colleagues = [...state.ip.inschatColleagues];
+    if(colleagues.length === 0) return false;
+    return colleagues.every(naam => ipInschattingEntriesForColleague(projectId, dateISO, omschrijving, naam).length > 0);
+  }
+
+  function renderIpInschattingColleagues(){
+    const wrap = el('ip-inschat-colleagues');
+    if(!wrap) return;
+    wrap.innerHTML = ipActivePeople().map(p => {
+      const on = state.ip.inschatColleagues.has(p.naam);
+      return `<label class="ip-inschat-colleague ${on ? 'on' : ''}"><input type="checkbox" data-colleague="${escapeHtml(p.naam)}" ${on ? 'checked' : ''}>${escapeHtml(p.naam)}</label>`;
+    }).join('') || '<span class="hint">Nog geen collega\'s ingesteld bij Bedrijfsgegevens → Team leden/Bureau.</span>';
+  }
+  el('ip-inschat-colleagues').addEventListener('change', e => {
+    const cb = e.target.closest('input[data-colleague]'); if(!cb) return;
+    const naam = cb.dataset.colleague;
+    if(cb.checked) state.ip.inschatColleagues.add(naam); else state.ip.inschatColleagues.delete(naam);
+    renderIpInschattingColleagues();
+    renderIpInschattingTab();
+  });
 
   async function ipToggleInschattingDag(projectId, dateISO, dayEl, omschrijving){
+    const colleagues = [...state.ip.inschatColleagues];
+    if(colleagues.length === 0){
+      alert('Vink eerst hierboven minstens 1 collega aan voor wie deze inschatting is.');
+      return;
+    }
     const isVrij = projectId === IP_VRIJE_TAAK_VALUE;
-    const existing = ipInschattingEntriesFor(projectId, dateISO, omschrijving);
+    const fullySelected = ipInschattingDayFullySelected(projectId, dateISO, omschrijving);
     try{
-      if(existing.length){
-        await dbDeletePlanningItem(existing[0].id);
-        state.planningItems = state.planningItems.filter(it => it.id !== existing[0].id);
+      if(fullySelected){
+        // Terugtrekken: verwijder enkel de voorstellen van de MOMENTEEL aangevinkte collega's op
+        // deze dag -- een voorstel van iemand die intussen weer uitgevinkt is, blijft met rust.
+        const toDelete = colleagues.flatMap(naam => ipInschattingEntriesForColleague(projectId, dateISO, omschrijving, naam));
+        for(const it of toDelete) await dbDeletePlanningItem(it.id);
+        const deleteIds = new Set(toDelete.map(it => it.id));
+        state.planningItems = state.planningItems.filter(it => !deleteIds.has(it.id));
       } else {
-        const fields = {
-          persoon_naam: IP_UNASSIGNED_NAME, datum: dateISO, type: 'project',
-          project_id: isVrij ? null : projectId,
-          bevestigd: false, aangemaakt_door: getCurrentUserNaam() || null
-        };
-        // Vrije taak zonder project (2026-09-22, op vraag van Peter) -- vereist de nieuwe
-        // `omschrijving`-kolom op planning_items, zie SQL-migratie in het projectdocument. Als die
-        // kolom nog niet bestaat, geeft dbInsertPlanningItem hieronder een duidelijke fout terug
-        // (opgevangen in de catch), i.p.v. stil te falen.
-        if(isVrij) fields.omschrijving = omschrijving;
-        const row = await dbInsertPlanningItem(fields);
-        state.planningItems.push(row);
+        // Aanvullen: enkel voor de aangevinkte collega's die deze dag nog GEEN voorstel hebben --
+        // ieder krijgt zijn eigen, aparte rij (dus zijn eigen doorzichtig voorstel in zijn kolom).
+        const ontbrekend = colleagues.filter(naam => ipInschattingEntriesForColleague(projectId, dateISO, omschrijving, naam).length === 0);
+        for(const naam of ontbrekend){
+          const fields = {
+            persoon_naam: naam, datum: dateISO, type: 'project',
+            project_id: isVrij ? null : projectId,
+            bevestigd: false, aangemaakt_door: getCurrentUserNaam() || null
+          };
+          // Vrije taak zonder project (2026-09-22, op vraag van Peter) -- vereist de nieuwe
+          // `omschrijving`-kolom op planning_items, zie SQL-migratie in het projectdocument. Als
+          // die kolom nog niet bestaat, geeft dbInsertPlanningItem hieronder een duidelijke fout
+          // terug (opgevangen in de catch), i.p.v. stil te falen.
+          if(isVrij) fields.omschrijving = omschrijving;
+          const row = await dbInsertPlanningItem(fields);
+          state.planningItems.push(row);
+        }
       }
       renderIpInschattingTab();
       renderIpGrid();
@@ -16360,12 +16442,20 @@ window.CaDosApp = {
 
   function renderIpInschattingTab(){
     renderIpInschattingProjectSelect();
+    renderIpInschattingColleagues();
     if(!el('ip-inschat-start').value) el('ip-inschat-start').value = todayISO();
     const projectId = el('ip-inschat-project').value;
     const isVrij = projectId === IP_VRIJE_TAAK_VALUE;
     el('ip-inschat-vrij-wrap').style.display = isVrij ? '' : 'none';
     const omschrijving = isVrij ? el('ip-inschat-vrij-omschrijving').value.trim() : '';
     const timelineEl = el('ip-inschat-timeline');
+    const geenCollegas = state.ip.inschatColleagues.size === 0;
+    timelineEl.classList.toggle('ip-inschat-timeline-disabled', geenCollegas);
+    if(geenCollegas){
+      timelineEl.innerHTML = '';
+      el('ip-inschat-count-hint').textContent = 'Vink hierboven eerst minstens 1 collega aan voor wie deze inschatting is.';
+      return;
+    }
     if(!projectId || (isVrij && !omschrijving)){
       timelineEl.innerHTML = '';
       el('ip-inschat-count-hint').textContent = isVrij ? 'Typ eerst een omschrijving voor deze vrije taak.' : 'Kies eerst een project.';
@@ -16384,7 +16474,7 @@ window.CaDosApp = {
         const dISO = ipIso(day);
         const weekend = ipIsWeekend(day);
         const holiday = ipIsHoliday(dISO);
-        const selected = ipInschattingEntriesFor(projectId, dISO, omschrijving).length > 0;
+        const selected = ipInschattingDayFullySelected(projectId, dISO, omschrijving);
         if(selected) selectedCount++;
         html += `<div class="inschat-day ${weekend || holiday ? 'weekend' : ''} ${selected ? 'selected' : ''}" data-inschat-date="${dISO}" title="${ipDowLabel(day)} ${ipDateLabel(day)}"><span class="d-num">${day.getDate()}</span>${ipDowLabel(day)}</div>`;
       }
@@ -16392,9 +16482,10 @@ window.CaDosApp = {
     }
     timelineEl.innerHTML = html;
     const doelLabel = isVrij ? 'deze vrije taak' : 'dit project';
+    const wieLabel = [...state.ip.inschatColleagues].sort((a, b) => a.localeCompare(b)).join(', ');
     el('ip-inschat-count-hint').textContent = selectedCount
-      ? `${selectedCount} dag${selectedCount === 1 ? '' : 'en'} geselecteerd voor ${doelLabel} — zichtbaar als doorzichtig voorstel in het Rooster.`
-      : `Nog geen dagen geselecteerd voor ${doelLabel} — klik op een dag om ze toe te voegen.`;
+      ? `${selectedCount} dag${selectedCount === 1 ? '' : 'en'} geselecteerd voor ${doelLabel}, voor ${wieLabel} — zichtbaar als doorzichtig voorstel in ieders rooster.`
+      : `Nog geen dagen geselecteerd voor ${doelLabel} — klik op een dag om ze toe te voegen voor ${wieLabel}.`;
   }
   el('ip-inschat-project').addEventListener('change', renderIpInschattingTab);
   el('ip-inschat-start').addEventListener('change', renderIpInschattingTab);
