@@ -1,73 +1,82 @@
-// Service worker voor de Casentis werfverslag-app -- offline-modus, deel 2 ("de app zelf kunnen
-// LADEN zonder bereik"; deel 1 is de lokale opslag-wachtrij in index.html zelf, zie de
-// toelichting daar bij "Offline-modus").
-//
-// LET OP -- dit bestand moet exact als "sw.js" naast index.html in de GitHub-repo (root van
-// GitHub Pages) staan. Dat is geen keuze maar een technische vereiste van service workers: ze
-// kunnen niet in het HTML-bestand zelf ingebed worden, en de "scope" (welke pagina's een
-// service worker mag afvangen) hangt af van waar het bestand zelf staat -- vandaar naast
-// index.html, niet in een submap.
-//
-// Werking (bijgewerkt 2026-08-24, zie hieronder): "network-first met korte timeout, terugval op
-// cache". Bij elk bezoek wordt EERST het netwerk geprobeerd (dus altijd de nieuwste versie zodra
-// er verbinding is) -- enkel als dat niet binnen 4 seconden lukt (geen bereik op de werf, of een
-// trage verbinding) valt dit terug op de laatst gekende, gecachte versie, zodat de app ook dan
-// meteen laadt i.p.v. te blijven hangen. Elke geslaagde netwerk-aanvraag werkt de cache meteen
-// bij voor de volgende keer.
-//
-// Bugfix (2026-08-24, gemeld door Peter: "in mijn gewone browser zie ik nog een oude versie, in
-// incognito wel de laatste"): de vorige strategie ("stale-while-revalidate") toonde bij ELK
-// bezoek EERST de al gecachte versie (ook al was er gewoon internet), en haalde pas op de
-// achtergrond een nieuwere versie op VOOR DE VOLGENDE KEER -- je liep dus permanent één bezoek
-// achter op de werkelijke laatste versie, tenzij je toevallig twee keer kort na elkaar herlaadde.
-// Incognito had nooit een bestaande cache, dus toonde daardoor toevallig altijd meteen de
-// nieuwste versie. Nu je online bent (het gangbare geval bij het openen van de browser) krijg je
-// dus voortaan meteen de nieuwste versie; enkel écht zonder bereik (of bij een zeer trage
-// verbinding) valt dit terug op de laatst gekende cache -- exact het doel van de offline-modus.
-const CACHE_NAME = 'casentis-werfverslag-v2';
+/**
+ * sw.js — service worker voor de CaSnap/CaSuite-appfamilie
+ * (de "gewone" website/index.html, en de installeerbare CaSnap Werf / CaPla / CaDos-apps
+ * — werf.html / planning.html / cados.html — die er allemaal naast staan).
+ *
+ * Twee doelen, allebei even belangrijk (herzien 2026-09-24 op vraag van Peter: "kunnen we
+ * niks implementeren dat alles ook offline werkt ... en dat er steeds naar laatste versie
+ * gekeken wordt zonder cache"):
+ *
+ * 1) OFFLINE BLIJVEN WERKEN: als er geen (goed) bereik is, toch meteen laden met de laatst
+ *    gekende versie i.p.v. een kapotte/lege pagina.
+ * 2) ALTIJD DE NIEUWSTE VERSIE bij een normaal bezoek met internet: het netwerk krijgt
+ *    steeds voorrang, de cache is enkel een terugval-optie (bij geen bereik, of een erg
+ *    trage verbinding die niet binnen NETWORK_TIMEOUT_MS antwoordt).
+ *
+ * BELANGRIJK bij elke nieuwe upload/ronde: verhoog CACHE_VERSION hieronder. Dat is wat de
+ * browser er zelf toe aanzet om alle oude, gecachete bestanden te laten vallen zodra deze
+ * nieuwe sw.js actief wordt (zie activate hieronder) — zonder deze wijziging zou "dezelfde
+ * bestandsnaam" niet altijd meteen als "nieuwe versie" herkend worden.
+ */
+const CACHE_VERSION = 'casnap-v2026-09-24a';
 const NETWORK_TIMEOUT_MS = 4000;
-
+ 
 self.addEventListener('install', () => {
+  // Meteen actief willen worden, niet wachten tot alle open tabbladen gesloten zijn —
+  // essentieel om "altijd de nieuwste versie" waar te kunnen maken. De pagina zelf
+  // (zie src2.html/index.html) toont een balk "Nieuwe versie beschikbaar" zodra dit
+  // gebeurt terwijl er al een oudere versie open stond, i.p.v. stilzwijgend te verversen.
   self.skipWaiting();
 });
-
+ 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))))
-      .then(() => self.clients.claim())
+    (async () => {
+      const keys = await caches.keys();
+      await Promise.all(
+        keys.filter((k) => k !== CACHE_VERSION).map((k) => caches.delete(k))
+      );
+      await self.clients.claim();
+    })()
   );
 });
-
+ 
 self.addEventListener('fetch', (event) => {
   const req = event.request;
-  if(req.method !== 'GET') return;
+  if (req.method !== 'GET') return; // enkel GET-verzoeken cachen/afvangen
+ 
   const url = new URL(req.url);
-  // Enkel de eigen pagina (same-origin) cachen -- nooit Supabase-API-aanvragen of andere externe
-  // aanvragen afvangen. Die moeten altijd gewoon via het netwerk gaan (of falen als er geen
-  // netwerk is, wat de app zelf al afhandelt via de lokale opslag-wachtrij in index.html).
-  if(url.origin !== self.location.origin) return;
-
-  event.respondWith((async () => {
-    const cache = await caches.open(CACHE_NAME);
-    const cached = await cache.match(req);
-
-    const networkFetch = fetch(req).then((res) => {
-      if(res && res.ok) cache.put(req, res.clone());
-      return res;
-    });
-    // Voorkomt dat de service worker gestopt wordt vóór deze achtergrond-cache-update klaar is,
-    // ook als hieronder al iets anders (de cache) teruggegeven werd omdat het netwerk traag was.
-    event.waitUntil(networkFetch.catch(() => {}));
-
-    const timeout = new Promise(resolve => setTimeout(() => resolve(null), NETWORK_TIMEOUT_MS));
-    try {
-      const fast = await Promise.race([networkFetch, timeout]);
-      if(fast) return fast; // netwerk was snel genoeg -> altijd de nieuwste versie
-    } catch(err) {
-      // netwerk faalde meteen (bv. echt geen bereik) -> hieronder meteen terugvallen op cache
-    }
-    if(cached) return cached;
-    return networkFetch; // laatste redmiddel: geen cache en het netwerk was traag, dan toch wachten
-  })());
+  // Enkel bestanden van deze app zelf (HTML/manifest/iconen) via deze strategie laten
+  // lopen. Externe diensten (Supabase, jsPDF/andere CDN-scripts, lettertypes, ...) laten we
+  // gewoon rechtstreeks door de browser afhandelen — die willen we nooit "verouderd" tonen,
+  // en sommige (bv. Supabase-auth/data-calls) horen sowieso niet gecached te worden.
+  if (url.origin !== self.location.origin) return;
+ 
+  event.respondWith(networkFirst(req));
 });
+ 
+async function networkFirst(req) {
+  const cache = await caches.open(CACHE_VERSION);
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), NETWORK_TIMEOUT_MS);
+    // cache:'no-store' negeert ook de HTTP-cache van de browser zelf (niet enkel deze
+    // service-worker-cache) -- zonder dit zou je soms nog een verouderde versie kunnen
+    // krijgen zelfs met een "netwerk-eerst"-opzet, als de server/host zelf een lange
+    // cache-levensduur meegeeft aan index.html.
+    const fresh = await fetch(req, { cache: 'no-store', signal: controller.signal });
+    clearTimeout(timeoutId);
+    if (fresh && fresh.ok) cache.put(req, fresh.clone());
+    return fresh;
+  } catch (networkErr) {
+    const cached = await cache.match(req);
+    if (cached) return cached;
+    // Geen netwerk én niets gecached (bv. allereerste bezoek zonder bereik) -- alsnog een
+    // gewone fetch proberen zonder timeout/no-store, als laatste redmiddel.
+    try {
+      return await fetch(req);
+    } catch (fallbackErr) {
+      throw networkErr;
+    }
+  }
+}

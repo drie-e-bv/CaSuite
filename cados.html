@@ -291,6 +291,23 @@
     max-width:420px;white-space:normal;line-height:1.4;
   }
   .status-msg.show{opacity:1;transform:translateY(0);}
+  /* Update-banner (2026-09-24, op vraag van Peter: "steeds naar laatste versie kijken zonder
+     cache") -- verschijnt onderaan zodra de service worker een nieuwere versie van de app op de
+     achtergrond heeft klaargezet. Bewust GEEN automatische herlading: iemand kan net een
+     werfverslag aan het invullen zijn, dus de gebruiker beslist zelf wanneer te verversen. */
+  .update-banner{
+    position:fixed;left:0;right:0;bottom:0;z-index:250;display:none;
+    background:var(--ink);color:#fff;padding:12px 16px;
+    box-shadow:0 -2px 12px rgba(0,0,0,.18);
+    align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;
+  }
+  .update-banner.show{display:flex;}
+  .update-banner span{font-size:.88rem;}
+  .update-banner button{
+    background:var(--accent);color:#fff;border:none;border-radius:7px;
+    padding:7px 14px;font-size:.85rem;font-weight:600;cursor:pointer;
+  }
+  .update-banner button.ghost{background:transparent;color:#fff;opacity:.75;padding:7px 8px;}
   .hidden-input{display:none;}
   .note{font-size:.78rem;color:var(--ink-soft);margin-top:6px;}
   .wa-share-bar{
@@ -643,10 +660,7 @@
   .ip-week-nav{display:flex;align-items:center;gap:8px;}
   .ip-week-nav button{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:7px 12px;cursor:pointer;font-size:.9rem;}
   .ip-range{font-size:.85rem;color:var(--ink-soft);min-width:180px;text-align:center;display:inline-block;}
-  .ip-oa-toggle{display:flex;align-items:center;gap:6px;font-size:.82rem;color:var(--ink-soft);margin-left:auto;}
-  .ip-oa-toggle input{width:auto;}
-  /* PDF-exportknop (2026-09-15): eigen margin-left:auto zodat hij ook rechts uitlijnt wanneer
-     "Toon onderaannemers" verborgen is (enkel zichtbaar bij team Tech, zie refreshInzetPlanning()). */
+  /* PDF-exportknop (2026-09-15): eigen margin-left:auto zodat hij rechts uitlijnt in de controlebalk. */
   #ip-export-pdf-btn{margin-left:auto;}
 
   .ip-role-filter{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;}
@@ -678,7 +692,7 @@
   td.ip-slot{min-width:150px;cursor:pointer;position:relative;padding:6px;}
   td.ip-slot.ip-weekend{background:#eef0f3;}
   td.ip-slot.ip-merged{background:#fbfcfe;vertical-align:middle;}
-  .ip-cellwrap{display:flex;flex-direction:column;gap:3px;min-height:32px;}
+  .ip-cellwrap{display:flex;flex-direction:column;gap:3px;min-height:32px;position:relative;}
   .ip-chip-mini{border-radius:4px;padding:5px 8px;font-size:.78rem;line-height:1.35;position:relative;}
   /* 📌 vastpinnen (verplaatsen) / 📋 kopiëren / 🗑️ verwijderen -- enkel zichtbaar bij hover op
      de afspraak zelf (2026-09-23, op vraag van Peter), zie ipChipActionsHtml()/ipCellInner(). */
@@ -693,6 +707,20 @@
   td.ip-slot.ip-drop-hint{cursor:copy;background:var(--accent-soft);}
   .ip-chip-mini.ip-placeholder{border:1px dashed var(--line);color:var(--ink-soft);opacity:0;text-align:center;}
   td.ip-slot:hover .ip-chip-mini.ip-placeholder{opacity:1;}
+  /* "+" onder een al ingevulde dag (2026-09-24, op vraag van Peter: "Wanneer er al een taak is
+     toegewezen in de planning zou er onder die taak nog een + moeten verschijnen bij hover om
+     extra taak toe te wijzen") -- zelfde onzichtbaar-tot-hover-idee als .ip-placeholder hierboven,
+     enkel voor een cel die al 1+ afspraken heeft. Bewust absoluut gepositioneerd EN permanent
+     pointer-events:none (i.p.v. enkel tot hover, zoals .ip-placeholder): dit is puur een visuele
+     hint, geen eigen klikzone -- de hele cel is al klikbaar om een afspraak toe te voegen (zie de
+     td.ip-slot-afhandeling verderop), dus deze laag hoeft geen klik zelf op te vangen. Belangrijk:
+     zou dit wél pointer-events:auto krijgen bij hover, dan onderschept het op precies dezelfde plek
+     de klik die bedoeld is om een voorstel rechtstreeks te bevestigen (zie [data-voorstel-confirm]
+     hieronder) -- een klik bestaat altijd uit eerst hoveren en dán klikken, dus "enkel bij hover
+     actief" is voor een overlappende laag niet veilig. */
+  .ip-chip-mini.ip-add-extra{position:absolute;left:4px;right:4px;bottom:2px;border:1px dashed var(--line);
+    color:var(--ink-soft);opacity:0;text-align:center;pointer-events:none;background:var(--card);}
+  td.ip-slot:hover .ip-chip-mini.ip-add-extra{opacity:1;}
   .ip-chip-mini.ip-muted{opacity:.75;font-style:italic;}
   .ip-week-badge{display:inline-block;font-size:.6rem;background:rgba(0,0,0,.08);padding:1px 6px;border-radius:8px;margin-left:5px;vertical-align:middle;}
   .ip-status-weekend{background:var(--ink);color:#dfe3e8;}
@@ -740,6 +768,9 @@
   .ip-proj-opt:last-child{border-bottom:none;}
   .ip-proj-opt:hover{background:var(--bg);}
   .ip-proj-opt .ip-tag{font-size:.68rem;color:var(--ink-soft);}
+  /* "▸ Toon ook afgewerkte/onderhoud-projecten"-regel (2026-09-24) -- zelfde rij-stijl, maar
+     duidelijk als schakelaar i.p.v. een echt project herkenbaar. */
+  .ip-proj-opt.ip-proj-showall{justify-content:flex-start;color:var(--ink-soft);font-style:italic;background:var(--bg);}
 
   table.ip-plist{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:8px;overflow:hidden;}
   table.ip-plist th{text-align:left;font-weight:600;font-size:.76rem;color:var(--ink-soft);padding:10px 12px;background:var(--bg);border-bottom:1px solid var(--line);}
@@ -1314,9 +1345,6 @@
           <span class="ip-range" id="ip-week-range"></span>
           <button id="ip-next-week" type="button">&rarr;</button>
         </div>
-        <label class="ip-oa-toggle" id="ip-oa-toggle-wrap">
-          <input type="checkbox" id="ip-oa-toggle"> Toon onderaannemers
-        </label>
         <button class="btn btn-secondary btn-sm" id="ip-export-pdf-btn" type="button">📄 Rooster exporteren</button>
       </div>
       <div class="ip-role-filter" id="ip-role-filter"></div>
@@ -11328,6 +11356,11 @@ window.CaDosApp = {
 </div>
 
 <div class="status-msg" id="status-msg"></div>
+<div class="update-banner" id="update-banner">
+  <span>🔄 Er is een nieuwere versie van de app klaar.</span>
+  <button type="button" id="update-banner-reload">Vernieuwen</button>
+  <button type="button" class="ghost" id="update-banner-dismiss">Later</button>
+</div>
 
 <script>
 (function(){
@@ -11452,6 +11485,7 @@ window.CaDosApp = {
       selectedRoles: new Set(),
       showOA: false,
       panelCtx: null, // {persoonNaam, datumISO}
+      projListShowAll: false, // 2026-09-24: snelle projectkeuze in het dagpaneel toont enkel "Actief" tot dit aangezet wordt
       subview: 'rooster',
       // Inschatting: voor wie is deze inschatting? (2026-09-23, op vraag van Peter: "bovenaan alle
       // collega's met vinkje voor wie deze inschatting is") -- namen van de aangevinkte collega's,
@@ -11502,6 +11536,18 @@ window.CaDosApp = {
   // Volgorde op vraag van Peter (2026-09-23): "Bij type in personeel naast technieker ook
   // Programmeur" -- Programmeur staat daarom meteen na Technieker.
   const IP_ROLES = ['Technieker', 'Programmeur', 'Service technieker', 'Bureau', 'Flexi', 'Onderaannemer'];
+  // Projectstatus (2026-09-24, op vraag van Peter: "Bij project zou een lijst van optie moeten
+  // bestaan: Actief, afgewerkt of onderhoud. Zodat voor snelle planning de actieve projecten
+  // kunnen gekozen worden. Wanneer je een afgewerkte of een in onderhoud wenst in te plannen moet
+  // je dan op pijltje klikken om al deze zichtbaar te maken in de zijbalk") -- los van het
+  // bestaande, bredere "Actief/Inactief"-vinkje op een project (dat blijft ongewijzigd, bepaalt
+  // zichtbaarheid overal in de app); dit is enkel een extra, fijnere indeling die specifiek het
+  // snelle-projectkeuzelijstje in het rooster-dagpaneel stuurt, zie renderIpProjSelectList().
+  const PLANNING_PROJECT_STATUSES = [
+    { key: 'actief', label: 'Actief' },
+    { key: 'afgewerkt', label: 'Afgewerkt' },
+    { key: 'onderhoud', label: 'Onderhoud' }
+  ];
   // Sentinel-"persoon" voor de projectinschatting (2026-09-20, ronde 24): een dag die op de
   // Inschatting-tijdlijn wordt aangeklikt, wordt gewoon een heel normale planning_items-rij, enkel
   // met deze magische naam i.p.v. een echte medewerker -- zo is er GEEN nieuwe SQL-kolom/tabel
@@ -12290,11 +12336,55 @@ window.CaDosApp = {
   // ingebed worden, dat is een technische beperking van service workers). Faalt dit (bv. omdat
   // sw.js nog niet mee geüpload is), dan werkt de rest van de app gewoon door zolang er
   // verbinding is -- enkel de "laadt ook zonder bereik"-eigenschap ontbreekt dan nog.
+  //
+  // Herzien (2026-09-24, op vraag van Peter: "kunnen we niks implementeren dat alles ook
+  // offline werkt ... en dat er steeds naar laatste versie gekeken wordt zonder cache" -- hij
+  // zag op de "globale" pagina nog verouderde inhoud terwijl werf/planning/cados-app wel al
+  // de laatste versie toonden). sw.js zelf haalt al altijd eerst het netwerk op (zie dat
+  // bestand), maar een browser controleert daarnaast maar zelf af en toe (soms pas na uren)
+  // of sw.js ÍÉTS gewijzigd is. Deze aanvulling doet 3 dingen extra:
+  // 1) `updateViaCache:'none'` -- verbiedt de browser om sw.js zelf uit zijn HTTP-cache te
+  //    halen bij die controle, dat was een mogelijke stille boosdoener voor "blijft verouderd".
+  // 2) Actief zelf regelmatig (elke 3 min + telkens het tabblad weer zichtbaar/actief wordt)
+  //    laten controleren op een nieuwe versie, i.p.v. enkel te wachten op de browser.
+  // 3) Zodra er een nieuwere versie klaarstaat: een duidelijke balk onderaan i.p.v. gewoon
+  //    stil verversen -- iemand kan net een verslag aan het invullen zijn, dus de gebruiker
+  //    kiest zelf het moment ("Vernieuwen" of "Later").
   if('serviceWorker' in navigator){
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js').catch(err => {
+      navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then((reg) => {
+        function showUpdateBanner(){
+          const banner = el('update-banner');
+          if(banner) banner.classList.add('show');
+        }
+        // Er lag al een nieuwere, geïnstalleerde versie klaar (bv. geopend terwijl de vorige
+        // sessie op de achtergrond al iets nieuws had opgehaald).
+        if(reg.waiting && reg.active) showUpdateBanner();
+        reg.addEventListener('updatefound', () => {
+          const nieuweWorker = reg.installing;
+          if(!nieuweWorker) return;
+          nieuweWorker.addEventListener('statechange', () => {
+            // 'installed' + er was al een actieve controller = een ECHTE update (niet de
+            // allereerste installatie ooit van de service worker op dit toestel).
+            if(nieuweWorker.state === 'installed' && navigator.serviceWorker.controller){
+              showUpdateBanner();
+            }
+          });
+        });
+        // Actief blijven pollen: de browser zelf controleert soms pas na uren opnieuw.
+        setInterval(() => { reg.update().catch(() => {}); }, 3 * 60 * 1000);
+        document.addEventListener('visibilitychange', () => {
+          if(document.visibilityState === 'visible') reg.update().catch(() => {});
+        });
+      }).catch(err => {
         console.error('Service worker registratie mislukt (offline laden van de app werkt dan niet, de rest van de app werkt gewoon door):', err);
       });
+    });
+    const updateBtn = document.getElementById('update-banner-reload');
+    const dismissBtn = document.getElementById('update-banner-dismiss');
+    if(updateBtn) updateBtn.addEventListener('click', () => { window.location.reload(); });
+    if(dismissBtn) dismissBtn.addEventListener('click', () => {
+      el('update-banner').classList.remove('show');
     });
   }
 
@@ -13122,7 +13212,7 @@ window.CaDosApp = {
       id: null, _localId: state.nextProjectId++, _expanded: true,
       naam: '', locatie: '', projectnummer: '', sharepoint_url: '', whatsapp_group_url: '', notities: '',
       werfleider_naam: '', projectleider_naam: '', contactpersonen: [], actief: true,
-      klant: '', protocol: '', todo_uren: null,
+      klant: '', protocol: '', todo_uren: null, planning_status: 'actief',
       // Nieuw (2026-09-22, later die dag, op vraag van Peter): vinkje bij het aanmaken van een
       // nieuw project, enkel zichtbaar zolang het project nog niet bewaard is (zie renderProjects
       // en saveProjectRow hieronder) -- puur lokale/tijdelijke UI-staat, wordt niet als kolom
@@ -13143,7 +13233,9 @@ window.CaDosApp = {
       // Personeelsplanning-velden (2026-09-08): klant/protocol/todo-uren, gebruikt op het
       // "Personeelsplanning"-tabblad (Projecten & capaciteit) -- optioneel, puur informatief hier.
       klant: p.klant || null, protocol: p.protocol || null,
-      todo_uren: (p.todo_uren === '' || p.todo_uren == null) ? null : Number(p.todo_uren)
+      todo_uren: (p.todo_uren === '' || p.todo_uren == null) ? null : Number(p.todo_uren),
+      // Projectstatus (2026-09-24): zie PLANNING_PROJECT_STATUSES hierboven.
+      planning_status: p.planning_status || 'actief'
     };
     if(!fields.naam){ alert('Geef het project een naam voor je opslaat.'); return; }
     try{
@@ -13422,6 +13514,9 @@ window.CaDosApp = {
             <div class="field"><label>Projectnaam</label><input type="text" class="p-naam"></div>
             <div class="field"><label>Projectnummer (bv. zoals in Plenion)</label><input type="text" class="p-projectnummer" placeholder="bv. 2026-158"></div>
             <div class="field"><label>Locatie</label><input type="text" class="p-locatie"></div>
+            <div class="field"><label>Status <span class="hint">(stuurt de snelle projectkeuze in het rooster-dagpaneel)</span></label>
+              <select class="p-planning-status">${PLANNING_PROJECT_STATUSES.map(s => `<option value="${s.key}">${s.label}</option>`).join('')}</select>
+            </div>
             <div class="field"><label>SharePoint / OneDrive-map (link)</label><input type="url" class="p-sharepoint" placeholder="https://casentis.sharepoint.com/..."></div>
             <div class="field"><label>WhatsApp-groep (uitnodigingslink)</label><input type="url" class="p-wagroup" placeholder="https://chat.whatsapp.com/..."></div>
             <div class="field"><label>Klant (voor Personeelsplanning, optioneel)</label><input type="text" class="p-klant" placeholder="bv. De Baene"></div>
@@ -13535,6 +13630,7 @@ window.CaDosApp = {
         row.querySelector('.p-naam').value = p.naam;
         row.querySelector('.p-projectnummer').value = p.projectnummer || '';
         row.querySelector('.p-locatie').value = p.locatie;
+        row.querySelector('.p-planning-status').value = p.planning_status || 'actief';
         row.querySelector('.p-sharepoint').value = p.sharepoint_url;
         row.querySelector('.p-wagroup').value = p.whatsapp_group_url;
         row.querySelector('.p-notities').value = p.notities;
@@ -13555,6 +13651,7 @@ window.CaDosApp = {
         });
         row.querySelector('.p-projectnummer').addEventListener('input', e => p.projectnummer = e.target.value);
         row.querySelector('.p-locatie').addEventListener('input', e => p.locatie = e.target.value);
+        row.querySelector('.p-planning-status').addEventListener('change', e => p.planning_status = e.target.value);
         row.querySelector('.p-sharepoint').addEventListener('input', e => p.sharepoint_url = e.target.value);
         row.querySelector('.p-wagroup').addEventListener('input', e => p.whatsapp_group_url = e.target.value);
         row.querySelector('.p-klant').addEventListener('input', e => p.klant = e.target.value);
@@ -16931,7 +17028,6 @@ window.CaDosApp = {
 
   async function refreshInzetPlanning(){
     if(!state.ip.weekStart) state.ip.weekStart = ipMondayOf(new Date());
-    el('ip-oa-toggle-wrap').style.display = state.ip.team === 'TECH' ? 'flex' : 'none';
     try{ state.actiepuntenList = await dbListActiepunten(); }
     catch(err){ console.error('Kon actiepunten niet laden voor Personeelsplanning:', err); }
     ipBuildOpenApMap();
@@ -17227,9 +17323,19 @@ window.CaDosApp = {
   function renderIpRoleFilter(){
     const roles = ipRolesInTeam(state.ip.team);
     if(state.ip.selectedRoles.size === 0) roles.forEach(r => state.ip.selectedRoles.add(r));
-    el('ip-role-filter').innerHTML = roles.map(r =>
+    let html = roles.map(r =>
       `<button type="button" class="ip-role-chip ${state.ip.selectedRoles.has(r) ? 'on' : ''}" data-role="${escapeHtml(r)}">${escapeHtml(r)}</button>`
     ).join('');
+    // "Toon onderaannemers" (2026-09-24, op vraag van Peter: "Vinkje voor toon onderaannemer mag
+    // verplaatst worden naar de manier hoe nu ook al filter op technikers en flexi en programmeur
+    // en service zijn") -- voorheen een apart vinkje in de controlebalk erboven, nu gewoon een
+    // extra chip in dezelfde rij/stijl als de rol-filters. Onderaannemers zijn geen rol-filter-
+    // optie (zie ipRolesInTeam(), sluit 'Onderaannemer' bewust uit) en enkel relevant bij team
+    // Tech, dus enkel dan tonen.
+    if(state.ip.team === 'TECH'){
+      html += `<button type="button" class="ip-role-chip ${state.ip.showOA ? 'on' : ''}" data-oa="1">Onderaannemers</button>`;
+    }
+    el('ip-role-filter').innerHTML = html;
   }
 
   function renderIpWeekRange(){
@@ -17303,7 +17409,7 @@ window.CaDosApp = {
       const apInfo = proj ? state.openApByProject[String(proj.id)] : null;
       const apBadge = apInfo && apInfo.count ? `<span class="ip-ap-badge" title="${apInfo.count} open actiepunt${apInfo.count===1?'':'en'}">${apInfo.count}</span>` : '';
       return `<div class="ip-chip-mini ip-status-project ${mismatch ? 'ip-mismatch' : ''} ${voorstel ? 'ip-voorstel' : ''} ${ipPinnedClass(en.id)}"${voorstelAttr}>${mismatch ? '⚠ ' : ''}${naamLabel}${proj && proj.protocol ? ` · ${escapeHtml(proj.protocol)}` : ''}${apBadge}${voorstelLabel}${ipChipActionsHtml(en.id)}</div>`;
-    }).join('');
+    }).join('') + '<div class="ip-chip-mini ip-add-extra">+ extra taak</div>';
   }
 
   function ipMergedLabel(info){
@@ -17613,6 +17719,9 @@ window.CaDosApp = {
     el('ip-vrije-taak-wrap').style.display = 'none';
     el('ip-vrije-taak-input').value = '';
     el('ip-proj-search').value = '';
+    // Bij elk openen van het paneel terug starten met enkel "Actief" (2026-09-24) -- zie
+    // renderIpProjSelectList() hieronder.
+    state.ip.projListShowAll = false;
     renderIpProjSelectList('');
     renderIpEntryList();
     el('ip-overlay').classList.add('open');
@@ -17624,12 +17733,27 @@ window.CaDosApp = {
     state.ip.panelCtx = null;
   }
   function renderIpProjSelectList(filter){
-    const list = ipActiveProjects().filter(p => (p.naam || '').toLowerCase().includes(filter.toLowerCase()));
-    el('ip-proj-select-list').innerHTML = list.map(p => {
+    const q = filter.toLowerCase();
+    const all = ipActiveProjects().filter(p => (p.naam || '').toLowerCase().includes(q));
+    // Projectstatus-filter (2026-09-24, zie PLANNING_PROJECT_STATUSES hierboven): voor snelle
+    // planning standaard enkel "Actief" tonen; Afgewerkt/Onderhoud pas na het pijltje hieronder.
+    // Een project zonder planning_status (oudere/nog niet ingestelde rijen) telt als "Actief".
+    const shown = all.filter(p => state.ip.projListShowAll || (p.planning_status || 'actief') === 'actief');
+    const hiddenCount = all.length - shown.length;
+    function optHtml(p){
       const apInfo = state.openApByProject[String(p.id)];
       const apBadge = apInfo && apInfo.count ? `<span class="ip-tag" style="color:var(--danger);">${apInfo.count} open AP</span>` : '';
-      return `<div class="ip-proj-opt" data-proj="${p.id}"><span>${escapeHtml(p.naam)}</span><span>${p.protocol ? `<span class="ip-tag">${escapeHtml(p.protocol)}</span> ` : ''}${apBadge}</span></div>`;
-    }).join('') || '<div class="ip-proj-opt">Geen (actieve) projecten gevonden</div>';
+      const status = p.planning_status || 'actief';
+      const statusBadge = status !== 'actief' ? `<span class="ip-tag">${escapeHtml(PLANNING_PROJECT_STATUSES.find(s => s.key === status)?.label || status)}</span> ` : '';
+      return `<div class="ip-proj-opt" data-proj="${p.id}"><span>${escapeHtml(p.naam)}</span><span>${statusBadge}${p.protocol ? `<span class="ip-tag">${escapeHtml(p.protocol)}</span> ` : ''}${apBadge}</span></div>`;
+    }
+    let html = shown.map(optHtml).join('') || '<div class="ip-proj-opt">Geen (actieve) projecten gevonden</div>';
+    if(!state.ip.projListShowAll && hiddenCount > 0){
+      html += `<div class="ip-proj-opt ip-proj-showall" data-toggle-proj-statuses="1">▸ Toon ook afgewerkte/onderhoud-projecten (${hiddenCount})</div>`;
+    } else if(state.ip.projListShowAll){
+      html += `<div class="ip-proj-opt ip-proj-showall" data-toggle-proj-statuses="1">▾ Enkel actieve projecten tonen</div>`;
+    }
+    el('ip-proj-select-list').innerHTML = html;
   }
   function ipOtherPeopleOptions(excludeNaam){
     return ipActivePeople().filter(p => p.naam !== excludeNaam).map(p => `<option value="${escapeHtml(p.naam)}">${escapeHtml(p.naam)} (${escapeHtml(p.rol || '')})</option>`).join('');
@@ -17930,17 +18054,23 @@ window.CaDosApp = {
     state.ip.team = btn.dataset.team;
     state.ip.selectedRoles = new Set();
     document.querySelectorAll('#ip-team-switch button').forEach(b => b.classList.toggle('active', b === btn));
-    el('ip-oa-toggle-wrap').style.display = state.ip.team === 'TECH' ? 'flex' : 'none';
     renderIpRoleFilter(); renderIpGrid(); renderIpCapacityTab(); renderIpSkillsTab();
   });
   el('ip-role-filter').addEventListener('click', e => {
     const chip = e.target.closest('.ip-role-chip'); if(!chip) return;
+    // "Onderaannemers"-chip (2026-09-24): eigen toggle, geen normale rol-filter -- zie
+    // renderIpRoleFilter() hierboven.
+    if(chip.dataset.oa){
+      state.ip.showOA = !state.ip.showOA;
+      renderIpRoleFilter(); renderIpGrid(); renderIpCapacityTab(); renderIpSkillsTab();
+      return;
+    }
     const r = chip.dataset.role;
+    if(!r) return;
     if(state.ip.selectedRoles.has(r)) state.ip.selectedRoles.delete(r); else state.ip.selectedRoles.add(r);
     if(state.ip.selectedRoles.size === 0) ipRolesInTeam(state.ip.team).forEach(x => state.ip.selectedRoles.add(x));
     renderIpRoleFilter(); renderIpGrid();
   });
-  el('ip-oa-toggle').addEventListener('change', e => { state.ip.showOA = e.target.checked; renderIpGrid(); renderIpCapacityTab(); renderIpSkillsTab(); });
   el('ip-prev-week').addEventListener('click', () => { state.ip.weekStart = ipAddDays(state.ip.weekStart, -14); renderIpGrid(); renderIpCapacityTab(); });
   el('ip-next-week').addEventListener('click', () => { state.ip.weekStart = ipAddDays(state.ip.weekStart, 14); renderIpGrid(); renderIpCapacityTab(); });
   // Duplicaat van de "→"-knop, onderaan het rooster (2026-09-22, op vraag van Peter) -- gewoon een
@@ -18031,6 +18161,12 @@ window.CaDosApp = {
   el('ip-vrije-taak-input').addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); submitIpVrijeTaak(); } });
   el('ip-proj-search').addEventListener('input', e => renderIpProjSelectList(e.target.value));
   el('ip-proj-select-list').addEventListener('click', e => {
+    const toggle = e.target.closest('[data-toggle-proj-statuses]');
+    if(toggle){
+      state.ip.projListShowAll = !state.ip.projListShowAll;
+      renderIpProjSelectList(el('ip-proj-search').value);
+      return;
+    }
     const opt = e.target.closest('.ip-proj-opt[data-proj]'); if(!opt) return;
     ipAddEntry('project', opt.dataset.proj);
   });
