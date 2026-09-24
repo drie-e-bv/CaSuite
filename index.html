@@ -67,6 +67,12 @@
   .ms-logo span{display:block;}
   .login-error{color:var(--danger);font-size:.82rem;margin-top:14px;min-height:1em;}
   .login-hint{color:var(--ink-soft);font-size:.78rem;margin-top:18px;}
+  /* Laad-indicator terwijl bootstrapAfterLogin() bezig is (2026-09-24, ronde 39) -- zie
+     renderAuthState()/revealApp() verderop voor de toelichting waarom dit nodig is. */
+  .login-loading{display:none;flex-direction:column;align-items:center;gap:14px;padding:20px 0;}
+  .login-spinner{width:34px;height:34px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:login-spin .8s linear infinite;}
+  @keyframes login-spin{to{transform:rotate(360deg);}}
+  .login-loading p{color:var(--ink-soft);font-size:.85rem;margin:0;}
   #app{display:none;max-width:860px;margin:0 auto;padding:24px 16px 80px;}
   /* app-wide (Personeelsplanning-tab, zie JS "app-wide"-toggle): het rooster heeft veel kolommen
      nodig -- op vraag van Peter (2026-09-22, "witruimtes links en rechts mogen veel kleiner
@@ -814,7 +820,9 @@
   .startup-choice-icon{width:24px;height:24px;border-radius:6px;flex:none;}
   #no-access-screen .btn{margin-top:16px;}
 
-  .tl-access-row, .bu-access-row{display:grid;grid-template-columns:2fr 2fr;gap:6px;align-items:center;margin-top:4px;}
+  /* 2026-09-24 (ronde 40): van een 2-koloms grid (1 dropdown + 1 vinkje) naar een flex-wrap rij
+     van 5 losse toegangsvinkjes -- zie buildIpPersonExtraRow(). */
+  .tl-access-row, .bu-access-row{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;margin-top:4px;}
   .tl-access-row select, .bu-access-row select{padding:6px 7px;border:1px solid var(--line);border-radius:5px;font-size:.8rem;}
   .tl-access-row label.chk, .bu-access-row label.chk{display:flex;align-items:center;gap:4px;font-size:.78rem;color:var(--ink-soft);white-space:nowrap;}
 
@@ -834,7 +842,7 @@
     .ip-status-options{grid-template-columns:1fr;}
     .tl-extra-row, .bu-extra-row{grid-template-columns:1fr;}
     .tl-extra-row .ip-p-volgorde, .bu-extra-row .ip-p-volgorde{width:100%;}
-    .tl-access-row, .bu-access-row{grid-template-columns:1fr;}
+    .tl-access-row, .bu-access-row{flex-direction:column;align-items:flex-start;}
   }
 </style>
 </head>
@@ -846,7 +854,7 @@
 <datalist id="team-leden-datalist"></datalist>
 
 <div id="login-screen">
-  <div class="login-card">
+  <div class="login-card" id="login-card">
     <div class="brand-mark"><img src="data:image/png;base64,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" alt="CaSuite" class="brand-mark-logo"><span class="brand">CaSuite</span></div>
     <h1>Werfverslag — aanmelden</h1>
     <button class="btn-ms" id="btn-login-ms" type="button">
@@ -855,6 +863,14 @@
     </button>
     <div class="login-error" id="login-error"></div>
     <div class="login-hint">Enkel toegankelijk met een Casentis Microsoft 365-account.</div>
+  </div>
+  <!-- Getoond i.p.v. de kaart hierboven terwijl bootstrapAfterLogin() nog bezig is (2026-09-24,
+       ronde 39): voorkomt dat de Werfverslag-tab heel even "flitst" op het scherm vóór het echte
+       start scherm (keuze, of rechtstreeks een tabblad) getoond wordt -- zie renderAuthState()/
+       revealApp() verderop. -->
+  <div class="login-loading" id="login-loading">
+    <div class="login-spinner"></div>
+    <p>Bezig met laden…</p>
   </div>
 </div>
 
@@ -883,7 +899,7 @@
 
 <!-- "Geen toegang"-scherm (2026-09-09), enkel voor het randgeval dat de doorsnede van app-modus
      (Werf-app/Planning-app/de gewone website, zie APP_MODE) en het eigen toegangsniveau
-     (state.access) leeg is -- bv. een "enkel planning"-persoon die de Werf-app-snelkoppeling
+     (de 6 toegangsvinkjes, zie tabsForPersonAccess()) leeg is -- bv. iemand zonder enkel vinkje aan die de Werf-app-snelkoppeling
      opent. Zie applyAccessRestrictions(). -->
 <div id="no-access-screen">
   <div class="login-card">
@@ -1327,7 +1343,7 @@
       <button class="ip-subtab-btn active" data-ipsub="rooster" type="button">Rooster</button>
       <button class="ip-subtab-btn" data-ipsub="capaciteit" type="button">Projecten &amp; capaciteit</button>
       <button class="ip-subtab-btn" data-ipsub="vaardigheden" type="button">Vaardigheden</button>
-      <button class="ip-subtab-btn" data-ipsub="inschatting" type="button">Inschatting</button>
+      <button class="ip-subtab-btn" data-ipsub="inschatting" type="button" id="ip-subtab-inschatting">Inschatting</button>
       <button class="ip-subtab-btn" data-ipsub="bevestigen" type="button" id="ip-subtab-bevestigen" style="display:none;">Te bevestigen<span class="ip-confirm-count" id="ip-confirm-count" style="display:none;">0</span></button>
     </div>
 
@@ -11377,7 +11393,7 @@ window.CaDosApp = {
   // elk hun eigen manifest/icoon/naam hebben (voor een eigen homescherm-snelkoppeling) en vóór
   // dit script een `window.CASNAP_APP_MODE` zetten. `index.html` (de gewone "website") zet dit
   // niet -> blijft default 'full', ongewijzigd gedrag. Dit werkt SAMEN met, niet in de plaats
-  // van, het per-persoon toegangsniveau (state.access, zie applyAccessRestrictions()): de
+  // van, het per-persoon toegangsniveau (de 6 toegangsvinkjes, zie tabsForPersonAccess()): de
   // uiteindelijk zichtbare tabbladen zijn de doorsnede van wat de geopende app toont EN wat die
   // persoon zelf mag zien.
   const APP_MODE = (window.CASNAP_APP_MODE || 'full'); // 'full' | 'werf' | 'planning' | 'cados'
@@ -11413,10 +11429,26 @@ window.CaDosApp = {
     if(APP_MODE === 'cados') return CADOS_TABS;
     return ALL_TABS;
   }
+  // 2026-09-24 (ronde 40): vervangt de vroegere "Volledige toegang / Enkel Personeelsplanning"-
+  // keuze door 6 losse vinkjes per persoon (zie buildIpPersonExtraRow()/state.currentPerson) --
+  // op vraag van Peter: "Bij iedereen van de teamleden zou ik vinkjes willen voorzien: Kan
+  // werfverslagen zien waaraan hij gelinkt is, kan werfverslagen maken, kan planning zien,
+  // voorstellen goedkeuren, voorstellen maken, actief in planning." Geeft de tabbladen terug die
+  // deze specifieke set vinkjes toelaat; welke verslagen/actiepunten daarbinnen zichtbaar zijn
+  // (enkel "gekoppelde" projecten) wordt apart geregeld via filterToLinkedProjects() hierboven.
   function tabsForPersonAccess(){
-    // 'geen' (Onderaannemer, 2026-09-23): geen enkel tabblad toegankelijk.
-    if(state.access === 'geen') return [];
-    return state.access === 'planning' ? PLANNING_TABS : ALL_TABS;
+    const p = state.currentPerson;
+    if(!p) return ALL_TABS; // geen gekoppeld teamlid-record (bv. de eigenaar) -- ongewijzigd, geen beperking
+    const tabs = new Set();
+    if(p.kan_verslagen_zien || p.kan_verslagen_maken){
+      ['verslag', 'verslagen', 'actiepunten', 'planning', 'cados'].forEach(t => tabs.add(t));
+    }
+    if(p.kan_planning_zien || p.is_planner || p.kan_voorstellen_maken) tabs.add('inzet');
+    // "Projecten"/"Bedrijfsgegevens" blijven, zoals voorheen bij beide oude toegangsniveaus,
+    // gewoon zichtbaar zodra er sowieso ergens toegang is (puur "geen enkel vinkje aan" -- bv.
+    // een Onderaannemer -- blijft volledig buitengesloten, zie #no-access-screen).
+    if(tabs.size){ tabs.add('projecten'); tabs.add('bedrijf'); }
+    return Array.from(tabs);
   }
   // De doorsnede van beide -- bv. een "enkel planning"-persoon die per ongeluk de Werf-app opent
   // ziet dan terecht niets (zie applyAccessRestrictions()/#no-access-screen).
@@ -12445,20 +12477,41 @@ window.CaDosApp = {
     await sb.auth.signOut();
   });
 
+  // 2026-09-24 (ronde 39): #app blijft, zolang er nog geen sessie is, gewoon verborgen zoals
+  // voorheen. Zodra er wél een sessie is, wordt #app NIET meer meteen getoond -- dat gebeurde
+  // hiervoor synchroon in deze functie, terwijl bootstrapAfterLogin() daarna nog een reeks
+  // await's doorloopt (dbGetBedrijf/dbListProjecten/...) vóór het uiteindelijk via
+  // applyAccessRestrictions() beslist welk tabblad/scherm je écht te zien moet krijgen. In die
+  // tussentijd kon de browser al een frame tekenen met #app zichtbaar en de Werfverslag-tab
+  // actief (staat standaard al .active in de kale HTML) -- vandaar de korte "flits" van
+  // Werfverslag vóór bv. het "Wat wil je doen?"-scherm. Het aanmeldscherm (nu met een laad-
+  // indicator i.p.v. de aanmeldknop, zie #login-loading) blijft daarom gewoon zichtbaar tot
+  // revealApp() hieronder, ná applyAccessRestrictions(), effectief de knoop doorhakt.
   function renderAuthState(){
     const loggedIn = !!state.session;
-    el('login-screen').style.display = loggedIn ? 'none' : 'flex';
-    el('app').style.display = loggedIn ? 'block' : 'none';
+    el('login-screen').style.display = 'flex';
+    el('login-card').style.display = loggedIn ? 'none' : '';
+    el('login-loading').style.display = loggedIn ? 'flex' : 'none';
     if(loggedIn){
       const user = state.session.user || {};
       el('user-email').textContent = user.email || (user.user_metadata && user.user_metadata.email) || '';
     } else {
-      // Bij uitloggen (o.a. vanaf het "Geen toegang"-scherm zelf) mogen deze twee full-screen
+      // Bij uitloggen (o.a. vanaf het "Geen toegang"-scherm zelf) mogen deze full-screen
       // overlays niet blijven staan boven het aanmeldscherm -- ze worden pas opnieuw gezet door
       // applyAccessRestrictions() na een volgende succesvolle aanmelding.
+      el('app').style.display = 'none';
       el('startup-chooser').style.display = 'none';
       el('no-access-screen').style.display = 'none';
     }
+  }
+
+  // Maakt #app pas zichtbaar en verbergt het aanmeldscherm -- wordt aangeroepen op de plekken
+  // waar bootstrapAfterLogin() klaar is met beslissen wat er getoond moet worden (zowel het
+  // gewone pad via applyAccessRestrictions() als de catch hieronder, zodat je bij een laadfout
+  // ook niet blijvend op het laadscherm blijft hangen).
+  function revealApp(){
+    el('login-screen').style.display = 'none';
+    el('app').style.display = 'block';
   }
 
   async function bootstrapAfterLogin(){
@@ -12472,6 +12525,13 @@ window.CaDosApp = {
         ? state.company.protocollen.slice()
         : ['Crestron', 'Qbus', 'KNX', 'Teletask'];
       renderCompany();
+      // Toegangsniveau van de ingelogde gebruiker bepalen -- moet ná renderCompany() (hierboven)
+      // gebeuren, want die normaliseert de 6 toegangsvinkjes/is_planner op elk team_leden-/
+      // bureau-object (2026-09-24, ronde 40). Bewust HIER al gezet, vóór refreshVerslagenList()
+      // hieronder -- die gebruikt state.currentPerson (via filterToLinkedProjects()) om te weten
+      // welke projecten "gekoppeld" zijn; stond dit nog op de oude plek (na refreshVerslagenList),
+      // dan zag iedereen bij de allereerste load nog even alles, vóór de beperking toesloeg.
+      state.currentPerson = getCurrentUserPerson();
       state.projects = await dbListProjecten();
       // kolom 'actief' bestaat mogelijk nog niet (oudere rijen/db) -> dan gewoon als actief behandelen
       state.projects.forEach(p => { p.actief = (p.actief !== false); });
@@ -12480,19 +12540,14 @@ window.CaDosApp = {
       catch(err){ console.error('Kon planning_items niet laden (tabel misschien nog niet aangemaakt):', err); state.planningItems = []; }
       await refreshVerslagenList();
       resetVerslagEditor();
-      // Toegangsniveau van de ingelogde gebruiker bepalen -- moet ná renderCompany() (hierboven)
-      // gebeuren, want die normaliseert app_toegang/is_planner op elk team_leden-/bureau-object.
-      state.currentPerson = getCurrentUserPerson();
-      // 'geen' (Onderaannemer, 2026-09-23): expliciet géén toegang, i.t.t. de standaard 'volledig'
-      // die gold zolang app_toegang niets bijzonders zei.
-      state.access = !state.currentPerson ? 'volledig'
-        : state.currentPerson.app_toegang === 'geen' ? 'geen'
-        : state.currentPerson.app_toegang === 'planning' ? 'planning'
-        : 'volledig';
       applyAccessRestrictions();
+      revealApp();
     }catch(err){
       console.error(err);
       showStatus('Kon gegevens niet laden: ' + err.message);
+      // Ook bij een laadfout de app tonen (i.p.v. de gebruiker blijvend op het laadscherm te
+      // laten hangen) -- de foutmelding zelf staat via showStatus() al klaar.
+      revealApp();
     }
   }
 
@@ -12512,6 +12567,13 @@ window.CaDosApp = {
     const isPlanner = !!(state.currentPerson && state.currentPerson.is_planner);
     const confirmTabBtn = el('ip-subtab-bevestigen');
     if(confirmTabBtn) confirmTabBtn.style.display = isPlanner ? '' : 'none';
+    // "Voorstellen maken" (2026-09-24, ronde 40): mag de Inschatting-tool gebruiken om
+    // planningsvoorstellen te maken (voor zichzelf en/of collega's), los van "voorstellen
+    // goedkeuren" hierboven. Wie geen gekoppeld teamlid-record heeft (bv. de eigenaar) ziet dit
+    // tabblad gewoon, zoals voorheen.
+    const canMakeProposals = !state.currentPerson || !!state.currentPerson.kan_voorstellen_maken;
+    const proposeTabBtn = el('ip-subtab-inschatting');
+    if(proposeTabBtn) proposeTabBtn.style.display = canMakeProposals ? '' : 'none';
     // De centrale projectkeuze in de header heeft enkel nut als er ook een tabblad bereikbaar is
     // dat er iets mee doet (Dossier/Werfverslag) -- bv. in de losse Planning-app (planning.html)
     // of voor een "enkel planning"-persoon is ze zinloos, dus dan verbergen.
@@ -12639,7 +12701,7 @@ window.CaDosApp = {
 
   function switchTab(tab){
     // Extra veiligheid boven op het verbergen van de tabknoppen zelf (applyAccessRestrictions()) --
-    // wat het toegangsniveau (state.access) en de geopende app (APP_MODE) samen niet toelaten,
+    // wat het toegangsniveau (de 6 toegangsvinkjes) en de geopende app (APP_MODE) samen niet toelaten,
     // is hoe dan ook nooit bereikbaar, ook niet via een verouderde/gedeelde link.
     const allowed = allowedTabs();
     if(!allowed.includes(tab)) tab = allowed[0];
@@ -12756,17 +12818,35 @@ window.CaDosApp = {
     if(!person.planning_team) person.planning_team = defaultTeam;
     if(!Array.isArray(person.protocollen)) person.protocollen = [];
     if(person.planning_actief == null) person.planning_actief = true;
-    // Toegangsniveau + planner-vinkje (2026-09-09), op vraag van Peter: sommige bureau-mensen
-    // mogen ENKEL Personeelsplanning zien/gebruiken (geen werfverslagen), en hun voorstellen in het
-    // rooster tellen pas definitief mee nadat een "planner" ze bevestigt. Standaard "volledig" /
-    // geen planner, zodat bestaande gebruikers ongewijzigd toegang houden tenzij je dit hier expliciet aanpast.
-    if(!person.app_toegang) person.app_toegang = 'volledig';
+    // Toegangsvinkjes (2026-09-09, herwerkt 2026-09-24 ronde 40), op vraag van Peter: "Bij
+    // iedereen van de teamleden zou ik vinkjes willen voorzien: Kan werfverslagen zien waaraan
+    // hij gelinkt is, kan werfverslagen maken, kan planning zien, voorstellen goedkeuren,
+    // voorstellen maken, actief in planning." Vervangt de vroegere "Volledige toegang / Enkel
+    // Personeelsplanning"-keuze + het losse "planner"-vinkje door 6 losse, onafhankelijke
+    // vinkjes. Bestaande personen die deze nieuwe velden nog niet hebben (van vóór deze ronde)
+    // worden hier 1x afgeleid uit hun oude `app_toegang`/`is_planner`, zodat niemand per ongeluk
+    // toegang verliest -- zie ook filterToLinkedProjects()/tabsForPersonAccess() hierboven.
+    if(person.kan_verslagen_zien == null || person.kan_verslagen_maken == null || person.kan_planning_zien == null || person.kan_voorstellen_maken == null){
+      const wasVolledig = !person.app_toegang || person.app_toegang === 'volledig';
+      const wasPlanningOnly = person.app_toegang === 'planning';
+      if(person.kan_verslagen_zien == null) person.kan_verslagen_zien = wasVolledig;
+      if(person.kan_verslagen_maken == null) person.kan_verslagen_maken = wasVolledig;
+      if(person.kan_planning_zien == null) person.kan_planning_zien = wasVolledig || wasPlanningOnly;
+      if(person.kan_voorstellen_maken == null) person.kan_voorstellen_maken = wasVolledig || wasPlanningOnly;
+    }
+    if(person.is_planner == null) person.is_planner = false;
     // Onderaannemers krijgen nooit app-/planningtoegang (2026-09-23, op vraag van Peter: "Hier ook
     // keuze Personeel of onderaannemer: Die hebben geen rechten in de planning") -- afgedwongen bij
     // elke render, ook voor al langer bestaande rijen waar de rol pas achteraf op Onderaannemer werd
-    // gezet.
-    if(person.rol === 'Onderaannemer') person.app_toegang = 'geen';
-    if(person.is_planner == null) person.is_planner = false;
+    // gezet. "Actief in planning" hieronder blijft wél gewoon instelbaar -- een onderaannemer moet
+    // nog steeds als inplanbare naam in het rooster kunnen verschijnen, enkel geen app-toegang.
+    if(person.rol === 'Onderaannemer'){
+      person.kan_verslagen_zien = false;
+      person.kan_verslagen_maken = false;
+      person.kan_planning_zien = false;
+      person.kan_voorstellen_maken = false;
+      person.is_planner = false;
+    }
     if(person.volgorde === undefined) person.volgorde = null;
     const wrapper = document.createDocumentFragment();
     const row = document.createElement('div');
@@ -12821,22 +12901,32 @@ window.CaDosApp = {
     row.appendChild(actiefLabel);
     wrapper.appendChild(row);
 
+    // 6 losse toegangsvinkjes (2026-09-24, ronde 40) i.p.v. de vroegere dropdown + 1 los vinkje --
+    // zie de toelichting hierboven bij het normaliseren van deze velden. "Actief in planning"
+    // staat bewust NIET hier maar hierboven bij de rol/team-rij (actiefLabel) -- dat blijft, zoals
+    // voorheen, ook voor Onderaannemers gewoon instelbaar.
     const accessRow = document.createElement('div');
     accessRow.className = defaultTeam === 'BUREAU' ? 'bu-access-row' : 'tl-access-row';
-    const accessSelect = document.createElement('select');
-    accessSelect.className = 'ip-p-toegang';
-    accessSelect.title = 'Wie enkel "Personeelsplanning" heeft, ziet geen enkel ander tabblad (geen werfverslagen) en gaat na aanmelden rechtstreeks naar Personeelsplanning.';
-    accessSelect.innerHTML = `<option value="volledig" ${person.app_toegang === 'volledig' ? 'selected' : ''}>Volledige toegang (werfverslagen + planning)</option><option value="planning" ${person.app_toegang === 'planning' ? 'selected' : ''}>Enkel Personeelsplanning</option>`;
-    accessSelect.addEventListener('change', e => { person.app_toegang = e.target.value; });
-    const plannerLabel = document.createElement('label');
-    plannerLabel.className = 'chk';
-    plannerLabel.title = 'Mag voorstellen van "enkel planning"-gebruikers bevestigen/afwijzen (Personeelsplanning → Te bevestigen).';
-    plannerLabel.innerHTML = `<input type="checkbox" class="ip-p-planner" ${person.is_planner ? 'checked' : ''}> Mag voorstellen bevestigen (planner)`;
-    plannerLabel.querySelector('input').addEventListener('change', e => { person.is_planner = e.target.checked; });
-    accessRow.appendChild(accessSelect);
-    accessRow.appendChild(plannerLabel);
-    // Hint die de toegangskeuze vervangt zodra de rol "Onderaannemer" is (zie updateAccessRowForRol
-    // hieronder) -- op vraag van Peter: "Die hebben geen rechten in de planning".
+    function buildPermCheckbox(cls, field, label, title){
+      const lbl = document.createElement('label');
+      lbl.className = 'chk';
+      if(title) lbl.title = title;
+      lbl.innerHTML = `<input type="checkbox" class="${cls}" ${person[field] ? 'checked' : ''}> ${label}`;
+      lbl.querySelector('input').addEventListener('change', e => { person[field] = e.target.checked; });
+      return lbl;
+    }
+    accessRow.appendChild(buildPermCheckbox('ip-p-verslagen-zien', 'kan_verslagen_zien', 'Kan werfverslagen zien',
+      'Ziet Werfverslag/Verslagen/Actiepunten/Planning/Dossier(CaDos) -- enkel verslagen van projecten waaraan deze persoon gekoppeld is (vaste werfleider, projectleider, of ooit ingepland op dat project).'));
+    accessRow.appendChild(buildPermCheckbox('ip-p-verslagen-maken', 'kan_verslagen_maken', 'Kan werfverslagen maken',
+      'Mag nieuwe werfverslagen aanmaken (naast enkel bestaande bekijken).'));
+    accessRow.appendChild(buildPermCheckbox('ip-p-planning-zien', 'kan_planning_zien', 'Kan planning zien',
+      'Ziet het tabblad Personeelsplanning.'));
+    accessRow.appendChild(buildPermCheckbox('ip-p-planner', 'is_planner', 'Voorstellen goedkeuren',
+      'Mag planningsvoorstellen van collega\'s bevestigen/afwijzen (Personeelsplanning → Te bevestigen).'));
+    accessRow.appendChild(buildPermCheckbox('ip-p-voorstellen-maken', 'kan_voorstellen_maken', 'Voorstellen maken',
+      'Mag de Inschatting-tool gebruiken om planningsvoorstellen te maken, voor zichzelf en/of collega\'s.'));
+    // Hint die de toegangsvinkjes vervangt zodra de rol "Onderaannemer" is (zie
+    // updateAccessRowForRol hieronder) -- op vraag van Peter: "Die hebben geen rechten in de planning".
     const accessOaHint = document.createElement('p');
     accessOaHint.className = 'ip-oa-access-hint';
     accessOaHint.style.cssText = 'font-size:.78rem;color:var(--ink-soft);margin:4px 0 0;';
@@ -12845,20 +12935,33 @@ window.CaDosApp = {
     wrapper.appendChild(accessRow);
     wrapper.appendChild(accessOaHint);
 
-    // Onderaannemers krijgen nooit toegang: de toegangskeuze wordt dan verborgen (en de hint
-    // hierboven getoond), en app_toegang staat vast op 'geen' (zie ook hierboven bij het
-    // initialiseren van deze rij). Bij een andere rol dan Onderaannemer wordt de gewone
-    // toegangskeuze terug getoond; stond app_toegang nog op 'geen' (dus kwam van Onderaannemer),
-    // dan valt dit terug op 'volledig' zodat de persoon niet per ongeluk toegangsloos blijft.
+    // Onderaannemers krijgen nooit toegang: de toegangsvinkjes worden dan verborgen (en de hint
+    // hierboven getoond) en staan vast uit (zie ook hierboven bij het initialiseren van deze
+    // rij). Bij een andere rol dan Onderaannemer worden de vinkjes terug getoond; stonden alle 4
+    // nog uit (dus kwam van Onderaannemer), dan vallen ze terug op de "volledige toegang"-
+    // standaard zodat de persoon niet per ongeluk toegangsloos blijft. "Voorstellen goedkeuren"
+    // (is_planner) wordt door deze toggle BEWUST nooit aangeraakt, in geen van beide richtingen
+    // -- net als voorheen bij de oude "app_toegang"-dropdown, is dat een volledig los, eigen
+    // vinkje; anders zou heen-en-weer schakelen tussen Onderaannemer en een andere rol iemands
+    // "planner"-status stilzwijgend kunnen wissen.
     function updateAccessRowForRol(){
       const isOa = person.rol === 'Onderaannemer';
       accessRow.style.display = isOa ? 'none' : '';
       accessOaHint.style.display = isOa ? '' : 'none';
       if(isOa){
-        person.app_toegang = 'geen';
-      } else if(person.app_toegang === 'geen'){
-        person.app_toegang = 'volledig';
-        accessSelect.value = 'volledig';
+        person.kan_verslagen_zien = false;
+        person.kan_verslagen_maken = false;
+        person.kan_planning_zien = false;
+        person.kan_voorstellen_maken = false;
+      } else if(!person.kan_verslagen_zien && !person.kan_verslagen_maken && !person.kan_planning_zien && !person.kan_voorstellen_maken){
+        person.kan_verslagen_zien = true;
+        person.kan_verslagen_maken = true;
+        person.kan_planning_zien = true;
+        person.kan_voorstellen_maken = true;
+        accessRow.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+          if(cb.classList.contains('ip-p-planner')) return; // "Voorstellen goedkeuren" blijft onaangeroerd
+          cb.checked = true;
+        });
       }
     }
     updateAccessRowForRol();
@@ -12971,8 +13074,8 @@ window.CaDosApp = {
     return emailToTeamNaam(email);
   }
   // Zelfde matching als getCurrentUserNaam()/emailToTeamNaam(), maar geeft het volledige
-  // team_leden-/bureau-object terug (i.p.v. enkel de naam) -- nodig om `app_toegang`/`is_planner`
-  // van de ingelogde gebruiker af te lezen (2026-09-09, toegangsniveaus).
+  // team_leden-/bureau-object terug (i.p.v. enkel de naam) -- nodig om de 6 toegangsvinkjes van
+  // de ingelogde gebruiker af te lezen (2026-09-09, toegangsniveaus; herwerkt 2026-09-24 ronde 40).
   function getCurrentUserPerson(){
     const email = ((state.session && state.session.user && state.session.user.email) || '').trim().toLowerCase();
     if(!email) return null;
@@ -12981,6 +13084,42 @@ window.CaDosApp = {
     if(teamMatch) return teamMatch;
     const bureau = (state.company && Array.isArray(state.company.bureau)) ? state.company.bureau : [];
     return bureau.find(b => (b.email || '').trim().toLowerCase() === email) || null;
+  }
+
+  // ---- "Gekoppelde projecten" van een persoon (2026-09-24, ronde 40) ----
+  // Gebruikt om te bepalen welke werfverslagen/actiepunten/Planning-punten iemand met enkel
+  // "Kan werfverslagen zien" (i.p.v. de vroegere "Volledige toegang") te zien krijgt -- op vraag
+  // van Peter: "Kan werfverslagen zien waaraan hij gelinkt is". Een project telt als gekoppeld
+  // zodra de persoon er de vaste werfleider of projectleider van is, of er ooit een (al dan niet
+  // bevestigde) planningsafspraak op heeft staan -- ruim genomen, zodat niemand per ongeluk
+  // verslagen van een project mist waar die effectief aan werkt(e).
+  // Veiligheidsklep: een project ZONDER vaste werfleider ÉN zonder projectleider (dus nooit
+  // expliciet aan iemand toegewezen) telt voor iedereen als "gekoppeld" -- anders zouden oudere
+  // of nog niet volledig ingevulde projecten plots voor niemand meer zichtbaar zijn zodra deze
+  // ronde live gaat. De beperking geldt dus vooral voor projecten die wél een expliciete
+  // werfleider/projectleider hebben, maar een ander dan deze persoon.
+  function personLinkedProjectIds(){
+    const p = state.currentPerson;
+    if(!p) return null; // geen gekoppeld teamlid-record (bv. de eigenaar) -- geen beperking
+    const naam = p.naam;
+    const ids = new Set();
+    (state.projects || []).forEach(proj => {
+      const geenEigenaar = !proj.werfleider_naam && !proj.projectleider_naam;
+      if(geenEigenaar || proj.werfleider_naam === naam || proj.projectleider_naam === naam) ids.add(String(proj.id));
+    });
+    (state.planningItems || []).forEach(it => {
+      if(it.persoon_naam === naam && it.project_id != null) ids.add(String(it.project_id));
+    });
+    return ids;
+  }
+  // `getProjectId` haalt het project-id uit 1 rij van de lijst (verslagen/actiepunten/Planning-
+  // punten hebben elk een net iets andere vorm, zie de aanroepen hieronder). Geeft `rows`
+  // ongewijzigd terug zolang er geen gekoppeld teamlid-record is (bv. de eigenaar) -- exact het
+  // huidige, onbeperkte gedrag.
+  function filterToLinkedProjects(rows, getProjectId){
+    const linked = personLinkedProjectIds();
+    if(linked === null) return rows;
+    return rows.filter(r => { const id = getProjectId(r); return id != null && linked.has(String(id)); });
   }
 
   el('btn-save-company').addEventListener('click', async () => {
@@ -15673,7 +15812,11 @@ window.CaDosApp = {
 
   async function refreshVerslagenList(){
     try{
-      state.verslagenList = await dbListVerslagen();
+      // Beperkt tot "gekoppelde" projecten (2026-09-24, ronde 40) zodra iemand enkel "Kan
+      // werfverslagen zien" heeft en geen bredere toegang -- zie filterToLinkedProjects()/
+      // personLinkedProjectIds() hierboven. Voor wie geen gekoppeld teamlid-record heeft (bv.
+      // de eigenaar) verandert er niets.
+      state.verslagenList = filterToLinkedProjects(await dbListVerslagen(), v => v.project_id);
     }catch(err){
       console.error(err);
       // Val terug op de laatst gekende lijst (state.verslagenList blijft ongewijzigd) i.p.v. een
@@ -15814,7 +15957,9 @@ window.CaDosApp = {
 
   async function refreshActiepunten(){
     try{
-      state.actiepuntenList = await dbListActiepunten();
+      // Zelfde "gekoppelde projecten"-beperking als refreshVerslagenList() hierboven (2026-09-24,
+      // ronde 40) -- via de meegehaalde verslagen(project_id).
+      state.actiepuntenList = filterToLinkedProjects(await dbListActiepunten(), p => p.verslagen ? p.verslagen.project_id : null);
       await refreshReactiesEnOpmerkingenTellers();
       renderApProjectFilter();
       renderApProjectleiderFilter();
@@ -16236,7 +16381,9 @@ window.CaDosApp = {
   }
   async function refreshPlanning(){
     try{
-      state.planningList = await dbListPlanningPunten();
+      // Zelfde "gekoppelde projecten"-beperking als refreshVerslagenList() hierboven (2026-09-24,
+      // ronde 40).
+      state.planningList = filterToLinkedProjects(await dbListPlanningPunten(), p => p.verslagen ? p.verslagen.project_id : null);
       renderPlProjectFilter();
       renderPlAuteurFilter();
       renderPlVerantwFilter();
@@ -17014,13 +17161,19 @@ window.CaDosApp = {
     state.openApByProject = map;
   }
 
-  // Op vraag van Peter (2026-09-09): een "enkel planning"-gebruiker (bureau, geen toegang tot
-  // werfverslagen) mag wel afspraken toevoegen, maar ALLE types (status én project) tellen pas
-  // definitief mee nadat een "planner" ze bevestigt. Iedereen met volledige toegang blijft, zoals
-  // voorheen, meteen definitief -- geen bevestiging nodig voor wie dat al kon.
+  // Op vraag van Peter (2026-09-09): iemand zonder toegang tot werfverslagen (bureau, enkel
+  // Personeelsplanning) mag wel afspraken toevoegen, maar ALLE types (status én project) tellen
+  // pas definitief mee nadat een "planner" ze bevestigt. Wie wél werfverslagen mag zien/maken
+  // blijft, zoals voorheen, meteen definitief -- geen bevestiging nodig voor wie dat al kon.
+  // 2026-09-24 (ronde 40): vroeger gebaseerd op de "Volledige toegang / Enkel Personeelsplanning"-
+  // keuze (state.access), nu op het dichtstbijzijnde equivalent uit de 6 nieuwe vinkjes
+  // (kan_verslagen_zien/kan_verslagen_maken) -- zelfde onderliggende bedoeling: wie geen bredere
+  // toegang heeft dan enkel de planning, wordt hier nog steeds als "minder vertrouwd" behandeld.
   function ipPendingFieldsForNewEntry(){
     const naam = getCurrentUserNaam() || (state.session && state.session.user && state.session.user.email) || null;
-    const needsConfirm = state.access === 'planning';
+    const p = state.currentPerson;
+    const heeftVerslagenToegang = !p || p.kan_verslagen_zien || p.kan_verslagen_maken;
+    const needsConfirm = !heeftVerslagenToegang;
     return { bevestigd: !needsConfirm, aangemaakt_door: naam };
   }
   function ipIsPlanner(){ return !!(state.currentPerson && state.currentPerson.is_planner); }
