@@ -33,6 +33,11 @@ const FAVICON_PLANNING_PATH = path.join(DIR, '..', 'casentis-deliver', 'favicon-
 // Favicon voor de CaDos-app (groen CaDos-icoon), zelfde reden (2026-09-23, op vraag van Peter:
 // "Is er geen html voor cados?").
 const FAVICON_CADOS_PATH = path.join(DIR, '..', 'casentis-deliver', 'favicon-cados-base64.txt');
+// Favicon voor de CaCalc-app (blauw CaCalc-icoon), zelfde reden -- CaCalc toegevoegd als eigen,
+// losstaand tabblad (op vraag van Peter: "Kun je extra app toevoegen aan de Suite? CaCalc App
+// voor de kabelberekeningen te maken... Is losstaand."). Optioneel: valt terug op het gewone
+// CaSuite-icoon zolang dit bestand nog niet aangeleverd is (zie buildCacalc() hieronder).
+const FAVICON_CACALC_PATH = path.join(DIR, '..', 'casentis-deliver', 'favicon-cacalc-base64.txt');
 
 function replaceOnce(str, pattern, replacement, label) {
   if (!pattern.test(str)) {
@@ -134,8 +139,55 @@ function buildCados() {
   console.log('cados.html geschreven.');
 }
 
+function buildCacalc() {
+  // Eigen installeerbare "CaCalc"-app (kabelberekening AREI/RGIE, toegevoegd als eigen, losstaand
+  // tabblad -- op vraag van Peter: "Kun je extra app toevoegen aan de Suite? CaCalc App voor de
+  // kabelberekeningen te maken. Mag te linken zijn aan een project, maar hoeft niet in CaDos te
+  // zitten. Is losstaand.") -- exact zelfde opzet als buildCados() hierboven: een dunne kopie met
+  // eigen naam/icoon/favicon/theme-color en een geïnjecteerde CASNAP_APP_MODE='cacalc', die er in
+  // index.html voor zorgt dat enkel het CaCalc-tabblad (+ Projecten/Bedrijfsgegevens) toegankelijk
+  // is (zie CACALC_TABS/tabsForAppMode()) en de opstart-keuze automatisch overgeslagen wordt (er
+  // is toch maar 1 optie).
+  let html = source;
+  html = replaceOnce(html, /<title>[^<]*<\/title>/, '<title>CaCalc – Kabelberekening AREI</title>', 'title (cacalc)');
+  html = replaceOnce(html, /<link rel="manifest" href="\.\/manifest\.json">/, '<link rel="manifest" href="./manifest-cacalc.json">', 'manifest (cacalc)');
+  // CaCalc's stijl is herleid naar CaSuite's eigen blauw (zie #cacalc-app-CSS-variabelen in
+  // src2.html) -- zelfde theme-color als de rest van CaSuite, geen eigen kleuridentiteit meer.
+  html = replaceOnce(html, /<meta name="theme-color" content="[^"]*">/, '<meta name="theme-color" content="#1465f5">', 'theme-color (cacalc)');
+  html = replaceOnce(html, /<meta name="apple-mobile-web-app-title" content="[^"]*">/, '<meta name="apple-mobile-web-app-title" content="CaCalc">', 'apple-mobile-web-app-title (cacalc)');
+  // Peter heeft de CaCalc-iconen (2026-09-25) rechtstreeks in de bestaande, gedeelde `icons/`-map
+  // op zijn website gezet -- niet in een eigen `icons-cacalc/`-map zoals bij CaDos/CaPla -- met de
+  // bezorgde bestandsnamen (`cacalc-icon-192.png`/`cacalc-icon-512.png`/`cacalc-icon-180.png`)
+  // ongewijzigd behouden i.p.v. ze te hernoemen naar icon192.png/icon512.png. Dit pad hieronder is
+  // daarop aangepast; zie ook manifest-cacalc.json (moet dezelfde bestandsnamen/map gebruiken).
+  html = replaceOnce(html, /<link rel="apple-touch-icon" href="\.\/icons\/icon192\.png">/, '<link rel="apple-touch-icon" href="./icons/cacalc-icon-192.png">', 'apple-touch-icon (cacalc)');
+  // eigen favicon (blauw CaCalc-icoon) i.p.v. het gewone CaSuite-icoon -- optioneel, zie
+  // FAVICON_CACALC_PATH hierboven; zolang dat bestand niet aangeleverd is, blijft gewoon het
+  // bestaande CaSuite-favicon staan (geen harde fout, enkel een waarschuwing).
+  if (fs.existsSync(FAVICON_CACALC_PATH)) {
+    const faviconData = fs.readFileSync(FAVICON_CACALC_PATH, 'utf-8').trim();
+    html = replaceOnce(
+      html,
+      /<link rel="icon" type="image\/png" href="data:image\/png;base64,[^"]+">/,
+      `<link rel="icon" type="image/png" href="${faviconData}">`,
+      'favicon (cacalc)'
+    );
+  } else {
+    console.warn('WAARSCHUWING: favicon-cacalc-base64.txt niet gevonden — CaCalc-favicon niet aangepast (valt terug op het gewone CaSuite-icoon).');
+  }
+  html = replaceOnce(
+    html,
+    /<script src="https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/jspdf\//,
+    `<script>window.CASNAP_APP_MODE = 'cacalc';</script>\n<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/`,
+    'CASNAP_APP_MODE injectie (cacalc)'
+  );
+  fs.writeFileSync(path.join(DIR, 'cacalc.html'), html, 'utf-8');
+  console.log('cacalc.html geschreven.');
+}
+
 buildIndex();
 buildWerf();
 buildPlanning();
 buildCados();
+buildCacalc();
 console.log('Klaar.');
