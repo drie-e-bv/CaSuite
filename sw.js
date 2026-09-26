@@ -28,7 +28,7 @@
  * CACHE_VERSION hieronder verhogen lost dit soort dingen sowieso op, dus voortaan bij ÉLKE
  * ronde die code aanraakt (niet enkel als sw.js zelf inhoudelijk wijzigt).
  */
-const CACHE_VERSION = 'casnap-v2026-09-25a';
+const CACHE_VERSION = 'casnap-v2026-09-26-r48'; // ronde 48 (design-herwerking, fase A)
 const NETWORK_TIMEOUT_MS = 4000;
 
 self.addEventListener('install', () => {
