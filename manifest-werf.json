@@ -1,0 +1,24 @@
+{
+  "name": "CaSnap – werfverslagen",
+  "short_name": "CaSnap",
+  "description": "Werfverslagen maken, opvolgen en delen voor Casentis.",
+  "start_url": "./werf.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f2f5f3",
+  "theme_color": "#f5790a",
+  "lang": "nl",
+  "icons": [
+    {
+      "src": "./icons/casnap-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "./icons/casnap-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

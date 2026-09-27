@@ -5,8 +5,8 @@
   "start_url": "./cacalc.html",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#f5f6f8",
-  "theme_color": "#1465f5",
+  "background_color": "#f2f5f3",
+  "theme_color": "#1b6b3e",
   "icons": [
     { "src": "./icons/cacalc-icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "./icons/cacalc-icon-512.png", "sizes": "512x512", "type": "image/png" }

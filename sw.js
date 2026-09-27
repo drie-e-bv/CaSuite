@@ -28,7 +28,7 @@
  * CACHE_VERSION hieronder verhogen lost dit soort dingen sowieso op, dus voortaan bij ÉLKE
  * ronde die code aanraakt (niet enkel als sw.js zelf inhoudelijk wijzigt).
  */
-const CACHE_VERSION = 'casnap-v2026-09-27-r53'; // ronde 53 (laatste 9 praktijktest-punten: touch-targets rooster, Escape op alle modals, "vrije invoer" zonder prompt(), CaCalc-projectinstellingen-modal, Belgische datumnotatie overal, offline-banner ook voor CaDos/CaCalc-autosave, CaDos-tab "Plannen" met pins op een plan, carry-over-tiebreak-fix, herbruikbare checklist-templates)
+const CACHE_VERSION = 'casnap-v2026-09-27-r54'; // ronde 54 (PWA-icoon/manifest-bugfix: hoofdapp "CaSuite" toonde nog het oude blauwe CaSnap-logo/naam op het Android-startscherm omdat manifest.json/icons/icon192+512.png nooit vervangen waren na de ronde 48-rebrand; manifest-werf.json/manifest-planning.json/manifest-cados.json bestonden zelfs helemaal niet; apple-touch-icon-paden voor Planning/CaDos wezen naar niet-bestaande mappen. Plus: "Mijn week" in Rooster is nu een per-gebruiker voorkeur (aan/uit, boven/onder), en het team-schakelaar (Tech/Bureau) in Rooster wordt nu ook per gebruiker onthouden.)
 const NETWORK_TIMEOUT_MS = 4000;
 
 self.addEventListener('install', () => {

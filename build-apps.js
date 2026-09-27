@@ -105,7 +105,13 @@ function buildPlanning() {
   html = replaceOnce(html, /<link rel="manifest" href="\.\/manifest\.json">/, '<link rel="manifest" href="./manifest-planning.json">', 'manifest (planning)');
   html = replaceOnce(html, /<meta name="theme-color" content="[^"]*">/, '<meta name="theme-color" content="#f58a14">', 'theme-color (planning)');
   html = replaceOnce(html, /<meta name="apple-mobile-web-app-title" content="[^"]*">/, '<meta name="apple-mobile-web-app-title" content="CaPla">', 'apple-mobile-web-app-title (planning)');
-  html = replaceOnce(html, /<link rel="apple-touch-icon" href="\.\/icons\/icon192\.png">/, '<link rel="apple-touch-icon" href="./icons-planning/icon192.png">', 'apple-touch-icon (planning)');
+  // Ronde 54 (2026-09-27): dit verwees naar "./icons-planning/icon192.png", een map die nooit
+  // bestaan heeft -- de echte, correcte CaPla-icoon staat (zoals bij CaSnap/CaCalc) gewoon in de
+  // gedeelde `icons/`-map onder de naam "capla-icon-192.png". Peter meldde dat het app-icoon op
+  // Android nog het oude logo toonde; dit bleek de oorzaak voor Planning (zie ook manifest.json/
+  // manifest-werf.json/manifest-planning.json/manifest-cados.json, die deze ronde voor het eerst
+  // aangemaakt/hersteld zijn -- manifest-planning.json bestond tot nu toe zelfs helemaal niet).
+  html = replaceOnce(html, /<link rel="apple-touch-icon" href="\.\/icons\/icon192\.png">/, '<link rel="apple-touch-icon" href="./icons/capla-icon-192.png">', 'apple-touch-icon (planning)');
   // eigen favicon (oranje/bruin CaPla-icoon) i.p.v. het blauwe CaSnap-icoon
   if (fs.existsSync(FAVICON_PLANNING_PATH)) {
     const faviconData = fs.readFileSync(FAVICON_PLANNING_PATH, 'utf-8').trim();
@@ -140,7 +146,9 @@ function buildCados() {
   // Zelfde gedempt groen als de CaDos-huisstijl zelf (--copper in de #cados-app-CSS-variabelen).
   html = replaceOnce(html, /<meta name="theme-color" content="[^"]*">/, '<meta name="theme-color" content="#2F7A4D">', 'theme-color (cados)');
   html = replaceOnce(html, /<meta name="apple-mobile-web-app-title" content="[^"]*">/, '<meta name="apple-mobile-web-app-title" content="CaDos">', 'apple-mobile-web-app-title (cados)');
-  html = replaceOnce(html, /<link rel="apple-touch-icon" href="\.\/icons\/icon192\.png">/, '<link rel="apple-touch-icon" href="./icons-cados/icon192.png">', 'apple-touch-icon (cados)');
+  // Ronde 54: zelfde fix als bij Planning hierboven -- "./icons-cados/icon192.png" bestond niet,
+  // de echte icoon staat in `icons/cados-icon-192.png`.
+  html = replaceOnce(html, /<link rel="apple-touch-icon" href="\.\/icons\/icon192\.png">/, '<link rel="apple-touch-icon" href="./icons/cados-icon-192.png">', 'apple-touch-icon (cados)');
   // eigen favicon (groen CaDos-icoon) i.p.v. het blauwe CaSuite-icoon
   if (fs.existsSync(FAVICON_CADOS_PATH)) {
     const faviconData = fs.readFileSync(FAVICON_CADOS_PATH, 'utf-8').trim();

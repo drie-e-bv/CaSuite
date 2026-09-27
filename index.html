@@ -3497,9 +3497,22 @@
            bovenaan het Rooster-subtabblad -- de lopende week (ma-zo) van de ingelogde gebruiker
            zelf, zonder door het hele rooster te moeten zoeken naar de eigen kolom. Enkel zichtbaar
            voor wie een gekoppelde naam heeft (zie renderIpMyWeek()); leeg/verborgen voor de
-           eigenaar (geen gekoppeld teamlid-record). -->
+           eigenaar (geen gekoppeld teamlid-record).
+           Ronde 54 (op vraag van Peter): aan/uit + boven/onder is nu een per-gebruiker voorkeur
+           (zie ipMyWeekPref()/renderIpMyWeek() in het script). Bewust GEEN nieuwe permanente
+           instellingenbalk hiervoor ("zo weinig settings in het rond en zo veel mogelijk rooster
+           zichtbaar") -- enkel de 2 mini-iconknopjes hieronder in de card-head zelf (zelfde
+           .ip-mini-btn-stijl als elders in dit tabblad), plus het kleine "tonen"-linkje net hierna
+           zodat wie de kaart uitzet, ze ook altijd makkelijk terugvindt. -->
+      <button type="button" class="ip-mini-btn" id="ip-myweek-show-link" style="display:none;margin-bottom:10px;">📅 Mijn week tonen</button>
       <div class="card ip-myweek-card" id="ip-myweek-card" style="display:none;margin-bottom:14px;">
-        <div class="card-head"><h3>📅 Mijn week</h3></div>
+        <div class="card-head">
+          <h3>📅 Mijn week</h3>
+          <div style="display:flex;gap:6px;">
+            <button type="button" class="ip-mini-btn" id="ip-myweek-pos-btn" title="Boven of onder het rooster tonen" aria-label="Mijn week boven of onder het rooster tonen">⇅</button>
+            <button type="button" class="ip-mini-btn" id="ip-myweek-hide-btn" title="Mijn week verbergen" aria-label="Mijn week verbergen">✕</button>
+          </div>
+        </div>
         <div class="card-body mp-week-days" id="ip-myweek-body"></div>
       </div>
       <!-- Ronde 48 fase C (2026-09-25, ronde 48 — design-herwerking): bovenbalk herschikt tot één
@@ -28732,8 +28745,37 @@ window.CaCalcApp = {
   }
   function ipIsPlanner(){ return !!(state.currentPerson && state.currentPerson.is_planner); }
 
+  // ===================== Team-keuze (Tech/Bureau) onthouden per gebruiker (ronde 54) =====================
+  // Audit-bevinding (op vraag van Peter, "wat kan er nog per gebruiker onthouden worden"): de
+  // Tech/Bureau-schakelaar bovenaan het Rooster stond puur in-memory (state.ip.team) en viel na
+  // elke herlaad/nieuwe login terug op 'TECH' -- wie meestal Bureau bekijkt moest dat dus elke
+  // keer opnieuw instellen. Zelfde localStorage-conventie als ipMyWeekPref() hierboven (en
+  // laatsteTabKey()/openVerslagKey() nog hoger in dit bestand); GEEN nieuwe UI, gewoon de
+  // bestaande schakelaar onthouden. Standaard (nog niets opgeslagen) = ongewijzigd 'TECH'.
+  function ipTeamPrefKey(){
+    const id = getCurrentUserNaam() || (state.session && state.session.user && state.session.user.email) || 'anoniem';
+    return 'casuite-ip-team-' + APP_MODE + '-' + id;
+  }
+  function ipReadTeamPref(){
+    try{ const v = localStorage.getItem(ipTeamPrefKey()); return (v === 'TECH' || v === 'BUREAU') ? v : null; }catch(e){ return null; }
+  }
+  function ipSaveTeamPref(team){
+    try{ localStorage.setItem(ipTeamPrefKey(), team); }catch(e){}
+  }
+
   async function refreshInzetPlanning(){
     if(!state.ip.weekStart) state.ip.weekStart = ipMondayOf(new Date());
+    // Eenmalig (per sessie) de onthouden team-keuze toepassen -- pas hier en niet al bij het
+    // aanmaken van de initiële `state` (helemaal bovenaan), want getCurrentUserNaam() heeft dan
+    // nog geen ingelogde gebruiker om op te sleutelen. De knoppen zelf tonen in de HTML altijd
+    // "Tech" als actief; die klassen hier meteen mee in sync zetten voorkomt dat de schakelaar
+    // "Tech" toont terwijl het rooster stiekem al Bureau laat zien.
+    if(!state.ip.__teamPrefLoaded){
+      state.ip.__teamPrefLoaded = true;
+      const storedTeam = ipReadTeamPref();
+      if(storedTeam) state.ip.team = storedTeam;
+      document.querySelectorAll('#ip-team-switch button[data-team]').forEach(b => b.classList.toggle('active', b.dataset.team === state.ip.team));
+    }
     try{ state.actiepuntenList = await dbListActiepunten(); }
     catch(err){ console.error('Kon actiepunten niet laden voor Personeelsplanning:', err); }
     ipBuildOpenApMap();
@@ -28801,16 +28843,69 @@ window.CaCalcApp = {
     wrap.innerHTML = html;
   }
 
+  // ===================== "📅 Mijn week": aan/uit + positie, per gebruiker (ronde 54) =====================
+  // Peter (eigenaar) wil zelf kunnen kiezen of de "📅 Mijn week"-kaart getoond wordt en of ze boven
+  // of onder het rooster staat. Uitdrukkelijk GEEN nieuwe permanente instellingenbalk hiervoor (zijn
+  // woorden: "Ik wil planning zo weinig settings in het rond en zo veel mogelijk rooster zichtbaar")
+  // -- vandaar de 2 mini-iconknopjes in de card-head van de kaart zelf (zie HTML hierboven) i.p.v.
+  // een apart instellingenscherm.
+  // "Per gebruiker" = zelfde localStorage-conventie als laatsteTabKey()/openVerslagKey() hierboven
+  // (casuite-<naam>-<APP_MODE>), maar dan ook nog gesleuteld op de ingelogde gebruiker zelf (naam of
+  // anders e-mail, met een device-only fallback voor wie niet ingelogd is) -- dit is namelijk
+  // écht een per-persoon voorkeur, geen per-toestel voorkeur: verschillende collega's die hetzelfde
+  // toestel/dezelfde browser delen mogen elk hun eigen keuze houden.
+  // Standaard (nog niets opgeslagen) = exact het bestaande gedrag: getoond, boven het rooster --
+  // dus 100% onzichtbaar/ongewijzigd voor wie deze knopjes nooit aanraakt.
+  function ipMyWeekPrefKey(){
+    const id = getCurrentUserNaam() || (state.session && state.session.user && state.session.user.email) || 'anoniem';
+    return 'casuite-myweek-pref-' + APP_MODE + '-' + id;
+  }
+  function ipMyWeekPref(){
+    try{
+      const raw = localStorage.getItem(ipMyWeekPrefKey());
+      if(!raw) return { on: true, pos: 'boven' };
+      const parsed = JSON.parse(raw) || {};
+      return { on: parsed.on !== false, pos: parsed.pos === 'onder' ? 'onder' : 'boven' };
+    }catch(e){ return { on: true, pos: 'boven' }; }
+  }
+  function ipSaveMyWeekPref(pref){
+    try{ localStorage.setItem(ipMyWeekPrefKey(), JSON.stringify(pref)); }catch(e){}
+  }
+  // Verplaatst de kaart zelf in de DOM i.p.v. de kaart 2x in de HTML te zetten -- "boven" = de
+  // bestaande plek (net voor .ip-toolbar, zoals in de HTML hierboven), "onder" = net na het
+  // rooster (.ip-grid-frame), voor de "→ volgende week"-knoppenrij. Idempotent: doet niets als de
+  // kaart al op de juiste plek staat.
+  function ipPositionMyWeekCard(pos){
+    const card = el('ip-myweek-card');
+    const toolbar = document.querySelector('#ipsub-rooster .ip-toolbar');
+    const frame = el('ip-grid-frame');
+    if(!card || !toolbar || !frame) return;
+    if(pos === 'onder'){
+      if(card.previousElementSibling !== frame) frame.insertAdjacentElement('afterend', card);
+    } else if(card.nextElementSibling !== toolbar){
+      toolbar.insertAdjacentElement('beforebegin', card);
+    }
+  }
   // ===================== "📅 Mijn week" (ronde 52, punt 7) =====================
-  // Kleine kaart bovenaan het Rooster-subtabblad -- de lopende week (ma-zo) van de ingelogde
-  // gebruiker zelf, vandaag gemarkeerd. Puur lezend; klikken op een dag springt naar diezelfde
-  // week in het volledige rooster (die staat toch al standaard op de lopende week bij het openen).
+  // Kleine kaart bovenaan (of onderaan, zie hierboven) het Rooster-subtabblad -- de lopende week
+  // (ma-zo) van de ingelogde gebruiker zelf, vandaag gemarkeerd. Puur lezend; klikken op een dag
+  // springt naar diezelfde week in het volledige rooster (die staat toch al standaard op de
+  // lopende week bij het openen).
   function renderIpMyWeek(){
     const card = el('ip-myweek-card');
     const body = el('ip-myweek-body');
+    const showLink = el('ip-myweek-show-link');
     if(!card || !body) return;
     const naam = getCurrentUserNaam();
-    if(!naam){ card.style.display = 'none'; return; } // geen gekoppeld teamlid-record (bv. de eigenaar)
+    if(!naam){ card.style.display = 'none'; if(showLink) showLink.style.display = 'none'; return; } // geen gekoppeld teamlid-record (bv. de eigenaar)
+    const pref = ipMyWeekPref();
+    ipPositionMyWeekCard(pref.pos);
+    if(!pref.on){
+      card.style.display = 'none';
+      if(showLink) showLink.style.display = '';
+      return;
+    }
+    if(showLink) showLink.style.display = 'none';
     card.style.display = '';
     const todayIso = todayISO();
     const weekStart = ipMondayOf(new Date());
@@ -28847,6 +28942,27 @@ window.CaCalcApp = {
     state.ip.weekStart = ipMondayOf(new Date(btn.dataset.myweekDate + 'T00:00:00'));
     renderIpGrid();
     renderIpCapacityTab();
+  });
+  // Mini-iconknopjes in de card-head (ronde 54) -- boven/onder wisselt meteen, geen bevestiging
+  // nodig (puur visueel, niets destructief). Uitzetten verbergt de kaart en toont het kleine
+  // "tonen"-linkje; dat linkje zet 'm gewoon weer aan. Alle 3 herrenderen meteen, geen page reload.
+  el('ip-myweek-pos-btn').addEventListener('click', () => {
+    const pref = ipMyWeekPref();
+    pref.pos = pref.pos === 'onder' ? 'boven' : 'onder';
+    ipSaveMyWeekPref(pref);
+    renderIpMyWeek();
+  });
+  el('ip-myweek-hide-btn').addEventListener('click', () => {
+    const pref = ipMyWeekPref();
+    pref.on = false;
+    ipSaveMyWeekPref(pref);
+    renderIpMyWeek();
+  });
+  el('ip-myweek-show-link').addEventListener('click', () => {
+    const pref = ipMyWeekPref();
+    pref.on = true;
+    ipSaveMyWeekPref(pref);
+    renderIpMyWeek();
   });
 
   // ===================== Projectinschatting (2026-09-20, ronde 24) =====================
@@ -30051,6 +30167,7 @@ window.CaCalcApp = {
     const btn = e.target.closest('button[data-team]'); if(!btn) return;
     state.ip.team = btn.dataset.team;
     state.ip.selectedRoles = new Set();
+    ipSaveTeamPref(state.ip.team); // ronde 54: onthouden per gebruiker, zie refreshInzetPlanning()
     document.querySelectorAll('#ip-team-switch button').forEach(b => b.classList.toggle('active', b === btn));
     renderIpRoleFilter(); renderIpGrid(); renderIpCapacityTab(); renderIpSkillsTab();
   });
