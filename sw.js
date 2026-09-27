@@ -28,7 +28,7 @@
  * CACHE_VERSION hieronder verhogen lost dit soort dingen sowieso op, dus voortaan bij ÉLKE
  * ronde die code aanraakt (niet enkel als sw.js zelf inhoudelijk wijzigt).
  */
-const CACHE_VERSION = 'casnap-v2026-09-26-r48'; // ronde 48 (design-herwerking, fase A)
+const CACHE_VERSION = 'casnap-v2026-09-27-r53'; // ronde 53 (laatste 9 praktijktest-punten: touch-targets rooster, Escape op alle modals, "vrije invoer" zonder prompt(), CaCalc-projectinstellingen-modal, Belgische datumnotatie overal, offline-banner ook voor CaDos/CaCalc-autosave, CaDos-tab "Plannen" met pins op een plan, carry-over-tiebreak-fix, herbruikbare checklist-templates)
 const NETWORK_TIMEOUT_MS = 4000;
 
 self.addEventListener('install', () => {

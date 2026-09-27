@@ -38,6 +38,12 @@ const FAVICON_CADOS_PATH = path.join(DIR, '..', 'casentis-deliver', 'favicon-cad
 // voor de kabelberekeningen te maken... Is losstaand."). Optioneel: valt terug op het gewone
 // CaSuite-icoon zolang dit bestand nog niet aangeleverd is (zie buildCacalc() hieronder).
 const FAVICON_CACALC_PATH = path.join(DIR, '..', 'casentis-deliver', 'favicon-cacalc-base64.txt');
+// Favicon voor de Werf-app (oranje "CaSnap"-icoon, ronde 46, 2026-09-25) -- Werfverslag/werf.html
+// viel tot nu toe gewoon terug op het gewone CaSuite-icoon (zie de bugfix-toelichting in
+// buildWerf() hieronder); op vraag van Peter ("Er zou CaSnap icoon ergens moeten bestaan voor de
+// werfverslagen") kreeg het nu, net als CaPla/CaDos/CaCalc, zijn eigen favicon/apple-touch-icon.
+// Optioneel: valt terug op het gewone CaSuite-favicon zolang dit bestand niet aangeleverd is.
+const FAVICON_CASNAP_PATH = path.join(DIR, '..', 'casentis-deliver', 'favicon-casnap-base64.txt');
 
 function replaceOnce(str, pattern, replacement, label) {
   if (!pattern.test(str)) {
@@ -60,10 +66,28 @@ function buildWerf() {
   html = replaceOnce(html, /<meta name="apple-mobile-web-app-title" content="[^"]*">/, '<meta name="apple-mobile-web-app-title" content="CaSnap Werf">', 'apple-mobile-web-app-title (werf)');
   // Bugfix (2026-09-23, op vraag van Peter -- "kun je de icoonbestanden correct linken"): er
   // stond hier vroeger een regel die apple-touch-icon naar een "icons-werf/"-map liet wijzen die
-  // nooit bestaan heeft of bezorgd is (dode link op de website). De Werf-app hergebruikt gewoon
-  // het CaSuite-logo (zelfde als index.html, geen eigen Werf-icoon) -- dus bewust GEEN
-  // apple-touch-icon-vervanging hier: die regel blijft "./icons/icon192.png" zoals in de bron.
-  // theme-color blijft hetzelfde blauw (#1465f5) voor de Werf-app — geen wijziging nodig.
+  // nooit bestaan heeft of bezorgd is (dode link op de website) -- daarom viel de Werf-app tot nu
+  // toe gewoon terug op het gewone CaSuite-logo (zelfde als index.html).
+  // Ronde 46 (2026-09-25): Werfverslag krijgt nu, net als CaPla/CaDos/CaCalc, zijn eigen icoon --
+  // op vraag van Peter ("Er zou CaSnap icoon ergens moeten bestaan voor de werfverslagen"). Zelfde
+  // padkeuze als bij CaCalc (ronde 45c): rechtstreeks in de gedeelde `icons/`-map, met een
+  // `casnap-icon-`-voorvoegsel, i.p.v. een eigen `icons-werf/`-submap.
+  html = replaceOnce(html, /<link rel="apple-touch-icon" href="\.\/icons\/icon192\.png">/, '<link rel="apple-touch-icon" href="./icons/casnap-icon-192.png">', 'apple-touch-icon (werf)');
+  // eigen favicon (oranje CaSnap-icoon) i.p.v. het blauwe CaSuite-icoon
+  if (fs.existsSync(FAVICON_CASNAP_PATH)) {
+    const faviconData = fs.readFileSync(FAVICON_CASNAP_PATH, 'utf-8').trim();
+    html = replaceOnce(
+      html,
+      /<link rel="icon" type="image\/png" href="data:image\/png;base64,[^"]+">/,
+      `<link rel="icon" type="image/png" href="${faviconData}">`,
+      'favicon (werf)'
+    );
+  } else {
+    console.warn('WAARSCHUWING: favicon-casnap-base64.txt niet gevonden — Werf-favicon niet aangepast.');
+  }
+  // Eigen theme-color (oranje, zelfde als het nieuwe CaSnap-icoon) i.p.v. het gewone CaSuite-blauw
+  // -- zelfde aanpak als CaDos (eigen theme-color, ook al is de in-app stijl zelf CaSuite-blauw).
+  html = replaceOnce(html, /<meta name="theme-color" content="[^"]*">/, '<meta name="theme-color" content="#f5790a">', 'theme-color (werf)');
   // CASNAP_APP_MODE injecteren vóór de eerste CDN-<script> (jsPDF)
   html = replaceOnce(
     html,
@@ -153,7 +177,9 @@ function buildCacalc() {
   html = replaceOnce(html, /<link rel="manifest" href="\.\/manifest\.json">/, '<link rel="manifest" href="./manifest-cacalc.json">', 'manifest (cacalc)');
   // CaCalc's stijl is herleid naar CaSuite's eigen blauw (zie #cacalc-app-CSS-variabelen in
   // src2.html) -- zelfde theme-color als de rest van CaSuite, geen eigen kleuridentiteit meer.
-  html = replaceOnce(html, /<meta name="theme-color" content="[^"]*">/, '<meta name="theme-color" content="#1465f5">', 'theme-color (cacalc)');
+  // Ronde 48 (2026-09-25, design-herwerking): het oude CaSuite-blauw bestaat niet meer -- zelfde
+  // merkgroen als index.html (src2.html) i.p.v. het vroegere #1465f5.
+  html = replaceOnce(html, /<meta name="theme-color" content="[^"]*">/, '<meta name="theme-color" content="#1b6b3e">', 'theme-color (cacalc)');
   html = replaceOnce(html, /<meta name="apple-mobile-web-app-title" content="[^"]*">/, '<meta name="apple-mobile-web-app-title" content="CaCalc">', 'apple-mobile-web-app-title (cacalc)');
   // Peter heeft de CaCalc-iconen (2026-09-25) rechtstreeks in de bestaande, gedeelde `icons/`-map
   // op zijn website gezet -- niet in een eigen `icons-cacalc/`-map zoals bij CaDos/CaPla -- met de
