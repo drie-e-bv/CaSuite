@@ -294,6 +294,12 @@
   }
   .appbar-account.open .appbar-account-pop{display:flex;}
   .appbar-account-label{font-size:12px;color:var(--ink-faint);font-weight:600;}
+  /* Ronde 55 (Outlook-sync): 2 persoonlijke opt-in-vinkjes in het accountmenu (zie
+     renderAccountOutlookToggles()) -- eigen klasse i.p.v. de bestaande .chk (die is scoped op
+     Bedrijfsgegevens-rijen en zou hier buiten dat scherm niets opleveren). */
+  .appbar-account-outlook{display:flex;flex-direction:column;gap:6px;padding:8px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
+  .acct-sync-row{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-soft);cursor:pointer;}
+  .acct-sync-row input{flex:none;}
   .user-bar .user-email{display:block;font-weight:600;color:var(--ink);font-size:14px;overflow-wrap:anywhere;margin-top:-6px;}
   #btn-logout::before{
     content:"";width:18px;height:18px;background:currentColor;
@@ -2953,6 +2959,15 @@
               <div class="appbar-account-label">Aangemeld als</div>
               <span class="user-email" id="user-email"></span>
             </div>
+            <!-- Ronde 55 (Outlook-sync): 2 persoonlijke, opt-in-vinkjes over de EIGEN Outlook-agenda
+                 -- bewust hier (self-service, geen beheerder-rechten nodig) en NIET op de
+                 Beheer-pagina (die is voor het beheren van de rechten van ANDERE mensen, zie
+                 buildIpPersonExtraRow()). Enkel zichtbaar met een gekoppeld teamlid-record (zie
+                 renderAccountOutlookToggles()); beide default UIT. -->
+            <div class="appbar-account-outlook" id="appbar-account-outlook" style="display:none;">
+              <label class="acct-sync-row"><input type="checkbox" id="acct-sync-push"> Mijn planning naar Outlook sturen</label>
+              <label class="acct-sync-row"><input type="checkbox" id="acct-sync-pull"> Wijzigingen uit Outlook overnemen</label>
+            </div>
             <button class="btn btn-secondary btn-sm" id="btn-logout" type="button">Uitloggen</button>
           </div>
         </div>
@@ -3509,6 +3524,10 @@
         <div class="card-head">
           <h3>📅 Mijn week</h3>
           <div style="display:flex;gap:6px;">
+            <!-- Ronde 55 (Outlook-sync): enkel zichtbaar als de ingelogde gebruiker minstens 1 van
+                 de 2 sync-vinkjes aan heeft staan (zie renderIpMyWeek()/#appbar-account-outlook) --
+                 wie de sync nooit gebruikt ziet dit knopje gewoon nooit. -->
+            <button type="button" class="ip-mini-btn" id="ip-myweek-sync-btn" style="display:none;" title="Nu synchroniseren met Outlook" aria-label="Rooster nu synchroniseren met Outlook">🔄 Synchroniseer</button>
             <button type="button" class="ip-mini-btn" id="ip-myweek-pos-btn" title="Boven of onder het rooster tonen" aria-label="Mijn week boven of onder het rooster tonen">⇅</button>
             <button type="button" class="ip-mini-btn" id="ip-myweek-hide-btn" title="Mijn week verbergen" aria-label="Mijn week verbergen">✕</button>
           </div>
@@ -20878,6 +20897,24 @@ window.CaCalcApp = {
     { key: 'AFWEZIG', label: 'Afwezig', cls: 'ip-status-afwezig' },
     { key: 'MAGAZIJN', label: 'Magazijn', cls: 'ip-status-magazijn' }
   ];
+  // Standaard werktijd per dagdeel voor de Outlook-sync (ronde 55) -- enkel gebruikt als een
+  // planning_item geen eigen van_uur/tot_uur heeft (dus nog nooit manueel aangepast is). Aanpasbaar
+  // hier op 1 plek; raakt geen bestaande data, enkel de Outlook-afspraken die hieruit berekend worden.
+  const OUTLOOK_WERKTIJDEN = {
+    dag: { van: '08:00', tot: '16:30' },
+    vm:  { van: '08:00', tot: '12:00' },
+    nm:  { van: '12:30', tot: '16:30' },
+  };
+  // Geeft de effectieve begin/eindtijd voor 1 planning_item terug -- het item zijn eigen van_uur/
+  // tot_uur (een handmatige override, bv. teruggeschreven door de Outlook-pull) als die er zijn,
+  // anders de standaard werktijd voor het dagdeel van dat item (zie OUTLOOK_WERKTIJDEN hierboven).
+  function ipWerktijdVoor(item){
+    // Postgres geeft een `time`-kolom terug als "HH:MM:SS" -- hier altijd naar "HH:MM" genormaliseerd
+    // zodat vergelijkingen (Outlook-pull) en de Graph-datetime-strings (Outlook-push) consistent zijn.
+    if(item && item.van_uur && item.tot_uur) return { van: String(item.van_uur).slice(0, 5), tot: String(item.tot_uur).slice(0, 5) };
+    const dagdeel = (item && item.dagdeel) || 'dag';
+    return OUTLOOK_WERKTIJDEN[dagdeel] || OUTLOOK_WERKTIJDEN.dag;
+  }
   el('f-datum').value = todayISO();
 
   // Verslagtype-toggle: "Werfverslag" (standaard, met aanwezigen/handtekeningen/...), "Verslag
@@ -21654,6 +21691,8 @@ window.CaCalcApp = {
     if(error) throw error;
     return data || [];
   }
+  // Generiek: .insert(fields)/.update(fields) op de rij zelf, dus de nieuwe ronde-55-kolommen
+  // (van_uur/tot_uur/outlook_event_id) gaan hier gewoon door zonder wijziging aan deze 2 functies.
   async function dbInsertPlanningItem(fields){
     const { data, error } = await sb.from('planning_items').insert(fields).select().single();
     if(error) throw error;
@@ -21663,15 +21702,27 @@ window.CaCalcApp = {
     const { error } = await sb.from('planning_items').update(fields).eq('id', id);
     if(error) throw error;
   }
+  // Ronde 55 (Outlook-sync): een planning_item dat hier verwijderd wordt en een outlook_event_id
+  // heeft, krijgt best-effort ook zijn Outlook-afspraak verwijderd (courtesy-mirror -- zie
+  // outlookBestEffortDeleteEvent() bij de rest van de sync-code hieronder). Het item wordt hier
+  // VOOR de echte databank-delete opgezocht in state.planningItems (elke aanroeper hierboven doet
+  // dat lokale-array-filteren pas NA deze functie), en de Outlook-kant gebeurt bewust niet-
+  // blokkerend/fire-and-forget na de succesvolle CaSuite-delete -- CaSuite blijft zo altijd de
+  // leidende, betrouwbare bron; een mislukte Outlook-verwijdering kan de echte delete nooit blokkeren.
   async function dbDeletePlanningItem(id){
+    const item = state.planningItems.find(it => String(it.id) === String(id));
     const { error } = await sb.from('planning_items').delete().eq('id', id);
     if(error) throw error;
+    outlookBestEffortDeleteEvent(item);
   }
   // Gebruikt door "Wis alle afspraken" in het zijpaneel -- verwijdert in 1 keer alle rijen voor
-  // die persoon+dag, i.p.v. losse deletes per entry.
+  // die persoon+dag, i.p.v. losse deletes per entry. Zelfde Outlook-courtesy-cleanup als
+  // dbDeletePlanningItem() hierboven, per betrokken rij.
   async function dbDeletePlanningItemsFor(persoonNaam, datumISO){
+    const items = state.planningItems.filter(it => it.persoon_naam === persoonNaam && it.datum === datumISO);
     const { error } = await sb.from('planning_items').delete().eq('persoon_naam', persoonNaam).eq('datum', datumISO);
     if(error) throw error;
+    items.forEach(outlookBestEffortDeleteEvent);
   }
 
   // ---- Urenregistratie (2026-09-27, ronde 52, punt 2) ----
@@ -22084,6 +22135,7 @@ window.CaCalcApp = {
     // welke projecten "gekoppeld" zijn; stond dit nog op de oude plek (na refreshVerslagenList),
     // dan zag iedereen bij de allereerste load nog even alles, vóór de beperking toesloeg.
     state.currentPerson = getCurrentUserPerson();
+    renderAccountOutlookToggles(); // ronde 55: de 2 persoonlijke Outlook-sync-vinkjes in het accountmenu
     state.projects = await dbListProjecten();
     // kolom 'actief' bestaat mogelijk nog niet (oudere rijen/db) -> dan gewoon als actief behandelen
     state.projects.forEach(p => { p.actief = (p.actief !== false); });
@@ -23991,6 +24043,46 @@ window.CaCalcApp = {
     const bureau = (state.company && Array.isArray(state.company.bureau)) ? state.company.bureau : [];
     return bureau.find(b => (b.email || '').trim().toLowerCase() === email) || null;
   }
+
+  // ---- Persoonlijke Outlook-sync-vinkjes in het accountmenu (ronde 55) ----
+  // Bewust GEEN beheerder-gate zoals de Beheer-pagina/buildIpPersonExtraRow() -- dit is een
+  // persoonlijke keuze over de EIGEN Outlook-agenda van de ingelogde gebruiker, dus zelf
+  // instelbaar door iedereen met een gekoppeld teamlid-/bureau-record (zie getCurrentUserPerson()
+  // hierboven). Enkel getoond mét zo'n record; een account zonder koppeling (bv. de eigenaar
+  // zonder eigen team_leden-rij) ziet dit blokje simpelweg niet, want er is niets om op te slaan.
+  function renderAccountOutlookToggles(){
+    const wrap = el('appbar-account-outlook');
+    if(!wrap) return;
+    const person = getCurrentUserPerson();
+    if(!person){ wrap.style.display = 'none'; return; }
+    wrap.style.display = '';
+    el('acct-sync-push').checked = !!person.sync_planning_naar_outlook;
+    el('acct-sync-pull').checked = !!person.sync_outlook_naar_planning;
+  }
+  // Opslaan via dbSaveGebruikersToegang() -- exact dezelfde, gerichte team_leden/bureau-partial-
+  // update als de Beheer-pagina gebruikt (zie de toelichting bij die functie); `person` hierboven
+  // is de rechtstreekse objectreferentie in state.company.team_leden/bureau, dus deze 2 velden
+  // hier aanpassen volstaat vóór het opslaan. Meteen na het aanzetten van een vinkje ook 1x
+  // synchroniseren (manual:true, geen debounce) zodat het effect meteen zichtbaar is i.p.v. tot
+  // 5 minuten te moeten wachten op de volgende automatische sync.
+  async function saveAccountOutlookToggle(field, checked){
+    const person = getCurrentUserPerson();
+    if(!person) return;
+    const vorige = !!person[field];
+    person[field] = checked;
+    try{
+      await dbSaveGebruikersToegang(state.company.team_leden, state.company.bureau);
+      showStatus(checked ? 'Outlook-sync aangezet' : 'Outlook-sync uitgezet');
+      renderIpMyWeek(); // toont/verbergt meteen de "🔄 Synchroniseer"-knop in "Mijn week"
+      if(checked) outlookSyncRoster({ manual: true }).catch(err => console.error('Outlook-sync (na inschakelen) mislukt:', err));
+    }catch(err){
+      person[field] = vorige; // terugdraaien in de UI/state als de databank het niet aanvaardde
+      el(field === 'sync_planning_naar_outlook' ? 'acct-sync-push' : 'acct-sync-pull').checked = vorige;
+      alert('Opslaan mislukt: ' + err.message);
+    }
+  }
+  el('acct-sync-push').addEventListener('change', e => saveAccountOutlookToggle('sync_planning_naar_outlook', e.target.checked));
+  el('acct-sync-pull').addEventListener('change', e => saveAccountOutlookToggle('sync_outlook_naar_planning', e.target.checked));
 
   // ---- "Vaste beheerder"-vloer + beheerder-check (2026-09-25) ----
   // Zie PETER_EMAIL hierboven voor de achtergrond. Deze vijf functies zijn samen de volledige
@@ -26691,38 +26783,72 @@ window.CaCalcApp = {
   // ververst wordt. Bij een lange werfdag kan het dus zijn dat je moet uitloggen en opnieuw
   // inloggen met Microsoft 365 om deze knop weer te laten werken — vandaar de duidelijke
   // foutmelding hieronder in plaats van een stille mislukking.
-  // Generieke basisfunctie: maakt een all-day Outlook-afspraak aan op `dateStr` (YYYY-MM-DD)
-  // met een vrij te kiezen onderwerp/tekst. Wordt hergebruikt door zowel de bestaande
-  // Actiepunt→agenda-knop hieronder als de nieuwe "AI-samenvatting voor planning"→agenda-knop.
-  async function createOutlookEventRaw({ subject, bodyText, dateStr }){
+  // Generieke basisfunctie: praat met Microsoft Graph (/me/events) voor zowel de bestaande
+  // Actiepunt→agenda-knop / "AI-samenvatting voor planning"→agenda-knop (all-day, POST-create,
+  // hun oorspronkelijke gedrag hieronder ONGEWIJZIGD) als de nieuwe Personeelsplanning-rooster-sync
+  // (ronde 55, zie outlookSyncRoster() verderop) -- die laatste heeft tijdgebonden afspraken en
+  // ook PATCH/GET/DELETE nodig, vandaar de `method`/`eventId`/`isAllDay`/`startDateTime`/
+  // `endDateTime`-opties hier ERBIJ i.p.v. een tweede, bijna-identieke kopie van deze fetch-
+  // boilerplate te schrijven. Achterwaarts compatibel: zonder `method`/`isAllDay` gedraagt dit
+  // zich exact zoals voorheen (POST, hele dag, op basis van `dateStr`).
+  //
+  // Belangrijke beperking om te weten: dit Microsoft-token is maar een tijd (meestal rond het
+  // uur) geldig, en Supabase ververst dit token NIET automatisch mee wanneer de sessie zelf
+  // ververst wordt. Bij een lange werfdag kan het dus zijn dat je moet uitloggen en opnieuw
+  // inloggen met Microsoft 365 om deze knop weer te laten werken — vandaar de duidelijke
+  // foutmelding hieronder in plaats van een stille mislukking (en, voor de Rooster-sync, waarom
+  // die zich "sessiegebonden" noemt: er is bewust GEEN achtergronddienst die dit ververst).
+  async function createOutlookEventRaw({ subject, bodyText, dateStr, method, eventId, isAllDay, startDateTime, endDateTime }){
     const token = state.session && state.session.provider_token;
     if(!token){
       const err = new Error('Geen Microsoft-agendatoegang beschikbaar.');
       err.needsReauth = true;
       throw err;
     }
-    const nextDay = (() => {
-      const d = new Date(dateStr + 'T00:00:00');
-      d.setDate(d.getDate() + 1);
-      return d.toISOString().slice(0,10);
-    })();
-    const res = await fetch('https://graph.microsoft.com/v1.0/me/events', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        subject,
-        body: { contentType: 'text', content: bodyText },
-        isAllDay: true,
-        start: { dateTime: dateStr + 'T00:00:00', timeZone: 'Europe/Brussels' },
-        end: { dateTime: nextDay + 'T00:00:00', timeZone: 'Europe/Brussels' }
-      })
+    const httpMethod = method || 'POST';
+    const path = eventId ? `/me/events/${encodeURIComponent(eventId)}` : '/me/events';
+    let body;
+    if(httpMethod !== 'GET' && httpMethod !== 'DELETE'){
+      if(isAllDay === false){
+        // Tijdgebonden afspraak (ronde 55, Personeelsplanning-rooster) -- rechtstreeks een
+        // begin/eindtijdstip meegeven, i.p.v. de hele-dag-opzet hieronder.
+        body = {
+          subject,
+          body: { contentType: 'text', content: bodyText || '' },
+          isAllDay: false,
+          start: { dateTime: startDateTime, timeZone: 'Europe/Brussels' },
+          end: { dateTime: endDateTime, timeZone: 'Europe/Brussels' }
+        };
+      } else {
+        const nextDay = (() => {
+          const d = new Date(dateStr + 'T00:00:00');
+          d.setDate(d.getDate() + 1);
+          return d.toISOString().slice(0,10);
+        })();
+        body = {
+          subject,
+          body: { contentType: 'text', content: bodyText || '' },
+          isAllDay: true,
+          start: { dateTime: dateStr + 'T00:00:00', timeZone: 'Europe/Brussels' },
+          end: { dateTime: nextDay + 'T00:00:00', timeZone: 'Europe/Brussels' }
+        };
+      }
+    }
+    const headers = { 'Authorization': 'Bearer ' + token, 'Prefer': 'outlook.timezone="Europe/Brussels"' };
+    if(body) headers['Content-Type'] = 'application/json';
+    const res = await fetch('https://graph.microsoft.com/v1.0' + path, {
+      method: httpMethod,
+      headers,
+      body: body ? JSON.stringify(body) : undefined
     });
     if(!res.ok){
       const errBody = await res.text().catch(() => '');
       const err = new Error(`Graph-fout (${res.status}): ${errBody.slice(0,200)}`);
       if(res.status === 401) err.needsReauth = true;
+      err.status = res.status;
       throw err;
     }
+    if(res.status === 204) return null; // DELETE geeft geen body terug
     return res.json();
   }
 
@@ -26732,6 +26858,174 @@ window.CaCalcApp = {
       bodyText: `Verantwoordelijke: ${item.responsible || '-'}\nWerf: ${projectNaam || '-'}\n\nAutomatisch aangemaakt vanuit het werfverslag (Casentis).`,
       dateStr: item.deadline
     });
+  }
+
+  // ===================== Outlook-synchronisatie van het Personeelsplanning-rooster (ronde 55) =====================
+  // "Sessiegebonden" tweerichtingssync met de eigen Outlook-agenda van de ingelogde gebruiker --
+  // op vraag van Peter bewust de kleinere, snellere "Optie A" i.p.v. een achtergronddienst met
+  // opgeslagen refresh-tokens (die optie heeft hij expliciet NIET gekozen): dit draait enkel
+  // zolang de gebruiker de app open heeft, hergebruikt het kortlevende Microsoft-token dat
+  // Supabase al meegeeft bij M365-inloggen (state.session.provider_token, zie
+  // createOutlookEventRaw() hierboven) en slaat nergens een eigen token/refresh-token op. Twee
+  // volledig persoonlijke, opt-in-vinkjes (sync_planning_naar_outlook/sync_outlook_naar_planning,
+  // beide default UIT -- zie #appbar-account-outlook/renderAccountOutlookToggles() bij de
+  // account-knop) bepalen of dit voor deze gebruiker iets doet; met beide uit is outlookSyncRoster()
+  // hieronder een pure no-op voor iedereen die er niets mee te maken wil hebben.
+  //
+  // Scope, bewust strikt gehouden (zie de toelichting bij Peter over wat dit WEL/NIET mag doen):
+  //  - enkel de eigen planning_items van de ingelogde gebruiker (via getCurrentUserNaam()) --
+  //    nooit die van een collega, ook niet voor een planner/beheerder.
+  //  - enkel een rollend venster van vandaag t/m +8 weken (zelfde venster als "Mijn planning"/
+  //    renderMijnPlanningTab() hierboven) -- nooit de volledige tabel.
+  //  - de Outlook-pull hieronder raakt UITSLUITEND van_uur/tot_uur, nooit dagdeel/project_id/
+  //    omschrijving/datum (Peter was hier specifiek: Outlook mag het uur aanpassen, niets anders).
+
+  // Best-effort Outlook-afspraak verwijderen nadat het bijhorende planning_item al écht (en
+  // succesvol) uit CaSuite verwijderd is (zie dbDeletePlanningItem()/dbDeletePlanningItemsFor()
+  // hierboven) -- NOOIT afwachten/laten blokkeren en NOOIT laten falen: Outlook is hier puur een
+  // "courtesy mirror", CaSuite-data blijft altijd de leidende, betrouwbare bron. Doet zelf niets
+  // als het item geen outlook_event_id had, niet van de ingelogde gebruiker zelf is (we hebben
+  // sowieso enkel het Microsoft-token van de ingelogde gebruiker, nooit dat van een collega), of
+  // als er geen enkele sync-toggle aan staat.
+  function outlookBestEffortDeleteEvent(item){
+    try{
+      if(!item || !item.outlook_event_id) return;
+      const naam = getCurrentUserNaam();
+      if(!naam || item.persoon_naam !== naam) return;
+      const person = getCurrentUserPerson();
+      if(!person || (!person.sync_planning_naar_outlook && !person.sync_outlook_naar_planning)) return;
+      if(!(state.session && state.session.provider_token)) return;
+      createOutlookEventRaw({ method: 'DELETE', eventId: item.outlook_event_id }).catch(err => {
+        console.error('Outlook-afspraak verwijderen na CaSuite-verwijdering mislukt (courtesy-mirror, CaSuite-data blijft leidend):', err);
+      });
+    }catch(err){
+      console.error('Outlook-sync (delete) onverwachte fout -- de echte CaSuite-verwijdering ging hoe dan ook al door:', err);
+    }
+  }
+
+  // Push: 1 eigen planning_item aanmaken/bijwerken in Outlook. Zonder outlook_event_id: aanmaken
+  // (POST) en de teruggekregen id bewaren op de rij. Mét outlook_event_id: bijwerken (PATCH) --
+  // altijd de huidige waarden opnieuw meesturen (geen dirty-tracking nodig, dit draait toch maar
+  // om de 5 minuten). 404 op de PATCH (de afspraak is aan Outlook-kant verwijderd, en de gebruiker
+  // heeft pull niet aan staan om dat al opgeruimd te hebben) wordt behandeld als "nog geen afspraak"
+  // -- gewoon een nieuwe aanmaken en de nieuwe id bewaren.
+  async function outlookPushPlanningItem(item){
+    const { van, tot } = ipWerktijdVoor(item);
+    const startDateTime = `${item.datum}T${van}:00`;
+    const endDateTime = `${item.datum}T${tot}:00`;
+    // ipEntryLabel() hergebruikt hier de al bestaande labellogica van het rooster zelf (zie
+    // verderop, gebruikt door renderIpGrid() e.d.: projectnaam + protocol, of de status-/vrije-
+    // taak-omschrijving) i.p.v. een 2e keer diezelfde if/else te herschrijven -- enkel de
+    // ".text"-helft nodig, ".cls" is een CSS-klasse die hier niet ter zake doet.
+    const subject = `CaSuite planning – ${ipEntryLabel(item).text}`;
+    const bodyText = `Medewerker: ${item.persoon_naam}\n\nAutomatisch gesynchroniseerd vanuit de CaSuite-personeelsplanning (Casentis). Wijzigingen hier worden bij de volgende sync overschreven met de planning in CaSuite.`;
+    if(item.outlook_event_id){
+      try{
+        await createOutlookEventRaw({ method: 'PATCH', eventId: item.outlook_event_id, subject, bodyText, isAllDay: false, startDateTime, endDateTime });
+        return;
+      }catch(err){
+        if(err.status !== 404) throw err; // enkel "afspraak bestaat niet meer" hieronder opvangen
+      }
+    }
+    const created = await createOutlookEventRaw({ method: 'POST', subject, bodyText, isAllDay: false, startDateTime, endDateTime });
+    if(created && created.id){
+      await dbUpdatePlanningItem(item.id, { outlook_event_id: created.id });
+      item.outlook_event_id = created.id; // lokale state meteen mee bijwerken, geen extra herlaad nodig
+    }
+  }
+
+  // Pull: het huidige begin/eindtijdstip van de Outlook-afspraak van 1 eigen (al gekoppelde)
+  // planning_item ophalen (GET) en, enkel als het afwijkt, terugschrijven als van_uur/tot_uur --
+  // NOOIT dagdeel/project_id/omschrijving/datum aanraken (zie de toelichting hierboven). 404 (de
+  // afspraak is aan Outlook-kant verwijderd) maakt enkel de koppeling (outlook_event_id) los --
+  // het planning_item zelf blijft gewoon bestaan (zie de toelichting bij Peter: een verwijderde
+  // agenda-afspraak mag nooit een hele shift laten verdwijnen) en krijgt bij een volgende push
+  // (als die ook aan staat) gewoon een nieuwe Outlook-afspraak.
+  async function outlookPullPlanningItem(item){
+    if(!item.outlook_event_id) return;
+    let ev;
+    try{
+      ev = await createOutlookEventRaw({ method: 'GET', eventId: item.outlook_event_id });
+    }catch(err){
+      if(err.status === 404){
+        await dbUpdatePlanningItem(item.id, { outlook_event_id: null });
+        item.outlook_event_id = null;
+        return;
+      }
+      throw err;
+    }
+    if(!ev || !ev.start || !ev.end) return;
+    const newVan = String(ev.start.dateTime || '').slice(11, 16);
+    const newTot = String(ev.end.dateTime || '').slice(11, 16);
+    if(!newVan || !newTot) return;
+    const huidig = ipWerktijdVoor(item);
+    if(newVan !== huidig.van || newTot !== huidig.tot){
+      await dbUpdatePlanningItem(item.id, { van_uur: newVan, tot_uur: newTot });
+      item.van_uur = newVan;
+      item.tot_uur = newTot;
+    }
+  }
+
+  // Entry-point: 1x per keer dat het Rooster-subtabblad voor de ingelogde gebruiker rendert (zie
+  // refreshInzetPlanning() hieronder, met debounce) of via de "🔄 Synchroniseer"-knop in "Mijn
+  // week" (manual:true -- geen debounce, en iets duidelijkere meldingen, zie hieronder).
+  async function outlookSyncRoster(opts){
+    const manual = !!(opts && opts.manual);
+    if(state.ip.__outlookSyncing) return; // geen overlappende runs (bv. 2x snel op de knop klikken)
+    const naam = getCurrentUserNaam();
+    const person = getCurrentUserPerson();
+    if(!naam || !person) return; // geen gekoppeld teamlid-record (bv. de eigenaar) -- niets te doen
+    const pushOn = !!person.sync_planning_naar_outlook;
+    const pullOn = !!person.sync_outlook_naar_planning;
+    if(!pushOn && !pullOn) return; // beide uit = altijd een no-op, zie de toelichting hierboven
+    if(!(state.session && state.session.provider_token)){
+      // Automatisch: stil overslaan -- dit is de normale toestand voor wie nog nooit met M365
+      // inlogde. Manueel (de knop): wél een duidelijke melding, net als de bestaande
+      // Actiepunten-agendaknop (btn-agenda-share) hierboven bij needsReauth.
+      if(manual) alert('Je hebt momenteel geen Microsoft-agendatoegang -- log uit en meld je opnieuw aan met Microsoft 365 om de Outlook-sync te gebruiken.');
+      return;
+    }
+    if(!manual){
+      const last = state.ip._lastOutlookSync || 0;
+      if(Date.now() - last < 5 * 60 * 1000) return; // debounce: max 1x per 5 min. per browsersessie
+    }
+    state.ip.__outlookSyncing = true;
+    state.ip._lastOutlookSync = Date.now();
+    try{
+      const startISO = todayISO();
+      const endISO = ipIso(ipAddDays(new Date(startISO + 'T00:00:00'), 56)); // vandaag t/m +8 weken
+      const items = state.planningItems.filter(it =>
+        it.persoon_naam === naam && it.datum >= startISO && it.datum <= endISO && it.bevestigd !== false
+      );
+      let needsReauth = false, failed = 0;
+      // Bewust PULL vóór PUSH als beide aan staan: zo neemt de push hierna automatisch een
+      // tijdstip mee dat net van Outlook kwam (item.van_uur/tot_uur staat dan al bijgewerkt) i.p.v.
+      // dat de push 'm eerst met de oude/standaard werktijd zou overschrijven vóór de pull hem ooit
+      // te zien kreeg -- anders zou een Outlook-kant-wijziging bij elke sync-cyclus weer verloren
+      // kunnen gaan aan de eigen push van dezelfde cyclus.
+      if(pullOn){
+        for(const item of items){
+          if(!item.outlook_event_id) continue;
+          try{ await outlookPullPlanningItem(item); }
+          catch(err){ console.error('Outlook-sync (pull) mislukt voor 1 planningsitem:', err); failed++; if(err.needsReauth) needsReauth = true; }
+        }
+      }
+      if(pushOn){
+        for(const item of items){
+          try{ await outlookPushPlanningItem(item); }
+          catch(err){ console.error('Outlook-sync (push) mislukt voor 1 planningsitem:', err); failed++; if(err.needsReauth) needsReauth = true; }
+        }
+      }
+      renderIpMyWeek();
+      renderIpGrid();
+      if(manual){
+        if(needsReauth) alert('Je Microsoft-agendatoegang is verlopen -- log uit en meld je opnieuw aan met Microsoft 365 om de Outlook-sync te vernieuwen.');
+        else if(failed) alert(`Outlook-sync: ${failed} item(s) niet gelukt. Probeer het straks opnieuw.`);
+        else showStatus('Rooster gesynchroniseerd met Outlook');
+      }
+    } finally {
+      state.ip.__outlookSyncing = false;
+    }
   }
 
   el('btn-agenda-share').addEventListener('click', async () => {
@@ -28788,6 +29082,13 @@ window.CaCalcApp = {
     renderIpConfirmTab();
     renderIpInschattingTab();
     renderIpMyWeek();
+    // Ronde 55: automatische Outlook-sync van het eigen rooster, telkens het Rooster-subtabblad
+    // rendert -- outlookSyncRoster() zelf regelt de debounce (max 1x/5min) + beide opt-in-vinkjes
+    // + "is er een provider_token" volledig intern, dus hier bewust GEEN extra voorwaarde: met
+    // beide vinkjes uit (de standaardsituatie voor bijna iedereen) is dit gewoon een no-op.
+    // Fire-and-forget (niet awaiten) -- een trage/mislukte Outlook-aanroep mag het Rooster zelf
+    // nooit laten wachten; render zelf gebeurt hierboven al.
+    outlookSyncRoster().catch(err => console.error('Automatische Outlook-sync mislukt:', err));
   }
 
   // ===================== "Mijn planning" (ronde 52, punt 1) =====================
@@ -28895,9 +29196,17 @@ window.CaCalcApp = {
     const card = el('ip-myweek-card');
     const body = el('ip-myweek-body');
     const showLink = el('ip-myweek-show-link');
+    const syncBtn = el('ip-myweek-sync-btn');
     if(!card || !body) return;
     const naam = getCurrentUserNaam();
-    if(!naam){ card.style.display = 'none'; if(showLink) showLink.style.display = 'none'; return; } // geen gekoppeld teamlid-record (bv. de eigenaar)
+    if(!naam){ card.style.display = 'none'; if(showLink) showLink.style.display = 'none'; if(syncBtn) syncBtn.style.display = 'none'; return; } // geen gekoppeld teamlid-record (bv. de eigenaar)
+    // Ronde 55: "🔄 Synchroniseer"-knop enkel tonen als minstens 1 van de 2 persoonlijke Outlook-
+    // sync-vinkjes van de ingelogde gebruiker aan staat (zie #appbar-account-outlook) -- voor
+    // wie de sync nooit gebruikt (bijna iedereen, standaard uit) verschijnt dit knopje nooit.
+    if(syncBtn){
+      const person = getCurrentUserPerson();
+      syncBtn.style.display = (person && (person.sync_planning_naar_outlook || person.sync_outlook_naar_planning)) ? '' : 'none';
+    }
     const pref = ipMyWeekPref();
     ipPositionMyWeekCard(pref.pos);
     if(!pref.on){
@@ -28946,6 +29255,17 @@ window.CaCalcApp = {
   // Mini-iconknopjes in de card-head (ronde 54) -- boven/onder wisselt meteen, geen bevestiging
   // nodig (puur visueel, niets destructief). Uitzetten verbergt de kaart en toont het kleine
   // "tonen"-linkje; dat linkje zet 'm gewoon weer aan. Alle 3 herrenderen meteen, geen page reload.
+  // Ronde 55: manuele sync-knop -- manual:true (geen debounce, duidelijkere melding, zie
+  // outlookSyncRoster()). Kort "Bezig…" tijdens de aanroep zodat een dubbele klik niet 2 runs
+  // tegelijk start (outlookSyncRoster() zelf beschermt hier ook al tegen via __outlookSyncing).
+  el('ip-myweek-sync-btn').addEventListener('click', async () => {
+    const btn = el('ip-myweek-sync-btn');
+    const origLabel = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '🔄 Bezig…';
+    try{ await outlookSyncRoster({ manual: true }); }
+    finally{ btn.disabled = false; btn.textContent = origLabel; }
+  });
   el('ip-myweek-pos-btn').addEventListener('click', () => {
     const pref = ipMyWeekPref();
     pref.pos = pref.pos === 'onder' ? 'boven' : 'onder';

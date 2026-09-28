@@ -28,7 +28,7 @@
  * CACHE_VERSION hieronder verhogen lost dit soort dingen sowieso op, dus voortaan bij ÉLKE
  * ronde die code aanraakt (niet enkel als sw.js zelf inhoudelijk wijzigt).
  */
-const CACHE_VERSION = 'casnap-v2026-09-27-r54'; // ronde 54 (PWA-icoon/manifest-bugfix: hoofdapp "CaSuite" toonde nog het oude blauwe CaSnap-logo/naam op het Android-startscherm omdat manifest.json/icons/icon192+512.png nooit vervangen waren na de ronde 48-rebrand; manifest-werf.json/manifest-planning.json/manifest-cados.json bestonden zelfs helemaal niet; apple-touch-icon-paden voor Planning/CaDos wezen naar niet-bestaande mappen. Plus: "Mijn week" in Rooster is nu een per-gebruiker voorkeur (aan/uit, boven/onder), en het team-schakelaar (Tech/Bureau) in Rooster wordt nu ook per gebruiker onthouden.)
+const CACHE_VERSION = 'casnap-v2026-09-28-r55'; // ronde 55 (Outlook-agenda-sync voor Personeelsplanning/Rooster: sessiegebonden, opt-in per gebruiker, 2 vinkjes in het accountmenu -- "Mijn planning naar Outlook sturen" / "Wijzigingen uit Outlook overnemen". Beide standaard UIT, dus geen gedragswijziging voor wie er niet aan komt. Enkel de eigen planning-items, enkel het venster vandaag t/m +8 weken, pull raakt uitsluitend het uur nooit project/dagdeel/datum. Vraagt de nieuwe SQL-migratie migratie-ronde55.sql (van_uur/tot_uur/outlook_event_id op planning_items).)
 const NETWORK_TIMEOUT_MS = 4000;
 
 self.addEventListener('install', () => {
