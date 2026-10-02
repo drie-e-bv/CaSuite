@@ -895,6 +895,16 @@
   .mp-entry{background:var(--sunken);border-radius:6px;padding:3px 6px;overflow-wrap:anywhere;}
   .mp-empty{color:var(--ink-faint,var(--ink-soft));font-size:12px;}
   @media (max-width:640px){ .mp-day{min-width:88px;} }
+  /* "🧾 Facturatiemelding" (ronde 57): 1 rij per open melding -- projectnaam + drempel links,
+     factuurnummer-veld + Bevestigen-knop rechts (wrapt netjes onder elkaar op gsm). */
+  .ip-factuur-row{
+    display:flex;align-items:center;justify-content:space-between;gap:10px 14px;flex-wrap:wrap;
+    padding:9px 0;border-top:1px solid var(--line);
+  }
+  .ip-factuur-row:first-child{border-top:none;padding-top:0;}
+  .ip-factuur-info{display:flex;flex-direction:column;gap:2px;min-width:0;}
+  .ip-factuur-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .ip-factuur-input{width:auto;min-width:140px;}
   .project-actief-switch{
     display:flex;align-items:center;gap:6px;font-size:.8rem;color:var(--ink-soft);flex:none;
   }
@@ -2477,6 +2487,16 @@
   #ip-panel .ip-status-options .ip-status-opt::before{content:"";flex:none;width:10px;height:10px;border-radius:3px;background:currentColor;}
   #ip-panel #ip-vrije-taak-toggle.ip-status-opt{margin-top:8px !important;background:#fff;border:1.5px dashed var(--line-strong);color:var(--ink);justify-content:flex-start;}
   #ip-panel #ip-vrije-taak-toggle.ip-status-opt:hover{border-color:var(--brand);color:var(--brand);box-shadow:none;}
+  /* Ronde 58 (op vraag van Peter): "Uitzonderingen" (Verlof/ADV/Ziek/Afwezig/Magazijn + Vrije taak)
+     staan voortaan onderaan het paneel, ná Project inplannen, en bewust kleiner/compacter zodat
+     Project inplannen (de meest gebruikte actie) het meeste visuele gewicht krijgt. auto-fit i.p.v.
+     een hardgecodeerd aantal kolommen -- blijft zo vanzelf ook op smalle (gsm-bottomsheet) breedte
+     werken zonder een aparte mobiele override nodig te hebben. */
+  #ip-panel .ip-panel-h4-uitzondering{margin-top:24px;}
+  #ip-panel .ip-status-options.ip-status-options-compact{grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:6px;}
+  #ip-panel .ip-status-options-compact .ip-status-opt{min-height:34px;padding:0 10px;font-size:12.5px;gap:7px;}
+  #ip-panel .ip-status-options-compact .ip-status-opt::before{width:8px;height:8px;}
+  #ip-panel #ip-vrije-taak-toggle.ip-status-opt-compact{min-height:34px;font-size:12.5px;padding:0 10px;}
   .ip-vrije-taak-wrap{gap:8px;margin:8px 0 0;}
   .ip-vrije-taak-wrap input{min-height:var(--tap);padding:8px 12px;border:1px solid var(--line-strong);border-radius:var(--r);font-size:15px;min-width:0;}
   .ip-vrije-taak-wrap .btn{min-height:var(--tap);}
@@ -2491,6 +2511,12 @@
   .ip-proj-opt > span:first-child{min-width:0;overflow-wrap:anywhere;}
   .ip-proj-opt > span:last-child{flex:none;display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap;justify-content:flex-end;}
   .ip-proj-opt .ip-tag{font-size:12px;padding:1px 7px;border-radius:999px;background:var(--sunken);border:1px solid var(--line);}
+  /* Ronde 58 (op vraag van Peter: "Je zou daar ook op project moeten kunnen klikken het te editen
+     (naam is verkeerd in dit geval)") -- eigen potlood-knopje i.p.v. de hele rij klikbaar maken voor
+     bewerken, want een klik op de rij zelf plant het project al in voor deze dag (zie
+     #ip-proj-select-list-click-listener in het script). */
+  .ip-proj-edit-btn{flex:none;border:1px solid transparent;background:none;border-radius:6px;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;font-size:13px;line-height:1;cursor:pointer;color:var(--ink-soft);padding:0;}
+  .ip-proj-edit-btn:hover{background:var(--sunken);border-color:var(--line);color:var(--brand);}
   .ip-proj-opt.ip-proj-showall{font-style:normal;font-weight:600;color:var(--brand);background:var(--sunken);}
   .ip-panel-foot{gap:10px;padding:12px 22px calc(12px + env(safe-area-inset-bottom));box-shadow:0 -6px 16px -12px rgba(21,36,28,.25);}
   .ip-panel-foot .btn{min-height:40px;padding:0 16px;font-size:14px;}
@@ -3508,6 +3534,17 @@
 
     <!-- ---- Rooster ---- -->
     <section class="ip-subview active" id="ipsub-rooster">
+      <!-- "🧾 Factuurmelding" (2026-09-29, ronde 57, op vraag van Peter): kaart bovenaan het
+           Rooster-subtabblad, zelfde plek/stijl als "📅 Mijn week" hieronder -- zie
+           renderIpFactuurMeldingen()/checkEnMaakFactuurMeldingenAan() in het script. Enkel per
+           project aan te zetten (Projecten-tabblad, "🧾 Facturatiemelding"-blokje, standaard UIT)
+           en enkel zichtbaar voor de VASTE PROJECTLEIDER van dat project -- bewust GEEN beheerder-
+           bypass. Standaard geen kaart (display:none): niets te tonen zolang er geen open melding
+           is, exact het "zo weinig mogelijk settings/banners"-uitgangspunt van ronde 54. -->
+      <div class="card ip-factuur-card" id="ip-factuur-card" style="display:none;margin-bottom:14px;">
+        <div class="card-head"><h3>🧾 Facturatiemelding</h3></div>
+        <div class="card-body" id="ip-factuur-body"></div>
+      </div>
       <!-- "📅 Mijn week" (ronde 52, punt 7, op vraag van Peter): compacte, puur lezende kaart
            bovenaan het Rooster-subtabblad -- de lopende week (ma-zo) van de ingelogde gebruiker
            zelf, zonder door het hele rooster te moeten zoeken naar de eigen kolom. Enkel zichtbaar
@@ -3725,16 +3762,25 @@
       <!-- Ronde 52 (punt 6, op vraag van Peter): dagdeel-keuze vóór de status-/projectkeuze -- geldt
            voor de eerstvolgende toevoeging, zie renderIpDagdeelChips()/ipAddEntry() in het script. -->
       <div class="ip-dagdeel-chips" id="ip-dagdeel-chips"></div>
-      <div class="ip-status-options" id="ip-status-options"></div>
-      <button type="button" class="ip-status-opt" id="ip-vrije-taak-toggle" style="width:100%;margin-top:6px;">➕ Vrije taak (zonder project)</button>
-      <div class="ip-vrije-taak-wrap" id="ip-vrije-taak-wrap" style="display:none;">
-        <input type="text" id="ip-vrije-taak-input" placeholder="bv. Magazijn opruimen">
-        <button type="button" class="btn btn-secondary btn-sm" id="ip-vrije-taak-add">Toevoegen</button>
-      </div>
+
+      <!-- Ronde 58 (op vraag van Peter: "Dat ziet er niet zo professioneel uit. Projecten moeten
+           hoger staan. De uitzonderingen (verlof etc) onderaan en kleiner.") -- Project inplannen is
+           verreweg de meest voorkomende actie in dit paneel en stond voorheen onder Verlof/ADV/Ziek/
+           Afwezig/Magazijn, die als even grote tegels evenveel gewicht kregen. Project inplannen
+           staat nu meteen na de dagdeel-keuze; de uitzonderingen + Vrije taak zijn verderop in dit
+           paneel verplaatst en bewust kleiner gestyled (zie .ip-status-options-compact in de CSS). -->
       <h4 class="ip-panel-h4-proj">Project inplannen</h4>
       <input type="text" class="ip-proj-search" id="ip-proj-search" placeholder="Zoek een project…">
       <div class="ip-proj-list" id="ip-proj-select-list"></div>
       <div id="ip-panel-open-ap"></div>
+
+      <h4 class="ip-panel-h4-uitzondering">Uitzonderingen</h4>
+      <div class="ip-status-options ip-status-options-compact" id="ip-status-options"></div>
+      <button type="button" class="ip-status-opt ip-status-opt-compact" id="ip-vrije-taak-toggle" style="width:100%;margin-top:6px;">➕ Vrije taak (zonder project)</button>
+      <div class="ip-vrije-taak-wrap" id="ip-vrije-taak-wrap" style="display:none;">
+        <input type="text" id="ip-vrije-taak-input" placeholder="bv. Magazijn opruimen">
+        <button type="button" class="btn btn-secondary btn-sm" id="ip-vrije-taak-add">Toevoegen</button>
+      </div>
     </div>
     <div class="ip-panel-foot">
       <button class="btn btn-ghost btn-sm" id="ip-clear-slot" type="button">Wis</button>
@@ -4082,6 +4128,23 @@
 #cados-app h2,
 #cados-app h3{font-family:var(--sans);font-weight:700;letter-spacing:-.01em;margin:0;}
 #cados-app table{border-collapse:collapse;width:100%;}
+/* Ronde 58 (witruimte-audit, op melding van Peter): de "Omschrijving"-kolom in lijst-tabellen
+   (renderSimpleList(), bv. Toegangscontrole; renderAlarmTab()) absorbeerde de volle, nu brede
+   kaartbreedte (tot ~1850px op een groot scherm) via de globale input{width:100%} hierboven, voor
+   doorgaans een paar woorden tekst -- het leek daardoor een kapot, half-leeg invoerveld i.p.v.
+   gewoon een nette kolom. Enkel een input rechtstreeks in een table.grid-cel krijgt deze kap, niet
+   gewone formuliervelden elders (die vullen hun kolom meestal wél terecht). */
+#cados-app table.grid td input{max-width:480px;}
+/* Ronde 58 (witruimte-audit, op melding van Peter): Keuring is het enige CaDos-paneel waar de
+   audit een hardgecodeerde 2-koloms .field-grid (regel ~4326) echt storend vond -- "Keuringsorganisme"
+   werd ~920px breed (3 velden in 2 kolommen laat het 3de half leeg naast zich staan) en "Opmerkingen"
+   (.field.wide, volle rijbreedte) tot ~1850px. Bewust enkel hier gescopet (#panel-keuring) i.p.v. de
+   gedeelde .field-grid-regel overal aan te passen -- die werkt in de andere ~35 gebruiksplekken in
+   CaDos al prima (2 velden die elkaars natuurlijke paar zijn), dit specifieke paneel had toevallig een
+   oneven aantal velden in zijn eerste rij. auto-fit laat de 3 velden van "Eerste keuring" gelijk de
+   rijbreedte verdelen i.p.v. met een leeg vakje ernaast; de textarea krijgt een eigen, leesbare kap. */
+#panel-keuring .field-grid{grid-template-columns:repeat(auto-fit,minmax(240px,1fr));}
+#panel-keuring .field.wide textarea{max-width:640px;}
 #cados-app input,
 #cados-app select,
 #cados-app textarea{font-family:inherit;font-size:13px;color:var(--ink);border:1.5px solid var(--line);
@@ -4380,7 +4443,13 @@
 #cados-app .staging-quick select{width:auto;min-width:120px;}
 #cados-app .kastenwrap{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start;margin-bottom:14px;}
 #cados-app .kast-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-lg);overflow:hidden;
-  flex:1 1 320px;min-width:280px;max-width:480px;box-shadow:var(--shadow-sm);}
+  flex:1 1 320px;min-width:280px;box-shadow:var(--shadow-sm);}
+  /* Ronde 58 (witruimte-audit): de vroegere max-width:480px hier weggehaald -- enkel Patchkast
+     (zie renderPatchKastCard()) gebruikt deze basisregel nog zónder .kast-card-wide erbij (alle
+     andere rack-tabs overschrijven hem toch al met .kast-card-wide{max-width:none}), dus dit raakt
+     uitsluitend Patchkast. Met 1 kast vult de kaart nu de volledige rij i.p.v. een groot dood gat
+     over te laten tot de 340px-zijbalk (zie Peter's screenshot); met 2-3 kasten blijft flex-wrap ze
+     eerlijk naast elkaar verdelen (min-width:280px voorkomt dat ze te smal worden). */
 #cados-app .kast-card-wide{max-width:none;width:100%;}
 #cados-app .rack{display:flex;flex-direction:column;gap:3px;margin:0;padding:13px 15px;}
 #cados-app .rack.drop-target{outline:2px dashed var(--copper);outline-offset:-2px;background:rgba(187,94,38,.06);}
@@ -8172,6 +8241,14 @@ function renderPatchStagingArea(item, rebuildAll, selectItem, editingId, clearSt
 
 function renderPatchKastCard(kast, ki, rebuildAll, codes, editingId, selectItem, movingRef, placeInto, startMoving, placeIntoLeegSplit, placeAtArrayIndex){
   const used = kast.items.reduce((s,it)=> s+(parseInt(it.hoogte)||1), 0);
+  // Ronde 58 (witruimte-audit, op melding van Peter -- zie zijn Patchkast-screenshot): bewust GEEN
+  // "kast-card-wide" hier (i.t.t. de meeste andere rack-tabs) -- Patchkast is de enige tab waarvan de
+  // eigen hint-tekst hierboven expliciet belooft dat extra kasten "ernaast (op een breed scherm)"
+  // komen i.p.v. eronder, dus meerdere kasten moeten hier wél nog naast elkaar kunnen blijven staan.
+  // De échte oorzaak van het dode gat in zijn screenshot was de harde max-width:480px op de kaart
+  // zelf (zie #cados-app .kast-card hieronder in de CSS) -- die is daar weggehaald i.p.v. hier de
+  // kaart geforceerd 100% breed te maken: met 1 kast vult de kaart nu vanzelf de rij (flex-grow),
+  // en met 2-3 kasten verdelen ze de beschikbare breedte nog steeds eerlijk naast elkaar.
   const card = el(`<div class="kast-card">
     <div class="rij-head">
       <div class="rij-title">Kast ${ki+1}</div>
@@ -12739,7 +12816,11 @@ function renderDomoticaOverzicht(){
     )}
     <div class="card"><div class="card-body" style="padding:0;overflow-x:auto;">
       <table class="grid">
-        <thead><tr><th>Code</th><th>Bron</th><th>Naam / omschrijving</th><th>Status</th></tr></thead>
+        <!-- Ronde 58 (witruimte-audit): Bron/Status kregen een vaste breedte (net als Code via
+             .codecell) -- zonder dat verdeelde de browser de overschot bijna volledig naar "Naam /
+             omschrijving", met een lange lege staart na de tekst (22-24% dode ruimte op dit scherm
+             volgens de audit) terwijl Bron/Status altijd maar een kort, vast woordje bevatten. -->
+        <thead><tr><th>Code</th><th style="width:130px;">Bron</th><th>Naam / omschrijving</th><th style="width:120px;">Status</th></tr></thead>
         <tbody id="domOverzichtBody"></tbody>
       </table>
     </div></div>
@@ -13453,8 +13534,12 @@ function renderKamersVerdiepingenTab(){
     kamersBox.innerHTML = '';
     if(!Array.isArray(state.kamers)) state.kamers = [];
     state.kamers.forEach((k, idx) => {
+      // Ronde 58 (witruimte-audit, op melding van Peter): max-width erbij -- dit paneel hergebruikt
+      // .builder-layout (1fr + 340px) voor zijn 2 kaarten naast elkaar, dus de "Kamers"-kaart is nu
+      // behoorlijk breed; zonder bovengrens werd een kamernaam-input (flex:1, geen max-width) daarin
+      // ~1450px breed voor één woord.
       const row = el(`<div class="klem-zijde">
-        <input type="text" value="${escapeHtml(k)}" placeholder="Kamernaam" style="flex:1;">
+        <input type="text" value="${escapeHtml(k)}" placeholder="Kamernaam" style="flex:1;max-width:420px;">
         <button class="rowdel" title="verwijderen">✕</button>
       </div>`);
       row.querySelector('input').addEventListener('input', e => { state.kamers[idx] = e.target.value; save(); });
@@ -20796,7 +20881,12 @@ window.CaCalcApp = {
     ip: {
       team: 'TECH',
       weekStart: null, // Date, maandag van de eerst getoonde week -- ingesteld bij eerste renderIpGrid()
-      selectedRoles: new Set(),
+      // Ronde 58 (bugfix, op melding van Peter): null = "nog niet geïnitialiseerd voor dit team"
+      // (zie renderIpRoleFilter()), NIET een gewone lege Set -- anders is een lege Set niet meer te
+      // onderscheiden van "nog nooit ingesteld" en wordt ze ergens weer stilzwijgend volgepropt.
+      // Zie ipCurrentPeople()/renderIpRoleFilter()/de rol-chip-click-listener hieronder voor de rest
+      // van de fix.
+      selectedRoles: null,
       showOA: false,
       panelCtx: null, // {persoonNaam, datumISO}
       // Ronde 52 (punt 6): "Hele dag / Voormiddag / Namiddag"-keuze in het dagpaneel, geldt voor de
@@ -20819,7 +20909,7 @@ window.CaCalcApp = {
       // gevraagd) -- rechtstreeks hergebruiken zou de Inschatting-lijst per ongeluk leeg kunnen laten
       // vallen zodra iemand het Rooster net op team Bureau met een Bureau-rolfilter had staan. Zie
       // renderIpInschatRoleFilter()/renderIpInschattingColleagues() hieronder.
-      inschatSelectedRoles: new Set(),
+      inschatSelectedRoles: null, // ronde 58: zelfde null-als-"nog niet geïnitialiseerd"-fix als state.ip.selectedRoles hierboven
       inschatShowOA: false,
       // "Vastpinnen om te verplaatsen" / "kopiëren" vanuit het rooster zelf (2026-09-23, op vraag
       // van Peter: "bij de planning graag het pin icoon of kopieer icoon zichtbaar maken wanneer
@@ -21723,6 +21813,42 @@ window.CaCalcApp = {
     const { error } = await sb.from('planning_items').delete().eq('persoon_naam', persoonNaam).eq('datum', datumISO);
     if(error) throw error;
     items.forEach(outlookBestEffortDeleteEvent);
+  }
+
+  // ---- "Factuurmelding" (2026-09-29, ronde 57) ----
+  // Per-project, standaard UIT staande herinnering voor de vaste projectleider (zie
+  // checkEnMaakFactuurMeldingenAan()/renderIpFactuurMeldingen() verderop bij Personeelsplanning)
+  // om na een instelbaar aantal ingeplande dagen een factuurnummer in te vullen. Alle 3 hieronder
+  // volgen exact hetzelfde dunne .from(tabel).select/insert/update()-patroon als de andere db*-
+  // helpers in dit bestand (zie bv. dbListPlanningItems()/dbInsertPlanningItem() hierboven).
+  // dbListOpenFactuurMeldingen() filtert client-side op afgehandeld_op == null i.p.v. .is() in de
+  // query zelf -- mock-supabase.js (de in-memory testmock) ondersteunt enkel .eq()/.in(), zie de
+  // toelichting daar; dit is dezelfde aanpak als de rest van dit bestand voor zulke gevallen.
+  async function dbListOpenFactuurMeldingen(){
+    const { data, error } = await sb.from('project_factuur_meldingen').select('*');
+    if(error) throw error;
+    return (data || []).filter(m => m.afgehandeld_op == null);
+  }
+  // Alle meldingen (ongeacht status) van 1 project -- nodig om te bepalen in welke "batch" de
+  // teller zit (bestaandAantal, zie checkEnMaakFactuurMeldingenAan()) en of er al een open melding
+  // voor dat project bestaat.
+  async function dbListFactuurMeldingenVoorProject(projectId){
+    const { data, error } = await sb.from('project_factuur_meldingen').select('*').eq('project_id', projectId);
+    if(error) throw error;
+    return data || [];
+  }
+  async function dbCreateFactuurMelding(projectId, drempel){
+    const { data, error } = await sb.from('project_factuur_meldingen').insert({ project_id: projectId, drempel }).select().single();
+    if(error) throw error;
+    return data;
+  }
+  // Enige manier om een melding te sluiten -- vereist altijd een echt ingetikt factuurnummer, er
+  // is bewust GEEN los "dismiss zonder invullen" (zie renderIpFactuurMeldingen()).
+  async function dbAfrondenFactuurMelding(id, factuurnummer){
+    const { error } = await sb.from('project_factuur_meldingen').update({
+      factuurnummer, afgehandeld_op: new Date().toISOString(), afgehandeld_door: getCurrentUserNaam() || null
+    }).eq('id', id);
+    if(error) throw error;
   }
 
   // ---- Urenregistratie (2026-09-27, ronde 52, punt 2) ----
@@ -24074,6 +24200,7 @@ window.CaCalcApp = {
       await dbSaveGebruikersToegang(state.company.team_leden, state.company.bureau);
       showStatus(checked ? 'Outlook-sync aangezet' : 'Outlook-sync uitgezet');
       renderIpMyWeek(); // toont/verbergt meteen de "🔄 Synchroniseer"-knop in "Mijn week"
+      renderIpFactuurMeldingen().catch(err => console.error('Factuurmeldingen bijwerken mislukt:', err)); // ronde 57
       if(checked) outlookSyncRoster({ manual: true }).catch(err => console.error('Outlook-sync (na inschakelen) mislukt:', err));
     }catch(err){
       person[field] = vorige; // terugdraaien in de UI/state als de databank het niet aanvaardde
@@ -24408,6 +24535,9 @@ window.CaCalcApp = {
       naam: '', locatie: '', projectnummer: '', sharepoint_url: '', whatsapp_group_url: '', notities: '',
       werfleider_naam: '', projectleider_naam: '', contactpersonen: [], actief: true,
       klant: '', protocol: '', todo_uren: null, planning_status: 'actief',
+      // "🧾 Facturatiemelding" (ronde 57): standaard UIT, drempel standaard 10 dagen -- zie
+      // saveProjectRow() en de SQL-defaults in migratie-ronde57.sql.
+      factuurmelding_actief: false, factuurmelding_dagen: 10,
       // Nieuw (2026-09-22, later die dag, op vraag van Peter): vinkje bij het aanmaken van een
       // nieuw project, enkel zichtbaar zolang het project nog niet bewaard is (zie renderProjects
       // en saveProjectRow hieronder) -- puur lokale/tijdelijke UI-staat, wordt niet als kolom
@@ -24431,6 +24561,12 @@ window.CaCalcApp = {
       todo_uren: (p.todo_uren === '' || p.todo_uren == null) ? null : Number(p.todo_uren),
       // Projectstatus (2026-09-24): zie PLANNING_PROJECT_STATUSES hierboven.
       planning_status: p.planning_status || 'actief',
+      // "🧾 Facturatiemelding" (ronde 57): standaard UIT/10, zie het blokje bij "Vaste
+      // projectleider" hierboven en checkEnMaakFactuurMeldingenAan()/renderIpFactuurMeldingen() in
+      // Personeelsplanning. Lege/ongeldige drempel -> 10 (nooit 0 of NaN, dat zou elke dag meteen
+      // een nieuwe melding triggeren).
+      factuurmelding_actief: !!p.factuurmelding_actief,
+      factuurmelding_dagen: (p.factuurmelding_dagen === '' || p.factuurmelding_dagen == null || isNaN(Number(p.factuurmelding_dagen)) || Number(p.factuurmelding_dagen) <= 0) ? 10 : Number(p.factuurmelding_dagen),
       // CaCalc — projectinstellingen (ronde 47, Task 1): zelfde "CaCalc — projectinstellingen"-
       // blokje hierboven op deze rij, optioneel/puur informatief hier -- Kabelberekening
       // (window.CaCalcApp) neemt deze over via applyLinkedProjectPrefill() zodra dit project daar
@@ -24777,6 +24913,25 @@ window.CaCalcApp = {
             <p class="hint">Meestal jezelf, of wie dit project intern trekt — kies uit de "Bureau"-lijst (Bedrijfsgegevens → Bureau). Staat iemand daar nog niet bij, voeg die eerst toe onder Bedrijfsgegevens. Wordt automatisch mee opgenomen in de contactpersonen hieronder, zodat je (of de gekozen persoon) hier altijd zelf als "Verantwoordelijke" bij een taak te kiezen bent.</p>
           </div>
           </div>
+          <!-- "🧾 Facturatiemelding" (2026-09-29, ronde 57, op vraag van Peter): pal onder "Vaste
+               projectleider" -- die twee horen inhoudelijk samen (wie de melding krijgt, en of/hoe
+               vaak die er komt). Standaard UIT (checkbox ongevinkt) en drempel standaard 10, zie
+               factuurmelding_actief/factuurmelding_dagen in saveProjectRow(). Zelfde opslagpad als
+               alle andere projectvelden (gewone "Opslaan"-knop onderaan deze rij) -- geen apart
+               save-pad zoals CaDos/CaCalc hieronder, dit zijn plain scalar velden net als
+               Klant/Protocol/Todo-uren. -->
+          <div class="field pr-sec factuurmelding-inst-block">
+            <h4 class="pr-subhead">🧾 Facturatiemelding</h4>
+            <label class="show-inactive-toggle" style="font-size:.88rem;">
+              <input type="checkbox" class="p-factuurmelding-actief">
+              Melding tonen bij de projectleider na een aantal ingeplande dagen
+            </label>
+            <div class="field p-factuurmelding-dagen-field">
+              <label>Aantal dagen</label>
+              <input type="number" class="p-factuurmelding-dagen" min="1" step="1" placeholder="10">
+            </div>
+            <p class="hint">Zodra dit project samen (over alle medewerkers) dit aantal bevestigde, al-verstreken planningdagen bereikt, verschijnt er een melding bij de vaste projectleider hierboven om een factuurnummer in te vullen — dat is de enige manier om de melding te sluiten. Herhaalt daarna automatisch telkens er weer evenveel dagen bijkomen.</p>
+          </div>
           <div class="field"><label>Notities</label><input type="text" class="p-notities"></div>
           <div class="field pr-sec pr-sec-contacts">
             <h4 class="pr-subhead">Vaste contactpersonen</h4>
@@ -24912,6 +25067,9 @@ window.CaCalcApp = {
         row.querySelector('.p-notities').value = p.notities || '';
         row.querySelector('.p-klant').value = p.klant || '';
         row.querySelector('.p-todo-uren').value = (p.todo_uren == null) ? '' : p.todo_uren;
+        // "🧾 Facturatiemelding" (ronde 57) -- zelfde bind-patroon als Klant/Todo-uren hierboven.
+        row.querySelector('.p-factuurmelding-actief').checked = !!p.factuurmelding_actief;
+        row.querySelector('.p-factuurmelding-dagen').value = (p.factuurmelding_dagen == null) ? '' : p.factuurmelding_dagen;
         const protoSel = row.querySelector('.p-protocol');
         protoSel.innerHTML = '<option value="">— geen —</option>' + state.protocollen.map(pr => `<option value="${escapeHtml(pr)}">${escapeHtml(pr)}</option>`).join('');
         if(p.protocol && !state.protocollen.includes(p.protocol)){
@@ -24951,6 +25109,8 @@ window.CaCalcApp = {
         row.querySelector('.p-klant').addEventListener('input', e => p.klant = e.target.value);
         row.querySelector('.p-protocol').addEventListener('change', e => p.protocol = e.target.value);
         row.querySelector('.p-todo-uren').addEventListener('input', e => p.todo_uren = e.target.value);
+        row.querySelector('.p-factuurmelding-actief').addEventListener('change', e => p.factuurmelding_actief = e.target.checked);
+        row.querySelector('.p-factuurmelding-dagen').addEventListener('input', e => p.factuurmelding_dagen = e.target.value);
         row.querySelector('.p-notities').addEventListener('input', e => p.notities = e.target.value);
         const maakCadosEl = row.querySelector('.p-maak-cados');
         if(maakCadosEl) maakCadosEl.addEventListener('change', e => p._maakCados = e.target.checked);
@@ -27017,6 +27177,7 @@ window.CaCalcApp = {
         }
       }
       renderIpMyWeek();
+      renderIpFactuurMeldingen().catch(err => console.error('Factuurmeldingen bijwerken mislukt:', err)); // ronde 57
       renderIpGrid();
       if(manual){
         if(needsReauth) alert('Je Microsoft-agendatoegang is verlopen -- log uit en meld je opnieuw aan met Microsoft 365 om de Outlook-sync te vernieuwen.');
@@ -28980,7 +29141,14 @@ window.CaCalcApp = {
     return ipActivePeople().filter(p => {
       if((p.planning_team || 'TECH') !== state.ip.team) return false;
       if(p.rol === 'Onderaannemer') return state.ip.showOA;
-      return state.ip.selectedRoles.size === 0 || state.ip.selectedRoles.has(p.rol || 'Technieker');
+      // Ronde 58 (bugfix, op melding van Peter: "wanneer ik enkel onderaannemers wil zichtbaar
+      // maken, dan selecteert hij plots alles"): `null` = de rol-filter is voor dit team nog niet
+      // geïnitialiseerd (zie renderIpRoleFilter()) -> dan als veilige terugval alles tonen. Een
+      // lege, wél al geïnitialiseerde Set betekent voortaan écht "0 rollen gekozen" (dus niemand) --
+      // voorheen gold een lege Set ook als "alles tonen", waardoor de laatste rol-chip (bv.
+      // Technieker) uitvinken om enkel Onderaannemers over te houden zichzelf meteen weer
+      // terugzette naar "alles aan" (zie de rol-chip-click-listener verderop).
+      return state.ip.selectedRoles === null || state.ip.selectedRoles.has(p.rol || 'Technieker');
     });
   }
   function ipRolesInTeam(team){
@@ -29082,6 +29250,7 @@ window.CaCalcApp = {
     renderIpConfirmTab();
     renderIpInschattingTab();
     renderIpMyWeek();
+    renderIpFactuurMeldingen().catch(err => console.error('Factuurmeldingen bijwerken mislukt:', err)); // ronde 57
     // Ronde 55: automatische Outlook-sync van het eigen rooster, telkens het Rooster-subtabblad
     // rendert -- outlookSyncRoster() zelf regelt de debounce (max 1x/5min) + beide opt-in-vinkjes
     // + "is er een provider_token" volledig intern, dus hier bewust GEEN extra voorwaarde: met
@@ -29285,6 +29454,113 @@ window.CaCalcApp = {
     renderIpMyWeek();
   });
 
+  // ===================== "🧾 Factuurmelding" (2026-09-29, ronde 57) =====================
+  // Op vraag van Peter: per project (standaard UIT, zie het "🧾 Facturatiemelding"-blokje op het
+  // Projecten-tabblad) een herhalende herinnering voor de VASTE PROJECTLEIDER (enkel die, bewust
+  // GEEN beheerder-bypass -- zie de toelichting in de opdracht) zodra er voor dat project een
+  // instelbaar aantal bevestigde, al-verstreken planningdagen opgeteld staan (samengeteld over alle
+  // medewerkers). De melding kan ENKEL gesloten worden door een factuurnummer in te tikken (zie
+  // renderIpFactuurMeldingen() hieronder) -- geen "sluiten zonder invullen"-knop.
+  //
+  // Halve dagen (dagdeel 'vm'/'nm', zie ronde 52) tellen voor 0.5, 'dag'/leeg/null voor 1 -- puur
+  // lezend op state.planningItems, geen extra databankaanroep nodig per berekening.
+  function projectDagenTotaal(projectId){
+    const vandaag = todayISO();
+    return (state.planningItems || []).reduce((totaal, it) => {
+      if(String(it.project_id) !== String(projectId)) return totaal;
+      if(it.bevestigd === false) return totaal; // enkel bevestigde afspraken tellen mee
+      if(!it.datum || it.datum >= vandaag) return totaal; // enkel al-verstreken dagen (je factureert afgewerkt werk)
+      const gewicht = (it.dagdeel === 'vm' || it.dagdeel === 'nm') ? 0.5 : 1;
+      return totaal + gewicht;
+    }, 0);
+  }
+  // Maakt (indien nodig) een nieuwe factuurmelding aan -- bewust ENKEL voor projecten waar de
+  // INGELOGDE gebruiker zelf de vaste projectleider van is (i.p.v. alle projecten met
+  // factuurmelding_actief te doorlopen). Dat is geen willekeurige beperking maar de vermeden
+  // racecondition: als elke ingelogde gebruiker enkel zijn/haar EIGEN projecten checkt/aanmaakt,
+  // kunnen 2 gelijktijdige gebruikers nooit dezelfde melding dubbel aanmaken (elke projectleider is
+  // er hoogstens 1, dus hoogstens 1 sessie doet ooit deze check voor een gegeven project). Dit
+  // voldoet meteen ook aan "enkel de projectleider ziet/beheert dit" uit de opdracht.
+  async function checkEnMaakFactuurMeldingenAan(){
+    const naam = getCurrentUserNaam();
+    if(!naam) return; // geen gekoppeld teamlid-/bureaurecord (bv. de eigenaar) -- niemands "eigen" projecten
+    const eigenProjecten = (state.projects || []).filter(p => p.id && p.factuurmelding_actief && p.projectleider_naam === naam);
+    for(const project of eigenProjecten){
+      try{
+        const meldingen = await dbListFactuurMeldingenVoorProject(project.id);
+        const bestaandAantal = meldingen.length; // "batch"-nummer, ongeacht afgehandeld-status
+        const stap = Number(project.factuurmelding_dagen) || 10;
+        const nextDrempel = (bestaandAantal + 1) * stap;
+        const totaal = projectDagenTotaal(project.id);
+        const heeftOpenMelding = meldingen.some(m => m.afgehandeld_op == null);
+        if(totaal >= nextDrempel && !heeftOpenMelding){
+          const nieuw = await dbCreateFactuurMelding(project.id, nextDrempel);
+          meldingen.push(nieuw); // lokaal meteen mee, mocht deze functie ooit 2x na elkaar lopen binnen dezelfde render
+        }
+      }catch(err){ console.error('Factuurmelding checken/aanmaken mislukt voor project ' + project.id + ':', err); }
+    }
+  }
+  // Kaart bovenaan het Rooster-subtabblad, zelfde plek/stijl als "📅 Mijn week" hierboven. Render-
+  // volgorde: eerst checkEnMaakFactuurMeldingenAan() (kan een nieuwe melding aanmaken), dan pas de
+  // open meldingen ophalen en tekenen -- zo verschijnt een net-aangemaakte melding meteen, zonder
+  // extra herlaad. Geen open melding voor de ingelogde gebruiker? Dan de kaart gewoon volledig
+  // verbergen (geen lege plaatshouder, zelfde "zo weinig mogelijk settings/banners" uit ronde 54).
+  async function renderIpFactuurMeldingen(){
+    const card = el('ip-factuur-card');
+    const body = el('ip-factuur-body');
+    if(!card || !body) return;
+    const naam = getCurrentUserNaam();
+    if(!naam){ card.style.display = 'none'; return; }
+    try{
+      await checkEnMaakFactuurMeldingenAan();
+      const open = await dbListOpenFactuurMeldingen();
+      const eigen = open.filter(m => {
+        const project = ipProjectById(m.project_id);
+        return project && project.projectleider_naam === naam;
+      });
+      if(!eigen.length){ card.style.display = 'none'; body.innerHTML = ''; return; }
+      card.style.display = '';
+      body.innerHTML = eigen.map(m => {
+        const project = ipProjectById(m.project_id);
+        const projectNaam = project ? project.naam : '(verwijderd project)';
+        return `<div class="ip-factuur-row" data-melding-id="${escapeHtml(String(m.id))}">
+          <div class="ip-factuur-info"><strong>${escapeHtml(projectNaam)}</strong><span class="hint">Drempel bereikt: ${escapeHtml(String(m.drempel))} dagen ingepland</span></div>
+          <div class="ip-factuur-actions">
+            <input type="text" class="ip-factuur-input" placeholder="Factuurnummer">
+            <button type="button" class="btn btn-primary btn-sm ip-factuur-confirm" disabled>Bevestigen</button>
+          </div>
+        </div>`;
+      }).join('');
+    }catch(err){
+      console.error('Factuurmeldingen laden mislukt:', err);
+      card.style.display = 'none';
+    }
+  }
+  // "Bevestigen" enkel bruikbaar zodra er echt iets ingetikt is -- geen los "dismiss"-pad, exact
+  // zoals gevraagd. Na het bewaren opnieuw checken/renderen (niet awaiten) zodat een volgende,
+  // al-bereikte drempel meteen verschijnt zonder de klik zelf te laten wachten op die herberekening.
+  el('ip-factuur-body').addEventListener('input', e => {
+    const row = e.target.closest('.ip-factuur-row'); if(!row) return;
+    const input = row.querySelector('.ip-factuur-input');
+    row.querySelector('.ip-factuur-confirm').disabled = !(input.value || '').trim();
+  });
+  el('ip-factuur-body').addEventListener('click', async e => {
+    const btn = e.target.closest('.ip-factuur-confirm'); if(!btn || btn.disabled) return;
+    const row = btn.closest('.ip-factuur-row');
+    const input = row.querySelector('.ip-factuur-input');
+    const factuurnummer = (input.value || '').trim();
+    if(!factuurnummer) return; // veiligheidsklep, hoort al afgedekt door disabled hierboven
+    const meldingId = row.dataset.meldingId;
+    btn.disabled = true; input.disabled = true;
+    try{
+      await dbAfrondenFactuurMelding(meldingId, factuurnummer);
+      await renderIpFactuurMeldingen();
+    }catch(err){
+      alert('Kon factuurnummer niet bewaren: ' + err.message);
+      btn.disabled = false; input.disabled = false;
+    }
+  });
+
   // ===================== Projectinschatting (2026-09-20, ronde 24) =====================
   // Zie IP_UNASSIGNED_NAME hierboven voor de gekozen aanpak (sentinel-persoon in planning_items,
   // geen nieuwe SQL). Dit blok bouwt het "Inschatting"-subtabblad (project + klikbare tijdlijn)
@@ -29328,7 +29604,9 @@ window.CaCalcApp = {
   // geen Tech/Bureau-schakelaar hier, Bureau is bewust niet nodig voor inschattingen).
   function renderIpInschatRoleFilter(){
     const roles = ipRolesInTeam('TECH');
-    if(state.ip.inschatSelectedRoles.size === 0) roles.forEach(r => state.ip.inschatSelectedRoles.add(r));
+    // Ronde 58 (zelfde bugfix als renderIpRoleFilter()): enkel initialiseren zolang nog nooit
+    // ingesteld (null), niet telkens de gebruiker alles uitvinkt.
+    if(state.ip.inschatSelectedRoles === null) state.ip.inschatSelectedRoles = new Set(roles);
     let html = roles.map(r =>
       `<button type="button" class="ip-role-chip ${state.ip.inschatSelectedRoles.has(r) ? 'on' : ''}" data-role="${escapeHtml(r)}">${escapeHtml(r)}</button>`
     ).join('');
@@ -29344,8 +29622,8 @@ window.CaCalcApp = {
     }
     const r = chip.dataset.role;
     if(!r) return;
+    // Ronde 58 (bugfix, zelfde als het Rooster-rolfilter): geen "alles terugzetten zodra leeg" meer.
     if(state.ip.inschatSelectedRoles.has(r)) state.ip.inschatSelectedRoles.delete(r); else state.ip.inschatSelectedRoles.add(r);
-    if(state.ip.inschatSelectedRoles.size === 0) ipRolesInTeam('TECH').forEach(x => state.ip.inschatSelectedRoles.add(x));
     renderIpInschatRoleFilter(); renderIpInschattingColleagues();
   });
   // Toont enkel team Tech (Bureau bewust niet nodig, zie hierboven), gefilterd op de vinkjes van
@@ -29357,7 +29635,7 @@ window.CaCalcApp = {
     const people = ipActivePeople().filter(p => {
       if((p.planning_team || 'TECH') !== 'TECH') return false;
       if(p.rol === 'Onderaannemer') return state.ip.inschatShowOA;
-      return state.ip.inschatSelectedRoles.size === 0 || state.ip.inschatSelectedRoles.has(p.rol || 'Technieker');
+      return state.ip.inschatSelectedRoles === null || state.ip.inschatSelectedRoles.has(p.rol || 'Technieker');
     });
     wrap.innerHTML = people.map(p => {
       const on = state.ip.inschatColleagues.has(p.naam);
@@ -29602,7 +29880,10 @@ window.CaCalcApp = {
 
   function renderIpRoleFilter(){
     const roles = ipRolesInTeam(state.ip.team);
-    if(state.ip.selectedRoles.size === 0) roles.forEach(r => state.ip.selectedRoles.add(r));
+    // Ronde 58: enkel initialiseren (alle rollen aan) zolang er nog nooit een keuze gemaakt is voor
+    // dit team (null) -- NIET telkens de gebruiker toevallig alles uitvinkt, anders kan "enkel
+    // Onderaannemers tonen" (alle gewone rollen uitvinken) nooit lukken, zie ipCurrentPeople().
+    if(state.ip.selectedRoles === null) state.ip.selectedRoles = new Set(roles);
     let html = roles.map(r =>
       `<button type="button" class="ip-role-chip ${state.ip.selectedRoles.has(r) ? 'on' : ''}" data-role="${escapeHtml(r)}">${escapeHtml(r)}</button>`
     ).join('');
@@ -30145,7 +30426,11 @@ window.CaCalcApp = {
       const apBadge = apInfo && apInfo.count ? `<span class="ip-tag" style="color:var(--danger);">${apInfo.count} open AP</span>` : '';
       const status = p.planning_status || 'actief';
       const statusBadge = status !== 'actief' ? `<span class="ip-tag">${escapeHtml(PLANNING_PROJECT_STATUSES.find(s => s.key === status)?.label || status)}</span> ` : '';
-      return `<div class="ip-proj-opt" data-proj="${p.id}"><span>${escapeHtml(p.naam)}</span><span>${statusBadge}${p.protocol ? `<span class="ip-tag">${escapeHtml(p.protocol)}</span> ` : ''}${apBadge}</span></div>`;
+      // Ronde 58 (op vraag van Peter): potlood-knopje om het project meteen te bewerken (bv. een
+      // verkeerde naam corrigeren) zonder het als afspraak van vandaag in te plannen -- zie
+      // data-edit-proj in de click-listener op #ip-proj-select-list.
+      const editBtn = `<button type="button" class="ip-proj-edit-btn" data-edit-proj="${p.id}" title="Project bewerken (naam, adres, …)" aria-label="${escapeHtml(p.naam)} bewerken">✏️</button>`;
+      return `<div class="ip-proj-opt" data-proj="${p.id}"><span>${escapeHtml(p.naam)}</span><span>${statusBadge}${p.protocol ? `<span class="ip-tag">${escapeHtml(p.protocol)}</span> ` : ''}${apBadge}${editBtn}</span></div>`;
     }
     let html = shown.map(optHtml).join('') || '<div class="ip-proj-opt">Geen (actieve) projecten gevonden</div>';
     if(!state.ip.projListShowAll && hiddenCount > 0){
@@ -30486,7 +30771,7 @@ window.CaCalcApp = {
   el('ip-team-switch').addEventListener('click', e => {
     const btn = e.target.closest('button[data-team]'); if(!btn) return;
     state.ip.team = btn.dataset.team;
-    state.ip.selectedRoles = new Set();
+    state.ip.selectedRoles = null; // ronde 58: terug "nog niet geïnitialiseerd" voor dit (andere) team
     ipSaveTeamPref(state.ip.team); // ronde 54: onthouden per gebruiker, zie refreshInzetPlanning()
     document.querySelectorAll('#ip-team-switch button').forEach(b => b.classList.toggle('active', b === btn));
     renderIpRoleFilter(); renderIpGrid(); renderIpCapacityTab(); renderIpSkillsTab();
@@ -30502,8 +30787,13 @@ window.CaCalcApp = {
     }
     const r = chip.dataset.role;
     if(!r) return;
+    // Ronde 58 (bugfix): bewust GEEN "alles terugzetten zodra leeg" meer hier -- dat veroorzaakte
+    // precies de klacht van Peter: de laatste rol-chip uitvinken (bv. om enkel Onderaannemers over
+    // te houden) zette zichzelf meteen weer terug naar "alles aan". Een leeg geraakte selectie
+    // betekent nu gewoon "0 rollen gekozen" (zie ipCurrentPeople()) -- de Onderaannemers-chip staat
+    // hier los van, dus "enkel onderaannemers tonen" werkt nu gewoon door alle andere chips uit te
+    // vinken en Onderaannemers aan te vinken.
     if(state.ip.selectedRoles.has(r)) state.ip.selectedRoles.delete(r); else state.ip.selectedRoles.add(r);
-    if(state.ip.selectedRoles.size === 0) ipRolesInTeam(state.ip.team).forEach(x => state.ip.selectedRoles.add(x));
     renderIpRoleFilter(); renderIpGrid();
   });
   el('ip-prev-week').addEventListener('click', () => { state.ip.weekStart = ipAddDays(state.ip.weekStart, -14); renderIpGrid(); renderIpCapacityTab(); });
@@ -30618,6 +30908,26 @@ window.CaCalcApp = {
     if(toggle){
       state.ip.projListShowAll = !state.ip.projListShowAll;
       renderIpProjSelectList(el('ip-proj-search').value);
+      return;
+    }
+    // Ronde 58 (op vraag van Peter: "Je zou daar ook op project moeten kunnen klikken het te
+    // editen (naam is verkeerd in dit geval)") -- eigen potlood-knopje per rij (zie optHtml() in
+    // renderIpProjSelectList()) i.p.v. de hele rij klikbaar maken: een klik op de rij zelf plant het
+    // project al in voor vandaag (ipAddEntry hieronder), dat mag niet per ongeluk gebeuren bij wie
+    // enkel de naam wil corrigeren. Zelfde "spring naar Projecten-tabblad + klap die rij open"-
+    // patroon als de bestaande #global-project-shortcut-link verderop in dit script.
+    const editBtn = e.target.closest('[data-edit-proj]');
+    if(editBtn){
+      const p = state.projects.find(x => String(x.id) === String(editBtn.dataset.editProj));
+      closeIpPanel();
+      if(!p) return;
+      switchTab('projecten');
+      p._expanded = true;
+      renderProjects();
+      setTimeout(() => {
+        const row = document.querySelector('.project-row[data-project-id="' + String(p.id).replace(/"/g, '') + '"]');
+        if(row && row.scrollIntoView) row.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 50);
       return;
     }
     const opt = e.target.closest('.ip-proj-opt[data-proj]'); if(!opt) return;
