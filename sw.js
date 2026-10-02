@@ -28,6 +28,18 @@
  * CACHE_VERSION hieronder verhogen lost dit soort dingen sowieso op, dus voortaan bij ÉLKE
  * ronde die code aanraakt (niet enkel als sw.js zelf inhoudelijk wijzigt).
  */
+// ronde 61: Peter meldde dat een CaDos-dossier soms stilzwijgend ontstond ("In settings van project
+// als cados dossier opmaken uitstaat en je doet opslaan komt er toch een dossier") -- bron was het
+// CaDos-instellingenblokje op de Projecten-pagina, dat bij elk uitklappen/bewaren van een project
+// onvoorwaardelijk synchroniseerde en bewaarde; dat gebeurt nu enkel nog als er al écht een dossier
+// bestond. Daarnaast, ook op vraag van Peter: de hoofdnav-knoppen "Dossier"/"Kabelberekening" tonen
+// zich voortaan enkel nog zodra bovenaan een project gekozen is (zonder gekozen project enkel
+// Werfverslag/Planning), en als "+ ... aanmaken" zolang dat project nog geen eigen dossier/
+// berekening heeft -- 1 klik maakt het dan aan en navigeert er meteen naartoe. Geen SQL-wijziging.
+// ronde 60b: de notitie (zie ronde 60 hieronder) toonde voorheen enkel een klein rood bolletje als
+// indicator -- op vraag van Peter ("Die notitie zou ook in het rooster zichtbaar mogen worden
+// wanneer er tekst in staat") toont de rooster-cel nu ook de notitietekst zelf, als eigen chipje
+// onderaan de cel (naast het bolletje, dat blijft ook staan). Geen SQL, geen nieuwe tabel.
 // ronde 60: (1) 2 nieuwe statussen in het rooster-dagpaneel -- "Keuring" (met een optioneel uur,
 // bv. "Keuring 14:30") en "Recup"; de 5 bestaande tegels (Verlof/ADV/Ziek/Afwezig/Magazijn) zijn
 // bewust gedimd/zachter gemaakt zodat Keuring als enige nog echt opvallend rood oogt; (2) vrije
@@ -51,7 +63,7 @@
 // vanaf"/"Uit dienst vanaf" (Bedrijfsgegevens) -- buiten die periode toont het rooster een grijze,
 // niet-klikbare "zone" i.p.v. een gewone cel, zodat niemand per ongeluk buiten zijn dienstperiode
 // ingepland kan worden.
-const CACHE_VERSION = 'casnap-v2026-10-02-r60';
+const CACHE_VERSION = 'casnap-v2026-10-02-r61';
 const NETWORK_TIMEOUT_MS = 4000;
 
 self.addEventListener('install', () => {

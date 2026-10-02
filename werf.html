@@ -1327,6 +1327,14 @@
   td.ip-slot:hover .ip-chip-mini.ip-confirm-hint{opacity:1;}
   .ip-chip-mini.ip-confirm-hint:hover{background:var(--green-soft);}
   .ip-chip-mini.ip-muted{opacity:.75;font-style:italic;}
+  /* Ronde 60b (2026-10-02, op vraag van Peter: "Die notitie zou ook in het rooster zichtbaar
+     mogen worden wanneer er tekst in staat") -- naast het rode bolletje (.ip-note-dot hierboven,
+     dat enkel een AANWEZIGHEID-indicator is) toont de cel nu ook de notitietekst zelf, als een
+     eigen, duidelijk apart ogend chipje onderaan de cel (zie ipNoteChipHtml() in het script).
+     Bewust GEEN apart klikgebied, net als de rest van de cel -- gewoon normaal doorklikbaar naar
+     het dagpaneel (zie de click-afhandeling op #ip-grid: enkel [data-...]-attributen worden daar
+     apart afgevangen, dit chipje heeft er geen). */
+  .ip-chip-mini.ip-note-chip{background:#fbeceb;color:#a8221a;font-style:italic;border:1px dashed #e7b4ae;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .ip-week-badge{display:inline-block;font-size:.6rem;background:rgba(0,0,0,.08);padding:1px 6px;border-radius:8px;margin-left:5px;vertical-align:middle;}
   .ip-status-weekend{background:var(--ink);color:#dfe3e8;}
   .ip-status-feestdag{background:#2f4a3a;color:#e7efe3;}
@@ -3065,11 +3073,21 @@
        de app-bar gezet (vóór de offline-banner). Desktop: witte balk met per app een gekleurd tegeltje;
        gsm (<= 720px): vaste onderbalk. Toont deze app-installatie maar 1 hoofdapp (losse app), dan
        verbergt updateMainNavVisibility() de hele balk (body.single-app). Knoppen zelf ongewijzigd. -->
+  <!-- Ronde 61 (2026-10-02, op vraag van Peter): de knoppen "Dossier"/"Kabelberekening" tonen/verbergen
+       zich nu afhankelijk van het globaal gekozen project (zie state.globalProjectHasCados/
+       globalProjectHasCacalc + updateMainNavModuleButtons() hieronder in het script):
+       - geen project gekozen: enkel Werfverslag + Planning zichtbaar (zoals Peter vroeg: "Dan enkel
+         werfversalg en planning zichtbaar ipv alle 4 de knoppen").
+       - project gekozen zonder dossier/berekening: knop zichtbaar in "aanmaken"-stand
+         (data-create="1", eigen label "+ Dossier aanmaken"/"+ Kabelberekening aanmaken") -- 1 klik
+         maakt het leeg record aan EN navigeert er meteen naartoe.
+       - project gekozen MET dossier/berekening: knop zichtbaar in normale stand (gewoon navigeren).
+       id="main-nav-btn-cados"/"main-nav-btn-cacalc" toegevoegd als CSS/JS-haakje hiervoor. -->
   <nav class="tabs app-nav" id="main-nav" aria-label="Apps">
     <button class="tab-btn nav-group-btn active" data-tab="verslag" type="button">Werfverslag</button>
     <button class="tab-btn" data-tab="inzet" type="button">Planning</button>
-    <button class="tab-btn" data-tab="cados" type="button">Dossier</button>
-    <button class="tab-btn" data-tab="cacalc" type="button">Kabelberekening</button>
+    <button class="tab-btn" id="main-nav-btn-cados" data-tab="cados" type="button">Dossier</button>
+    <button class="tab-btn" id="main-nav-btn-cacalc" data-tab="cacalc" type="button">Kabelberekening</button>
   </nav>
 
   <div class="offline-banner" id="offline-banner" style="display:none;">
@@ -20907,6 +20925,14 @@ window.CaCalcApp = {
     // aanpasbaar). Raakt bewust NIET aan de eigen "alle projecten"-filters van Verslagen/
     // Actiepunten (die tonen net vaak meerdere projecten tegelijk) en niet aan Personeelsplanning.
     globalProjectId: null,
+    // Ronde 61 (2026-10-02): of het gekozen project (globalProjectId) al een CaDos-dossier/
+    // CaCalc-berekening heeft -- null = nog niet opgezocht, true/false = bekend. Gebruikt door
+    // updateMainNavModuleButtons() om de knoppen "Dossier"/"Kabelberekening" bovenaan te tonen als
+    // "+ ... aanmaken" (nog geen record) vs. gewoon te navigeren (record bestaat al), en om de 2
+    // knoppen helemaal te verbergen als er nog geen project gekozen is. Zie
+    // refreshGlobalProjectModuleFlags() hieronder.
+    globalProjectHasCados: null,
+    globalProjectHasCacalc: null,
     currentVerslagId: null,
     standVanZaken: [], // "Stand van zaken per vakgebied" -- {vakgebied, tekst}, zie ArchiSnapper-voorbeeldverslag (2026-08-21)
     verslagenList: [],
@@ -22431,6 +22457,12 @@ window.CaCalcApp = {
     document.querySelectorAll('.tab-btn').forEach(b => {
       b.style.display = allowed.includes(b.dataset.tab) ? '' : 'none';
     });
+    // Ronde 61: deze forEach hierboven zou de knoppen Dossier/Kabelberekening altijd weer tonen
+    // (zodra de persoon er sowieso toegang toe heeft), ongeacht of er een project gekozen is of dat
+    // er al een dossier/berekening bestaat -- updateMainNavModuleButtons() hierna trekt dat meteen
+    // recht, zodat ook een latere herroep van deze functie (bv. na "rechten opslaan" op de
+    // Beheer-pagina) de "aanmaken"/verborgen-stand niet stilzwijgend ongedaan maakt.
+    updateMainNavModuleButtons();
     // Ronde 48 (2026-09-25, design-herwerking): hoofdnav verbergen als er maar 1 hoofdapp overblijft
     // (losse app zoals cados.html) -- zie updateMainNavVisibility() bij de Tabs-code hieronder.
     updateMainNavVisibility();
@@ -22719,7 +22751,16 @@ window.CaCalcApp = {
 
   // ---------- Tabs ----------
   document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+    btn.addEventListener('click', () => {
+      // Ronde 61: de 2 hoofdnav-knoppen Dossier/Kabelberekening staan in "aanmaken"-stand
+      // (data-create="1", zie updateMainNavModuleButtons()) zolang het gekozen project nog geen
+      // dossier/berekening heeft -- dan 1 klik aanmaken + meteen navigeren i.p.v. gewoon switchTab().
+      if(btn.dataset.create === '1'){
+        if(btn.id === 'main-nav-btn-cados'){ maakCadosDossierEnGa(); return; }
+        if(btn.id === 'main-nav-btn-cacalc'){ maakCacalcBerekeningEnGa(); return; }
+      }
+      switchTab(btn.dataset.tab);
+    });
   });
 
   // ---------- App-bar, gsm-menu (bottom sheet), accountmenu, hoofdnav-zichtbaarheid ----------
@@ -22834,8 +22875,14 @@ window.CaCalcApp = {
     // originele hoofdnav-knop aan, dus switchTab()/allowedTabs() beslissen zoals altijd.
     el('appbar-home').addEventListener('click', () => {
       const tabForApp = { werf: 'verslag', planning: 'inzet', dossier: 'cados', calc: 'cacalc' }[document.body.dataset.app];
-      const btns = Array.from(el('main-nav').querySelectorAll('.tab-btn')).filter(b => b.style.display !== 'none');
-      const target = btns.find(b => b.dataset.tab === tabForApp) || btns[0];
+      const nav = el('main-nav');
+      // Ronde 61: de knop zelf kan nu ook verborgen staan omdat er (nog) geen project gekozen is (zie
+      // updateMainNavModuleButtons()) -- in een losse app-installatie (bv. cados.html) is dit de
+      // ENIGE weg terug vanaf Projecten/Bedrijfsgegevens, dus bewust NIET meer filteren op
+      // zichtbaarheid zoals voorheen (die filter liet deze knop anders stilzwijgend onvindbaar
+      // worden, met btns[0] als verkeerde terugval naar een andere/geen knop). .click() werkt
+      // gewoon op een display:none-knop (vuurt zijn click-listener nog steeds af).
+      const target = nav && (nav.querySelector('.tab-btn[data-tab="' + tabForApp + '"]') || nav.querySelector('.tab-btn'));
       if(target) target.click();
     });
   }
@@ -23083,6 +23130,7 @@ window.CaCalcApp = {
   // project"-variant van zichzelf te tonen).
   function renderGlobalProjectShortcut(){
     renderGlobalProjectExtras();
+    refreshGlobalProjectModuleFlags(); // ronde 61: knoppen Dossier/Kabelberekening in de hoofdnav bijwerken
     const link = el('global-project-shortcut');
     if(!link) return;
     const p = state.globalProjectId ? state.projects.find(x => String(x.id) === String(state.globalProjectId)) : null;
@@ -23117,6 +23165,131 @@ window.CaCalcApp = {
     if(koppel) koppel.style.display = isConceptProject(p) ? '' : 'none';
     const pill = el('global-project-picker');
     if(pill) pill.classList.toggle('is-concept', isConceptProject(p));
+  }
+  // ===================== Ronde 61: Dossier/Kabelberekening pas tonen als het al bestaat =====================
+  // Op vraag van Peter: "Kabelberekening en dossier pas beide knop aanmaken als het moet aangemaakt
+  // worden. en pas als het dossier bovenaan werd gekozen met een dossier of berekening de knoppen om
+  // er naartoe te gaan weergeven. Dan enkel werfverslag en planning zichtbaar ipv alle 4 de knoppen."
+  // state.globalProjectHasCados/globalProjectHasCacalc (null = nog onbekend/aan het nakijken, true/
+  // false = bekend) sturen updateMainNavModuleButtons() hieronder. Gededuped per project-id + een
+  // oplopend token, zodat een snelle projectwissel geen verouderd antwoord meer kan tonen.
+  let moduleFlagsProjectId = null;
+  let moduleFlagsToken = 0;
+  async function refreshGlobalProjectModuleFlags(force){
+    // Ronde 61: deze "aanmaken"-gating hoort enkel bij de VOLLEDIGE suite (index.html/werf.html/
+    // planning.html), waar Dossier/Kabelberekening naast Werfverslag/Planning in dezelfde hoofdnav
+    // staan te wedijveren om aandacht. In een losse installatie (cados.html/cacalc.html,
+    // APP_MODE!=='full') IS dat tabblad de enige hoofdapp van die installatie -- de knop blijft daar
+    // dus gewoon ongewijzigd werken (zie updateMainNavModuleButtons() hieronder), en deze 2 extra
+    // opzoekingen (dbGetCadosDossier/dbGetCacalcData) zijn daar overbodig.
+    if(APP_MODE !== 'full') return;
+    const projectId = state.globalProjectId ? String(state.globalProjectId) : '';
+    if(!projectId){
+      moduleFlagsProjectId = null;
+      state.globalProjectHasCados = null;
+      state.globalProjectHasCacalc = null;
+      updateMainNavModuleButtons();
+      return;
+    }
+    if(!force && moduleFlagsProjectId === projectId){ updateMainNavModuleButtons(); return; }
+    moduleFlagsProjectId = projectId;
+    const myToken = ++moduleFlagsToken;
+    // Onbekend tot het nakijken klaar is -- updateMainNavModuleButtons() verbergt de 2 knoppen dan
+    // voorlopig helemaal (veiliger dan al te raden, zie de toelichting daar).
+    state.globalProjectHasCados = null;
+    state.globalProjectHasCacalc = null;
+    updateMainNavModuleButtons();
+    try{
+      const [cadosRow, cacalcRow] = await Promise.all([ dbGetCadosDossier(projectId), dbGetCacalcData(projectId) ]);
+      if(myToken !== moduleFlagsToken) return; // ondertussen al opnieuw gewisseld -- dit antwoord is verouderd
+      state.globalProjectHasCados = !!cadosRow;
+      state.globalProjectHasCacalc = !!cacalcRow;
+    }catch(err){
+      console.error('Kon niet nakijken of dit project al een CaDos-dossier/CaCalc-berekening heeft:', err);
+      if(myToken !== moduleFlagsToken) return;
+      // Bij een fout (bv. geen verbinding) de knoppen toch in de normale ("navigeren")-stand tonen
+      // i.p.v. "aanmaken" -- beter een knop die gewoon naar het tabblad gaat (dat zelf nog eens
+      // probeert te laden) dan het risico dat een foutieve "nog niet aangemaakt"-inschatting een 2e
+      // dossier/berekening boven op een bestaande aanmaakt.
+      state.globalProjectHasCados = true;
+      state.globalProjectHasCacalc = true;
+    }
+    updateMainNavModuleButtons();
+  }
+  function updateMainNavModuleButtons(){
+    const btnCados = el('main-nav-btn-cados');
+    const btnCacalc = el('main-nav-btn-cacalc');
+    if(!btnCados || !btnCacalc) return;
+    // Ronde 61: zie de toelichting bij refreshGlobalProjectModuleFlags() hierboven -- in een losse
+    // installatie (APP_MODE!=='full') laten we deze knop gewoon staan zoals applyAccessRestrictions()
+    // hem al zette (ongewijzigd gedrag); enkel in de volledige suite passen we de "aanmaken"-gating toe.
+    if(APP_MODE !== 'full'){
+      btnCados.removeAttribute('data-create');
+      btnCacalc.removeAttribute('data-create');
+      return;
+    }
+    const projectId = state.globalProjectId || '';
+    // Ronde 61: applyAccessRestrictions() (toegangsvinkjes) kan deze functie vóór OF NA zichzelf
+    // laten lopen (bv. bij "rechten opslaan" op de Beheer-pagina, lang na de eerste opstart) -- de
+    // eigen allowed.includes(...)-check hier zorgt dat deze functie nooit een knop toont die iemand
+    // zonder toegang tot dat tabblad niet mag zien, ongeacht de volgorde van beide aanroepen.
+    const allowed = allowedTabs();
+    function configureer(btn, tabNaam, heeftAl, label, aanmaakLabel){
+      if(!allowed.includes(tabNaam) || !projectId || heeftAl === null){
+        // Geen toegang, geen project gekozen (Peter: "enkel werfverslag en planning zichtbaar"), of
+        // nog aan het nakijken: in alle 3 gevallen de knop gewoon verbergen i.p.v. een stand te raden.
+        btn.style.display = 'none';
+        btn.removeAttribute('data-create');
+        return;
+      }
+      btn.style.display = '';
+      if(heeftAl){
+        btn.textContent = label;
+        btn.removeAttribute('data-create');
+      } else {
+        btn.textContent = aanmaakLabel;
+        btn.dataset.create = '1';
+      }
+    }
+    configureer(btnCados, 'cados', state.globalProjectHasCados, 'Dossier', '+ Dossier aanmaken');
+    configureer(btnCacalc, 'cacalc', state.globalProjectHasCacalc, 'Kabelberekening', '+ Kabelberekening aanmaken');
+  }
+  // Aangeroepen vanuit de .tab-btn-klikdelegatie hieronder (switchTab()) als data-create="1" staat --
+  // 1 klik maakt het dossier aan (zie maakCadosDossier() hierboven) EN navigeert er meteen naartoe.
+  async function maakCadosDossierEnGa(){
+    const projectId = state.globalProjectId;
+    if(!projectId) return;
+    const project = state.projects.find(x => String(x.id) === String(projectId));
+    const btn = el('main-nav-btn-cados');
+    if(btn) btn.disabled = true;
+    try{
+      await maakCadosDossier(projectId, project);
+      state.globalProjectHasCados = true;
+      updateMainNavModuleButtons();
+      switchTab('cados');
+    }catch(err){
+      console.error('CaDos-dossier aanmaken mislukt:', err);
+      alert('Kon het dossier niet aanmaken: ' + (err && err.message ? err.message : '(onbekende fout)'));
+    }finally{
+      if(btn) btn.disabled = false;
+    }
+  }
+  async function maakCacalcBerekeningEnGa(){
+    const projectId = state.globalProjectId;
+    if(!projectId) return;
+    const btn = el('main-nav-btn-cacalc');
+    if(btn) btn.disabled = true;
+    try{
+      await maakCacalcBerekening(projectId);
+      state.globalProjectHasCacalc = true;
+      updateMainNavModuleButtons();
+      switchTab('cacalc');
+    }catch(err){
+      console.error('CaCalc-berekening aanmaken mislukt:', err);
+      alert('Kon de berekening niet aanmaken: ' + (err && err.message ? err.message : '(onbekende fout)'));
+    }finally{
+      if(btn) btn.disabled = false;
+    }
   }
   function actiefTabblad(){
     const activeSection = document.querySelector('.tab-section.active');
@@ -25365,6 +25538,31 @@ window.CaCalcApp = {
     return changed;
   }
 
+  // Ronde 61: EENMALIGE, bewuste aanmaak van een leeg CaDos-dossier -- gedeeld tussen de
+  // hoofdnav-knop "+ Dossier aanmaken" (zie maakCadosDossierEnGa() bij renderGlobalProjectShortcut()
+  // hieronder) en het "+ Dossier aanmaken"-knopje in renderCadosInstellingenBlock() hierboven. Dit is
+  // de ENIGE plek die nog een CaDos-dossier aanmaakt vanuit het hoofdscript (naast de "CaDos-dossier
+  // aanmaken"-vink bij het aanmaken van een gloednieuw project, zie saveProjectRow()) -- nergens
+  // anders gebeurt dit nog stilzwijgend.
+  async function maakCadosDossier(projectId, project){
+    if(!window.CaDosApp || !window.CaDosApp.blankState || !window.CaDosApp.migrate){
+      throw new Error('CaDos-module nog niet geladen.');
+    }
+    const dossier = window.CaDosApp.migrate(window.CaDosApp.blankState());
+    if(project) syncCadosBasisvelden(dossier, project);
+    await dbSaveCadosDossier(projectId, dossier);
+    return dossier;
+  }
+  // Ronde 61: zelfde als maakCadosDossier() hierboven, maar voor CaCalc -- een lege { boards: [] }
+  // volstaat, window.CaCalcApp.loadForProject() vult de rest vanzelf aan zodra het tabblad opent
+  // (zie loadForProjectCacalc() in het gewrapte CaCalc-script, exact hetzelfde patroon als een
+  // dossier dat nog niet bestaat).
+  async function maakCacalcBerekening(projectId){
+    const blob = { boards: [] };
+    await dbSaveCacalcData(projectId, blob);
+    return blob;
+  }
+
   // ===================== CaDos-instellingen op de Projecten-pagina (2026-09-23) =====================
   // Op vraag van Peter: "Instellingen zou dan ook beter verhuizen naar de algemene project pagina
   // van het bijhorende project." Dit blokje werkt rechtstreeks op het bewaarde CaDos-dossier-JSON
@@ -25387,9 +25585,20 @@ window.CaCalcApp = {
       container.innerHTML = '<p class="hint">CaDos-module nog niet geladen.</p>';
       return;
     }
-    let dossier;
+    let dossier, bestondAl;
     try{
       const row = await window.dbGetCadosDossier(projectId);
+      // Ronde 61 (bugfix, op vraag van Peter: "In settings van project als cados dossier opmaken
+      // uitstaat en je doet opslaan komt er toch een dossier"): voorheen werd hier ALTIJD een
+      // dossier opgebouwd (al dan niet leeg) en -- zodra syncCadosBasisvelden() hieronder iets
+      // veranderde, wat bij een nog nooit bewaard dossier bijna altijd het geval is -- ook meteen
+      // bewaard via scheduleSave(), volledig los van de "CaDos-dossier aanmaken"-vink bij het
+      // aanmaken van een project. Elke keer een project uitgeklapt/bewaard werd (wat dit blokje
+      // opnieuw laat renderen) ontstond zo stilzwijgend een dossier. Nu: enkel nog bewaren/
+      // synchroniseren als er al ECHT een dossier bestond (bestondAl); bestaat er nog geen, dan
+      // tonen we hieronder enkel een hint + een bewuste "+ Dossier aanmaken"-knop (zelfde
+      // aanmaak-logica als de hoofdnav-knop, zie maakCadosDossier()).
+      bestondAl = !!row;
       const parsed = (row && row.data) ? row.data : {};
       dossier = window.CaDosApp.migrate(Object.assign(window.CaDosApp.blankState(), parsed));
       // migrate()/blankState() hierboven kunnen dossier.armaturen/driver vullen met de vestigiale
@@ -25402,6 +25611,31 @@ window.CaCalcApp = {
       if(parsed.driver !== undefined) dossier.driver = parsed.driver; else delete dossier.driver;
     }catch(err){
       container.innerHTML = '<p class="hint">Kon CaDos-instellingen niet laden: ' + escapeHtml(err.message || String(err)) + '</p>';
+      return;
+    }
+
+    if(!bestondAl){
+      container.innerHTML = `
+        <p class="hint">Dit project heeft nog geen CaDos-dossier.</p>
+        <button type="button" class="btn btn-secondary btn-sm cados-inst-maak-btn">+ Dossier aanmaken</button>
+      `;
+      container.querySelector('.cados-inst-maak-btn').addEventListener('click', async (e) => {
+        const btn = e.target;
+        btn.disabled = true;
+        try{
+          await maakCadosDossier(projectId, project);
+          // Hoofdnav-knop (bovenaan) kan hetzelfde project net nu ook getoond krijgen -- meteen mee
+          // bijwerken, anders blijft die nog even ten onrechte "aanmaken" tonen.
+          if((state.globalProjectId || '') === String(projectId)){
+            state.globalProjectHasCados = true;
+            updateMainNavModuleButtons();
+          }
+          await renderCadosInstellingenBlock(container, projectId, project); // nu normaal tonen (bestondAl=true)
+        }catch(err){
+          console.error('CaDos-dossier aanmaken mislukt:', err);
+          container.innerHTML = '<p class="hint">Kon het dossier niet aanmaken: ' + escapeHtml(err.message || String(err)) + '</p>';
+        }
+      });
       return;
     }
 
@@ -29349,6 +29583,17 @@ window.CaCalcApp = {
     if(!note || !(note.tekst || '').trim()) return '';
     return `<span class="ip-note-dot" title="Notitie: ${escapeHtml(note.tekst)}"></span>`;
   }
+  // Ronde 60b (op vraag van Peter: "Die notitie zou ook in het rooster zichtbaar mogen worden
+  // wanneer er tekst in staat") -- naast het rode bolletje hierboven (dat enkel aanwezigheid
+  // aangeeft) toont de cel zelf nu ook de notitietekst, als een eigen chipje (zie .ip-note-chip
+  // in de CSS) onderaan de rest van de celinhoud. Volledige tekst blijft als tooltip beschikbaar
+  // voor als de tekst te lang is om in 1 regel te passen (zie white-space:nowrap + ellipsis).
+  function ipNoteChipHtml(naam, dateISO){
+    const note = ipNoteFor(naam, dateISO);
+    const tekst = note ? (note.tekst || '').trim() : '';
+    if(!tekst) return '';
+    return `<div class="ip-chip-mini ip-note-chip" title="Notitie: ${escapeHtml(tekst)}">📝 ${escapeHtml(tekst)}</div>`;
+  }
 
   // Sufficient dat ÉÉN van de op dat project+die dag ingeplande mensen het protocol kent.
   function ipProjectDayHasSkillCoverage(projectId, dateISO){
@@ -30270,9 +30515,9 @@ window.CaCalcApp = {
           // (lege of ingevulde) cel. Zie isPersoonInDienst()/.ip-slot.ip-buiten-dienst (CSS) en de
           // blokkering in de click-afhandeling op #ip-grid hieronder (data-buiten-dienst).
           const reden = (p.in_dienst_vanaf && dISO < p.in_dienst_vanaf) ? 'Nog niet in dienst' : 'Uit dienst';
-          tbody += `<td class="ip-slot ip-buiten-dienst" data-person="${escapeHtml(p.naam)}" data-date="${dISO}" data-buiten-dienst="1" title="${reden} (zie Bedrijfsgegevens → Team leden/Bureau)">${ipNoteDotHtml(p.naam, dISO)}<div class="ip-cellwrap"><div class="ip-chip-mini ip-muted">${reden}</div></div></td>`;
+          tbody += `<td class="ip-slot ip-buiten-dienst" data-person="${escapeHtml(p.naam)}" data-date="${dISO}" data-buiten-dienst="1" title="${reden} (zie Bedrijfsgegevens → Team leden/Bureau)">${ipNoteDotHtml(p.naam, dISO)}<div class="ip-cellwrap"><div class="ip-chip-mini ip-muted">${reden}</div>${ipNoteChipHtml(p.naam, dISO)}</div></td>`;
         } else {
-          tbody += `<td class="ip-slot ${weekend ? 'ip-weekend' : ''}" data-person="${escapeHtml(p.naam)}" data-date="${dISO}">${ipNoteDotHtml(p.naam, dISO)}<div class="ip-cellwrap">${ipCellInner(p.naam, dISO, weekend, holiday)}</div></td>`;
+          tbody += `<td class="ip-slot ${weekend ? 'ip-weekend' : ''}" data-person="${escapeHtml(p.naam)}" data-date="${dISO}">${ipNoteDotHtml(p.naam, dISO)}<div class="ip-cellwrap">${ipCellInner(p.naam, dISO, weekend, holiday)}${ipNoteChipHtml(p.naam, dISO)}</div></td>`;
         }
       });
       tbody += '</tr>';
