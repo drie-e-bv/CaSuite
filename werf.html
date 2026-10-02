@@ -1248,7 +1248,20 @@
 
   td.ip-slot{min-width:150px;cursor:pointer;position:relative;padding:6px;}
   td.ip-slot.ip-weekend{background:#eef0f3;}
+  /* Ronde 59 (op vraag van Peter: "In dienst en uit dienst. buiten de dienst periode kunnen ze
+     niet ingepland worden. Grijze zone markeren ofzo.") -- duidelijk donkerder/grover gearceerd
+     dan de lichte weekend-/feestdag-arcering (--ips-hatch) hierboven, zodat "deze persoon was hier
+     nog/niet meer in dienst" nooit verward wordt met een gewoon weekend. Niet klikbaar (zie de
+     click-afhandeling op #ip-grid: data-buiten-dienst blokkeert het openen van het dagpaneel). */
+  td.ip-slot.ip-buiten-dienst{background:repeating-linear-gradient(135deg, #d8dce1 0 7px, #c7cdd5 7px 14px);cursor:not-allowed;opacity:.82;}
+  td.ip-slot.ip-buiten-dienst:hover{background:repeating-linear-gradient(135deg, #d8dce1 0 7px, #c7cdd5 7px 14px);}
+  td.ip-slot.ip-buiten-dienst .ip-chip-mini{background:none;color:var(--ink-faint);font-style:italic;cursor:not-allowed;}
   td.ip-slot.ip-merged{background:#fbfcfe;vertical-align:middle;}
+  /* Ronde 60 (op vraag van Peter): klein rood bolletje zodra er een vrije notitie op deze dag/
+     persoon staat (zie ipNoteFor()/ipNoteDotHtml() in het script) -- de cel was altijd al
+     aanklikbaar (opent het dagpaneel, met de notitie erin), dus bewust GEEN apart klikgebied, enkel
+     deze indicator; pointer-events:none zodat hij de gewone celklik nooit onderschept. */
+  .ip-note-dot{position:absolute;top:4px;right:4px;width:8px;height:8px;border-radius:50%;background:#d93025;box-shadow:0 0 0 2px var(--card);pointer-events:none;z-index:2;}
   .ip-cellwrap{display:flex;flex-direction:column;gap:3px;min-height:32px;position:relative;}
   /* Ronde 52 (punt 6): dagdeel-splitsing -- een cel met minstens 1 'vm'- of 'nm'-item toont een
      boven-/onderhelft (elk ip-chip-mini binnenin blijft verder ongewijzigd/individueel bedienbaar,
@@ -1317,11 +1330,16 @@
   .ip-week-badge{display:inline-block;font-size:.6rem;background:rgba(0,0,0,.08);padding:1px 6px;border-radius:8px;margin-left:5px;vertical-align:middle;}
   .ip-status-weekend{background:var(--ink);color:#dfe3e8;}
   .ip-status-feestdag{background:#2f4a3a;color:#e7efe3;}
-  .ip-status-verlof{background:var(--green-soft);color:var(--green);}
-  .ip-status-adv{background:var(--blue-soft);color:var(--blue);}
-  .ip-status-ziek{background:#f8dbd5;color:var(--danger);}
-  .ip-status-afwezig{background:#e4e1d8;color:#6b6a60;}
-  .ip-status-magazijn{background:#eae0c4;color:#7a6420;}
+  /* Ronde 60: zie de toelichting bij IP_STATUSES in het script -- alle statustegels hieronder zijn
+     bewust gedimd (zachtere achtergrond + tekstkleur dan voorheen), op Keuring na (hieronder,
+     ip-status-keuring), die juist als enige "alarm-rood" moet blijven opvallen. */
+  .ip-status-verlof{background:#eef6f0;color:#5c8f6f;}
+  .ip-status-adv{background:#f1eef9;color:#8a79b8;}
+  .ip-status-ziek{background:#f8eeec;color:#b08078;}
+  .ip-status-recup{background:#e9f5f6;color:#4f9499;}
+  .ip-status-afwezig{background:#f1efe9;color:#8c8a7e;}
+  .ip-status-magazijn{background:#f6efe0;color:#a4874e;}
+  .ip-status-keuring{background:#d93025;color:#fff;font-weight:700;box-shadow:inset 0 0 0 1px #a8221a;}
   .ip-status-project{background:#fff;border:1px solid var(--line);border-left:3px solid var(--accent);color:var(--ink);}
   .ip-status-project.ip-mismatch{box-shadow:inset 0 0 0 1px var(--danger);}
   .ip-ap-badge{display:inline-block;background:var(--danger);color:#fff;border-radius:9px;padding:0 6px;font-size:.68rem;line-height:16px;height:16px;margin-left:5px;vertical-align:middle;}
@@ -1356,6 +1374,11 @@
   .ip-open-ap-note{font-size:.74rem;color:var(--ink-soft);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px 10px;margin-top:4px;}
   .ip-open-ap-note b{color:var(--danger);}
 
+  /* Ronde 60: vrije notitie per dag/persoon, zie hoger in dit bestand (.ip-note-dot) voor de
+     rode-bolletje-indicator in het rooster zelf. */
+  .ip-panel-notitie{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:6px;padding:8px 10px;font:inherit;font-size:.82rem;resize:vertical;min-height:52px;}
+  .ip-panel-notitie:focus{outline:2px solid var(--brand);outline-offset:1px;}
+
   .ip-status-options{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
   .ip-status-opt{border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-size:.8rem;cursor:pointer;text-align:left;background:var(--card);}
   /* Ronde 52 (punt 6): "Hele dag / Voormiddag / Namiddag"-chips in het dagpaneel. */
@@ -1366,6 +1389,13 @@
   .ip-proj-list{max-height:340px;overflow-y:auto;border:1px solid var(--line);border-radius:6px;}
   .ip-vrije-taak-wrap{display:flex;gap:6px;margin:6px 0 2px;}
   .ip-vrije-taak-wrap input{flex:1;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-size:.85rem;font-family:inherit;box-sizing:border-box;}
+  /* Ronde 60: Vrije taak inline bewerken (zie ipEntryLabel()/renderIpEntryList() in het script). */
+  .ip-edit-wrap{display:flex;gap:6px;margin-top:6px;}
+  .ip-edit-wrap input{flex:1;padding:7px 9px;border:1px solid var(--line);border-radius:6px;font-size:.82rem;font-family:inherit;box-sizing:border-box;}
+  .ip-entry-main .ip-edit-btn{padding:2px 6px;font-size:.78rem;line-height:1;border:0;background:none;flex:none;}
+  /* Ronde 60: Keuring-uur inline aanpasbaar. */
+  .ip-keuring-uur-wrap{display:flex;align-items:center;gap:7px;margin-top:6px;font-size:.78rem;color:var(--ink-soft);}
+  .ip-keuring-uur-wrap input{padding:5px 7px;border:1px solid var(--line);border-radius:6px;font-size:.82rem;font-family:inherit;}
   .ip-proj-opt{padding:9px 10px;font-size:.82rem;cursor:pointer;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:8px;}
   .ip-proj-opt:last-child{border-bottom:none;}
   .ip-proj-opt:hover{background:var(--bg);}
@@ -2211,20 +2241,27 @@
   /* ---------- Statuskleuren (één plek) ----------
      Zacht gekleurde blokjes met duidelijke tekst. ADV kreeg violet i.p.v. blauw, zodat het niet meer
      samenvalt met de (blauwe) projectblokjes; de PDF-export (IP_EXPORT_COLORS) volgt mee. */
+  /* Ronde 60: zie IP_STATUSES in het script -- Verlof/ADV/Ziek/Afwezig/Magazijn bewust gedimd,
+     Recup nieuw (zelfde zachte stijl), Keuring nieuw en bewust NIET gedimd (vol, opvallend rood --
+     Peter: "Duidelijk zichtbaar rode kleur, alle andere kleuren mogen wat zachter"). */
   #tab-inzet, #ip-panel{
     --ips-proj:#2563c9;      --ips-proj-bg:#e8effb;
-    --ips-verlof:#1f7a45;    --ips-verlof-bg:#e3f4ea;
-    --ips-adv:#6a4bc0;       --ips-adv-bg:#efeafb;
-    --ips-ziek:#b8352a;      --ips-ziek-bg:#fbe7e4;
-    --ips-afwezig:#66645a;   --ips-afwezig-bg:#eeece6;
-    --ips-magazijn:#8a6417;  --ips-magazijn-bg:#f7eedb;
+    --ips-verlof:#5c8f6f;    --ips-verlof-bg:#eef6f0;
+    --ips-adv:#8a79b8;       --ips-adv-bg:#f1eef9;
+    --ips-ziek:#b08078;      --ips-ziek-bg:#f8eeec;
+    --ips-recup:#4f9499;     --ips-recup-bg:#e9f5f6;
+    --ips-afwezig:#8c8a7e;   --ips-afwezig-bg:#f1efe9;
+    --ips-magazijn:#a4874e;  --ips-magazijn-bg:#f6efe0;
+    --ips-keuring:#ffffff;   --ips-keuring-bg:#d93025;
     --ips-hatch:repeating-linear-gradient(135deg, rgba(21,36,28,.045) 0 6px, transparent 6px 12px);
   }
   :is(#tab-inzet, #ip-panel) .ip-status-verlof{background:var(--ips-verlof-bg);color:var(--ips-verlof);}
   :is(#tab-inzet, #ip-panel) .ip-status-adv{background:var(--ips-adv-bg);color:var(--ips-adv);}
   :is(#tab-inzet, #ip-panel) .ip-status-ziek{background:var(--ips-ziek-bg);color:var(--ips-ziek);}
+  :is(#tab-inzet, #ip-panel) .ip-status-recup{background:var(--ips-recup-bg);color:var(--ips-recup);}
   :is(#tab-inzet, #ip-panel) .ip-status-afwezig{background:var(--ips-afwezig-bg);color:var(--ips-afwezig);}
   :is(#tab-inzet, #ip-panel) .ip-status-magazijn{background:var(--ips-magazijn-bg);color:var(--ips-magazijn);}
+  :is(#tab-inzet, #ip-panel) .ip-status-keuring{background:var(--ips-keuring-bg);color:var(--ips-keuring);font-weight:700;box-shadow:inset 0 0 0 1px #a8221a;}
   :is(#tab-inzet, #ip-panel) .ip-status-project{background:var(--ips-proj-bg);color:var(--ink);border:0;box-shadow:inset 3px 0 0 var(--ips-proj);}
   :is(#tab-inzet, #ip-panel) .ip-status-project.ip-mismatch{background:#fdf1ef;box-shadow:inset 3px 0 0 var(--danger), inset 0 0 0 1px rgba(192,57,43,.45);}
   :is(#tab-inzet, #ip-panel) .ip-chip-mini.ip-voorstel{
@@ -2295,8 +2332,10 @@
   #ipsub-rooster .ip-legend-dot.ip-status-verlof{background:var(--ips-verlof);}
   #ipsub-rooster .ip-legend-dot.ip-status-adv{background:var(--ips-adv);}
   #ipsub-rooster .ip-legend-dot.ip-status-ziek{background:var(--ips-ziek);}
+  #ipsub-rooster .ip-legend-dot.ip-status-recup{background:var(--ips-recup);}
   #ipsub-rooster .ip-legend-dot.ip-status-afwezig{background:var(--ips-afwezig);}
   #ipsub-rooster .ip-legend-dot.ip-status-magazijn{background:#c9922a;}
+  #ipsub-rooster .ip-legend-dot.ip-status-keuring{background:var(--ips-keuring-bg);box-shadow:inset 0 0 0 1px #a8221a;}
   #ipsub-rooster .ip-legend-dot.ip-status-project{background:var(--ips-proj);}
 
   /* ---------- Het rooster ----------
@@ -3758,6 +3797,15 @@
     <div class="ip-panel-body">
       <h4>Afspraken deze dag</h4>
       <div id="ip-entry-list"></div>
+
+      <!-- Ronde 60 (op vraag van Peter): vrije notitie per dag/persoon, los van een project --
+           "Genre start later, vroeger naar huis, te laat begonnen,..." -- altijd hier beschikbaar
+           (ook een dag zonder enige afspraak). Bewaard in de nieuwe planning_notities-tabel, zie
+           dbSavePlanningNotitie()/submitIpNotitie() in het script. In het rooster zelf toont een
+           klein rood bolletje op de cel zodra hier iets in staat (zie .ip-note-dot in de CSS) --
+           de cel was al altijd aanklikbaar (opent dit paneel), dus geen apart klikgebied nodig. -->
+      <h4>Notitie</h4>
+      <textarea id="ip-panel-notitie" class="ip-panel-notitie" rows="2" placeholder="bv. Start later, vroeger naar huis, te laat begonnen,…"></textarea>
 
       <h4>Nieuwe afspraak toevoegen</h4>
       <!-- Ronde 52 (punt 6, op vraag van Peter): dagdeel-keuze vóór de status-/projectkeuze -- geldt
@@ -20875,6 +20923,12 @@ window.CaCalcApp = {
     protocollen: [], // bedrijf.protocollen -- lijst domoticaprotocollen, beheerd via Bedrijfsgegevens
     planningItems: [], // alle rijen uit planning_items (het "rooster"), 1x geladen bij inloggen
     urenRegistraties: [], // alle rijen uit uren_registraties (ronde 52, punt 2), 1x geladen bij inloggen
+    // Ronde 60: vrije notitie per dag/persoon ("Genre start later, vroeger naar huis, te laat
+    // begonnen,...") -- los van planning_items, want een dag zonder ENIGE afspraak moet ook een
+    // notitie kunnen krijgen. Zie dbListPlanningNotities()/dbSavePlanningNotitie()/ipNoteFor()
+    // hieronder; nieuwe tabel planning_notities (migratie al rechtstreeks in Supabase uitgevoerd,
+    // geen actie van Peter nodig).
+    planningNotities: [],
     openApByProject: {}, // project_id -> {count, items:[{beschrijving,deadline,verantwoordelijke}]}, uit actiepuntenList
     // ---- Toegangsniveaus (2026-09-09) ----
     currentPerson: null, // team_leden-/bureau-object van de ingelogde gebruiker (of null, onbekend e-mailadres)
@@ -20981,13 +21035,26 @@ window.CaCalcApp = {
   // Zo'n rij krijgt project_id = null en een vrije tekst in de nieuwe `omschrijving`-kolom (zie
   // SQL-migratie in het projectdocument) i.p.v. een gekoppeld project.
   const IP_VRIJE_TAAK_VALUE = '__vrije_taak__';
+  // Ronde 60 (2026-10-02, op vraag van Peter): "Keuring" toegevoegd (AREI/RGIE-keuring e.d. op
+  // een bepaald UUR -- zie de uur-invoer per KEURING-rij in renderIpEntryList() hieronder, bewaard
+  // in de al bestaande planning_items.van_uur-kolom uit ronde 55, geen nieuwe SQL-kolom nodig) en
+  // "Recup" (recuperatiedag). Keuring krijgt bewust een opvallende, volle rode tegel (zie
+  // .ip-status-keuring in de CSS) -- Peter: "Duidelijk zichtbaar rode kleur, alle andere kleuren
+  // mogen wat zachter" -- daarom zijn de 4 oorspronkelijke tegelkleuren hieronder bewust gedimd
+  // (zie dezelfde toelichting bij de CSS-variabelen --ips-* hierboven in het bestand), zodat Keuring
+  // als enige nog echt "alarm-rood" oogt.
   const IP_STATUSES = [
     { key: 'VERLOF', label: 'Verlof', cls: 'ip-status-verlof' },
     { key: 'ADV', label: 'ADV', cls: 'ip-status-adv' },
     { key: 'ZIEK', label: 'Ziek', cls: 'ip-status-ziek' },
+    { key: 'RECUP', label: 'Recup', cls: 'ip-status-recup' },
     { key: 'AFWEZIG', label: 'Afwezig', cls: 'ip-status-afwezig' },
-    { key: 'MAGAZIJN', label: 'Magazijn', cls: 'ip-status-magazijn' }
+    { key: 'MAGAZIJN', label: 'Magazijn', cls: 'ip-status-magazijn' },
+    { key: 'KEURING', label: 'Keuring', cls: 'ip-status-keuring' }
   ];
+  // Enige status waarbij ook een uur ingevuld kan worden (zie hierboven) -- 1 centrale plek zodat
+  // renderIpEntryList() niet met een losse "=== 'KEURING'"-string-check hoeft te werken.
+  const IP_STATUS_MET_UUR = 'KEURING';
   // Standaard werktijd per dagdeel voor de Outlook-sync (ronde 55) -- enkel gebruikt als een
   // planning_item geen eigen van_uur/tot_uur heeft (dus nog nooit manueel aangepast is). Aanpasbaar
   // hier op 1 plek; raakt geen bestaande data, enkel de Outlook-afspraken die hieruit berekend worden.
@@ -21816,6 +21883,34 @@ window.CaCalcApp = {
     items.forEach(outlookBestEffortDeleteEvent);
   }
 
+  // ---- Vrije notitie per dag/persoon (2026-10-02, ronde 60) ----
+  // Nieuwe, eigen tabel planning_notities (losstaand van planning_items -- zie de toelichting bij
+  // state.planningNotities hierboven), 1 rij per persoon+datum (unique-constraint in de SQL-
+  // migratie). dbSavePlanningNotitie() zoekt zelf op of er al een rij is (ipNoteFor(), zie de
+  // Personeelsplanning-sectie verderop) en doet dan update, anders insert -- bewust geen .upsert()
+  // (de generieke mock-supabase.js ondersteunt enkel een single-kolom onConflict, hier zijn het 2
+  // kolommen samen).
+  async function dbListPlanningNotities(){
+    const { data, error } = await sb.from('planning_notities').select('*');
+    if(error) throw error;
+    return data || [];
+  }
+  async function dbSavePlanningNotitie(persoonNaam, datumISO, tekst){
+    const existing = ipNoteFor(persoonNaam, datumISO);
+    if(existing){
+      const { error } = await sb.from('planning_notities').update({ tekst, bijgewerkt_op: new Date().toISOString() }).eq('id', existing.id);
+      if(error) throw error;
+      existing.tekst = tekst;
+      return existing;
+    }
+    const { data, error } = await sb.from('planning_notities').insert({
+      persoon_naam: persoonNaam, datum: datumISO, tekst, aangemaakt_door: getCurrentUserNaam() || null
+    }).select().single();
+    if(error) throw error;
+    state.planningNotities.push(data);
+    return data;
+  }
+
   // ---- "Factuurmelding" (2026-09-29, ronde 57) ----
   // Per-project, standaard UIT staande herinnering voor de vaste projectleider (zie
   // checkEnMaakFactuurMeldingenAan()/renderIpFactuurMeldingen() verderop bij Personeelsplanning)
@@ -22274,6 +22369,10 @@ window.CaCalcApp = {
     // i.p.v. de hele opstart te laten vastlopen.
     try{ state.urenRegistraties = await dbListUrenRegistraties(); }
     catch(err){ console.error('Kon uren_registraties niet laden (tabel misschien nog niet aangemaakt):', err); state.urenRegistraties = []; }
+    // Ronde 60: zelfde defensieve laadpatroon -- planning_notities bestaat intussen al (migratie
+    // rechtstreeks in Supabase uitgevoerd), maar dit blijft zo ook veilig als dat ooit niet zo was.
+    try{ state.planningNotities = await dbListPlanningNotities(); }
+    catch(err){ console.error('Kon planning_notities niet laden (tabel misschien nog niet aangemaakt):', err); state.planningNotities = []; }
     await refreshVerslagenList();
     resetVerslagEditor();
     applyAccessRestrictions();
@@ -23587,6 +23686,48 @@ window.CaCalcApp = {
     }
   };
 
+  // ---------- Terug-knop onthoudt een stap i.p.v. de app te sluiten (ronde 59) ----------
+  // Peter: "retour knop sluit ook meestal de app af, kan dat niet stap terug ingesteld worden?"
+  // Oorzaak: dit is 1 grote pagina -- tab wisselen of het dagpaneel openen gebeurt allemaal met
+  // gewoon JS (niks herlaadt of navigeert écht), dus de browser/Android hield nooit een "stap
+  // terug" bij. Op een geïnstalleerde (homescherm-)app sluit de hardware-/gebaar-terugknop dan
+  // ook meteen de hele app zodra er niks in de geschiedenis staat, in plaats van 1 stap terug te
+  // doen zoals een "echte" native app.
+  // Oplossing: na elke tabwissel én na het openen/sluiten van het dagpaneel (de 2 meest gebruikte
+  // navigatiemomenten) leggen we zelf de huidige "stand" vast via history.pushState() -- welke
+  // tab actief is, en of het dagpaneel open staat. Komt er een nieuwe stand bij die verschilt van
+  // de vorige, dan is er een extra stap op de geschiedenis-stack bijgekomen; de terugknop doet die
+  // dan eerst ongedaan (vorige tab terug tonen, of het paneel sluiten) in plaats van de app af te
+  // sluiten. Pas bij de allereerste, originele pagina (die geen eigen "caSuiteNav"-stand heeft)
+  // doet de terugknop weer zijn normale, app-sluitende ding.
+  // Bewust beperkt tot tabwissels + het dagpaneel (niet elk van de ~12 andere modals/paneeltjes
+  // in de app, zoals Beheer/Catalogus/checklist-templates) -- dit dekt veruit het vaakst gebruikte
+  // "de terugknop sluit de app" geval; de overige, minder vaak gebruikte modals sluiten voorlopig
+  // nog steeds met hun eigen ×/Sluiten-knop of Escape (ronde 53), niet met de terugknop.
+  var applyingHistoryState = false; // staat aan terwijl we ZELF een stap terugzetten -- voorkomt een oneindige lus
+  function pushHistoryState(){
+    if(applyingHistoryState) return;
+    const tab = document.body.dataset.tab;
+    const ipPanelOpen = !!(el('ip-panel') && el('ip-panel').classList.contains('open'));
+    const cur = history.state;
+    if(cur && cur.caSuiteNav && cur.tab === tab && cur.ipPanelOpen === ipPanelOpen) return; // geen echte wijziging -- geen extra stap pushen
+    try{ history.pushState({ caSuiteNav: true, tab: tab, ipPanelOpen: ipPanelOpen }, ''); }
+    catch(e){ /* bv. een weergave zonder pushState-ondersteuning -- dan gewoon geen stap-terug, geen crash */ }
+  }
+  window.addEventListener('popstate', (e) => {
+    const st = e.state;
+    if(!st || !st.caSuiteNav) return; // niet van ons (de allereerste pagina) -- laat de browser/het OS gewoon zijn normale gang gaan
+    applyingHistoryState = true;
+    try{
+      if(st.tab && st.tab !== document.body.dataset.tab) switchTab(st.tab);
+      const panelNuOpen = !!(el('ip-panel') && el('ip-panel').classList.contains('open'));
+      if(!st.ipPanelOpen && panelNuOpen) closeIpPanel();
+      // st.ipPanelOpen && !panelNuOpen ("voorwaarts" terug een paneel in) wordt bewust niet
+      // heropend -- de ingevulde paneel-context (welke persoon/dag) wordt niet apart onthouden,
+      // dus een volgende tabwissel/paneelactie zet de stand gewoon vanaf daar verder.
+    } finally { applyingHistoryState = false; }
+  });
+
   function switchTab(tab){
     // Extra veiligheid boven op het verbergen van de tabknoppen zelf (applyAccessRestrictions()) --
     // wat het toegangsniveau (de 6 toegangsvinkjes) en de geopende app (APP_MODE) samen niet toelaten,
@@ -23660,6 +23801,7 @@ window.CaCalcApp = {
     if(tab === 'verslag') verslagTabBinnengekomen();
     // Ronde 52 (punt 1): "Mijn planning"-pseudo-tab voor een gekoppeld Onderaannemer-account.
     if(tab === 'mijn-planning') renderMijnPlanningTab();
+    pushHistoryState(); // ronde 59: terugknop toont voortaan de vorige tab i.p.v. de app te sluiten
   }
 
   // ---------- Bedrijfsgegevens ----------
@@ -23895,6 +24037,25 @@ window.CaCalcApp = {
     teamSelect.innerHTML = `<option value="TECH" ${person.planning_team==='TECH'?'selected':''}>Tech</option><option value="BUREAU" ${person.planning_team==='BUREAU'?'selected':''}>Bureau</option>`;
     teamSelect.title = 'Team voor het Personeelsplanning-rooster (los van deze lijst hier)';
     teamSelect.addEventListener('change', e => { person.planning_team = e.target.value; });
+    // In dienst / uit dienst (ronde 59, op vraag van Peter: "Bij personeel (allemaal): In dienst
+    // en uit dienst. buiten de dienst periode kunnen ze niet ingepland worden. Grijze zone
+    // markeren ofzo.") -- 2 losse, optionele datumvelden, net als de rest van deze rij gewoon op
+    // dezelfde jsonb-rij bewaard (geen nieuwe SQL-kolom nodig). Beide leeg = geen begrenzing (zoals
+    // voorheen voor iedereen) -- dit raakt dus niemands bestaande planning tenzij je het hier zelf
+    // instelt. Zie isPersoonInDienst()/renderIpGrid() verderop voor de grijze, niet-klikbare
+    // "zone" buiten die periode.
+    const inDienstInput = document.createElement('input');
+    inDienstInput.type = 'date';
+    inDienstInput.className = 'ip-p-in-dienst';
+    inDienstInput.title = 'Vanaf deze datum pas inplanbaar in het rooster. Leeg = geen begindatum (zoals voorheen).';
+    if(person.in_dienst_vanaf) inDienstInput.value = person.in_dienst_vanaf;
+    inDienstInput.addEventListener('change', e => { person.in_dienst_vanaf = e.target.value || null; if(typeof renderIpGrid === 'function' && el('ip-grid')) renderIpGrid(); });
+    const uitDienstInput = document.createElement('input');
+    uitDienstInput.type = 'date';
+    uitDienstInput.className = 'ip-p-uit-dienst';
+    uitDienstInput.title = 'Tot en met deze datum nog inplanbaar in het rooster. Leeg = nog in dienst, geen einddatum.';
+    if(person.uit_dienst_vanaf) uitDienstInput.value = person.uit_dienst_vanaf;
+    uitDienstInput.addEventListener('change', e => { person.uit_dienst_vanaf = e.target.value || null; if(typeof renderIpGrid === 'function' && el('ip-grid')) renderIpGrid(); });
     const protoWrap = document.createElement('div');
     protoWrap.className = 'tl-protocollen bu-protocollen';
     function renderProtoChecks(){
@@ -23929,6 +24090,8 @@ window.CaCalcApp = {
     row.insertBefore(tmField('Volgorde in rooster', volgordeInput, 'tm-f-volgorde'), row.firstChild);
     row.appendChild(tmField('Rol', rolSelect));
     row.appendChild(tmField('Team (rooster)', teamSelect));
+    row.appendChild(tmField('In dienst vanaf', inDienstInput));
+    row.appendChild(tmField('Uit dienst vanaf (optioneel)', uitDienstInput));
     const skillsWrap = document.createElement('div');
     skillsWrap.className = 'tm-skills';
     skillsWrap.innerHTML = '<span class="tm-f-lbl">Vaardigheden</span>';
@@ -29137,6 +29300,18 @@ window.CaCalcApp = {
     return list;
   }
   function ipPersonByNaam(naam){ return ipAllPeople().find(p => p.naam === naam); }
+  // Ronde 59 (op vraag van Peter: "Bij personeel (allemaal): In dienst en uit dienst. buiten de
+  // dienst periode kunnen ze niet ingepland worden. Grijze zone markeren ofzo.") -- `in_dienst_
+  // vanaf`/`uit_dienst_vanaf` zijn 2 nieuwe, optionele datumvelden per teamlid/Bureau-lid (zie
+  // buildIpPersonExtraRow() bij Bedrijfsgegevens), gewoon op diezelfde jsonb-rij als de rest van
+  // deze lijst (geen nieuwe SQL-kolom nodig). Leeg = geen begrenzing aan die kant (zoals voorheen
+  // voor iedereen): een persoon zonder 1 van beide data blijft dus overal gewoon inplanbaar.
+  // ISO-datumstrings ("YYYY-MM-DD") vergelijken hieronder gewoon correct als tekst.
+  function isPersoonInDienst(p, dateISO){
+    if(p.in_dienst_vanaf && dateISO < p.in_dienst_vanaf) return false;
+    if(p.uit_dienst_vanaf && dateISO > p.uit_dienst_vanaf) return false;
+    return true;
+  }
   function ipActivePeople(){ return ipAllPeople().filter(p => p.planning_actief !== false); }
   function ipCurrentPeople(){
     return ipActivePeople().filter(p => {
@@ -29164,6 +29339,16 @@ window.CaCalcApp = {
 
   // ---- Rooster (planning_items) ----
   function ipEntriesFor(naam, dateISO){ return state.planningItems.filter(it => it.persoon_naam === naam && it.datum === dateISO); }
+  // Ronde 60: vrije notitie per dag/persoon -- zie state.planningNotities/dbSavePlanningNotitie()
+  // hierboven. ipNoteDotHtml() geeft enkel iets terug zodra er écht tekst in staat (een lege rij kan
+  // eventueel wel bestaan, bv. net gewist); het rooster-vakje was altijd al aanklikbaar (opent dit
+  // paneel), dus hier is bewust geen apart klikgebied nodig -- enkel het rode bolletje als indicator.
+  function ipNoteFor(naam, dateISO){ return (state.planningNotities || []).find(n => n.persoon_naam === naam && n.datum === dateISO); }
+  function ipNoteDotHtml(naam, dateISO){
+    const note = ipNoteFor(naam, dateISO);
+    if(!note || !(note.tekst || '').trim()) return '';
+    return `<span class="ip-note-dot" title="Notitie: ${escapeHtml(note.tekst)}"></span>`;
+  }
 
   // Sufficient dat ÉÉN van de op dat project+die dag ingeplande mensen het protocol kent.
   function ipProjectDayHasSkillCoverage(projectId, dateISO){
@@ -29872,8 +30057,10 @@ window.CaCalcApp = {
       { label: 'Verlof', cls: 'ip-status-verlof' },
       { label: 'ADV', cls: 'ip-status-adv' },
       { label: 'Ziek', cls: 'ip-status-ziek' },
+      { label: 'Recup', cls: 'ip-status-recup' },
       { label: 'Afwezig', cls: 'ip-status-afwezig' },
       { label: 'Magazijn', cls: 'ip-status-magazijn' },
+      { label: 'Keuring', cls: 'ip-status-keuring' },
       { label: 'Project', cls: 'ip-status-project' }
     ];
     el('ip-legend').innerHTML = items.map(it => `<span class="ip-legend-chip"><span class="ip-legend-dot ${it.cls}"></span>${it.label}</span>`).join('');
@@ -29989,7 +30176,11 @@ window.CaCalcApp = {
     const dagdeelBadge = en.dagdeel === 'vm' ? '<span class="ip-dagdeel-badge">VM</span>' : en.dagdeel === 'nm' ? '<span class="ip-dagdeel-badge">NM</span>' : '';
     if(en.type === 'status'){
       const st = IP_STATUSES.find(s => s.key === en.status) || { cls: '', label: en.status };
-      return `<div class="ip-chip-mini ${st.cls} ${voorstel ? 'ip-voorstel' : ''} ${ipPinnedClass(en.id)}"${voorstelAttr}>${dagdeelBadge}${escapeHtml(st.label)}${voorstelLabel}${ipChipActionsHtml(en.id)}</div>`;
+      // Ronde 60: Keuring-uur (van_uur, zie IP_STATUS_MET_UUR/de uur-invoer in renderIpEntryList())
+      // mee tonen op de chip zelf, bv. "Keuring 14:00", zodat je dat ook zonder het paneel te openen
+      // al ziet staan in het rooster.
+      const uurSuffix = (en.status === IP_STATUS_MET_UUR && en.van_uur) ? ' ' + String(en.van_uur).slice(0, 5) : '';
+      return `<div class="ip-chip-mini ${st.cls} ${voorstel ? 'ip-voorstel' : ''} ${ipPinnedClass(en.id)}"${voorstelAttr}>${dagdeelBadge}${escapeHtml(st.label)}${uurSuffix}${voorstelLabel}${ipChipActionsHtml(en.id)}</div>`;
     }
     const proj = ipProjectById(en.project_id);
     // Vrije taak zonder project (2026-09-22, op vraag van Peter): en.project_id is dan null en
@@ -30074,8 +30265,14 @@ window.CaCalcApp = {
         const rsInfo = rowspanStart[cellKey];
         if(rsInfo){
           tbody += `<td class="ip-slot ip-merged" rowspan="5" data-person="${escapeHtml(p.naam)}" data-date="${dISO}" title="Hele week (ma–vr) identiek ingepland. Klik om aan te passen — een wijziging verbreekt automatisch de samenvoeging."><div class="ip-cellwrap">${ipMergedLabel(rsInfo)}</div></td>`;
+        } else if(!isPersoonInDienst(p, dISO)){
+          // Ronde 59: buiten de dienstperiode -- grijze, niet-klikbare "zone" i.p.v. de gewone
+          // (lege of ingevulde) cel. Zie isPersoonInDienst()/.ip-slot.ip-buiten-dienst (CSS) en de
+          // blokkering in de click-afhandeling op #ip-grid hieronder (data-buiten-dienst).
+          const reden = (p.in_dienst_vanaf && dISO < p.in_dienst_vanaf) ? 'Nog niet in dienst' : 'Uit dienst';
+          tbody += `<td class="ip-slot ip-buiten-dienst" data-person="${escapeHtml(p.naam)}" data-date="${dISO}" data-buiten-dienst="1" title="${reden} (zie Bedrijfsgegevens → Team leden/Bureau)">${ipNoteDotHtml(p.naam, dISO)}<div class="ip-cellwrap"><div class="ip-chip-mini ip-muted">${reden}</div></div></td>`;
         } else {
-          tbody += `<td class="ip-slot ${weekend ? 'ip-weekend' : ''}" data-person="${escapeHtml(p.naam)}" data-date="${dISO}"><div class="ip-cellwrap">${ipCellInner(p.naam, dISO, weekend, holiday)}</div></td>`;
+          tbody += `<td class="ip-slot ${weekend ? 'ip-weekend' : ''}" data-person="${escapeHtml(p.naam)}" data-date="${dISO}">${ipNoteDotHtml(p.naam, dISO)}<div class="ip-cellwrap">${ipCellInner(p.naam, dISO, weekend, holiday)}</div></td>`;
         }
       });
       tbody += '</tr>';
@@ -30140,14 +30337,18 @@ window.CaCalcApp = {
   //
   // Kleurcodering per vakje volgt dezelfde kleuren als de legende/het rooster op het scherm (zie
   // .ip-status-* hierboven), zodat een uitgeprint rooster er meteen herkenbaar uitziet.
+  // Ronde 60: zelfde gedimde kleuren als de schermtegels (zie de --ips-*-toelichting hierboven) op
+  // Keuring na, die bewust vol/opvallend rood blijft; Recup nieuw, zelfde zachte stijl.
   const IP_EXPORT_COLORS = {
-    VERLOF:   { fill: [226,245,234], text: [31,146,84] },
+    VERLOF:   { fill: [238,246,240], text: [92,143,111] },
     // Ronde 48 fase C (2026-09-25): ADV violet i.p.v. blauw -- zelfde kleur als op het scherm, en niet
     // meer te verwarren met de (blauwe) projectblokjes.
-    ADV:      { fill: [239,234,251], text: [106,75,192] },
-    ZIEK:     { fill: [248,219,213], text: [192,57,43] },
-    AFWEZIG:  { fill: [228,225,216], text: [107,106,96] },
-    MAGAZIJN: { fill: [234,224,196], text: [122,100,32] },
+    ADV:      { fill: [241,238,249], text: [138,121,184] },
+    ZIEK:     { fill: [248,238,236], text: [176,128,120] },
+    RECUP:    { fill: [233,245,246], text: [79,148,153] },
+    AFWEZIG:  { fill: [241,239,233], text: [140,138,126] },
+    MAGAZIJN: { fill: [246,239,224], text: [164,135,78] },
+    KEURING:  { fill: [217,48,37], text: [255,255,255] },
     PROJECT:  { fill: [255,255,255], text: [23,35,59], accent: [20,101,245] }
   };
 
@@ -30379,7 +30580,13 @@ window.CaCalcApp = {
   // `presetDagdeel` (ronde 52, punt 6): 'vm'/'nm' wanneer het paneel geopend werd door op de lege
   // helft van een al gesplitste rooster-cel te klikken (zie ipCellInner()/de click-listener op
   // #ip-grid) -- dan staat de dagdeel-keuze meteen op die helft i.p.v. op de standaard "Hele dag".
+  // Ronde 60: debounce-timer voor de vrije notitie (zie hieronder bij #ip-panel-notitie) -- 1
+  // gedeelde variabele is hier voldoende, want er kan nooit meer dan 1 dagpaneel open staan.
+  let ipNotitieSaveTimer = null;
   function openIpPanel(naam, dateISO, presetDagdeel){
+    // Ronde 60: wissel je razendsnel van cel (zonder dat de debounce hieronder al vuurde), dan moet
+    // de notitie van de VORIGE cel eerst nog weggeschreven worden -- anders gaat die verloren.
+    flushIpNotitieSave();
     state.ip.panelCtx = { naam, dateISO };
     el('ip-panel-person').textContent = naam;
     const d = new Date(dateISO + 'T00:00:00');
@@ -30388,6 +30595,9 @@ window.CaCalcApp = {
     el('ip-vrije-taak-wrap').style.display = 'none';
     el('ip-vrije-taak-input').value = '';
     el('ip-proj-search').value = '';
+    // Ronde 60: notitie van deze dag/persoon tonen (leeg als er nog geen is).
+    const bestaandeNotitie = ipNoteFor(naam, dateISO);
+    el('ip-panel-notitie').value = bestaandeNotitie ? (bestaandeNotitie.tekst || '') : '';
     // Bij elk openen van het paneel terug starten met enkel "Actief" (2026-09-24) -- zie
     // renderIpProjSelectList() hieronder.
     state.ip.projListShowAll = false;
@@ -30399,6 +30609,7 @@ window.CaCalcApp = {
     renderIpEntryList();
     el('ip-overlay').classList.add('open');
     el('ip-panel').classList.add('open');
+    pushHistoryState(); // ronde 59: terugknop sluit voortaan dit paneel i.p.v. de app
   }
   // 3-weg keuze "Hele dag / Voormiddag / Namiddag" (ronde 52, punt 6) -- geldt voor de eerstvolgende
   // NIEUW toegevoegde afspraak in dit paneel (ipAddEntry()), niet voor al bestaande afspraken (die
@@ -30410,9 +30621,29 @@ window.CaCalcApp = {
     wrap.innerHTML = IP_DAGDEEL_OPTIES.map(o => `<button type="button" class="ip-dagdeel-chip ${state.ip.panelDagdeel === o.key ? 'active' : ''}" data-dagdeel="${o.key}">${o.label}</button>`).join('');
   }
   function closeIpPanel(){
+    flushIpNotitieSave(); // ronde 60: niet nog opgeslagen notitie-wijziging niet laten verloren gaan
     el('ip-overlay').classList.remove('open');
     el('ip-panel').classList.remove('open');
     state.ip.panelCtx = null;
+    pushHistoryState(); // ronde 59: legt vast dat het paneel weer dicht is (zie hierboven)
+  }
+  // Ronde 60: vrije notitie per dag/persoon -- getypt in #ip-panel-notitie, 600ms na de laatste
+  // toets (of meteen bij het verlaten van het veld/sluiten van het paneel) weggeschreven naar de
+  // nieuwe planning_notities-tabel. Geen eigen "Toevoegen"-knop nodig (anders dan Vrije taak
+  // hierboven) -- gewoon tikken en het wordt vanzelf bewaard, net als de in-dienst-datumvelden.
+  async function submitIpNotitie(){
+    const ctx = state.ip.panelCtx;
+    if(!ctx) return;
+    const tekst = el('ip-panel-notitie').value;
+    const vorige = ipNoteFor(ctx.naam, ctx.dateISO);
+    if((vorige ? vorige.tekst : '') === tekst) return; // niets gewijzigd -- geen onnodige db-call
+    try{
+      await dbSavePlanningNotitie(ctx.naam, ctx.dateISO, tekst);
+      renderIpGrid(); // het rode bolletje (ip-note-dot) moet meteen mee bijwerken
+    }catch(err){ showStatus('Notitie bewaren mislukt: ' + err.message, 4500); }
+  }
+  function flushIpNotitieSave(){
+    if(ipNotitieSaveTimer){ clearTimeout(ipNotitieSaveTimer); ipNotitieSaveTimer = null; submitIpNotitie(); }
   }
   function renderIpProjSelectList(filter){
     const q = filter.toLowerCase();
@@ -30447,10 +30678,18 @@ window.CaCalcApp = {
   function ipEntryLabel(en){
     if(en.type === 'status'){
       const st = IP_STATUSES.find(s => s.key === en.status) || { cls: '', label: en.status };
-      return { cls: st.cls, text: st.label };
+      const uurSuffix = (en.status === IP_STATUS_MET_UUR && en.van_uur) ? ' ' + String(en.van_uur).slice(0, 5) : '';
+      return { cls: st.cls, text: st.label + uurSuffix };
     }
     const proj = ipProjectById(en.project_id);
-    return { cls: 'ip-status-project', text: proj ? proj.naam + (proj.protocol ? ` · ${proj.protocol}` : '') : '(verwijderd project)' };
+    // Bugfix ronde 60 (gemeld door Peter: "Nu staat er 'verwijderd project' en moet je in feite
+    // herbeginnen"): een Vrije taak (project_id null + en.omschrijving, zie ipAddEntry()) toonde
+    // hier altijd de harde fallbacktekst '(verwijderd project)', in plaats van de eigen ingetypte
+    // tekst -- ipEntryChipHtml()/ipMergedLabel() (de rooster-cel zelf) deden dit al wél correct,
+    // enkel deze functie (het zijpaneel-lijstje) was het vergeten. Nu consistent: en.omschrijving
+    // als die er is, en pas als allerlaatste terugval '(verwijderd project)' (een echt gekoppeld
+    // project dat nadien verwijderd is, en dus geen omschrijving heeft).
+    return { cls: 'ip-status-project', text: proj ? proj.naam + (proj.protocol ? ` · ${proj.protocol}` : '') : (en.omschrijving || '(verwijderd project)') };
   }
   function renderIpEntryList(){
     const ctx = state.ip.panelCtx;
@@ -30480,8 +30719,35 @@ window.CaCalcApp = {
             <button type="button" class="ip-mini-btn danger ip-reject-btn" data-entry="${en.id}">Afwijzen</button>
           </div>`
         : '';
+      // Ronde 60 (op vraag van Peter: "Wanneer we vrije planning invoegen als je er dan op klikt
+      // zou je dat moeten kunnen bewerken. Nu staat er 'verwijderd project' en moet je in feite
+      // herbeginnen.") -- een Vrije taak (project_id null + omschrijving) krijgt hier een eigen
+      // ✏️-knopje dat de tekst inline bewerkbaar maakt, i.p.v. de hele afspraak te moeten
+      // verwijderen en opnieuw aan te maken. Een echt gekoppeld project bewerk je nog steeds via
+      // het potlood-knopje op het project zelf (data-edit-proj, elders in dit paneel).
+      const isVrijeTaak = en.type === 'project' && en.project_id == null;
+      const editBtn = isVrijeTaak
+        ? `<button type="button" class="ip-mini-btn ip-edit-btn" data-entry="${en.id}" title="Tekst bewerken">✏️</button>`
+        : '';
+      const editWrap = isVrijeTaak
+        ? `<div class="ip-edit-wrap" id="ip-edit-wrap-${en.id}" style="display:none;">
+            <input type="text" class="ip-edit-input" id="ip-edit-input-${en.id}" value="${escapeHtml(en.omschrijving || '')}">
+            <button type="button" class="ip-mini-btn primary ip-edit-save-btn" data-entry="${en.id}">Bewaar</button>
+          </div>`
+        : '';
+      // Ronde 60 (op vraag van Peter): Keuring kan een uur meekrijgen -- bewaard in de al
+      // bestaande planning_items.van_uur-kolom (ronde 55), hier rechtstreeks aanpasbaar zonder de
+      // afspraak te moeten verwijderen (zie ipUpdateEntryUur()/de change-listener hieronder).
+      const keuringUurWrap = (en.type === 'status' && en.status === IP_STATUS_MET_UUR)
+        ? `<div class="ip-keuring-uur-wrap">
+            <label for="ip-keuring-uur-${en.id}">Uur</label>
+            <input type="time" id="ip-keuring-uur-${en.id}" class="ip-keuring-uur-input" data-entry="${en.id}" value="${en.van_uur ? String(en.van_uur).slice(0, 5) : ''}">
+          </div>`
+        : '';
       return `<div class="ip-entry-row" data-entry="${en.id}">
-        <div class="ip-entry-main"><span class="ip-chip-mini ${lab.cls} ${voorstel ? 'ip-voorstel' : ''}">${escapeHtml(lab.text)}</span></div>
+        <div class="ip-entry-main"><span class="ip-chip-mini ${lab.cls} ${voorstel ? 'ip-voorstel' : ''}">${escapeHtml(lab.text)}</span>${editBtn}</div>
+        ${editWrap}
+        ${keuringUurWrap}
         ${voorstelNote}
         ${mismatchNote}
         ${confirmActions}
@@ -30558,6 +30824,28 @@ window.CaCalcApp = {
       state.planningItems = state.planningItems.filter(en => String(en.id) !== String(entryId));
       renderIpGrid(); renderIpCapacityTab(); renderIpEntryList(); renderIpConfirmTab();
     }catch(err){ alert('Kon afspraak niet verwijderen: ' + err.message); }
+  }
+  // Ronde 60 (op vraag van Peter: zie de toelichting bij ipEntryLabel()/renderIpEntryList()
+  // hierboven) -- een Vrije taak inline aanpassen i.p.v. verwijderen + opnieuw aanmaken.
+  async function ipUpdateEntryOmschrijving(entryId, tekst){
+    const nieuweTekst = (tekst || '').trim();
+    if(!nieuweTekst) return; // leeg laten we niet opslaan -- verwijderen kan via het bestaande kruisje
+    try{
+      await dbUpdatePlanningItem(entryId, { omschrijving: nieuweTekst });
+      const it = state.planningItems.find(en => String(en.id) === String(entryId));
+      if(it) it.omschrijving = nieuweTekst;
+      renderIpGrid(); renderIpEntryList();
+      showStatus('Aangepast');
+    }catch(err){ alert('Kon niet aanpassen: ' + err.message); }
+  }
+  // Ronde 60: Keuring-uur inline aanpasbaar (zie keuringUurWrap in renderIpEntryList()).
+  async function ipUpdateEntryUur(entryId, uur){
+    try{
+      await dbUpdatePlanningItem(entryId, { van_uur: uur || null });
+      const it = state.planningItems.find(en => String(en.id) === String(entryId));
+      if(it) it.van_uur = uur || null;
+      renderIpGrid();
+    }catch(err){ alert('Kon uur niet bewaren: ' + err.message); }
   }
   async function ipConfirmEntry(entryId){
     try{
@@ -30807,6 +31095,14 @@ window.CaCalcApp = {
   // "Volgende week"-knop).
   el('ip-prev-week-bottom').addEventListener('click', () => { el('ip-prev-week').click(); });
   el('ip-grid').addEventListener('click', e => {
+    // Ronde 59: buiten de dienstperiode (zie isPersoonInDienst()/renderIpGrid() hierboven) -- deze
+    // grijze cel is bewust nergens klikbaar, zelfs niet voor een vastgepinde verplaatsing/kopie
+    // (anders zou je iemand via een omweg tóch buiten zijn dienstperiode kunnen inplannen).
+    const buitenDienstTd = e.target.closest('td[data-buiten-dienst]');
+    if(buitenDienstTd){
+      showStatus((buitenDienstTd.title || 'Buiten de dienstperiode van deze persoon') + ' — niet inplanbaar.');
+      return;
+    }
     // 📌/📋/🗑️-icoontjes op een afspraak zelf (2026-09-23, zie ipChipActionsHtml() hierboven) --
     // altijd als eerste afgehandeld, vóór de ghost-/td-afhandeling hieronder.
     const actionBtn = e.target.closest('.ip-chip-icon');
@@ -30882,6 +31178,14 @@ window.CaCalcApp = {
     state.ip.panelDagdeel = btn.dataset.dagdeel;
     renderIpDagdeelChips();
   });
+  // Ronde 60: vrije notitie -- zie submitIpNotitie()/flushIpNotitieSave() hierboven. 'input' (met
+  // debounce) dekt "gewoon tikken en vergeten", 'blur' zorgt dat een snelle wissel naar een ander
+  // veld in dit paneel niet alsnog 600ms moet wachten.
+  el('ip-panel-notitie').addEventListener('input', () => {
+    clearTimeout(ipNotitieSaveTimer);
+    ipNotitieSaveTimer = setTimeout(submitIpNotitie, 600);
+  });
+  el('ip-panel-notitie').addEventListener('blur', flushIpNotitieSave);
   // "Vrije taak (zonder project)" rechtstreeks vanuit het dagpaneel (2026-09-23, op vraag van
   // Peter: "Afspraak in de planning die niet aan een project is gekoppeld, is nog niet
   // beschikbaar. Best een vakje daarvoor voorzien") -- hergebruikt dezelfde data-vorm
@@ -30943,6 +31247,26 @@ window.CaCalcApp = {
     const rejectEntryBtn = e.target.closest('.ip-reject-btn');
     if(confirmEntryBtn){ ipConfirmEntry(confirmEntryBtn.dataset.entry); return; }
     if(rejectEntryBtn){ ipRejectEntry(rejectEntryBtn.dataset.entry); return; }
+    // Ronde 60: ✏️ op een Vrije taak -- toont het invoerveld (zie editWrap in renderIpEntryList()),
+    // focust het meteen met de cursor achteraan de al ingetypte tekst.
+    const editBtn = e.target.closest('.ip-edit-btn');
+    if(editBtn){
+      const wrap = el('ip-edit-wrap-' + editBtn.dataset.entry);
+      if(wrap){
+        wrap.style.display = wrap.style.display === 'none' ? 'flex' : 'none';
+        if(wrap.style.display === 'flex'){
+          const input = el('ip-edit-input-' + editBtn.dataset.entry);
+          if(input){ input.focus(); input.selectionStart = input.selectionEnd = input.value.length; }
+        }
+      }
+      return;
+    }
+    const editSaveBtn = e.target.closest('.ip-edit-save-btn');
+    if(editSaveBtn){
+      const input = el('ip-edit-input-' + editSaveBtn.dataset.entry);
+      if(input) ipUpdateEntryOmschrijving(editSaveBtn.dataset.entry, input.value);
+      return;
+    }
     // "📌 Verplaatsen" vanuit het dagpaneel (2026-09-25, ronde 48 fase C — design-herwerking): op een
     // aanraakscherm zijn de hover-icoontjes in het rooster verborgen, dus hier dezelfde "vastpinnen"-
     // actie als het 📌-icoontje (state.ip.pendingAction, zie de click-listener op #ip-grid): paneel
@@ -30983,6 +31307,17 @@ window.CaCalcApp = {
       });
       return;
     }
+  });
+  // Ronde 60: Enter in het Vrije-taak-bewerkveld bewaart meteen (net als bij Vrije taak zelf
+  // toevoegen, zie submitIpVrijeTaak() hieronder); 'change' op het Keuring-uurveld bewaart zodra je
+  // het veld verlaat (geen apart knopje nodig voor dat ene veldje).
+  el('ip-entry-list').addEventListener('keydown', e => {
+    const input = e.target.closest('.ip-edit-input');
+    if(input && e.key === 'Enter'){ e.preventDefault(); ipUpdateEntryOmschrijving(input.id.replace('ip-edit-input-', ''), input.value); }
+  });
+  el('ip-entry-list').addEventListener('change', e => {
+    const uurInput = e.target.closest('.ip-keuring-uur-input');
+    if(uurInput) ipUpdateEntryUur(uurInput.dataset.entry, uurInput.value);
   });
   el('ip-confirm-tbody').addEventListener('click', e => {
     const confirmEntryBtn = e.target.closest('.ip-confirm-btn');

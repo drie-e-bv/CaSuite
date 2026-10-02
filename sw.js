@@ -28,7 +28,30 @@
  * CACHE_VERSION hieronder verhogen lost dit soort dingen sowieso op, dus voortaan bij ÉLKE
  * ronde die code aanraakt (niet enkel als sw.js zelf inhoudelijk wijzigt).
  */
-const CACHE_VERSION = 'casnap-v2026-10-02-r58'; // ronde 58: (1) witruimte-audit + -fixes op desktop (Patchkast-kaart vulde de rij niet meer bij weinig kasten; Toegangscontrole/Alarm-Omschrijving, Keuring-velden en Kamers-namen kregen een leesbare max-breedte i.p.v. tot de rand te rekken; Domotica overzicht-tabel verdeelt zijn kolommen nu eerlijker) -- geen gedragswijziging, enkel CSS/breedtes; (2) bugfix: het rol-filter in Personeelsplanning (Rooster én Inschatting) zette zichzelf stilzwijgend terug op "alles aan" zodra je de laatste rol-chip uitvinkte, waardoor "enkel Onderaannemers tonen" nooit lukte; (3) het dagpaneel (Rooster, "Afspraak toevoegen") is herschikt: Project inplannen staat nu vóór de Uitzonderingen (Verlof/ADV/Ziek/Afwezig/Magazijn/Vrije taak), die verderop en kleiner staan; elke projectrij in dat paneel heeft nu ook een ✏️-knopje om het project direct te bewerken (bv. een verkeerde naam corrigeren) zonder het als afspraak van vandaag in te plannen.
+// ronde 60: (1) 2 nieuwe statussen in het rooster-dagpaneel -- "Keuring" (met een optioneel uur,
+// bv. "Keuring 14:30") en "Recup"; de 5 bestaande tegels (Verlof/ADV/Ziek/Afwezig/Magazijn) zijn
+// bewust gedimd/zachter gemaakt zodat Keuring als enige nog echt opvallend rood oogt; (2) vrije
+// notitie per dag/persoon (bv. "Start later", "Vroeger naar huis") -- altijd aan te maken via het
+// dagpaneel (ook op een dag zonder enige afspraak), een klein rood bolletje op de rooster-cel zelf
+// toont of er iets in staat (nieuwe tabel planning_notities, migratie al rechtstreeks in Supabase
+// uitgevoerd, geen actie van Peter nodig); (3) bugfix: een "Vrije taak" (zonder gekoppeld project)
+// toonde in het zijpaneel altijd "(verwijderd project)" i.p.v. de eigen ingetypte tekst -- nu
+// correct, en meteen ook rechtstreeks bewerkbaar via een ✏️-knopje (geen verwijderen+herbeginnen
+// meer nodig).
+// ronde 59: (1) de 5 manifest-*.json-bestanden deelden allemaal "scope":"./", waardoor Android/
+// Chrome elke apart te installeren app (bv. CaPla) als "al geïnstalleerd" beschouwde zodra CaSuite
+// zelf al op het beginscherm stond -- elk manifest kreeg nu zijn eigen, nauwe scope + id
+// (BELANGRIJK: een al eerder geïnstalleerde app moet 1x verwijderd en opnieuw geïnstalleerd worden
+// vóór dit effect heeft, een gewone update van deze bestanden volstaat niet voor een reeds
+// bestaande installatie); (2) de hardware-/gebaar-terugknop sloot op een geïnstalleerde
+// (homescherm-)app meestal meteen de hele app af i.p.v. 1 stap terug te doen -- een tabwissel of
+// het openen/sluiten van het dagpaneel legt nu zelf een stap vast in de browsergeschiedenis, zodat
+// de terugknop die eerst ongedaan maakt (voorlopig enkel tabwissels + het dagpaneel, niet de
+// andere modals); (3) elk teamlid/Bureau-lid kreeg 2 nieuwe, optionele datumvelden "In dienst
+// vanaf"/"Uit dienst vanaf" (Bedrijfsgegevens) -- buiten die periode toont het rooster een grijze,
+// niet-klikbare "zone" i.p.v. een gewone cel, zodat niemand per ongeluk buiten zijn dienstperiode
+// ingepland kan worden.
+const CACHE_VERSION = 'casnap-v2026-10-02-r60';
 const NETWORK_TIMEOUT_MS = 4000;
 
 self.addEventListener('install', () => {
