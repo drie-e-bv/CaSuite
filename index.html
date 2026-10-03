@@ -1394,8 +1394,8 @@
   .ip-dagdeel-chip.active{background:var(--brand,#1b6b3e);border-color:var(--brand,#1b6b3e);color:#fff;}
   .ip-proj-search{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:6px;font-size:.85rem;margin-bottom:8px;font-family:inherit;box-sizing:border-box;}
   .ip-proj-list{max-height:340px;overflow-y:auto;border:1px solid var(--line);border-radius:6px;}
-  .ip-vrije-taak-wrap{display:flex;gap:6px;margin:6px 0 2px;}
-  .ip-vrije-taak-wrap input{flex:1;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-size:.85rem;font-family:inherit;box-sizing:border-box;}
+  .ip-vrije-taak-wrap, .ip-keuring-proj-wrap{display:flex;gap:6px;margin:6px 0 2px;}
+  .ip-vrije-taak-wrap input, .ip-keuring-proj-wrap input{flex:1;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-size:.85rem;font-family:inherit;box-sizing:border-box;}
   /* Ronde 60: Vrije taak inline bewerken (zie ipEntryLabel()/renderIpEntryList() in het script). */
   .ip-edit-wrap{display:flex;gap:6px;margin-top:6px;}
   .ip-edit-wrap input{flex:1;padding:7px 9px;border:1px solid var(--line);border-radius:6px;font-size:.82rem;font-family:inherit;box-sizing:border-box;}
@@ -2548,9 +2548,9 @@
   #ip-panel .ip-status-options-compact .ip-status-opt{min-height:34px;padding:0 10px;font-size:12.5px;gap:7px;}
   #ip-panel .ip-status-options-compact .ip-status-opt::before{width:8px;height:8px;}
   #ip-panel #ip-vrije-taak-toggle.ip-status-opt-compact{min-height:34px;font-size:12.5px;padding:0 10px;}
-  .ip-vrije-taak-wrap{gap:8px;margin:8px 0 0;}
-  .ip-vrije-taak-wrap input{min-height:var(--tap);padding:8px 12px;border:1px solid var(--line-strong);border-radius:var(--r);font-size:15px;min-width:0;}
-  .ip-vrije-taak-wrap .btn{min-height:var(--tap);}
+  .ip-vrije-taak-wrap, .ip-keuring-proj-wrap{gap:8px;margin:8px 0 0;}
+  .ip-vrije-taak-wrap input, .ip-keuring-proj-wrap input{min-height:var(--tap);padding:8px 12px;border:1px solid var(--line-strong);border-radius:var(--r);font-size:15px;min-width:0;}
+  .ip-vrije-taak-wrap .btn, .ip-keuring-proj-wrap .btn{min-height:var(--tap);}
   .ip-proj-search{min-height:var(--tap);padding:8px 12px 8px 38px;margin-bottom:8px;border:1px solid var(--line-strong);border-radius:var(--r);font-size:15px;
     background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%235b6b62' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E") no-repeat 12px 50% / 18px 18px;}
   /* Eén scrollgebied: de projectlijst scrolt niet meer apart (was max-height 340px binnen de body). */
@@ -2750,7 +2750,7 @@
     .ip-panel-foot .btn{flex:1 1 0;}
     #ip-close-panel{margin-left:0 !important;}
     #ip-panel .ip-status-options{grid-template-columns:repeat(2,minmax(0,1fr));}
-    .ip-proj-search, .ip-vrije-taak-wrap input, .ip-copy-picker select{font-size:16px;}
+    .ip-proj-search, .ip-vrije-taak-wrap input, .ip-keuring-proj-wrap input, .ip-copy-picker select{font-size:16px;}
 
     /* Vaardigheden: kaart per persoon (naam / rol · team / protocollen). */
     #ip-skills-table thead{display:none;}
@@ -2815,9 +2815,25 @@
        een kale .ip-toolbar-sub .ip-legend/.ip-toolbar-sub #ip-role-filter-regel zonder #ipsub-rooster
        ervoor -- zonder dit wint de "altijd zichtbaar"-regel van hierboven altijd, ook op gsm. */
     #ipsub-rooster .ip-toolbar-sub #ip-role-filter, #ipsub-rooster .ip-toolbar-sub .ip-legend{display:none;}
-    /* Rol-filters (open): 1 swipebare rij van rand tot rand (verborgen scrollbalk + fade-randen). */
+    /* Rol-filters (open): 1 swipebare rij van rand tot rand (verborgen scrollbalk + fade-randen).
+       Ronde 64 (op vraag van Peter, met screenshot: "Ik kan niet op de filter schollen op gsm") --
+       #ip-role-filter is zelf een flex-ITEM van .ip-toolbar-sub, en die staat op gsm (zie
+       .ip-toolbar-sub{flex-direction:column} hierboven) in KOLOM-richting -- de hoofdas is dan
+       verticaal, dus flex-basis/flex-grow/flex-shrink (die de hoofdas regelen) hebben geen enkele
+       invloed op de BREEDTE; die wordt bepaald door de dwarsas (align-items:stretch, breedte =
+       volle containerbreedte) EN de "automatische minimumbreedte" van het kind. Omdat deze rij zelf
+       ook een flex-container is met niet-krimpbare (flex:none) rolchip-kinderen zonder wrap, is zijn
+       eigen intrinsieke inhoudsbreedte de som van alle chips (~1072px) -- zonder een expliciete
+       breedte/min-width wint die intrinsieke breedte het van de stretch, en groeide de rij dus
+       gewoon tot ~1072px i.p.v. de ~390px van het scherm, in plaats van binnen het scherm te passen
+       en te scrollen. scrollWidth/clientWidth waren daardoor gelijk (niets om te scrollen binnenin
+       #ip-role-filter zelf), en wat niet paste werd gewoon afgesneden door html{overflow-x:clip} --
+       vandaar "ik kan niet scrollen": er wás niets scrollbaar, het stond er gewoon niet. Een
+       expliciete width:100% + min-width:0 (i.p.v. flex-basis, die hier de verkeerde as regelt)
+       dwingt de rij nu wel tot de beschikbare breedte, waarna overflow-x:auto hierbeneden effectief
+       iets te scrollen heeft. */
     #ipsub-rooster .ip-toolbar-sub.ip-filters-open #ip-role-filter{
-      --fl:0px;--fr:0px;display:flex;flex-wrap:nowrap;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none;
+      --fl:0px;--fr:0px;display:flex;width:100%;max-width:100%;min-width:0;flex-wrap:nowrap;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none;-webkit-overflow-scrolling:touch;
       margin:0 calc(-1 * var(--page-pad));padding:2px var(--page-pad);
       -webkit-mask-image:linear-gradient(to right, transparent 0, #000 var(--fl), #000 calc(100% - var(--fr)), transparent 100%);
       mask-image:linear-gradient(to right, transparent 0, #000 var(--fl), #000 calc(100% - var(--fr)), transparent 100%);
@@ -3879,6 +3895,19 @@
 
       <h4 class="ip-panel-h4-uitzondering">Uitzonderingen</h4>
       <div class="ip-status-options ip-status-options-compact" id="ip-status-options"></div>
+      <!-- Ronde 64 (op vraag van Peter: "Keuring in de planning te koppelen aan project, of vrije
+           ingave van project") -- op "Keuring" klikken opent dit veld i.p.v. meteen toe te voegen
+           (zie de click-listener op #ip-status-options in het script): 1 tekstveld met
+           project-suggesties (datalist) dekt beide wensen tegelijk -- een naam die exact
+           overeenkomt met een bestaand project wordt gekoppeld (project_id), al de rest wordt
+           gewoon als vrije tekst bewaard (omschrijving, zelfde twee velden als de "Vrije taak"-
+           optie hieronder) -- geen nieuwe SQL-kolom nodig. Optioneel: leeg laten voegt Keuring toe
+           zonder project, exact zoals voorheen. -->
+      <div class="ip-keuring-proj-wrap" id="ip-keuring-proj-wrap" style="display:none;">
+        <input type="text" id="ip-keuring-proj-input" list="ip-keuring-proj-datalist" placeholder="Project (optioneel) — kies of typ vrije tekst">
+        <datalist id="ip-keuring-proj-datalist"></datalist>
+        <button type="button" class="btn btn-secondary btn-sm" id="ip-keuring-proj-add">Keuring toevoegen</button>
+      </div>
       <button type="button" class="ip-status-opt ip-status-opt-compact" id="ip-vrije-taak-toggle" style="width:100%;margin-top:6px;">➕ Vrije taak (zonder project)</button>
       <div class="ip-vrije-taak-wrap" id="ip-vrije-taak-wrap" style="display:none;">
         <input type="text" id="ip-vrije-taak-input" placeholder="bv. Magazijn opruimen">
@@ -17147,6 +17176,10 @@ function renderBoardDetail() {
   html += '</div>';
 
   var voedingstypeNet = state.project.voedingstype === 'net';
+  // Ronde 64: vlag die bepaalt of de (verderop, onderaan deze kolom geplaatste) "Vertrekkende
+  // kabels (eindgroepen)"-sectie moet verschijnen -- enkel wanneer de echte kabelvelden hierboven
+  // ook effectief tonen (dus niet in de zeldzame "buiten scope"-situatie van het hoofdbord).
+  var toonVertrekkendeKabelsDefaults = false;
   html += '<div class="section-title">Kabel</div>';
   if (isRoot && !voedingstypeNet) {
     html += '<div class="grid">';
@@ -17207,19 +17240,14 @@ function renderBoardDetail() {
     html += '</div>';
     html += '<p class="hint">N = aantal parallelle geleiders <strong>per fase</strong>, gebruikt voor de Iz-, weerstands- en thermische berekening van dit bord (kabelnorm-tabel bepaalt de stroom van 1 geleider, N is daarna een vermenigvuldiger). Standaard wordt de neutrale geleider verondersteld met dezelfde N/sectie mee te lopen (hieronder uit te schakelen via "Neutraal apart"). Let op het praktijkverschil: bij <strong>Mono</strong> (eendradige) kabels ligt elke parallelle geleider fysiek apart, dus N&nbsp;&gt;&nbsp;1 betekent doorgaans ook N aparte neutrale aders naast N per fase &mdash; bij <strong>Multi/XGB</strong> (alle aders samen in één mantel) is meerdere kabels parallel leggen minder gebruikelijk (meestal N=1, een grotere sectie kiezen ligt meer voor de hand); gebeurt het toch, dan zit de neutrale ader automatisch mee in elke parallelle kabel.</p>';
 
-    // Vertrekkende kabels (eindgroepen) -- zie defaultBoardInputs() hierboven.
-    var vEffOmgeving = (b.vertrekOmgeving != null && b.vertrekOmgeving !== '') ? b.vertrekOmgeving : b.omgeving;
-    var vConstructieList = DATATABEL.constructie.filter(function (c) { return c.omgeving === vEffOmgeving; });
-    var vBundelList = DATATABEL.bundel.filter(function (c) { return c.omgeving === vEffOmgeving; });
-    var vTempLabel = CalcEngine.tempForOmgeving(vEffOmgeving);
-    html += '<div class="section-title">Vertrekkende kabels (eindgroepen)</div>';
-    html += '<p class="hint">Standaard gebruiken alle eindgroepen van dit bord dezelfde omgeving/constructie/bundel als de voedingskabel hierboven. Vul hier enkel iets in als de vertrekken zelf een afwijkende installatiesituatie hebben (bv. voedingskabel zwaar gebundeld in een kabelgoot, maar de vertrekken zelf lopen apart naar hun verbruikers).</p>';
-    html += '<div class="grid">';
-    html += field('Omgeving (vertrekken)', '<select data-f="vertrekOmgeving"><option value="">— (zelfde als voedingskabel)</option>' + opts(OMGEVINGEN, b.vertrekOmgeving) + '</select>');
-    html += field('Constructie (vertrekken)', '<select data-f="vertrekConstructie"><option value="">— (zelfde als voedingskabel)</option>' + opts(vConstructieList.map(function (c) { return c.label; }), b.vertrekConstructie) + '</select>');
-    html += field('Bundel (vertrekken)', '<select data-f="vertrekBundel"><option value="">— (zelfde als voedingskabel)</option>' + opts(vBundelList.map(function (c) { return c.label; }), b.vertrekBundel) + '</select>');
-    html += field('Omgevingtemperatuur (vertrekken)', '<select data-f="vertrekTempOverride"><option value="">— (zelfde als voedingskabel, nu: ' + (b.vertrekTempOverride ? escapeHtml(b.vertrekTempOverride) : (b.tempOverride ? escapeHtml(b.tempOverride) : 'automatisch, ' + vTempLabel)) + ')</option>' + opts(DATATABEL.tempcorr.map(function (t) { return t.label; }), b.vertrekTempOverride) + '</select>');
-    html += '</div>';
+    // Ronde 64 (op vraag van Peter, n.a.v. een screenshot: "Bovenaan zou alles van de 'inkomende
+    // zaken' gegroepeerd moeten staan en dan onderaan de vertrekkende") -- Neutraal/PE apart horen
+    // bij DEZE (inkomende) voedingskabel, dus voortaan meteen hier, vóór de vertrek-eindgroepen-
+    // sectie i.p.v. (verwarrend) erna/eronder. De "Vertrekkende kabels (eindgroepen)"-sectie zelf
+    // (hieronder bij "Neutraal/PE apart -- Peter's Caneco-screenshot") is verderop in deze functie
+    // verplaatst naar helemaal onderaan deze kolom (na Beveiliging/Bijkomende gegevens), zie
+    // toonVertrekkendeKabelsDefaults.
+    toonVertrekkendeKabelsDefaults = true;
 
     // Neutraal/PE apart -- Peter's Caneco-screenshot ("Kabel" 4X3X(1x300) /
     // "Neutraal Afzonderlijk" 2X(1x300) / "PE/PEN" 1x185): dezelfde N/sectie
@@ -17326,6 +17354,41 @@ function renderBoardDetail() {
     html += '</div>';
   } else {
     html += '<p class="hint">Uitgeschakeld — deze gegevens verschijnen niet in het rapport voor dit bord.</p>';
+  }
+
+  // Ronde 64 (op vraag van Peter, n.a.v. screenshot van deze sectie: "Bovenaan zou alles van de
+  // 'inkomende zaken' gegroepeerd moeten staan en dan onderaan de vertrekkende [...] Zaken die je
+  // op 2 plaatsen kunt instellen schakelaartje voorzien [...] Schakelaar erbij maakt alles grijs
+  // niet aanpasbaar") -- deze sectie stond voorheen meteen na de Kabel-grid (met de inkomende
+  // Neutraal/PE-apart-vinkjes er verwarrend onderaan ingebed), nu helemaal onderaan deze kolom:
+  // alles hierboven is "inkomend" (Kabel + Neutraal/PE apart + Hoofdautomaat/Vertrek-automaat/
+  // Hoofdschakelaar + Bijkomende gegevens), dit is het enige "vertrekkend"-blok in deze kolom (de
+  // echte eindgroepen-tabel zelf staat al, zoals voorheen, nog verder onderaan de pagina). Nieuw:
+  // 1 schakelaar ("Zelfde omgevingsinstellingen als voedingskabel") i.p.v. 4 losse dropdowns die
+  // elk apart op "— (zelfde als voedingskabel)" moesten blijven staan -- aan: de 4 velden staan
+  // grijs/niet aanpasbaar (en worden leeggemaakt, dus terug naar "zelfde"); uit: ze worden
+  // bewerkbaar met hun huidige waarde. Niet-destructief voor bestaande borden: b.vertrekZelfde
+  // bestaat nog niet op oudere borden, dus dan leidt vertrekZelfde zich af uit of er al een van de
+  // 4 velden effectief ingevuld staat (zie hieronder) i.p.v. alles stil terug te zetten.
+  if (toonVertrekkendeKabelsDefaults) {
+    var vEffOmgeving = (b.vertrekOmgeving != null && b.vertrekOmgeving !== '') ? b.vertrekOmgeving : b.omgeving;
+    var vConstructieList = DATATABEL.constructie.filter(function (c) { return c.omgeving === vEffOmgeving; });
+    var vBundelList = DATATABEL.bundel.filter(function (c) { return c.omgeving === vEffOmgeving; });
+    var vTempLabel = CalcEngine.tempForOmgeving(vEffOmgeving);
+    var vertrekZelfde = b.vertrekZelfde !== undefined ? b.vertrekZelfde : !(b.vertrekOmgeving || b.vertrekConstructie || b.vertrekBundel || b.vertrekTempOverride);
+    var vDisabled = vertrekZelfde ? ' disabled' : '';
+    html += '<div class="section-title">Vertrekkende kabels (eindgroepen)</div>';
+    html += '<p class="hint">Standaard gebruiken alle eindgroepen van dit bord dezelfde omgeving/constructie/bundel/temperatuur als de voedingskabel hierboven. Zet de schakelaar hieronder uit enkel als de vertrekken zelf een afwijkende installatiesituatie hebben (bv. voedingskabel zwaar gebundeld in een kabelgoot, maar de vertrekken zelf lopen apart naar hun verbruikers).</p>';
+    html += '<div class="grid">';
+    html += '<div class="field" style="grid-column:1/-1"><label style="display:flex;align-items:center;gap:6px;font-weight:600;cursor:pointer">' +
+      '<input type="checkbox" data-f="vertrekZelfde"' + (vertrekZelfde ? ' checked' : '') + '> Zelfde omgevingsinstellingen als voedingskabel</label></div>';
+    html += '</div>';
+    html += '<div class="grid">';
+    html += field('Omgeving (vertrekken)', '<select data-f="vertrekOmgeving"' + vDisabled + '><option value="">— (zelfde als voedingskabel)</option>' + opts(OMGEVINGEN, b.vertrekOmgeving) + '</select>');
+    html += field('Constructie (vertrekken)', '<select data-f="vertrekConstructie"' + vDisabled + '><option value="">— (zelfde als voedingskabel)</option>' + opts(vConstructieList.map(function (c) { return c.label; }), b.vertrekConstructie) + '</select>');
+    html += field('Bundel (vertrekken)', '<select data-f="vertrekBundel"' + vDisabled + '><option value="">— (zelfde als voedingskabel)</option>' + opts(vBundelList.map(function (c) { return c.label; }), b.vertrekBundel) + '</select>');
+    html += field('Omgevingtemperatuur (vertrekken)', '<select data-f="vertrekTempOverride"' + vDisabled + '><option value="">— (zelfde als voedingskabel, nu: ' + (b.vertrekTempOverride ? escapeHtml(b.vertrekTempOverride) : (b.tempOverride ? escapeHtml(b.tempOverride) : 'automatisch, ' + vTempLabel)) + ')</option>' + opts(DATATABEL.tempcorr.map(function (t) { return t.label; }), b.vertrekTempOverride) + '</select>');
+    html += '</div>';
   }
   html += '</div>'; // left col
 
@@ -18147,6 +18210,14 @@ function onFieldChange(b, el) {
   else if (f === 'geenEindautomaten') { b.geenEindautomaten = el.checked; renderBordSchemaSelect(); }
   else if (f === 'neutraalApart') { b.neutraalApart = el.checked; }
   else if (f === 'peApart') { b.peApart = el.checked; }
+  // Ronde 64: "Zelfde omgevingsinstellingen als voedingskabel"-schakelaar (zie renderBoardDetail())
+  // -- aanvinken maakt de 4 vertrek-overrides grijs/niet-aanpasbaar EN maakt ze meteen leeg (= terug
+  // naar "zelfde als voedingskabel"); uitvinken laat ze gewoon staan (meestal al leeg) en maakt ze
+  // weer bewerkbaar.
+  else if (f === 'vertrekZelfde') {
+    b.vertrekZelfde = el.checked;
+    if (b.vertrekZelfde) { b.vertrekOmgeving = ''; b.vertrekConstructie = ''; b.vertrekBundel = ''; b.vertrekTempOverride = ''; }
+  }
   else if (f === 'hoofdschakelaarFiliatie') { b.hoofdschakelaarFiliatie = el.checked; }
   else if (['lengte', 'aantal', 'sectie', 'In', 'hoofdautomaatIn', 'icu', 't_kortsl', 'imHandmatig',
     'hoofdschakelaarIn', 'hoofdschakelaarIcu', 'aantalAders',
@@ -20891,7 +20962,9 @@ window.CaCalcApp = {
     // wél degelijk ingepland in planning_items. Geeft daarom voortaan enkel de nieuwe, minimale
     // read-only pseudo-tab 'mijn-planning' terug -- zie renderMijnPlanningTab() verderop. Dit
     // omzeilt bewust de 6 toegangsvinkjes hierboven (die staan voor deze rol toch altijd op false).
-    if(p.rol === 'Onderaannemer') return ['mijn-planning'];
+    // Ronde 64: Peter: "Flexi krijgen geen app-/planningtoegang. ook aanpassen aub" -- Flexi krijgt
+    // voortaan exact dezelfde behandeling als Onderaannemer hier.
+    if(p.rol === 'Onderaannemer' || p.rol === 'Flexi') return ['mijn-planning'];
     const tabs = new Set();
     if(p.kan_verslagen_zien || p.kan_verslagen_maken){
       ['verslag', 'verslagen', 'actiepunten', 'planning', 'cados', 'cacalc'].forEach(t => tabs.add(t));
@@ -24209,7 +24282,9 @@ window.CaCalcApp = {
     // elke render, ook voor al langer bestaande rijen waar de rol pas achteraf op Onderaannemer werd
     // gezet. "Actief in planning" hieronder blijft wél gewoon instelbaar -- een onderaannemer moet
     // nog steeds als inplanbare naam in het rooster kunnen verschijnen, enkel geen app-toegang.
-    if(person.rol === 'Onderaannemer'){
+    // Ronde 64 (op vraag van Peter): Flexi krijgt exact dezelfde behandeling -- ook zij blijven
+    // gewoon een inplanbare naam in het rooster, enkel zonder app-/planningtoegang.
+    if(person.rol === 'Onderaannemer' || person.rol === 'Flexi'){
       person.kan_verslagen_zien = false;
       person.kan_verslagen_maken = false;
       person.kan_planning_zien = false;
@@ -24252,7 +24327,7 @@ window.CaCalcApp = {
     rolSelect.addEventListener('change', e => {
       const vorigeRol = person.rol;
       person.rol = e.target.value;
-      updateAccessRowForRol(vorigeRol === 'Onderaannemer');
+      updateAccessRowForRol(vorigeRol === 'Onderaannemer' || vorigeRol === 'Flexi');
     });
     const teamSelect = document.createElement('select');
     teamSelect.className = 'ip-p-team';
@@ -24375,24 +24450,25 @@ window.CaCalcApp = {
       adminBadge.textContent = '🔒 vaste beheerder';
       accessRow.appendChild(adminBadge);
     }
-    // Hint die de toegangsvinkjes vervangt zodra de rol "Onderaannemer" is (zie
-    // updateAccessRowForRol hieronder) -- op vraag van Peter: "Die hebben geen rechten in de planning".
+    // Hint die de toegangsvinkjes vervangt zodra de rol "Onderaannemer" of "Flexi" is (zie
+    // updateAccessRowForRol hieronder) -- op vraag van Peter: "Die hebben geen rechten in de
+    // planning" (Onderaannemer, ronde 40) / "Flexi krijgen geen app-/planningtoegang" (Flexi, ronde 64).
     const accessOaHint = document.createElement('p');
     accessOaHint.className = 'ip-oa-access-hint';
     accessOaHint.style.cssText = 'font-size:.78rem;color:var(--ink-soft);margin:4px 0 0;';
-    accessOaHint.textContent = 'Onderaannemers krijgen geen app-/planningtoegang.';
+    accessOaHint.textContent = 'Onderaannemers en Flexi\'s krijgen geen app-/planningtoegang.';
     accessOaHint.style.display = 'none';
     wrapper.appendChild(accessRow);
     wrapper.appendChild(accessOaHint);
 
-    // Onderaannemers krijgen nooit toegang: de toegangsvinkjes worden dan verborgen (en de hint
-    // hierboven getoond) en staan vast uit (zie ook hierboven bij het initialiseren van deze
-    // rij). Bij een andere rol dan Onderaannemer worden de vinkjes terug getoond; stonden alle 4
-    // nog uit (dus kwam van Onderaannemer), dan vallen ze terug op de "volledige toegang"-
+    // Onderaannemers/Flexi krijgen nooit toegang: de toegangsvinkjes worden dan verborgen (en de
+    // hint hierboven getoond) en staan vast uit (zie ook hierboven bij het initialiseren van deze
+    // rij). Bij een andere rol dan Onderaannemer/Flexi worden de vinkjes terug getoond; stonden alle
+    // 4 nog uit (dus kwam van Onderaannemer/Flexi), dan vallen ze terug op de "volledige toegang"-
     // standaard zodat de persoon niet per ongeluk toegangsloos blijft. "Voorstellen goedkeuren"
     // (is_planner) wordt door deze toggle BEWUST nooit aangeraakt, in geen van beide richtingen
     // -- net als voorheen bij de oude "app_toegang"-dropdown, is dat een volledig los, eigen
-    // vinkje; anders zou heen-en-weer schakelen tussen Onderaannemer en een andere rol iemands
+    // vinkje; anders zou heen-en-weer schakelen tussen Onderaannemer/Flexi en een andere rol iemands
     // "planner"-status stilzwijgend kunnen wissen.
     // BUGFIX (2026-09-26, ronde 48b, gemeld door Peter: "Na het opslaan van de beheersrechten komen
     // die automatisch terug naar vorige status"): de terugval hieronder ("alle 4 uit -> terug alles
@@ -24400,10 +24476,10 @@ window.CaCalcApp = {
     // Beheer-pagina (of hier) bewust alle 4 toegangsvinkjes van iemand uit, dan zette de eerstvolgende
     // render (meteen na "Opslaan": renderTeamLeden()/renderBureau()) ze stilletjes weer aan -- op het
     // scherm leek de wijziging teruggedraaid, en een volgende save schreef die "aan"-stand terug naar
-    // de databank. De terugval geldt nu enkel nog wanneer de rol net van Onderaannemer naar iets
-    // anders gewisseld wordt (het oorspronkelijke doel ervan, ronde 40).
-    function updateAccessRowForRol(kwamVanOnderaannemer){
-      const isOa = person.rol === 'Onderaannemer';
+    // de databank. De terugval geldt nu enkel nog wanneer de rol net van Onderaannemer/Flexi naar iets
+    // anders gewisseld wordt (het oorspronkelijke doel ervan, ronde 40; uitgebreid naar Flexi, ronde 64).
+    function updateAccessRowForRol(kwamVanOnderaannemerOfFlexi){
+      const isOa = person.rol === 'Onderaannemer' || person.rol === 'Flexi';
       accessRow.style.display = isOa ? 'none' : '';
       accessOaHint.style.display = isOa ? '' : 'none';
       if(isOa){
@@ -24412,7 +24488,7 @@ window.CaCalcApp = {
         person.kan_planning_zien = false;
         person.kan_voorstellen_maken = false;
         person.ziet_alle_projecten = false;
-      } else if(kwamVanOnderaannemer && !person.kan_verslagen_zien && !person.kan_verslagen_maken && !person.kan_planning_zien && !person.kan_voorstellen_maken){
+      } else if(kwamVanOnderaannemerOfFlexi && !person.kan_verslagen_zien && !person.kan_verslagen_maken && !person.kan_planning_zien && !person.kan_voorstellen_maken){
         person.kan_verslagen_zien = true;
         person.kan_verslagen_maken = true;
         person.kan_planning_zien = true;
@@ -30520,7 +30596,14 @@ window.CaCalcApp = {
       // mee tonen op de chip zelf, bv. "Keuring 14:00", zodat je dat ook zonder het paneel te openen
       // al ziet staan in het rooster.
       const uurSuffix = (en.status === IP_STATUS_MET_UUR && en.van_uur) ? ' ' + String(en.van_uur).slice(0, 5) : '';
-      return `<div class="ip-chip-mini ${st.cls} ${voorstel ? 'ip-voorstel' : ''} ${ipPinnedClass(en.id)}"${voorstelAttr}>${dagdeelBadge}${escapeHtml(st.label)}${uurSuffix}${voorstelLabel}${ipChipActionsHtml(en.id)}</div>`;
+      // Ronde 64: Keuring's optionele project (gekoppeld of vrije tekst, zie ipEntryLabel()
+      // hierboven) ook meteen op de rooster-chip zelf tonen, zonder het dagpaneel te moeten openen.
+      const keuringProjSuffix = (en.status === IP_STATUS_MET_UUR) ? (() => {
+        const p = en.project_id ? ipProjectById(en.project_id) : null;
+        const naam = p ? p.naam : en.omschrijving;
+        return naam ? ' — ' + escapeHtml(naam) : '';
+      })() : '';
+      return `<div class="ip-chip-mini ${st.cls} ${voorstel ? 'ip-voorstel' : ''} ${ipPinnedClass(en.id)}"${voorstelAttr}>${dagdeelBadge}${escapeHtml(st.label)}${uurSuffix}${keuringProjSuffix}${voorstelLabel}${ipChipActionsHtml(en.id)}</div>`;
     }
     const proj = ipProjectById(en.project_id);
     // Vrije taak zonder project (2026-09-22, op vraag van Peter): en.project_id is dan null en
@@ -30935,6 +31018,11 @@ window.CaCalcApp = {
     el('ip-vrije-taak-wrap').style.display = 'none';
     el('ip-vrije-taak-input').value = '';
     el('ip-proj-search').value = '';
+    // Ronde 64: Keuring-projectveld terugzetten + de suggestielijst (datalist) verversen met de
+    // actieve projecten van dit moment (kan tussen 2 paneelopeningen gewijzigd zijn).
+    el('ip-keuring-proj-wrap').style.display = 'none';
+    el('ip-keuring-proj-input').value = '';
+    el('ip-keuring-proj-datalist').innerHTML = ipActiveProjects().map(p => `<option value="${escapeHtml(p.naam)}">`).join('');
     // Ronde 60: notitie van deze dag/persoon tonen (leeg als er nog geen is).
     const bestaandeNotitie = ipNoteFor(naam, dateISO);
     el('ip-panel-notitie').value = bestaandeNotitie ? (bestaandeNotitie.tekst || '') : '';
@@ -31019,7 +31107,16 @@ window.CaCalcApp = {
     if(en.type === 'status'){
       const st = IP_STATUSES.find(s => s.key === en.status) || { cls: '', label: en.status };
       const uurSuffix = (en.status === IP_STATUS_MET_UUR && en.van_uur) ? ' ' + String(en.van_uur).slice(0, 5) : '';
-      return { cls: st.cls, text: st.label + uurSuffix };
+      // Ronde 64 (op vraag van Peter: "Keuring in de planning te koppelen aan project, of vrije
+      // ingave van project") -- Keuring kan optioneel een gekoppeld project (project_id) of een
+      // vrije projectnaam (omschrijving) hebben, zie ipAddEntry()/het Keuring-projectveld in het
+      // dagpaneel. Tekst wordt hier NIET geëscaped -- de aanroeper (renderIpEntryList) doet dat zelf.
+      const keuringProjSuffix = (en.status === IP_STATUS_MET_UUR) ? (() => {
+        const p = en.project_id ? ipProjectById(en.project_id) : null;
+        const naam = p ? p.naam : en.omschrijving;
+        return naam ? ' — ' + naam : '';
+      })() : '';
+      return { cls: st.cls, text: st.label + uurSuffix + keuringProjSuffix };
     }
     const proj = ipProjectById(en.project_id);
     // Bugfix ronde 60 (gemeld door Peter: "Nu staat er 'verwijderd project' en moet je in feite
@@ -31116,13 +31213,16 @@ window.CaCalcApp = {
     }).join('');
   }
 
-  async function ipAddEntry(type, value, omschrijving){
+  async function ipAddEntry(type, value, omschrijving, extra){
     const ctx = state.ip.panelCtx;
     if(!ctx) return;
     // Ronde 52 (punt 6): dagdeel van de gekozen chip in het paneel (standaard 'dag' = hele dag).
     const fields = Object.assign({ persoon_naam: ctx.naam, datum: ctx.dateISO, type, dagdeel: state.ip.panelDagdeel || 'dag' }, ipPendingFieldsForNewEntry());
     if(type === 'status') fields.status = value;
     else { fields.project_id = value; if(omschrijving) fields.omschrijving = omschrijving; }
+    // Ronde 64: optionele extra velden (bv. Keuring gekoppeld aan een project_id, of met vrije
+    // tekst in omschrijving) -- overschrijft bewust eventuele waarden hierboven.
+    if(extra) Object.assign(fields, extra);
     try{
       const row = await dbInsertPlanningItem(fields);
       state.planningItems.push(row);
@@ -31508,6 +31608,16 @@ window.CaCalcApp = {
   });
   el('ip-status-options').addEventListener('click', e => {
     const btn = e.target.closest('.ip-status-opt'); if(!btn) return;
+    // Ronde 64: Peter: "Keuring in de planning te koppelen aan project, of vrije ingave van
+    // project" -- bij Keuring niet meteen toevoegen, eerst het (optionele) projectveld tonen/
+    // sluiten. Alle andere tegels gedragen zich onveranderd (meteen toevoegen).
+    if(btn.dataset.status === 'KEURING'){
+      const wrap = el('ip-keuring-proj-wrap');
+      const opening = wrap.style.display === 'none';
+      wrap.style.display = opening ? 'flex' : 'none';
+      if(opening) el('ip-keuring-proj-input').focus();
+      return;
+    }
     ipAddEntry('status', btn.dataset.status);
   });
   // Dagdeel-keuze (ronde 52, punt 6) -- geldt voor de eerstvolgende toevoeging, zie ipAddEntry().
@@ -31545,6 +31655,27 @@ window.CaCalcApp = {
   }
   el('ip-vrije-taak-add').addEventListener('click', submitIpVrijeTaak);
   el('ip-vrije-taak-input').addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); submitIpVrijeTaak(); } });
+  // Ronde 64: Keuring koppelen aan een project (uit de lijst) of vrije ingave van een
+  // projectnaam -- zelfde "kies of typ vrije tekst"-opzet (<datalist>) als elders in CaDos.
+  // Geen tekst ingetypt -> Keuring zonder project (oude, eenvoudige gedrag blijft werken).
+  // Tekst die exact (hoofdletterongevoelig) overeenkomt met een actief project -> gekoppeld
+  // (project_id); anders -> vrije tekst (omschrijving). Geen nieuwe SQL-kolom nodig, zie
+  // ipAddEntry() hieronder.
+  function submitIpKeuringMetProject(){
+    const input = el('ip-keuring-proj-input');
+    const tekst = input.value.trim();
+    if(!tekst){
+      ipAddEntry('status', 'KEURING');
+    } else {
+      const match = ipActiveProjects().find(p => (p.naam || '').trim().toLowerCase() === tekst.toLowerCase());
+      if(match) ipAddEntry('status', 'KEURING', null, { project_id: match.id });
+      else ipAddEntry('status', 'KEURING', null, { omschrijving: tekst });
+    }
+    input.value = '';
+    el('ip-keuring-proj-wrap').style.display = 'none';
+  }
+  el('ip-keuring-proj-add').addEventListener('click', submitIpKeuringMetProject);
+  el('ip-keuring-proj-input').addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); submitIpKeuringMetProject(); } });
   el('ip-proj-search').addEventListener('input', e => renderIpProjSelectList(e.target.value));
   el('ip-proj-select-list').addEventListener('click', e => {
     const toggle = e.target.closest('[data-toggle-proj-statuses]');

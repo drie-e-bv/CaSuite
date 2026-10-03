@@ -28,6 +28,24 @@
  * CACHE_VERSION hieronder verhogen lost dit soort dingen sowieso op, dus voortaan bij ÉLKE
  * ronde die code aanraakt (niet enkel als sw.js zelf inhoudelijk wijzigt).
  */
+// ronde 64: 4 wijzigingen, allemaal in Personeelsplanning/CaCalc -- (1) CaCalc-bordinstellingen
+// (Peter, met screenshot: "Bovenaan zou alles van de 'inkomende zaken' gegroepeerd moeten staan en
+// dan onderaan de vertrekkende [...] Schakelaar erbij maakt alles grijs niet aanpasbaar") --
+// renderBoardDetail() is herschikt: alles inkomend (Kabel + Neutraal/PE apart + Hoofdautomaat/
+// Vertrek-automaat/Hoofdschakelaar + Bijkomende gegevens) staat nu bovenaan, "Vertrekkende kabels
+// (eindgroepen)" helemaal onderaan, met 1 nieuwe schakelaar ("Zelfde omgevingsinstellingen als
+// voedingskabel") i.p.v. 4 losse dropdowns; (2) Peter: "Flexi krijgen geen app-/planningtoegang.
+// ook aanpassen aub" -- de rol "Flexi" krijgt nu exact dezelfde (vaste, niet per persoon
+// aanpasbare) toegangsblokkade als "Onderaannemer" al had; (3) Peter: "Keurin in de planning te
+// koppelen aan project, of vrije ingave van project" -- de Keuring-status in het rooster-dagpaneel
+// heeft nu een optioneel projectveld (kies uit de lijst of typ vrije tekst), hergebruikt de
+// bestaande project_id/omschrijving-kolommen; (4) Peter, met screenshot: "Ik kan niet op de filter
+// schollen op gsm" -- de rol-filterrij boven het rooster was op gsm geen echte flex-krimp-/
+// stretch-breedte-beperking toegepast (flex-item in een flex-direction:column-ouder), waardoor ze
+// gewoon tot haar volle inhoudsbreedte groeide i.p.v. binnen het scherm te passen en te scrollen --
+// wat niet paste werd zonder enige scroll-mogelijkheid afgesneden. Nu met een expliciete breedte
+// (width:100%/min-width:0) effectief swipebaar. Geen SQL-wijziging voor (2)/(4); (1)/(3)
+// hergebruiken bestaande kolommen.
 // ronde 63: Peter: "Ik heb indruk dat de laatste ingestelde filter, wat je zichtbaar wou in de
 // planning, niet opgeslagen wordt bij nieuwe opstart" -- klopte: de rol-/onderaannemers-filter
 // boven het Personeelsplanning-rooster stond nooit in localStorage, enkel in het geheugen, dus
@@ -82,7 +100,7 @@
 // vanaf"/"Uit dienst vanaf" (Bedrijfsgegevens) -- buiten die periode toont het rooster een grijze,
 // niet-klikbare "zone" i.p.v. een gewone cel, zodat niemand per ongeluk buiten zijn dienstperiode
 // ingepland kan worden.
-const CACHE_VERSION = 'casnap-v2026-10-03-r63';
+const CACHE_VERSION = 'casnap-v2026-10-03-r64';
 const NETWORK_TIMEOUT_MS = 4000;
 
 self.addEventListener('install', () => {
