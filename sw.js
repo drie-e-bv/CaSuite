@@ -28,6 +28,25 @@
  * CACHE_VERSION hieronder verhogen lost dit soort dingen sowieso op, dus voortaan bij ÉLKE
  * ronde die code aanraakt (niet enkel als sw.js zelf inhoudelijk wijzigt).
  */
+// ronde 63: Peter: "Ik heb indruk dat de laatste ingestelde filter, wat je zichtbaar wou in de
+// planning, niet opgeslagen wordt bij nieuwe opstart" -- klopte: de rol-/onderaannemers-filter
+// boven het Personeelsplanning-rooster stond nooit in localStorage, enkel in het geheugen, dus
+// elke herlaad/herstart viel terug op "alle rollen aan". Wordt nu per gebruiker bewaard (zelfde
+// localStorage-conventie als de "Mijn week"-voorkeur), en blijft veilig als een bewaarde rol later
+// niet meer bestaat (bv. de ronde 62b-opsplitsing van "Bureau"). Geen SQL-wijziging.
+// ronde 62b: Peter, meteen na ronde 62 hieronder: "Bureau dan mss nog meer opsplitsen als management,
+// projectleiders en administratie" -- de ene generieke rol "Bureau" is vervangen door deze 3
+// specifiekere rollen (IP_ROLES in src2.html). Geen SQL-wijziging; bestaande personen met de oude
+// waarde "Bureau" blijven gewoon werken (vrije tekst), enkel niet meer kiesbaar in de rol-keuzelijst.
+// ronde 62: Peter: "Scherm op gsm is voor meer dan 50% ingenomen [...] Kunnen we daar aanpassingen/
+// zaken verplaatsen/groeperen om beter zichtbaar te maken?", daarna "Zouden we bureau/techniekers
+// niet aanpassen en bureau bij de flexi/onderaannemers/... stoppen. Zo winnen we ook veel scherm" --
+// (1) op gsm staan de rol-filters + legende boven het Personeelsplanning-rooster voortaan standaard
+// dicht achter 1 knop "Filters & legende" (badge = aantal actieve rollen), op tablet/desktop blijft
+// alles gewoon altijd zichtbaar; (2) de Tech/Bureau-schakelaar (eigen rij) is volledig verdwenen --
+// Rooster/Capaciteit/Vaardigheden tonen voortaan altijd alle actieve mensen samen in 1 tabel, Bureau
+// is nu gewoon een rol-filterchip naast Technieker/Flexi/Onderaannemers (Inschatting blijft bewust
+// Tech-only). Geen SQL-wijziging.
 // ronde 61: Peter meldde dat een CaDos-dossier soms stilzwijgend ontstond ("In settings van project
 // als cados dossier opmaken uitstaat en je doet opslaan komt er toch een dossier") -- bron was het
 // CaDos-instellingenblokje op de Projecten-pagina, dat bij elk uitklappen/bewaren van een project
@@ -63,7 +82,7 @@
 // vanaf"/"Uit dienst vanaf" (Bedrijfsgegevens) -- buiten die periode toont het rooster een grijze,
 // niet-klikbare "zone" i.p.v. een gewone cel, zodat niemand per ongeluk buiten zijn dienstperiode
 // ingepland kan worden.
-const CACHE_VERSION = 'casnap-v2026-10-02-r61';
+const CACHE_VERSION = 'casnap-v2026-10-03-r63';
 const NETWORK_TIMEOUT_MS = 4000;
 
 self.addEventListener('install', () => {

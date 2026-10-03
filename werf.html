@@ -2283,13 +2283,17 @@
      Desktop: team-schakelaar links | periode-navigatie midden | export rechts; eronder de rol-filters
      als kleine schakel-chips en rechts de compacte legende. Gsm: zie het blok onderaan. */
   .ip-toolbar{display:flex;flex-direction:column;gap:12px;margin:0 0 14px;}
-  #ipsub-rooster .ip-controls{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:12px;margin:0;}
-  #ipsub-rooster .ip-team-switch{justify-self:start;}
+  /* Ronde 62: geen Tech/Bureau-schakelaar meer -- .ip-controls toont nu enkel periode-navigatie
+     (gecentreerd) + export (rechts). */
+  #ipsub-rooster .ip-controls{display:grid;grid-template-columns:1fr auto;align-items:center;gap:12px;margin:0;}
   #ipsub-rooster .ip-week-nav{justify-self:center;}
   #ip-export-pdf-btn{justify-self:end;margin-left:0;min-height:42px;padding:0 14px;font-size:14px;border-radius:var(--r);}
   .ip-toolbar-sub{display:flex;flex-wrap:wrap;align-items:center;gap:10px 24px;}
   .ip-toolbar-sub .ip-role-filter{margin:0;flex:0 1 auto;min-width:0;}
   .ip-toolbar-sub .ip-legend{margin:0 0 0 auto;}
+  /* Ronde 62: "Filters & legende"-inklapknop -- enkel zichtbaar op gsm (zie media query onderaan);
+     op tablet/desktop blijft alles gewoon altijd in 1 rij zichtbaar, vandaar hier display:none. */
+  .ip-filters-toggle{display:none;}
 
   /* Team-schakelaar + periode-navigatie: zelfde "segmented"-look als de subtabs (fase A). */
   .ip-team-switch, .ip-week-nav{
@@ -2785,25 +2789,43 @@
   @media (max-width:640px){
     #ipsub-rooster{--ip-date-w:58px;--ip-col-min:140px;}
     .ip-toolbar{gap:10px;margin-bottom:12px;}
-    /* Rij 1: team-schakelaar (volle breedte) + export; rij 2: periode-navigatie volle breedte. */
-    #ipsub-rooster .ip-controls{grid-template-columns:minmax(0,1fr) auto;gap:10px;}
-    #ipsub-rooster .ip-team-switch{justify-self:stretch;display:flex;}
-    .ip-team-switch button{flex:1 1 0;}
+    /* Ronde 62: 1 compacte rij -- periode-navigatie (groeit mee) + export-icoon ernaast (geen
+       Tech/Bureau-schakelaar meer, zie hierboven). */
+    #ipsub-rooster .ip-controls{display:flex;align-items:center;gap:8px;}
+    #ipsub-rooster .ip-week-nav{flex:1 1 auto;display:flex;}
     #ip-export-pdf-btn .ip-exp-long{display:none;}
-    #ipsub-rooster .ip-week-nav{grid-column:1 / -1;grid-row:2;justify-self:stretch;display:flex;}
-    #ip-export-pdf-btn{grid-column:2;grid-row:1;}
+    #ip-export-pdf-btn{flex:none;}
     .ip-week-nav .ip-range{flex:1 1 auto;min-width:0;}
-    /* Rol-filters: 1 swipebare rij van rand tot rand (verborgen scrollbalk + fade-randen). */
-    .ip-toolbar-sub{gap:8px;}
-    .ip-toolbar-sub #ip-role-filter{
-      --fl:0px;--fr:0px;flex:1 1 100%;flex-wrap:nowrap;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none;
+    /* Ronde 62: rol-filters + legende staan op gsm voortaan samen achter de "Filters & legende"-
+       knop, standaard dicht (loutere UI-staat, niet bewaard -- altijd dicht bij opstart/
+       tabwissel). De knop zelf staat hierboven (buiten deze media query) op display:none; hier
+       wordt hij pas zichtbaar. */
+    .ip-toolbar-sub{flex-direction:column;align-items:stretch;gap:8px;}
+    .ip-filters-toggle{
+      display:flex;align-items:center;justify-content:space-between;gap:8px;
+      min-height:40px;padding:0 12px;border-radius:10px;background:var(--card);border:1px solid var(--line);
+      font:600 13px/1 var(--font-ui);color:var(--ink);cursor:pointer;
+    }
+    .ip-filters-toggle-right{display:inline-flex;align-items:center;gap:8px;}
+    .ip-filters-badge{display:none;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:var(--brand);color:#fff;font:700 11px/18px var(--font-ui);text-align:center;}
+    .ip-filters-badge.show{display:inline-block;}
+    .ip-filters-chevron{color:var(--ink-soft);font-weight:700;transition:transform .15s;}
+    #ip-filters-toggle[aria-expanded="true"] .ip-filters-chevron{transform:rotate(180deg);}
+    /* #ipsub-rooster-prefix hier bewust nodig (i.p.v. enkel .ip-toolbar-sub ...): #ipsub-rooster
+       .ip-legend/.ip-toolbar-sub #ip-role-filter hierboven zijn specifieker (ID in de selector) dan
+       een kale .ip-toolbar-sub .ip-legend/.ip-toolbar-sub #ip-role-filter-regel zonder #ipsub-rooster
+       ervoor -- zonder dit wint de "altijd zichtbaar"-regel van hierboven altijd, ook op gsm. */
+    #ipsub-rooster .ip-toolbar-sub #ip-role-filter, #ipsub-rooster .ip-toolbar-sub .ip-legend{display:none;}
+    /* Rol-filters (open): 1 swipebare rij van rand tot rand (verborgen scrollbalk + fade-randen). */
+    #ipsub-rooster .ip-toolbar-sub.ip-filters-open #ip-role-filter{
+      --fl:0px;--fr:0px;display:flex;flex-wrap:nowrap;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none;
       margin:0 calc(-1 * var(--page-pad));padding:2px var(--page-pad);
       -webkit-mask-image:linear-gradient(to right, transparent 0, #000 var(--fl), #000 calc(100% - var(--fr)), transparent 100%);
       mask-image:linear-gradient(to right, transparent 0, #000 var(--fl), #000 calc(100% - var(--fr)), transparent 100%);
     }
-    .ip-toolbar-sub #ip-role-filter::-webkit-scrollbar{display:none;}
+    .ip-toolbar-sub.ip-filters-open #ip-role-filter::-webkit-scrollbar{display:none;}
     .ip-toolbar-sub #ip-role-filter .ip-role-chip{flex:none;}
-    .ip-toolbar-sub .ip-legend{margin:0;gap:0 12px;}
+    #ipsub-rooster .ip-toolbar-sub.ip-filters-open .ip-legend{display:flex;margin:0;gap:0 12px;}
     #ipsub-rooster .ip-legend-chip{font-size:12px;line-height:20px;}
     /* Compacter rooster: datum op 2 regels (~58px), 2 personen naast de datumkolom. */
     #ipsub-rooster :is(table.ip-grid, table.ip-headclone) thead th{padding:8px 10px;font-size:13px;}
@@ -3630,15 +3652,24 @@
         <div class="card-body mp-week-days" id="ip-myweek-body"></div>
       </div>
       <!-- Ronde 48 fase C (2026-09-25, ronde 48 — design-herwerking): bovenbalk herschikt tot één
-           toolbar -- rij 1 = team-schakelaar | periode-navigatie | export, rij 2 = rol-filterchips +
-           compacte legende (kleurstip + label). Alle id's/knoppen/handlers ongewijzigd; enkel
-           wrappers (.ip-toolbar/.ip-toolbar-sub) + aria-labels + een kort/lang exportlabel erbij. -->
+           toolbar -- rij 1 = periode-navigatie | export, rij 2 = rol-filterchips + compacte legende
+           (kleurstip + label). Alle id's/knoppen/handlers ongewijzigd; enkel wrappers
+           (.ip-toolbar/.ip-toolbar-sub) + aria-labels + een kort/lang exportlabel erbij.
+           Ronde 62 (op vraag van Peter):
+           (1) "Scherm op gsm voor meer dan 50% ingenomen door de kopbalk" -- de rol-filters en de
+               legende staan op gsm (<=640px) voortaan standaard dicht achter 1 knop "Filters &
+               legende" (badge = aantal actieve rollen); op tablet/desktop blijft alles zoals
+               voorheen altijd in 1 rij zichtbaar. Zie ipToggleFiltersPanel()/ipUpdateFiltersToggle()
+               in het script.
+           (2) "Bureau bij de flexi/onderaannemers stoppen, zo winnen we ook veel scherm" -- de
+               Tech/Bureau-schakelaar (die hier stond, eigen rij) is volledig verdwenen: Rooster/
+               Capaciteit/Vaardigheden tonen voortaan altijd alle actieve mensen samen in 1 tabel,
+               en "Bureau" is nu gewoon nog 1 rol-filterchip naast Technieker/Programmeur/Service
+               technieker/Flexi/Onderaannemers (zie ipAlleRoosterRollen()/ipCurrentPeople() in het
+               script). Inschatting blijft bewust Tech-only zoals voorheen (ongewijzigd, "Bureau
+               niet nodig voor inschattingen"). -->
       <div class="ip-toolbar">
         <div class="ip-controls">
-          <div class="ip-team-switch" id="ip-team-switch" role="group" aria-label="Team">
-            <button data-team="TECH" class="active" type="button">Tech</button>
-            <button data-team="BUREAU" type="button">Bureau</button>
-          </div>
           <div class="ip-week-nav">
             <button id="ip-prev-week" type="button" aria-label="Vorige periode" title="Vorige periode">&larr;</button>
             <span class="ip-range" id="ip-week-range"></span>
@@ -3646,7 +3677,11 @@
           </div>
           <button class="btn btn-secondary btn-sm" id="ip-export-pdf-btn" type="button"><span class="btn-ico">📄</span><span><span class="ip-exp-long">Rooster </span>exporteren</span></button>
         </div>
-        <div class="ip-toolbar-sub">
+        <div class="ip-toolbar-sub" id="ip-toolbar-sub">
+          <button type="button" class="ip-filters-toggle" id="ip-filters-toggle" aria-expanded="false" aria-controls="ip-role-filter ip-legend">
+            <span>🔎 Filters &amp; legende</span>
+            <span class="ip-filters-toggle-right"><span class="ip-filters-badge" id="ip-filters-badge"></span><span class="ip-filters-chevron" aria-hidden="true">⌄</span></span>
+          </button>
           <div class="ip-role-filter" id="ip-role-filter"></div>
           <div class="ip-legend" id="ip-legend"></div>
         </div>
@@ -3682,7 +3717,9 @@
           <tbody id="ip-plist-tbody"></tbody>
         </table>
       </div>
-      <h3 class="ip-sec-title">Capaciteit per week — huidig team (<span id="ip-cap-team-label"></span>)</h3>
+      <!-- Ronde 62: geen Tech/Bureau-label meer -- "huidig team" bestaat niet meer, zie de toelichting
+           bij .ip-toolbar hierboven (Rooster toont nu altijd alle actieve mensen samen). -->
+      <h3 class="ip-sec-title">Capaciteit per week</h3>
       <p class="hint">Beschikbare uren = vaste medewerkers (geen Flexi/Onderaannemer) &times; werkdagen &times; 8u, min ingepland. Flexi's en onderaannemers tellen apart mee, als extra.</p>
       <div class="ip-cap-grid" id="ip-cap-grid"></div>
     </section>
@@ -20960,7 +20997,8 @@ window.CaCalcApp = {
     currentPerson: null, // team_leden-/bureau-object van de ingelogde gebruiker (of null, onbekend e-mailadres)
     access: 'volledig', // 'volledig' | 'planning' -- zie applyAccessRestrictions()
     ip: {
-      team: 'TECH',
+      // Ronde 62: geen Tech/Bureau-"team" meer -- Rooster/Capaciteit/Vaardigheden tonen voortaan
+      // altijd alle actieve mensen samen (zie ipCurrentPeople()/ipAlleRoosterRollen()).
       weekStart: null, // Date, maandag van de eerst getoonde week -- ingesteld bij eerste renderIpGrid()
       // Ronde 58 (bugfix, op melding van Peter): null = "nog niet geïnitialiseerd voor dit team"
       // (zie renderIpRoleFilter()), NIET een gewone lege Set -- anders is een lege Set niet meer te
@@ -20985,11 +21023,12 @@ window.CaCalcApp = {
       // Rol-filter boven de Inschatting-collegalijst (2026-09-24, op vraag van Peter: "Inschatting
       // graag dezelfde filters bovenaan als bij het rooster. Bureau niet nodig") -- BEWUST een eigen,
       // los paar van state.ip.selectedRoles/showOA hierboven (i.p.v. die twee rechtstreeks te
-      // hergebruiken): die zijn gekoppeld aan state.ip.team (Tech/Bureau, enkel instelbaar op het
-      // Rooster-subtabblad), en Inschatting toont altijd enkel team Tech (geen Bureau-optie, zoals
-      // gevraagd) -- rechtstreeks hergebruiken zou de Inschatting-lijst per ongeluk leeg kunnen laten
-      // vallen zodra iemand het Rooster net op team Bureau met een Bureau-rolfilter had staan. Zie
-      // renderIpInschatRoleFilter()/renderIpInschattingColleagues() hieronder.
+      // hergebruiken): Inschatting toont altijd enkel Tech-rollen (geen Bureau-optie, zoals
+      // gevraagd, zie ipRolesInTeam('TECH') in renderIpInschatRoleFilter()), terwijl het Rooster
+      // sinds ronde 62 Tech + Bureau samen toont -- rechtstreeks hergebruiken zou de
+      // Inschatting-lijst dus per ongeluk Bureau-mensen kunnen laten meetellen zodra iemand in het
+      // Rooster de Bureau-rolfilter had aanstaan. Zie renderIpInschatRoleFilter()/
+      // renderIpInschattingColleagues() hieronder.
       inschatSelectedRoles: null, // ronde 58: zelfde null-als-"nog niet geïnitialiseerd"-fix als state.ip.selectedRoles hierboven
       inschatShowOA: false,
       // "Vastpinnen om te verplaatsen" / "kopiëren" vanuit het rooster zelf (2026-09-23, op vraag
@@ -21036,7 +21075,15 @@ window.CaCalcApp = {
   // ---- Personeelsplanning (2026-09-08): rollen/statussen voor het rooster-tabblad ----
   // Volgorde op vraag van Peter (2026-09-23): "Bij type in personeel naast technieker ook
   // Programmeur" -- Programmeur staat daarom meteen na Technieker.
-  const IP_ROLES = ['Technieker', 'Programmeur', 'Service technieker', 'Bureau', 'Flexi', 'Onderaannemer'];
+  // Ronde 62b (op vraag van Peter, meteen na de Tech/Bureau-samenvoeging van ronde 62: "Bureau dan
+  // mss nog meer opsplitsen als management, projectleiders en administratie") -- de vroegere ene
+  // generieke rol "Bureau" is vervangen door deze 3 specifiekere rollen. Geen verdere code-wijziging
+  // nodig: ipAlleRoosterRollen()/ipCurrentPeople() (Rooster) bouwen hun rol-filterchips gewoon
+  // dynamisch op uit wat hier staat, net als voor elke andere rol. Bestaande personen met de oude
+  // waarde "Bureau" (vrije tekst, geen DB-contrainte) blijven gewoon werken -- enkel niet meer
+  // kiesbaar in de rol-keuzelijst; Peter kan ze 1x handmatig op de juiste nieuwe rol zetten bij
+  // Bedrijfsgegevens.
+  const IP_ROLES = ['Technieker', 'Programmeur', 'Service technieker', 'Management', 'Projectleider', 'Administratie', 'Flexi', 'Onderaannemer'];
   // Projectstatus (2026-09-24, op vraag van Peter: "Bij project zou een lijst van optie moeten
   // bestaan: Actief, afgewerkt of onderhoud. Zodat voor snelle planning de actieve projecten
   // kunnen gekozen worden. Wanneer je een afgewerkte of een in onderhoud wenst in te plannen moet
@@ -24128,7 +24175,10 @@ window.CaCalcApp = {
   // de rest van deze lijst. `defaultTeam` is de standaard TECH/BUREAU-indeling (team_leden -> TECH,
   // Bureau-lijst -> BUREAU) voor wie dat nog niet expliciet ingesteld heeft.
   function buildIpPersonExtraRow(person, defaultTeam){
-    if(!person.rol) person.rol = (defaultTeam === 'BUREAU') ? 'Bureau' : 'Technieker';
+    // Ronde 62b: generieke rol "Bureau" bestaat niet meer (zie IP_ROLES) -- "Administratie" als
+    // neutrale standaardwaarde voor een nieuw toegevoegd Bureau-lid, door Peter zelf meteen aan te
+    // passen naar Management/Projectleider zodra van toepassing.
+    if(!person.rol) person.rol = (defaultTeam === 'BUREAU') ? 'Administratie' : 'Technieker';
     if(!person.planning_team) person.planning_team = defaultTeam;
     if(!Array.isArray(person.protocollen)) person.protocollen = [];
     if(person.planning_actief == null) person.planning_actief = true;
@@ -29547,12 +29597,18 @@ window.CaCalcApp = {
     return true;
   }
   function ipActivePeople(){ return ipAllPeople().filter(p => p.planning_actief !== false); }
+  // Ronde 62 (op vraag van Peter: "bureau/techniekers niet aanpassen en bureau bij de flexi/
+  // onderaannemers stoppen, zo winnen we ook veel scherm" -- en nadien bevestigd: "echt
+  // samenvoegen tot 1 rooster"): ipCurrentPeople() filtert niet langer op planning_team -- Tech en
+  // Bureau tonen voortaan altijd samen in 1 tabel, en de vroegere Bureau-"team" is nu gewoon een
+  // rol-waarde zoals Technieker/Programmeur/Flexi (zie IP_ROLES hierboven). Ronde 62b: die ene
+  // generieke rol "Bureau" is intussen zelf verder opgesplitst in Management/Projectleider/
+  // Administratie -- ongewijzigd hier, want deze functie werkt toch al rol-agnostisch.
   function ipCurrentPeople(){
     return ipActivePeople().filter(p => {
-      if((p.planning_team || 'TECH') !== state.ip.team) return false;
       if(p.rol === 'Onderaannemer') return state.ip.showOA;
       // Ronde 58 (bugfix, op melding van Peter: "wanneer ik enkel onderaannemers wil zichtbaar
-      // maken, dan selecteert hij plots alles"): `null` = de rol-filter is voor dit team nog niet
+      // maken, dan selecteert hij plots alles"): `null` = de rol-filter is nog niet
       // geïnitialiseerd (zie renderIpRoleFilter()) -> dan als veilige terugval alles tonen. Een
       // lege, wél al geïnitialiseerde Set betekent voortaan écht "0 rollen gekozen" (dus niemand) --
       // voorheen gold een lege Set ook als "alles tonen", waardoor de laatste rol-chip (bv.
@@ -29561,9 +29617,18 @@ window.CaCalcApp = {
       return state.ip.selectedRoles === null || state.ip.selectedRoles.has(p.rol || 'Technieker');
     });
   }
+  // Ongewijzigd (team-parameter blijft bestaan): Inschatting gebruikt deze nog wel, bewust
+  // Tech-only, zie renderIpInschatRoleFilter() ("Bureau niet nodig voor inschattingen").
   function ipRolesInTeam(team){
     const set = new Set();
     ipActivePeople().filter(p => (p.planning_team || 'TECH') === team && p.rol !== 'Onderaannemer').forEach(p => set.add(p.rol || 'Technieker'));
+    return [...set];
+  }
+  // Ronde 62: teamloze variant voor het Rooster -- alle rollen (Tech én Bureau) van alle actieve
+  // mensen samen, los van planning_team.
+  function ipAlleRoosterRollen(){
+    const set = new Set();
+    ipActivePeople().filter(p => p.rol !== 'Onderaannemer').forEach(p => set.add(p.rol || 'Technieker'));
     return [...set];
   }
 
@@ -29638,37 +29703,12 @@ window.CaCalcApp = {
   }
   function ipIsPlanner(){ return !!(state.currentPerson && state.currentPerson.is_planner); }
 
-  // ===================== Team-keuze (Tech/Bureau) onthouden per gebruiker (ronde 54) =====================
-  // Audit-bevinding (op vraag van Peter, "wat kan er nog per gebruiker onthouden worden"): de
-  // Tech/Bureau-schakelaar bovenaan het Rooster stond puur in-memory (state.ip.team) en viel na
-  // elke herlaad/nieuwe login terug op 'TECH' -- wie meestal Bureau bekijkt moest dat dus elke
-  // keer opnieuw instellen. Zelfde localStorage-conventie als ipMyWeekPref() hierboven (en
-  // laatsteTabKey()/openVerslagKey() nog hoger in dit bestand); GEEN nieuwe UI, gewoon de
-  // bestaande schakelaar onthouden. Standaard (nog niets opgeslagen) = ongewijzigd 'TECH'.
-  function ipTeamPrefKey(){
-    const id = getCurrentUserNaam() || (state.session && state.session.user && state.session.user.email) || 'anoniem';
-    return 'casuite-ip-team-' + APP_MODE + '-' + id;
-  }
-  function ipReadTeamPref(){
-    try{ const v = localStorage.getItem(ipTeamPrefKey()); return (v === 'TECH' || v === 'BUREAU') ? v : null; }catch(e){ return null; }
-  }
-  function ipSaveTeamPref(team){
-    try{ localStorage.setItem(ipTeamPrefKey(), team); }catch(e){}
-  }
+  // Ronde 62: de "Team-keuze (Tech/Bureau) onthouden per gebruiker"-functies die hier stonden
+  // (ipTeamPrefKey/ipReadTeamPref/ipSaveTeamPref, ronde 54) zijn verwijderd -- er is geen
+  // Tech/Bureau-schakelaar meer om te onthouden, zie de toelichting bij .ip-toolbar/ipCurrentPeople().
 
   async function refreshInzetPlanning(){
     if(!state.ip.weekStart) state.ip.weekStart = ipMondayOf(new Date());
-    // Eenmalig (per sessie) de onthouden team-keuze toepassen -- pas hier en niet al bij het
-    // aanmaken van de initiële `state` (helemaal bovenaan), want getCurrentUserNaam() heeft dan
-    // nog geen ingelogde gebruiker om op te sleutelen. De knoppen zelf tonen in de HTML altijd
-    // "Tech" als actief; die klassen hier meteen mee in sync zetten voorkomt dat de schakelaar
-    // "Tech" toont terwijl het rooster stiekem al Bureau laat zien.
-    if(!state.ip.__teamPrefLoaded){
-      state.ip.__teamPrefLoaded = true;
-      const storedTeam = ipReadTeamPref();
-      if(storedTeam) state.ip.team = storedTeam;
-      document.querySelectorAll('#ip-team-switch button[data-team]').forEach(b => b.classList.toggle('active', b.dataset.team === state.ip.team));
-    }
     try{ state.actiepuntenList = await dbListActiepunten(); }
     catch(err){ console.error('Kon actiepunten niet laden voor Personeelsplanning:', err); }
     ipBuildOpenApMap();
@@ -30311,12 +30351,47 @@ window.CaCalcApp = {
     el('ip-legend').innerHTML = items.map(it => `<span class="ip-legend-chip"><span class="ip-legend-dot ${it.cls}"></span>${it.label}</span>`).join('');
   }
 
+  // Ronde 63: Peter meldde dat de laatst ingestelde rol-/onderaannemers-filter in de Personeelsplanning
+  // niet bewaard bleef bij een nieuwe opstart (herladen van de pagina, nieuwe dag, ...) -- klopt: dit
+  // stond nooit in localStorage, enkel in het geheugen van state.ip (zie hierboven), dus elke herstart
+  // viel terug op "alle rollen aan". Zelfde per-gebruiker localStorage-conventie als ipMyWeekPrefKey()
+  // hierboven (casuite-<naam>-<APP_MODE>, gesleuteld op de ingelogde gebruiker, device-only fallback).
+  function ipRoleFilterPrefKey(){
+    const id = getCurrentUserNaam() || (state.session && state.session.user && state.session.user.email) || 'anoniem';
+    return 'casuite-rolefilter-pref-' + APP_MODE + '-' + id;
+  }
+  function ipReadRoleFilterPref(){
+    try{
+      const raw = localStorage.getItem(ipRoleFilterPrefKey());
+      if(!raw) return null;
+      const parsed = JSON.parse(raw);
+      if(!parsed || !Array.isArray(parsed.roles)) return null;
+      return { roles: parsed.roles, showOA: !!parsed.showOA };
+    }catch(e){ return null; }
+  }
+  function ipSaveRoleFilterPref(){
+    try{
+      localStorage.setItem(ipRoleFilterPrefKey(), JSON.stringify({ roles: [...state.ip.selectedRoles], showOA: state.ip.showOA }));
+    }catch(e){}
+  }
+
   function renderIpRoleFilter(){
-    const roles = ipRolesInTeam(state.ip.team);
-    // Ronde 58: enkel initialiseren (alle rollen aan) zolang er nog nooit een keuze gemaakt is voor
-    // dit team (null) -- NIET telkens de gebruiker toevallig alles uitvinkt, anders kan "enkel
-    // Onderaannemers tonen" (alle gewone rollen uitvinken) nooit lukken, zie ipCurrentPeople().
-    if(state.ip.selectedRoles === null) state.ip.selectedRoles = new Set(roles);
+    const roles = ipAlleRoosterRollen();
+    // Ronde 58: enkel initialiseren zolang er nog nooit een keuze gemaakt is (null) -- NIET telkens
+    // de gebruiker toevallig alles uitvinkt, anders kan "enkel Onderaannemers tonen" (alle gewone
+    // rollen uitvinken) nooit lukken, zie ipCurrentPeople(). Ronde 63: bij die eerste initialisatie nu
+    // eerst de bewaarde voorkeur (hierboven) proberen overnemen i.p.v. altijd "alles aan" -- enkel de
+    // rollen die nog effectief bestaan (bv. na de Bureau-opsplitsing in ronde 62b kan een oude
+    // bewaarde rol niet meer bestaan, die valt dan gewoon weg i.p.v. een fout te geven).
+    if(state.ip.selectedRoles === null){
+      const pref = ipReadRoleFilterPref();
+      if(pref){
+        state.ip.selectedRoles = new Set(pref.roles.filter(r => roles.includes(r)));
+        state.ip.showOA = pref.showOA;
+      } else {
+        state.ip.selectedRoles = new Set(roles);
+      }
+    }
     let html = roles.map(r =>
       `<button type="button" class="ip-role-chip ${state.ip.selectedRoles.has(r) ? 'on' : ''}" data-role="${escapeHtml(r)}">${escapeHtml(r)}</button>`
     ).join('');
@@ -30324,12 +30399,33 @@ window.CaCalcApp = {
     // verplaatst worden naar de manier hoe nu ook al filter op technikers en flexi en programmeur
     // en service zijn") -- voorheen een apart vinkje in de controlebalk erboven, nu gewoon een
     // extra chip in dezelfde rij/stijl als de rol-filters. Onderaannemers zijn geen rol-filter-
-    // optie (zie ipRolesInTeam(), sluit 'Onderaannemer' bewust uit) en enkel relevant bij team
-    // Tech, dus enkel dan tonen.
-    if(state.ip.team === 'TECH'){
-      html += `<button type="button" class="ip-role-chip ${state.ip.showOA ? 'on' : ''}" data-oa="1">Onderaannemers</button>`;
-    }
+    // optie (zie ipAlleRoosterRollen(), sluit 'Onderaannemer' bewust uit). Ronde 62: voorheen enkel
+    // bij team Tech getoond -- nu er geen Tech/Bureau-onderscheid meer is, gewoon altijd tonen.
+    html += `<button type="button" class="ip-role-chip ${state.ip.showOA ? 'on' : ''}" data-oa="1">Onderaannemers</button>`;
     el('ip-role-filter').innerHTML = html;
+    ipUpdateFiltersToggle(); // ronde 62: badge (aantal actieve rollen) in de "Filters & legende"-knop bijwerken
+  }
+
+  // Ronde 62: "Filters & legende"-inklapknop op gsm (zie .ip-filters-toggle in de CSS) -- een
+  // loutere UI-staat (niet bewaard, altijd dicht bij opstart/tabwissel), volledig los van de
+  // rol-/onderaannemers-selectie zelf (die blijft gewoon in state.ip.selectedRoles/showOA staan,
+  // ook terwijl het paneel dicht staat). Op tablet/desktop bestaat deze knop niet (display:none,
+  // zie CSS) en doen deze functies dus niets zichtbaars.
+  function ipUpdateFiltersToggle(){
+    const toggle = el('ip-filters-toggle');
+    const badge = el('ip-filters-badge');
+    if(!toggle || !badge) return;
+    const actief = document.querySelectorAll('#ip-role-filter .ip-role-chip.on').length;
+    badge.textContent = String(actief);
+    badge.classList.toggle('show', actief > 0);
+  }
+  function ipToggleFiltersPanel(force){
+    const sub = el('ip-toolbar-sub');
+    const toggle = el('ip-filters-toggle');
+    if(!sub || !toggle) return;
+    const open = typeof force === 'boolean' ? force : !sub.classList.contains('ip-filters-open');
+    sub.classList.toggle('ip-filters-open', open);
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
   }
 
   function renderIpWeekRange(){
@@ -31254,9 +31350,10 @@ window.CaCalcApp = {
       </tr>`;
     }).join('') || '<tr class="ipc-empty"><td colspan="6">Nog geen (actieve) projecten.</td></tr>';
 
-    el('ip-cap-team-label').textContent = state.ip.team;
-    const vaste = ipActivePeople().filter(p => (p.planning_team || 'TECH') === state.ip.team && p.rol !== 'Flexi' && p.rol !== 'Onderaannemer');
-    const extra = ipActivePeople().filter(p => (p.planning_team || 'TECH') === state.ip.team && (p.rol === 'Flexi' || (p.rol === 'Onderaannemer' && state.ip.showOA)));
+    // Ronde 62: geen team-filter meer -- Capaciteit telt voortaan altijd iedereen (Tech + Bureau
+    // samen), net als het Rooster erboven.
+    const vaste = ipActivePeople().filter(p => p.rol !== 'Flexi' && p.rol !== 'Onderaannemer');
+    const extra = ipActivePeople().filter(p => p.rol === 'Flexi' || (p.rol === 'Onderaannemer' && state.ip.showOA));
     const weeks = [state.ip.weekStart, ipAddDays(state.ip.weekStart, 7)];
     el('ip-cap-grid').innerHTML = weeks.map(ws => {
       let workdays = 0, plannedVaste = 0, plannedExtra = 0;
@@ -31302,20 +31399,16 @@ window.CaCalcApp = {
   }
 
   // ---- Event-koppeling (eenmalig, elementen staan altijd in de DOM) ----
-  el('ip-team-switch').addEventListener('click', e => {
-    const btn = e.target.closest('button[data-team]'); if(!btn) return;
-    state.ip.team = btn.dataset.team;
-    state.ip.selectedRoles = null; // ronde 58: terug "nog niet geïnitialiseerd" voor dit (andere) team
-    ipSaveTeamPref(state.ip.team); // ronde 54: onthouden per gebruiker, zie refreshInzetPlanning()
-    document.querySelectorAll('#ip-team-switch button').forEach(b => b.classList.toggle('active', b === btn));
-    renderIpRoleFilter(); renderIpGrid(); renderIpCapacityTab(); renderIpSkillsTab();
-  });
+  // Ronde 62: de #ip-team-switch-click-listener die hier stond is verwijderd samen met de
+  // Tech/Bureau-schakelaar zelf (zie .ip-toolbar/ipCurrentPeople() hierboven).
+  el('ip-filters-toggle').addEventListener('click', () => ipToggleFiltersPanel());
   el('ip-role-filter').addEventListener('click', e => {
     const chip = e.target.closest('.ip-role-chip'); if(!chip) return;
     // "Onderaannemers"-chip (2026-09-24): eigen toggle, geen normale rol-filter -- zie
     // renderIpRoleFilter() hierboven.
     if(chip.dataset.oa){
       state.ip.showOA = !state.ip.showOA;
+      ipSaveRoleFilterPref(); // ronde 63: filterkeuze bewaren zodat ze bij een volgende opstart terugkomt
       renderIpRoleFilter(); renderIpGrid(); renderIpCapacityTab(); renderIpSkillsTab();
       return;
     }
@@ -31328,6 +31421,7 @@ window.CaCalcApp = {
     // hier los van, dus "enkel onderaannemers tonen" werkt nu gewoon door alle andere chips uit te
     // vinken en Onderaannemers aan te vinken.
     if(state.ip.selectedRoles.has(r)) state.ip.selectedRoles.delete(r); else state.ip.selectedRoles.add(r);
+    ipSaveRoleFilterPref(); // ronde 63: filterkeuze bewaren zodat ze bij een volgende opstart terugkomt
     renderIpRoleFilter(); renderIpGrid();
   });
   el('ip-prev-week').addEventListener('click', () => { state.ip.weekStart = ipAddDays(state.ip.weekStart, -14); renderIpGrid(); renderIpCapacityTab(); });
