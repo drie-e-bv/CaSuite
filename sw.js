@@ -28,6 +28,35 @@
  * CACHE_VERSION hieronder verhogen lost dit soort dingen sowieso op, dus voortaan bij ÉLKE
  * ronde die code aanraakt (niet enkel als sw.js zelf inhoudelijk wijzigt).
  */
+// ronde 67: Peter: "Kunnen we een 'enkel weergave' scherm/layout webpagina maken van de planning
+// vanaf de huidige week? om op een scherm weer te geven" -- bedoeld voor een vast wandscherm op
+// kantoor. Nieuw, HELEMAAL LOSSTAAND bestand scherm.html (niet via build-apps.js uit src2.html
+// gegenereerd, geen aanmelding): toont, bevestigd via AskUserQuestion, vandaag bovenaan/groot, de
+// volgende dagen (instelbaar aantal) daaronder, schakelt om 00u00 automatisch door, en herlaadt de
+// gegevens elke 3 minuten. Toegang zonder in te loggen -- Peter koos expliciet voor "geen login
+// nodig (vaste link)" en aanvaardde daarbij bewust: "wie de link kent, kan de planning zien... geen
+// gevoelige data zoals lonen". De échte beveiliging zit niet in de link zelf (de
+// Supabase-anoniem-sleutel staat toch al gewoon in de broncode) maar in een nieuw, geheim
+// "scherm_token" op bedrijf, gecontroleerd door de nieuwe scherm_data()-databankfunctie (security
+// definer, bypasst RLS bewust zelf en geeft bij een fout/ontbrekend token altijd gewoon null terug).
+// Instelbaar op Bedrijfsgegevens -> "Schermweergave (planningsbord)": de link zelf (met
+// "Nieuwe link genereren"-knop, maakt de vorige onmiddellijk ongeldig), hoeveel dagen vooruit
+// getoond worden, en welke rollen (niets aanvinken = alle rollen) -- exact zoals gevraagd
+// ("instelbaar in de bedrijfspagina... hoeveel dagen en welke werknemers"). sw.js zelf is
+// inhoudelijk ongewijzigd voor dit onderdeel (scherm.html registreert deze service worker nooit
+// zelf), enkel de cacheversie hieronder opgehoogd zoals bij elke ronde die code aanraakt.
+// ronde 66: Peter: "Kun je bij kabelberekening het nieuwe RZ1 kabeltype ook bij mantel toevoegen
+// en de gegevens ervan opnemen in de tabellen?" -- "RZ1" (RZ1-K(AS)) is zelf XLPE-geïsoleerd, enkel
+// de buitenmantel is halogeenvrij/brandwerend, dus elektrisch dezelfde belastbaarheids-/
+// kortsluitklasse als de al bestaande "XLPE / PR"-isolatieklasse (zelfde klasse als "XGB" en
+// "Halogeenvrij (Cca/B2ca)"). Toegevoegd als 1 nieuwe regel in DATATABEL.mantelmap ("RZ1":"XLPE /
+// PR") -- hergebruikt zo de bestaande, al correcte belastbaarheids-/kfactor-tabellen i.p.v. nieuwe,
+// zelf-ingevoerde rijen (veiliger voor een rekentool). Zelf gevonden en meteen verholpen:
+// importParseKabel() (compacte Excel-import-notatie zoals "XGB3G2,5") herkende mantelnamen voorheen
+// via een vaste "eerst enkel letters, dan cijfers"-regex, die een mantelnaam met een eigen cijfer
+// (zoals "RZ1") niet meer kon onderscheiden van het daaropvolgende aantal-aders-cijfer ("RZ13G2,5"
+// zou dan foutief als mantel "RZ" + 13 aders gelezen zijn). Matcht nu expliciet tegen de bekende
+// mantelcodes, langste eerst. Geen SQL-wijziging.
 // ronde 64: 4 wijzigingen, allemaal in Personeelsplanning/CaCalc -- (1) CaCalc-bordinstellingen
 // (Peter, met screenshot: "Bovenaan zou alles van de 'inkomende zaken' gegroepeerd moeten staan en
 // dan onderaan de vertrekkende [...] Schakelaar erbij maakt alles grijs niet aanpasbaar") --
@@ -100,7 +129,7 @@
 // vanaf"/"Uit dienst vanaf" (Bedrijfsgegevens) -- buiten die periode toont het rooster een grijze,
 // niet-klikbare "zone" i.p.v. een gewone cel, zodat niemand per ongeluk buiten zijn dienstperiode
 // ingepland kan worden.
-const CACHE_VERSION = 'casnap-v2026-10-03-r64';
+const CACHE_VERSION = 'casnap-v2026-10-03-r67';
 const NETWORK_TIMEOUT_MS = 4000;
 
 self.addEventListener('install', () => {

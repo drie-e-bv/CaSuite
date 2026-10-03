@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>CaSuite — Planningsbord</title>
+<!--
+  scherm.html -- Ronde 67 (2026-10-03), op vraag van Peter: "Kunnen we een 'enkel weergave'
+  scherm/layout webpagina maken van de planning vanaf de huidige week? om op een scherm weer te
+  geven" -- bedoeld om op een vast scherm op kantoor te laten draaien (bv. een wandscherm).
+
+  Bewust een VOLLEDIG LOSSTAANDE pagina, niet via build-apps.js uit src2.html gegenereerd zoals
+  index.html/werf.html/planning.html/cados.html/cacalc.html: dit is geen tabblad van de normale,
+  aanmeld-vereisende app, maar een eigen, publieke, niet-aanmeld-pagina. Peter's expliciete keuze
+  (via AskUserQuestion, "Geen login nodig (vaste link)"): wie de link kent kan de planning zien --
+  "geen gevoelige data zoals lonen" stond toch al nooit in deze app.
+
+  BEVEILIGING: de Supabase-anoniem-sleutel hieronder is sowieso altijd publiek leesbaar (staat
+  ook gewoon in de broncode van index.html) -- de ECHTE poort is het geheime "scherm_token" (zie
+  de ?token=-parameter in de URL), gecontroleerd door de scherm_data()-databankfunctie (security
+  definer, SQL-migratie "scherm_weergave_planningsbord"). Die functie bypasst RLS bewust zelf en
+  geeft bij een foutief/ontbrekend token altijd gewoon `null` terug (geen onderscheid tussen "fout
+  token" en "geen token", zodat niets te raden/verklappen valt). Bedrijfsgegevens -> "Schermweergave
+  (planningsbord)" toont/genereert de link; een nieuwe code maakt de vorige onmiddellijk ongeldig.
+
+  Toont, zoals gevraagd: vandaag bovenaan (groot/opvallend), de volgende dagen (instelbaar aantal,
+  zie "scherm_dagen") daaronder; schakelt om 00u00 automatisch door naar de volgende dag; en
+  herlaadt de gegevens elke paar minuten automatisch (zie SCHERM_REFRESH_MS hieronder) zodat een
+  wijziging in de planning vanzelf op het scherm verschijnt zonder dat iemand moet ingrijpen.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,500..800&family=Figtree:wght@400..700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --ink:#15241c; --ink-soft:#5b6b62; --ink-faint:#8a988f;
+    --bg:#f2f5f3; --card:#ffffff; --line:#dde5e0;
+    --brand:#1b6b3e; --brand-strong:#135230; --brand-soft:#e5f1e9;
+    --font-display:"Archivo","Figtree",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --font-ui:"Figtree",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --font-mono:"JetBrains Mono","SF Mono",Consolas,Menlo,"Liberation Mono",monospace;
+    /* Statuskleuren -- exact dezelfde waarden als #tab-inzet/#ip-panel in de hoofdapp (ronde 60),
+       zodat dit scherm visueel overeenkomt met het rooster dat iedereen al kent. */
+    --st-verlof-bg:#eef6f0; --st-verlof:#5c8f6f;
+    --st-adv-bg:#f1eef9; --st-adv:#8a79b8;
+    --st-ziek-bg:#f8eeec; --st-ziek:#b08078;
+    --st-recup-bg:#e9f5f6; --st-recup:#4f9499;
+    --st-afwezig-bg:#f1efe9; --st-afwezig:#8c8a7e;
+    --st-magazijn-bg:#f6efe0; --st-magazijn:#a4874e;
+    --st-keuring-bg:#d93025; --st-keuring:#fff;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--font-ui);}
+  body{min-height:100vh;padding:28px 36px 60px;}
+  h1,h2,h3{font-family:var(--font-display);font-stretch:110%;letter-spacing:-.005em;margin:0;color:var(--ink);}
+  .scherm-header{display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;margin-bottom:22px;}
+  .scherm-brand{display:flex;align-items:center;gap:12px;}
+  .scherm-brand-dot{width:14px;height:14px;border-radius:50%;background:var(--brand);}
+  .scherm-brand-naam{font-family:var(--font-display);font-weight:800;font-stretch:112%;color:var(--brand-strong);font-size:1.5rem;letter-spacing:.01em;}
+  .scherm-clock{font-family:var(--font-mono);font-size:1.4rem;color:var(--ink-soft);text-align:right;}
+  .scherm-clock .scherm-refresh-note{display:block;font-size:.72rem;color:var(--ink-faint);margin-top:2px;font-family:var(--font-ui);}
+  .scherm-days{display:flex;flex-direction:column;gap:22px;}
+
+  .day-card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 22px;}
+  .day-card.today{border-color:var(--brand);box-shadow:0 2px 0 var(--brand);padding:26px 30px;}
+  .day-head{display:flex;align-items:baseline;gap:14px;margin-bottom:14px;flex-wrap:wrap;}
+  .day-card.today .day-head{margin-bottom:20px;}
+  .day-badge{font-family:var(--font-display);font-weight:800;font-size:.72rem;letter-spacing:.07em;text-transform:uppercase;color:#fff;background:var(--brand);border-radius:20px;padding:4px 14px;}
+  .day-weekday{font-family:var(--font-display);font-weight:700;font-size:1.3rem;color:var(--ink);}
+  .day-card.today .day-weekday{font-size:2.1rem;}
+  .day-date{font-size:1rem;color:var(--ink-soft);}
+  .day-card.today .day-date{font-size:1.3rem;}
+  .day-empty{color:var(--ink-faint);font-style:italic;font-size:.95rem;}
+
+  .person-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;}
+  .day-card.today .person-grid{grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px;}
+  .person-tile{border:1px solid var(--line);border-radius:12px;padding:10px 14px;background:var(--bg);}
+  .day-card.today .person-tile{padding:14px 18px;}
+  .person-naam{font-family:var(--font-display);font-weight:700;font-size:.95rem;color:var(--ink);margin-bottom:6px;}
+  .day-card.today .person-naam{font-size:1.15rem;}
+  .person-rol{font-size:.68rem;color:var(--ink-faint);font-weight:500;text-transform:uppercase;letter-spacing:.04em;margin-left:6px;}
+  .assign-row{display:flex;flex-wrap:wrap;gap:6px;}
+  .assign-chip{display:inline-flex;align-items:center;gap:5px;border-radius:7px;padding:4px 10px;font-size:.82rem;font-weight:600;line-height:1.3;}
+  .day-card.today .assign-chip{font-size:.98rem;padding:6px 12px;}
+  .assign-chip.project{background:var(--brand-soft);color:var(--brand-strong);}
+  .assign-chip.vrij{background:#eef0f1;color:var(--ink-soft);font-style:italic;}
+  .assign-chip.verlof{background:var(--st-verlof-bg);color:var(--st-verlof);}
+  .assign-chip.adv{background:var(--st-adv-bg);color:var(--st-adv);}
+  .assign-chip.ziek{background:var(--st-ziek-bg);color:var(--st-ziek);}
+  .assign-chip.recup{background:var(--st-recup-bg);color:var(--st-recup);}
+  .assign-chip.afwezig{background:var(--st-afwezig-bg);color:var(--st-afwezig);}
+  .assign-chip.magazijn{background:var(--st-magazijn-bg);color:var(--st-magazijn);}
+  .assign-chip.keuring{background:var(--st-keuring-bg);color:var(--st-keuring);font-weight:700;}
+  .assign-chip .dagdeel{font-size:.68rem;opacity:.75;font-weight:700;}
+  .person-vrij-dag{color:var(--ink-faint);font-size:.82rem;font-style:italic;}
+
+  .scherm-state{max-width:640px;margin:14vh auto;text-align:center;}
+  .scherm-state h1{font-size:1.6rem;margin-bottom:12px;}
+  .scherm-state p{color:var(--ink-soft);font-size:1.05rem;line-height:1.5;}
+  .scherm-errorbar{position:fixed;left:0;right:0;bottom:0;background:#b8402f;color:#fff;text-align:center;padding:10px;font-size:.9rem;display:none;}
+
+  @media (max-width: 760px){
+    body{padding:18px 16px 50px;}
+    .scherm-header{flex-direction:column;align-items:flex-start;}
+    .scherm-clock{text-align:left;}
+  }
+</style>
+</head>
+<body>
+
+  <div class="scherm-header">
+    <div class="scherm-brand"><span class="scherm-brand-dot" aria-hidden="true"></span><span class="scherm-brand-naam" id="scherm-bedrijfsnaam">CaSuite</span></div>
+    <div class="scherm-clock"><span id="scherm-klok">--:--</span><span class="scherm-refresh-note" id="scherm-refresh-note">bezig met laden…</span></div>
+  </div>
+
+  <div id="scherm-content"></div>
+  <div class="scherm-errorbar" id="scherm-errorbar"></div>
+
+<script>
+(function(){
+  // Zelfde Supabase-project/anoniem-sleutel als de rest van de CaSuite-apps (zie index.html) --
+  // deze sleutel is op zichzelf nooit het geheim, zie de toelichting in de <!--comment--> hierboven.
+  const SUPABASE_URL = 'https://eownpxplsnqbghcggugs.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVvd25weHBsc25xYmdoY2dndWdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxMDg1MDcsImV4cCI6MjEwMjY4NDUwN30.KmzypFOwMvH5Rf_AK9EGDt2593vrqHn1UR-WSiURXZs';
+  // Hoe vaak de gegevens zelf opnieuw opgehaald worden (Peter koos "elke paar minuten automatisch").
+  const SCHERM_REFRESH_MS = 3 * 60 * 1000;
+
+  const IP_STATUSES = {
+    VERLOF: { label: 'Verlof', cls: 'verlof' },
+    ADV: { label: 'ADV', cls: 'adv' },
+    ZIEK: { label: 'Ziek', cls: 'ziek' },
+    RECUP: { label: 'Recup', cls: 'recup' },
+    AFWEZIG: { label: 'Afwezig', cls: 'afwezig' },
+    MAGAZIJN: { label: 'Magazijn', cls: 'magazijn' },
+    KEURING: { label: 'Keuring', cls: 'keuring' }
+  };
+  const WEEKDAGEN = ['zondag','maandag','dinsdag','woensdag','donderdag','vrijdag','zaterdag'];
+  const MAANDEN = ['januari','februari','maart','april','mei','juni','juli','augustus','september','oktober','november','december'];
+
+  function escapeHtml(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function isoVandaag(){
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
+  function addDagen(iso, n){
+    const d = new Date(iso + 'T00:00:00');
+    d.setDate(d.getDate() + n);
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
+  function datumLabel(iso){
+    const d = new Date(iso + 'T00:00:00');
+    return { weekdag: WEEKDAGEN[d.getDay()], datumTekst: d.getDate() + ' ' + MAANDEN[d.getMonth()] };
+  }
+
+  const params = new URLSearchParams(location.search);
+  const token = params.get('token');
+  const content = document.getElementById('scherm-content');
+  const refreshNote = document.getElementById('scherm-refresh-note');
+  const errorbar = document.getElementById('scherm-errorbar');
+
+  function toonState(titel, tekst){
+    content.innerHTML = '<div class="scherm-state"><h1>' + escapeHtml(titel) + '</h1><p>' + escapeHtml(tekst) + '</p></div>';
+  }
+
+  if(!token){
+    toonState('Geen link-code gevonden', 'Deze pagina heeft een geldige ?token=-link nodig. Haal de volledige link op via Bedrijfsgegevens → "Schermweergave (planningsbord)".');
+    refreshNote.textContent = '';
+  } else {
+    laadEnToon();
+    setInterval(laadEnToon, SCHERM_REFRESH_MS);
+    planMiddernachtVerversing();
+    // Eens per nacht een volledige pagina-herlaad (i.p.v. enkel de gegevens) -- vangt ook een
+    // nieuwe upload van dit bestand zelf op, voor een scherm dat soms wekenlang niet afgesloten
+    // wordt. Rustig tijdstip gekozen (03u17, een beetje willekeurig zodat niet elk scherm precies
+    // tegelijk herlaadt als er ooit meerdere draaien).
+    planNachtelijkeHerlaad();
+  }
+
+  function planMiddernachtVerversing(){
+    const nu = new Date();
+    const morgen = new Date(nu.getFullYear(), nu.getMonth(), nu.getDate() + 1, 0, 0, 5);
+    setTimeout(() => { laadEnToon(); planMiddernachtVerversing(); }, morgen - nu);
+  }
+  function planNachtelijkeHerlaad(){
+    const nu = new Date();
+    const volgende = new Date(nu.getFullYear(), nu.getMonth(), nu.getDate(), 3, 17, 0);
+    if(volgende <= nu) volgende.setDate(volgende.getDate() + 1);
+    setTimeout(() => location.reload(), volgende - nu);
+  }
+
+  async function laadEnToon(){
+    try{
+      const res = await fetch(SUPABASE_URL + '/rest/v1/rpc/scherm_data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY },
+        body: JSON.stringify({ p_token: token })
+      });
+      if(!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      if(data == null){
+        toonState('Ongeldige of verlopen link', 'Deze link werkt niet (meer) -- waarschijnlijk is er een nieuwe aangemaakt. Vraag de actuele link via Bedrijfsgegevens → "Schermweergave (planningsbord)".');
+        refreshNote.textContent = '';
+        return;
+      }
+      errorbar.style.display = 'none';
+      renderScherm(data);
+      refreshNote.textContent = 'laatst bijgewerkt om ' + new Date().toLocaleTimeString('nl-BE', { hour:'2-digit', minute:'2-digit' });
+      if(data.bedrijf_naam) document.getElementById('scherm-bedrijfsnaam').textContent = data.bedrijf_naam;
+    }catch(err){
+      // Bewust de laatst geslaagde weergave laten staan (geen lege/foutpagina) -- enkel een kleine
+      // balk onderaan, want dit scherm draait onbemand en moet zo veel mogelijk blijven tonen wat
+      // het al had, ook bij een kort netwerkhaperinkje.
+      errorbar.style.display = 'block';
+      errorbar.textContent = 'Kan de planning niet verversen (verbindingsprobleem) -- blijft de laatst gekende stand tonen. Nieuwe poging binnen enkele minuten.';
+      if(!content.innerHTML) toonState('Kan niet verbinden', 'Geen verbinding met de databank. Wordt automatisch opnieuw geprobeerd.');
+    }
+  }
+
+  function persoonIsActief(p, dateISO){
+    if(p.planning_actief === false) return false;
+    if(p.in_dienst_vanaf && dateISO < p.in_dienst_vanaf) return false;
+    if(p.uit_dienst_vanaf && dateISO > p.uit_dienst_vanaf) return false;
+    return true;
+  }
+
+  function renderScherm(data){
+    const rollenFilter = new Set(data.scherm_rollen || []);
+    const alleMensen = [].concat(data.team_leden || [], data.bureau || []);
+    alleMensen.sort((a, b) => {
+      const va = (a.volgorde == null || a.volgorde === '' || isNaN(a.volgorde)) ? Infinity : Number(a.volgorde);
+      const vb = (b.volgorde == null || b.volgorde === '' || isNaN(b.volgorde)) ? Infinity : Number(b.volgorde);
+      return va - vb;
+    });
+    const projectNaamById = {};
+    (data.projecten || []).forEach(p => { projectNaamById[String(p.id)] = p.naam; });
+    const itemsPerPersoonEnDag = {};
+    (data.planning_items || []).forEach(it => {
+      const k = it.persoon_naam + '|' + it.datum;
+      (itemsPerPersoonEnDag[k] = itemsPerPersoonEnDag[k] || []).push(it);
+    });
+
+    const vandaag = data.vandaag || isoVandaag();
+    const aantalDagen = Math.max(1, data.scherm_dagen || 5);
+    let html = '';
+    for(let i = 0; i < aantalDagen; i++){
+      const dateISO = addDagen(vandaag, i);
+      const isVandaag = i === 0;
+      const { weekdag, datumTekst } = datumLabel(dateISO);
+      const mensenVandaag = alleMensen.filter(p => persoonIsActief(p, dateISO) && (!rollenFilter.size || rollenFilter.has(p.rol || 'Technieker')));
+
+      html += '<section class="day-card' + (isVandaag ? ' today' : '') + '">';
+      html += '<div class="day-head">';
+      if(isVandaag) html += '<span class="day-badge">Vandaag</span>';
+      html += '<span class="day-weekday">' + escapeHtml(weekdag.charAt(0).toUpperCase() + weekdag.slice(1)) + '</span>';
+      html += '<span class="day-date">' + escapeHtml(datumTekst) + '</span>';
+      html += '</div>';
+
+      if(!mensenVandaag.length){
+        html += '<p class="day-empty">Geen personen te tonen (controleer de rol-instellingen op Bedrijfsgegevens).</p>';
+      } else {
+        html += '<div class="person-grid">';
+        mensenVandaag.forEach(p => {
+          const items = itemsPerPersoonEnDag[p.naam + '|' + dateISO] || [];
+          html += '<div class="person-tile"><div class="person-naam">' + escapeHtml(p.naam) + '<span class="person-rol">' + escapeHtml(p.rol || 'Technieker') + '</span></div>';
+          if(!items.length){
+            html += '<span class="person-vrij-dag">—</span>';
+          } else {
+            html += '<div class="assign-row">' + items.map(it => chipHtml(it, projectNaamById)).join('') + '</div>';
+          }
+          html += '</div>';
+        });
+        html += '</div>';
+      }
+      html += '</section>';
+    }
+    content.innerHTML = '<div class="scherm-days">' + html + '</div>';
+  }
+
+  function chipHtml(it, projectNaamById){
+    const dagdeelBadge = it.dagdeel === 'vm' ? '<span class="dagdeel">VM</span>' : it.dagdeel === 'nm' ? '<span class="dagdeel">NM</span>' : '';
+    if(it.type === 'status'){
+      const st = IP_STATUSES[it.status] || { label: it.status || '?', cls: 'vrij' };
+      const uur = (it.status === 'KEURING' && it.van_uur) ? ' ' + String(it.van_uur).slice(0,5) : '';
+      const proj = it.project_id ? projectNaamById[String(it.project_id)] : (it.omschrijving || '');
+      const projSuffix = (it.status === 'KEURING' && proj) ? ' — ' + escapeHtml(proj) : '';
+      return '<span class="assign-chip ' + st.cls + '">' + dagdeelBadge + escapeHtml(st.label) + uur + projSuffix + '</span>';
+    }
+    const naam = it.project_id ? (projectNaamById[String(it.project_id)] || '(verwijderd)') : (it.omschrijving || '(verwijderd)');
+    const cls = it.project_id ? 'project' : 'vrij';
+    return '<span class="assign-chip ' + cls + '">' + dagdeelBadge + escapeHtml(naam) + '</span>';
+  }
+
+  function tikKlok(){
+    document.getElementById('scherm-klok').textContent = new Date().toLocaleTimeString('nl-BE', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  }
+  tikKlok();
+  setInterval(tikKlok, 1000);
+})();
+</script>
+</body>
+</html>
