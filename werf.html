@@ -27,6 +27,11 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,500..800&family=Figtree:wght@400..700&family=JetBrains+Mono:wght@400;500&display=swap">
 <script>window.CASNAP_APP_MODE = 'werf';</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<!-- pdf.js (ronde "plannen-pdf-schets"): rasteriseert een geüpload PDF-plan naar PNG-pagina's,
+     zodat een PDF-plan daarna precies als een gewoon afbeelding-plan behandeld kan worden (zelfde
+     opslag/pins/schets-stroom). workerSrc wordt verderop, bij de eerste module-initialisatie,
+     ingesteld op dezelfde CDN-versie. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.5.141/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
   /* Design-tokens -- ronde 48 (2026-09-25, design-herwerking, zie DESIGN-ronde48.md §2): één
@@ -1422,6 +1427,35 @@
   /* "▸ Toon ook afgewerkte/onderhoud-projecten"-regel (2026-09-24) -- zelfde rij-stijl, maar
      duidelijk als schakelaar i.p.v. een echt project herkenbaar. */
   .ip-proj-opt.ip-proj-showall{justify-content:flex-start;color:var(--ink-soft);font-style:italic;background:var(--bg);}
+  /* Ronde 70 (geschiedenis/undo op een planning-afspraak) -- tijdlijn-rijtjes in #ip-historiek-modal,
+     nieuwste eerst; elk rijtje toont actie+wie+wanneer, en bij "verplaatst" ook van/naar +
+     eventueel een "Ongedaan maken"-knop (enkel voor een planner, zie ipIsPlanner()). */
+  .ip-historiek-rij{padding:9px 0;border-bottom:1px solid var(--line);font-size:.85rem;}
+  .ip-historiek-rij:last-child{border-bottom:none;}
+  .ip-historiek-rij .ip-historiek-detail{color:var(--ink-soft);margin-top:2px;}
+  .ip-historiek-rij .ip-historiek-undo-btn{margin-top:6px;}
+
+  /* PDF-plannen + schets (ronde "plannen-pdf-schets"): paginakiezer-thumbnails na een PDF-upload
+     (#plan-pdf-pagina-modal, gedeeld tussen CaDos' eigen "Plan uploaden" en de nieuwe schets-tool
+     hieronder), en de schets-tool zelf (#schets-kies-plan-modal / #schets-canvas-modal) in de
+     Werfverslag-app. Bewust NIET onder #cados-app geschoold: deze modals leven buiten dat
+     app-specifieke blok en moeten er dus ook los van werken. */
+  .plan-pdf-pagina-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-top:10px;}
+  .plan-pdf-pagina-kaart{display:flex;flex-direction:column;align-items:center;gap:5px;padding:7px;border:1px solid var(--line);border-radius:var(--r,8px);background:var(--card);cursor:pointer;font-size:.78rem;font-family:inherit;color:var(--ink-soft);}
+  .plan-pdf-pagina-kaart:hover{border-color:var(--brand,#1b6b3e);}
+  .plan-pdf-pagina-kaart img{width:100%;height:110px;object-fit:contain;background:var(--bg);border-radius:4px;}
+  .schets-plan-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;}
+  .schets-plan-kaart{display:flex;flex-direction:column;align-items:center;gap:5px;padding:7px;border:1px solid var(--line);border-radius:var(--r,8px);background:var(--card);cursor:pointer;font-size:.78rem;font-family:inherit;color:var(--ink-soft);}
+  .schets-plan-kaart:hover{border-color:var(--brand,#1b6b3e);}
+  .schets-plan-kaart img{width:100%;height:90px;object-fit:cover;background:var(--bg);border-radius:4px;}
+  .schets-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:10px;}
+  .schets-kleuren, .schets-diktes, .schets-acties{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+  .schets-kleur-btn{width:26px;height:26px;border-radius:50%;border:2px solid transparent;cursor:pointer;padding:0;}
+  .schets-kleur-btn.is-actief{border-color:var(--ink,#17233b);}
+  .schets-dikte-btn{border:1px solid var(--line);border-radius:999px;padding:5px 11px;font-size:.76rem;font-family:inherit;background:var(--card);color:var(--ink-soft);cursor:pointer;}
+  .schets-dikte-btn.is-actief{background:var(--brand,#1b6b3e);border-color:var(--brand,#1b6b3e);color:#fff;}
+  .schets-canvas-scroll{max-width:100%;max-height:60vh;overflow:auto;border:1px solid var(--line);border-radius:var(--r,8px);background:var(--bg);touch-action:none;}
+  .schets-canvas-scroll canvas{display:block;cursor:crosshair;touch-action:none;}
 
   table.ip-plist{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:8px;overflow:hidden;}
   table.ip-plist th{text-align:left;font-weight:600;font-size:.76rem;color:var(--ink-soft);padding:10px 12px;background:var(--bg);border-bottom:1px solid var(--line);}
@@ -1740,8 +1774,19 @@
   .vk-tile-sub{font-size:12.5px;color:var(--ink-soft);}
   /* De projectkiezer voor "Nieuw gekoppeld verslag" hergebruikt bewust de bestaande .ip-proj-search/
      .ip-proj-list-stijl van de Personeelsplanning-projectkeuze (zie .ip-proj-opt hierboven) i.p.v.
-     een eigen lijst-stijl te verzinnen -- zelfde look, enkel eigen id's (#vk-proj-search/#vk-proj-list). */
-  #verslag-projectkiezer .ip-proj-list{max-height:420px;}
+     een eigen lijst-stijl te verzinnen -- zelfde look, enkel eigen id's (#vk-proj-search/#vk-proj-list).
+     Ronde 70-bugfix (gemeld door Peter via screenshot, "nieuw gekoppeld verslag"): er stond hier
+     vroeger een eigen `#verslag-projectkiezer .ip-proj-list{max-height:420px;}`-regel, met de
+     bedoeling een eigen (iets hogere) scrollbox te geven dan de 340px van de oude basisregel. Maar
+     sinds ronde 58 geldt de latere, algemene regel ".ip-proj-list{max-height:none;overflow:visible;
+     ...}" hieronder ("Eén scrollgebied: de projectlijst scrolt niet meer apart") -- niet gescoped tot
+     gsm, gewoon altijd. Omdat een #id altijd zwaarder weegt dan een losse klasse, bleef enkel de
+     max-height-klem van de oude regel hier nog gelden, zonder de overflow-y:auto die daar origineel
+     bijhoorde -- bij genoeg projecten (> ca. 9) "lekten" de onderste rijen dus gewoon onder de
+     afgeronde kaart uit als een platte, niet-omrande lijst, op ELK schermformaat. Vandaar nu gewoon
+     verwijderd: deze kiezer is een volwaardig, eigen scherm (geen los paneel/bottomsheet), dus de
+     lijst mag -- net als de rest van de app sinds ronde 58 -- gewoon meegroeien en laat de pagina
+     zelf scrollen, geen eigen nest-scrollbox nodig. */
   /* De header-projectkiezer (#global-project-select) wordt op het Werfverslag-tabblad alleen-lezen
      (zie switchTab()/renderGlobalProjectPicker() in het script) -- toont enkel nog welk project het
      open verslag heeft, niet meer bedienbaar vanop die plek (ronde 71). Lichte visuele aanduiding
@@ -14367,7 +14412,7 @@ function renderPlannenTab(){
     ${panelHeadHtml(
       "Plannen",
       "Plan- of tekeningafbeeldingen waarop je punten kan vastprikken — bv. een opmerking op een specifieke plaats op het grondplan.",
-      `Upload hieronder een plan of tekening (foto, scan of een afbeelding-export van een PDF) en klik het open. Tik daarna ergens op de afbeelding om een nieuwe pin te plaatsen: geef een korte omschrijving mee en eventueel een verantwoordelijke en een deadline. Vink een pin af zodra hij is opgelost. Pins tellen niet mee in de gewone actiepuntenlijst van het werfverslag — ze horen puur bij dit plan.`
+      `Upload hieronder een plan of tekening (foto, scan, of rechtstreeks een PDF — kies dan eerst de juiste pagina) en klik het open. Tik daarna ergens op de afbeelding om een nieuwe pin te plaatsen: geef een korte omschrijving mee en eventueel een verantwoordelijke en een deadline. Vink een pin af zodra hij is opgelost. Pins tellen niet mee in de gewone actiepuntenlijst van het werfverslag — ze horen puur bij dit plan. Via het Werfverslag zelf kan je trouwens ook rechtstreeks op zo'n plan schetsen en dat als foto bij een actiepunt bewaren (zie "🖊️ Schets op plan" bij een foto).`
     )}
     <div id="plannenZone"><div class="hint">Laden…</div></div>
   </div>`);
@@ -14421,25 +14466,27 @@ function renderPlannenLijst(zone){
     });
     grid.appendChild(kaart);
   });
+  // Ronde "plannen-pdf-schets": accepteert nu ook een PDF (naast een gewone afbeelding) --
+  // wordt bij een PDF eerst via de gedeelde paginakiezer (#plan-pdf-pagina-modal,
+  // window.kiesPdfPaginaAlsPlan) naar een PNG gerasteriseerd, en loopt vanaf daar verder via
+  // dezelfde window.uploadNieuwPlan() als een gewone afbeelding-upload (hergebruikt door zowel
+  // CaDos hier als de nieuwe schets-tool in het Werfverslag).
   const addKaart = el(`<div class="plan-add-kaart">
     <div style="font-size:26px;">＋</div>
     <input type="text" placeholder="Naam (bv. Grondplan gelijkvloers)" class="plan-nieuwe-naam">
     <button type="button" class="btn btn-secondary btn-sm">Plan uploaden</button>
-    <input type="file" accept="image/*" class="hidden-input">
+    <input type="file" accept="image/*,application/pdf" class="hidden-input">
   </div>`);
   const naamInput = addKaart.querySelector(".plan-nieuwe-naam");
   const uploadBtn = addKaart.querySelector("button");
   const fileInput = addKaart.querySelector("input[type=file]");
   uploadBtn.addEventListener("click", ()=> fileInput.click());
-  fileInput.addEventListener("change", async (e)=>{
-    const file = e.target.files[0];
-    if(!file) return;
-    uploadBtn.disabled = true;
+  async function plannenUploadEnAfronden(plaatjeFile, pdfBron, pdfPagina){
     const origLabel = uploadBtn.textContent;
+    uploadBtn.disabled = true;
     uploadBtn.textContent = "Bezig met uploaden…";
     try{
-      const url = await window.dbUploadFile("project-plannen", file);
-      const nieuw = await window.dbInsertPlan({ project_id: currentProjectId, naam: naamInput.value.trim(), afbeelding_url: url, pins: [] });
+      const nieuw = await window.uploadNieuwPlan({ projectId: currentProjectId, naam: naamInput.value.trim(), file: plaatjeFile, pdfBron, pdfPagina });
       plannenLijst.push(nieuw);
       renderPlannenLijst(zone);
     }catch(err){
@@ -14447,6 +14494,19 @@ function renderPlannenLijst(zone){
       uploadBtn.disabled = false;
       uploadBtn.textContent = origLabel;
       fileInput.value = "";
+    }
+  }
+  fileInput.addEventListener("change", async (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    if(file.type === "application/pdf" || /\.pdf$/i.test(file.name)){
+      await window.kiesPdfPaginaAlsPlan(file, (dataUrl, pagina)=>{
+        const plaatjeFile = window.dataUrlNaarFile(dataUrl, (naamInput.value.trim() || file.name.replace(/\.pdf$/i,'')) + "-p" + pagina + ".png");
+        plannenUploadEnAfronden(plaatjeFile, file.name, pagina);
+      });
+      fileInput.value = "";
+    } else {
+      await plannenUploadEnAfronden(file, null, null);
     }
   });
   grid.appendChild(addKaart);
@@ -20818,6 +20878,64 @@ window.CaCalcApp = {
   </div>
 </div>
 
+<!-- Ronde 70 (2026-10-08) -- geschiedenis/logboek + "ongedaan maken" op 1 afspraak, op vraag van
+     Peter: "Wie heeft ze gemaakt, wie heeft ze verplaatst, wanneer geplaatst, wanneer verplaatst,
+     ongedaan maken van verplaatsing." Geopend via het nieuwe 🕘-icoontje in ipChipActionsHtml();
+     gevuld door renderIpHistoriekModal(), zie de JS-sectie bij ipMoveOrCopyEntry(). -->
+<div class="modal-overlay" id="ip-historiek-modal" style="display:none;">
+  <div class="modal-box" style="max-width:520px;">
+    <h2>🕘 Geschiedenis</h2>
+    <div class="modal-body" id="ip-historiek-body"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="ip-historiek-close-btn" type="button">Sluiten</button>
+    </div>
+  </div>
+</div>
+
+<!-- PDF-plannen + schets (op vraag van Peter: "1. Bij een project PDF plannen toevoegen. 2. Op
+     die plannen schets te maken... als onderdeel van de werfverslag app."). Drie nieuwe modals:
+     - #plan-pdf-pagina-modal: gedeelde paginakiezer na een PDF-upload (pdf.js rasteriseert elke
+       pagina naar een thumbnail) -- gebruikt door zowel CaDos' eigen "Plan uploaden" (zie
+       renderPlannenLijst hierboven in dit bestand) als de nieuwe schets-tool hieronder. Gevuld
+       door kiesPdfPaginaAlsPlan() in het hoofdscript (op window gezet voor CaDos' eigen IIFE).
+     - #schets-kies-plan-modal: eerste stap van de schets-tool -- kies een bestaand plan van het
+       gekoppelde project, of upload meteen een nieuw plan (afbeelding of PDF).
+     - #schets-canvas-modal: de eigenlijke tekentool (zoom/kleur/dikte/ongedaan maken/wis alles),
+       hergebruikt de coördinaten-schaling van setupSignaturePad(). "Opslaan" vlakt de tekening +
+       het plan samen af tot 1 PNG (canvas.toDataURL) en zet die als item.photoDataUrl -- exact
+       hetzelfde deferred-upload-pad als een gewone foto (zie handlePhotoFile()), dus geen eigen
+       dbUploadFile-aanroep nodig in de schets-tool zelf. -->
+<div class="modal-overlay" id="plan-pdf-pagina-modal" style="display:none;">
+  <div class="modal-box" style="max-width:640px;">
+    <h2>📄 Kies een pagina</h2>
+    <div class="modal-body" id="plan-pdf-pagina-body"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="plan-pdf-pagina-close-btn" type="button">Annuleren</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="schets-kies-plan-modal" style="display:none;">
+  <div class="modal-box" style="max-width:640px;">
+    <h2>🖊️ Schets op plan</h2>
+    <div class="modal-body" id="schets-kies-plan-body"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="schets-kies-plan-close-btn" type="button">Annuleren</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="schets-canvas-modal" style="display:none;">
+  <div class="modal-box" style="max-width:860px;">
+    <h2>🖊️ Schets op plan</h2>
+    <div class="modal-body" id="schets-canvas-body"></div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" id="schets-opslaan-btn" type="button">Opslaan als foto bij dit punt</button>
+      <button class="btn btn-secondary" id="schets-annuleer-btn" type="button">Annuleren</button>
+    </div>
+  </div>
+</div>
+
 <!-- Generieke keuze-modal (op vraag van Peter, 2026-08-21): vervangt een reeks losse confirm()-
      dialogen door een consistente, dynamisch ingevulde modal met eigen knoppen -- gebruikt door
      zowel de verslagtype-wissel-bevestiging als, indirect, de carry-over-bevestiging hieronder. -->
@@ -21734,6 +21852,219 @@ window.CaCalcApp = {
   }
 
   // ================================================================
+  // Schets op plan (op vraag van Peter: "Op die plannen schets te maken (na inzoomen indien
+  // nodig) en dit opslaan. Dit als onderdeel van de werfverslag app.") -- #schets-kies-plan-modal
+  // (kies een bestaand plan van het gekoppelde project, of upload meteen een nieuw plan) gevolgd
+  // door #schets-canvas-modal (de eigenlijke tekentool). "Opslaan" vlakt plan+tekening samen af
+  // tot 1 PNG en zet die als item.photoDataUrl -- exact hetzelfde deferred-upload-pad als een
+  // gewone foto (zie handlePhotoFile() hierboven bij de punt-kaart), dus geen eigen
+  // dbUploadFile-aanroep nodig hier. schetsHuidigItem/schetsHuidigeCanvas zijn pure UI-status
+  // (niet bewaard), zelfde patroon als plannenHuidigId in het CaDos-IIFE.
+  // ================================================================
+  let schetsHuidigItem = null;
+  let schetsHuidigeCanvas = null;
+  async function openSchetsKiesPlanModal(item){
+    if(!state.activeProjectId){ alert('Koppel eerst een project aan dit verslag om een schets op een plan te kunnen maken.'); return; }
+    schetsHuidigItem = item;
+    const modal = el('schets-kies-plan-modal');
+    const body = el('schets-kies-plan-body');
+    body.innerHTML = '<p class="hint">Plannen laden…</p>';
+    modal.style.display = 'flex';
+    try{
+      const plannen = await dbListPlannenVoorProject(state.activeProjectId);
+      renderSchetsKiesPlanLijst(body, plannen);
+    }catch(err){
+      body.innerHTML = `<p class="hint" style="color:#b3261e;">Kon de plannen van dit project niet laden: ${escapeHtml(err.message)}</p>`;
+    }
+  }
+  function renderSchetsKiesPlanLijst(body, plannen){
+    const kaarten = plannen.map(p => `<button type="button" class="schets-plan-kaart" data-plan="${p.id}"><img src="${escapeHtml(p.afbeelding_url)}" alt=""><span>${escapeHtml(p.naam || 'Naamloos plan')}</span></button>`).join('');
+    body.innerHTML = `
+      ${plannen.length ? `<div class="schets-plan-grid">${kaarten}</div>` : '<p class="hint">Dit project heeft nog geen plannen. Upload hieronder het eerste plan (afbeelding of PDF).</p>'}
+      <p class="hint" style="margin-top:12px;">Of upload een nieuw plan (afbeelding of PDF):</p>
+      <div class="field" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <input type="text" id="schets-nieuw-plan-naam" placeholder="Naam (optioneel)" style="flex:1;min-width:160px;padding:9px 10px;border:1px solid var(--line);border-radius:6px;font-size:.85rem;font-family:inherit;box-sizing:border-box;">
+        <button type="button" class="btn btn-secondary btn-sm" id="schets-nieuw-plan-btn">Plan uploaden</button>
+        <input type="file" accept="image/*,application/pdf" class="hidden-input" id="schets-nieuw-plan-input">
+      </div>`;
+    body.querySelectorAll('.schets-plan-kaart').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const plan = plannen.find(p => String(p.id) === btn.dataset.plan);
+        if(plan) startSchetsOpPlan(plan);
+      });
+    });
+    const nieuwBtn = el('schets-nieuw-plan-btn');
+    const nieuwInput = el('schets-nieuw-plan-input');
+    nieuwBtn.addEventListener('click', () => nieuwInput.click());
+    nieuwInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if(!file) return;
+      const naam = el('schets-nieuw-plan-naam').value.trim();
+      nieuwBtn.disabled = true;
+      const origLabel = nieuwBtn.textContent;
+      nieuwBtn.textContent = 'Bezig…';
+      try{
+        if(file.type === 'application/pdf' || /\.pdf$/i.test(file.name)){
+          closeSchetsKiesPlanModal(); // de paginakiezer is een eigen modal -- 2 tegelijk wordt verwarrend
+          await kiesPdfPaginaAlsPlan(file, async (dataUrl, pagina) => {
+            try{
+              const plaatjeFile = dataUrlNaarFile(dataUrl, (naam || file.name.replace(/\.pdf$/i,'')) + '-p' + pagina + '.png');
+              const plan = await uploadNieuwPlan({ projectId: state.activeProjectId, naam, file: plaatjeFile, pdfBron: file.name, pdfPagina: pagina });
+              startSchetsOpPlan(plan);
+            }catch(err){ alert('Uploaden mislukt: ' + err.message); }
+          });
+        } else {
+          const plan = await uploadNieuwPlan({ projectId: state.activeProjectId, naam, file });
+          startSchetsOpPlan(plan);
+        }
+      }catch(err){
+        alert('Uploaden mislukt: ' + err.message);
+        nieuwBtn.disabled = false;
+        nieuwBtn.textContent = origLabel;
+      }
+    });
+  }
+  function closeSchetsKiesPlanModal(){ el('schets-kies-plan-modal').style.display = 'none'; }
+  function startSchetsOpPlan(plan){
+    closeSchetsKiesPlanModal();
+    const modal = el('schets-canvas-modal');
+    const body = el('schets-canvas-body');
+    body.innerHTML = '<p class="hint">Plan wordt geladen…</p>';
+    modal.style.display = 'flex';
+    loadImage(plan.afbeelding_url).then(img => {
+      setupSchetsCanvas(img);
+    }).catch(() => {
+      body.innerHTML = '<p class="hint" style="color:#b3261e;">Kon dit plan niet laden.</p>';
+    });
+  }
+  const SCHETS_MAX_DIM = 1600; // begrenst geheugengebruik/canvasgrootte, ruim voldoende leesbaar voor een bouwplan
+  const SCHETS_KLEUREN = ['#e02424', '#17233b', '#1457c7', '#e0a000'];
+  const SCHETS_DIKTES = [{ label: 'Dun', w: 2 }, { label: 'Middel', w: 4 }, { label: 'Dik', w: 7 }];
+  function setupSchetsCanvas(img){
+    const body = el('schets-canvas-body');
+    const schaal = Math.min(1, SCHETS_MAX_DIM / Math.max(img.naturalWidth, img.naturalHeight));
+    const breedte = Math.max(1, Math.round(img.naturalWidth * schaal));
+    const hoogte = Math.max(1, Math.round(img.naturalHeight * schaal));
+    body.innerHTML = `
+      <div class="schets-toolbar">
+        <div class="schets-kleuren">${SCHETS_KLEUREN.map((c,i) => `<button type="button" class="schets-kleur-btn${i===0?' is-actief':''}" data-kleur="${c}" style="background:${c};" title="Kleur"></button>`).join('')}</div>
+        <div class="schets-diktes">${SCHETS_DIKTES.map((d,i) => `<button type="button" class="schets-dikte-btn${i===1?' is-actief':''}" data-dikte="${d.w}">${d.label}</button>`).join('')}</div>
+        <div class="schets-acties">
+          <button type="button" class="btn btn-ghost btn-sm" id="schets-undo-btn">↺ Ongedaan maken</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="schets-wis-btn">Wis alles</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="schets-zoom-uit-btn">－ Uitzoomen</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="schets-zoom-in-btn">＋ Inzoomen</button>
+        </div>
+      </div>
+      <div class="schets-canvas-scroll" id="schets-canvas-scroll"><canvas id="schets-canvas"></canvas></div>`;
+    const canvas = el('schets-canvas');
+    canvas.width = breedte;
+    canvas.height = hoogte;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, breedte, hoogte);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    let kleur = SCHETS_KLEUREN[0];
+    let dikte = SCHETS_DIKTES[1].w;
+    let zoom = 1;
+    let drawing = false;
+    const undoStack = [];
+
+    function pasZoomToe(){
+      canvas.style.width = Math.round(breedte * zoom) + 'px';
+      canvas.style.height = Math.round(hoogte * zoom) + 'px';
+    }
+    pasZoomToe();
+    // Zelfde coördinaten-schaling als setupSignaturePad() hierboven: canvas.width/height blijft
+    // vast (de echte tekenresolutie), enkel canvas.style.width/height verandert met de
+    // zoomfactor -- deze verhouding (canvas.width / rect.width) levert daardoor automatisch
+    // correcte tekencoördinaten op bij elke zoomstand, zonder dat posFromEvent zelf iets van
+    // zoom moet afweten.
+    function posFromEvent(e){
+      const rect = canvas.getBoundingClientRect();
+      return { x: (e.clientX - rect.left) * (canvas.width / rect.width), y: (e.clientY - rect.top) * (canvas.height / rect.height) };
+    }
+    function start(e){
+      undoStack.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+      if(undoStack.length > 20) undoStack.shift(); // begrenst geheugengebruik -- 20 stappen is ruim genoeg
+      drawing = true;
+      ctx.strokeStyle = kleur;
+      ctx.lineWidth = dikte;
+      const p = posFromEvent(e);
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      if(canvas.setPointerCapture && e.pointerId != null){
+        try{ canvas.setPointerCapture(e.pointerId); }catch(err){ /* negeer */ }
+      }
+      e.preventDefault();
+    }
+    function move(e){
+      if(!drawing) return;
+      const p = posFromEvent(e);
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+      e.preventDefault();
+    }
+    function end(){ drawing = false; }
+    canvas.addEventListener('pointerdown', start);
+    canvas.addEventListener('pointermove', move);
+    canvas.addEventListener('pointerup', end);
+    canvas.addEventListener('pointerleave', end);
+    canvas.addEventListener('pointercancel', end);
+
+    body.querySelectorAll('.schets-kleur-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        kleur = btn.dataset.kleur;
+        body.querySelectorAll('.schets-kleur-btn').forEach(b => b.classList.toggle('is-actief', b === btn));
+      });
+    });
+    body.querySelectorAll('.schets-dikte-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        dikte = Number(btn.dataset.dikte);
+        body.querySelectorAll('.schets-dikte-btn').forEach(b => b.classList.toggle('is-actief', b === btn));
+      });
+    });
+    el('schets-undo-btn').addEventListener('click', () => {
+      if(!undoStack.length) return;
+      ctx.putImageData(undoStack.pop(), 0, 0);
+    });
+    el('schets-wis-btn').addEventListener('click', () => {
+      if(!confirm('Alle schetslijnen op dit plan wissen? Het plan zelf blijft staan.')) return;
+      undoStack.length = 0;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, breedte, hoogte);
+    });
+    el('schets-zoom-in-btn').addEventListener('click', () => { zoom = Math.min(zoom + 0.25, 3); pasZoomToe(); });
+    el('schets-zoom-uit-btn').addEventListener('click', () => { zoom = Math.max(zoom - 0.25, 0.5); pasZoomToe(); });
+
+    schetsHuidigeCanvas = canvas;
+  }
+  function closeSchetsCanvasModal(){
+    el('schets-canvas-modal').style.display = 'none';
+    schetsHuidigeCanvas = null;
+    schetsHuidigItem = null;
+  }
+  el('schets-opslaan-btn').addEventListener('click', () => {
+    if(!schetsHuidigeCanvas || !schetsHuidigItem) return;
+    const dataUrl = schetsHuidigeCanvas.toDataURL('image/png');
+    schetsHuidigItem.photoDataUrl = dataUrl;
+    schetsHuidigItem.photoUrl = null; // nieuwe schets vervangt een eventueel eerder bewaarde foto/schets
+    schetsHuidigItem.photoName = 'schets.png';
+    closeSchetsCanvasModal();
+    renderItems();
+    showStatus('Schets opgeslagen als foto bij dit punt');
+  });
+  el('schets-annuleer-btn').addEventListener('click', closeSchetsCanvasModal);
+  el('schets-kies-plan-close-btn').addEventListener('click', closeSchetsKiesPlanModal);
+  el('schets-canvas-modal').addEventListener('click', e => { if(e.target.id === 'schets-canvas-modal') closeSchetsCanvasModal(); });
+  el('schets-kies-plan-modal').addEventListener('click', e => { if(e.target.id === 'schets-kies-plan-modal') closeSchetsKiesPlanModal(); });
+  document.addEventListener('keydown', e => {
+    if(e.key !== 'Escape') return;
+    if(el('schets-canvas-modal').style.display !== 'none') closeSchetsCanvasModal();
+    else if(el('schets-kies-plan-modal').style.display !== 'none') closeSchetsKiesPlanModal();
+  });
+
+  // ================================================================
   // DB-laag (Supabase)
   // ================================================================
   async function dbGetBedrijf(){
@@ -22020,6 +22351,101 @@ window.CaCalcApp = {
   // nieuwe bucketnaam ("project-plannen", zie migratie-ronde53.sql voor de toelichting).
   window.dbUploadFile = dbUploadFile;
 
+  // ===== PDF-plannen + schets (op vraag van Peter: "1. Bij een project PDF plannen toevoegen.
+  // 2. Op die plannen schets te maken... als onderdeel van de werfverslag app.") =====
+  // project_plannen kreeg deze ronde 2 nieuwe, nullable kolommen (pdf_bron text, pdf_pagina
+  // integer, rechtstreeks via de Supabase-tool toegevoegd en geverifieerd) zodat een uit een PDF
+  // gerasteriseerd plan nadien nog herkenbaar is -- de rest van de app (pins, de schets-tool
+  // hieronder) behandelt zo'n plan verder gewoon als een normaal afbeelding-plan, want
+  // afbeelding_url wijst na de rasterisatie naar een gewone PNG.
+  // pdf.js wordt pas de EERSTE keer dat er echt een PDF gekozen wordt geïnitialiseerd
+  // (workerSrc instellen kan pas nadat het CDN-script geladen is, zie de <script>-tag in <head>).
+  let pdfjsWorkerKlaar = false;
+  function pdfZorgVoorWorker(){
+    if(pdfjsWorkerKlaar || !window.pdfjsLib) return;
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.5.141/pdf.worker.min.js';
+    pdfjsWorkerKlaar = true;
+  }
+  async function pdfLaadDocument(file){
+    pdfZorgVoorWorker();
+    const buf = await file.arrayBuffer();
+    return await pdfjsLib.getDocument({ data: buf }).promise;
+  }
+  // Rasteriseert 1 PDF-pagina naar een PNG-dataURL, maximaal maxAfmeting px langs de langste
+  // zijde (begrenst geheugengebruik -- 1600px is ruim voldoende leesbaar voor een bouwplan,
+  // 240px wordt gebruikt voor de kleine keuze-thumbnails hieronder).
+  async function pdfRenderPaginaAlsDataUrl(pdfDoc, paginaNum, maxAfmeting){
+    const pagina = await pdfDoc.getPage(paginaNum);
+    const basisViewport = pagina.getViewport({ scale: 1 });
+    const schaal = Math.max(0.1, Math.min(3, (maxAfmeting || 1600) / Math.max(basisViewport.width, basisViewport.height)));
+    const viewport = pagina.getViewport({ scale: schaal });
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(viewport.width);
+    canvas.height = Math.round(viewport.height);
+    const ctx = canvas.getContext('2d');
+    await pagina.render({ canvasContext: ctx, viewport }).promise;
+    return canvas.toDataURL('image/png');
+  }
+  function dataUrlNaarFile(dataUrl, naam){
+    return new File([dataURLtoBlob(dataUrl)], naam, { type: 'image/png' });
+  }
+  // Gedeelde upload+insert-stap voor een NIEUW plan -- gebruikt door zowel CaDos' eigen "Plan
+  // uploaden" (afbeelding of PDF) als de nieuwe schets-tool se "nieuw plan uploaden"-keuze. `file`
+  // is altijd al een kant-en-klaar afbeeldingsbestand; deze functie weet zelf niets van PDF's --
+  // bij een PDF-bron wordt de rasterisatie door de aanroeper al via dataUrlNaarFile() gedaan.
+  async function uploadNieuwPlan({ projectId, naam, file, pdfBron, pdfPagina }){
+    const url = await dbUploadFile('project-plannen', file);
+    const fields = { project_id: projectId, naam: (naam || '').trim(), afbeelding_url: url, pins: [] };
+    if(pdfBron){ fields.pdf_bron = pdfBron; fields.pdf_pagina = pdfPagina || null; }
+    return await dbInsertPlan(fields);
+  }
+  // Toont #plan-pdf-pagina-modal met een thumbnail-grid van alle pagina's in `file` (een PDF); bij
+  // een keuze (of meteen, als de PDF maar 1 pagina heeft) roept dit `onKeuze(dataUrl, paginaNum)`
+  // aan -- de aanroeper bepaalt zelf wat ermee gebeurt (meestal: dataUrlNaarFile() + hierboven).
+  async function kiesPdfPaginaAlsPlan(file, onKeuze){
+    const modal = el('plan-pdf-pagina-modal');
+    const body = el('plan-pdf-pagina-body');
+    body.innerHTML = '<p class="hint">PDF wordt geladen…</p>';
+    modal.style.display = 'flex';
+    let pdfDoc;
+    try{
+      pdfDoc = await pdfLaadDocument(file);
+    }catch(err){
+      body.innerHTML = `<p class="hint" style="color:#b3261e;">Kon de PDF niet lezen: ${escapeHtml(err.message || String(err))}</p>`;
+      return;
+    }
+    if(pdfDoc.numPages <= 1){
+      modal.style.display = 'none';
+      const dataUrl = await pdfRenderPaginaAlsDataUrl(pdfDoc, 1, 1600);
+      onKeuze(dataUrl, 1);
+      return;
+    }
+    const kaarten = [];
+    for(let p = 1; p <= pdfDoc.numPages; p++){
+      const thumbUrl = await pdfRenderPaginaAlsDataUrl(pdfDoc, p, 240);
+      kaarten.push(`<button type="button" class="plan-pdf-pagina-kaart" data-pagina="${p}"><img src="${thumbUrl}" alt=""><span>Pagina ${p}</span></button>`);
+    }
+    body.innerHTML = `<p class="hint">Deze PDF heeft ${pdfDoc.numPages} pagina's — kies welke je als plan wil gebruiken.</p><div class="plan-pdf-pagina-grid">${kaarten.join('')}</div>`;
+    body.querySelectorAll('.plan-pdf-pagina-kaart').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const p = Number(btn.dataset.pagina);
+        modal.style.display = 'none';
+        const dataUrl = await pdfRenderPaginaAlsDataUrl(pdfDoc, p, 1600);
+        onKeuze(dataUrl, p);
+      });
+    });
+  }
+  function sluitPlanPdfPaginaModal(){ el('plan-pdf-pagina-modal').style.display = 'none'; }
+  el('plan-pdf-pagina-close-btn').addEventListener('click', sluitPlanPdfPaginaModal);
+  el('plan-pdf-pagina-modal').addEventListener('click', e => { if(e.target.id === 'plan-pdf-pagina-modal') sluitPlanPdfPaginaModal(); });
+  // Op window gezet zodat CaDos' eigen, gewrapte IIFE (dat zelf geen toegang heeft tot de hier
+  // gedeclareerde functies/`el`) deze ook kan gebruiken voor zijn eigen "Plan uploaden"-knop.
+  window.pdfLaadDocument = pdfLaadDocument;
+  window.pdfRenderPaginaAlsDataUrl = pdfRenderPaginaAlsDataUrl;
+  window.dataUrlNaarFile = dataUrlNaarFile;
+  window.uploadNieuwPlan = uploadNieuwPlan;
+  window.kiesPdfPaginaAlsPlan = kiesPdfPaginaAlsPlan;
+
   // ===== Checklist-templates (ronde 53, punt 9 -- LetsBuild-aanrader: herbruikbare
   // checklist-templates die automatisch actiepunten aanmaken) =====
   // Gedeeld/project-onafhankelijk, zelfde eenvoudige patroon als de Catalogus hierboven. Blijft
@@ -22221,9 +22647,36 @@ window.CaCalcApp = {
   }
   // Generiek: .insert(fields)/.update(fields) op de rij zelf, dus de nieuwe ronde-55-kolommen
   // (van_uur/tot_uur/outlook_event_id) gaan hier gewoon door zonder wijziging aan deze 2 functies.
+  // Ronde 70 (2026-10-08, geschiedenis/logboek op een afspraak, op vraag van Peter): planning_items_
+  // historiek heeft BEWUST geen foreign key naar planning_items.id (zie SQL-migratie/projectdoc) --
+  // de tijdlijn van een verwijderde afspraak moet blijven bestaan. Logging is bewust "best effort":
+  // een mislukte historiek-insert mag de eigenlijke actie (aanmaken/verplaatsen/bevestigen/
+  // verwijderen) nooit blokkeren, vandaar de eigen try/catch hier i.p.v. gewoon `throw error`
+  // zoals de andere db*-helpers -- zelfde filosofie als outlookBestEffortDeleteEvent() hieronder.
+  async function dbLogPlanningHistoriek(fields){
+    try{
+      const { error } = await sb.from('planning_items_historiek').insert(Object.assign({ op: new Date().toISOString() }, fields));
+      if(error) console.error('Historiek-log mislukt:', error);
+    }catch(err){ console.error('Historiek-log mislukt:', err); }
+  }
+  // Tijdlijn voor 1 afspraak, nieuwste eerst -- client-side gesorteerd (zelfde aanpak als elders in
+  // dit bestand bij mock-supabase.js, die geen kolom-defaults/order op datum-kolommen simuleert).
+  async function dbListPlanningHistoriek(itemId){
+    const { data, error } = await sb.from('planning_items_historiek').select('*').eq('planning_item_id', itemId);
+    if(error) throw error;
+    return (data || []).slice().sort((a, b) => new Date(b.op) - new Date(a.op));
+  }
+  // Ronde 70: elke insert via deze functie logt zelf een historiek-rij 'aangemaakt' -- bewust hier
+  // gecentraliseerd (i.p.v. bij elke afzonderlijke aanroepplek: ipAddEntry, "kopiëren", "Snel een
+  // gaatje zoeken", de Inschatting-module, ...) zodat GEEN enkel aanmaakpad per ongeluk gemist kan
+  // worden. dbUpdatePlanningItem blijft bewust generiek/ongelogd (wordt voor te veel verschillende,
+  // niet-historiek-waardige veldwijzigingen gebruikt, bv. omschrijving/uur aanpassen) -- 'verplaatst'/
+  // 'bevestigd' loggen zelf expliciet op hun eigen, specifieke aanroepplek (zie ipMoveOrCopyEntry()/
+  // ipConfirmEntry() e.a. hieronder).
   async function dbInsertPlanningItem(fields){
     const { data, error } = await sb.from('planning_items').insert(fields).select().single();
     if(error) throw error;
+    dbLogPlanningHistoriek({ planning_item_id: data.id, actie: 'aangemaakt', door: fields.aangemaakt_door || getCurrentUserNaam() || null });
     return data;
   }
   async function dbUpdatePlanningItem(id, fields){
@@ -27535,6 +27988,19 @@ window.CaCalcApp = {
       photoBtnRow.appendChild(cameraBtn);
       photoBtnRow.appendChild(galleryBtn);
       photoBtnRow.appendChild(pasteBtn);
+      // "🖊️ Schets op plan" (op vraag van Peter: PDF-plannen + schets): enkel zichtbaar zodra dit
+      // verslag aan een project gekoppeld is (state.activeProjectId) -- zonder project is er geen
+      // plannenlijst om uit te kiezen. Opent #schets-kies-plan-modal, zie openSchetsKiesPlanModal()
+      // hierboven; "Opslaan" daar zet item.photoDataUrl exact zoals handlePhotoFile() hierboven.
+      if(state.activeProjectId){
+        const schetsBtn = document.createElement('button');
+        schetsBtn.type = 'button';
+        schetsBtn.className = 'btn btn-ghost btn-sm';
+        schetsBtn.textContent = '🖊️ Schets op plan';
+        schetsBtn.title = 'Teken een schets op een plan van dit project en gebruik die als foto bij dit punt';
+        schetsBtn.addEventListener('click', () => openSchetsKiesPlanModal(item));
+        photoBtnRow.appendChild(schetsBtn);
+      }
       photoControls.appendChild(photoBtnRow);
       photoControls.appendChild(galleryInput);
       photoControls.appendChild(cameraInput);
@@ -30637,6 +31103,7 @@ window.CaCalcApp = {
       for(const en of teBevestigen){
         await dbUpdatePlanningItem(en.id, { bevestigd: true });
         en.bevestigd = true;
+        dbLogPlanningHistoriek({ planning_item_id: en.id, actie: 'bevestigd', door: getCurrentUserNaam() || null });
       }
       renderIpGrid();
       renderIpConfirmTab();
@@ -30905,6 +31372,7 @@ window.CaCalcApp = {
     return `<span class="ip-chip-actions">
       <button type="button" class="ip-chip-icon" data-action="pin" data-entry="${entryId}" title="Vastpinnen om te verplaatsen — klik daarna op het doelvakje (andere dag/persoon)">📌</button>
       <button type="button" class="ip-chip-icon" data-action="copy" data-entry="${entryId}" title="Kopiëren — klik daarna op het doelvakje (andere dag/persoon)">📋</button>
+      <button type="button" class="ip-chip-icon" data-action="historiek" data-entry="${entryId}" title="Geschiedenis bekijken">🕘</button>
       <button type="button" class="ip-chip-icon" data-action="delete" data-entry="${entryId}" title="Verwijderen">🗑️</button>
     </span>`;
   }
@@ -31872,7 +32340,15 @@ window.CaCalcApp = {
   }
   async function ipDeleteEntry(entryId){
     try{
+      // Ronde 70: snapshot VOOR de delete vastleggen (de rij zelf verdwijnt anders definitief uit
+      // state.planningItems/de databank) -- enkel dit 🗑️-knopje (ipChipActionsHtml()) telt als "de"
+      // verwijder-actie die gelogd wordt; de andere dbDeletePlanningItem()-aanroepers hieronder
+      // (afwijzen van een voorstel, een inschattingsdag terugtrekken, een hele dag/persoon wissen)
+      // zijn bewust andere, niet-gelogde acties -- zie de toelichting in het projectdocument.
+      const entry = state.planningItems.find(en => String(en.id) === String(entryId));
+      const snapshot = entry ? Object.assign({}, entry) : null;
       await dbDeletePlanningItem(entryId);
+      dbLogPlanningHistoriek({ planning_item_id: entryId, actie: 'verwijderd', door: getCurrentUserNaam() || null, snapshot });
       state.planningItems = state.planningItems.filter(en => String(en.id) !== String(entryId));
       renderIpGrid(); renderIpCapacityTab(); renderIpEntryList(); renderIpConfirmTab();
     }catch(err){ alert('Kon afspraak niet verwijderen: ' + err.message); }
@@ -31904,6 +32380,7 @@ window.CaCalcApp = {
       await dbUpdatePlanningItem(entryId, { bevestigd: true });
       const it = state.planningItems.find(en => String(en.id) === String(entryId));
       if(it) it.bevestigd = true;
+      dbLogPlanningHistoriek({ planning_item_id: entryId, actie: 'bevestigd', door: getCurrentUserNaam() || null });
       renderIpGrid(); renderIpCapacityTab(); renderIpEntryList(); renderIpConfirmTab();
       showStatus('Voorstel bevestigd');
     }catch(err){ alert('Kon niet bevestigen: ' + err.message); }
@@ -31921,6 +32398,7 @@ window.CaCalcApp = {
         await dbUpdatePlanningItem(id, { bevestigd: true });
         const it = state.planningItems.find(en => String(en.id) === String(id));
         if(it) it.bevestigd = true;
+        dbLogPlanningHistoriek({ planning_item_id: id, actie: 'bevestigd', door: getCurrentUserNaam() || null });
       }
       renderIpGrid(); renderIpCapacityTab(); renderIpEntryList(); renderIpConfirmTab();
       showStatus(ids.length === 1 ? 'Voorstel bevestigd' : `${ids.length} voorstellen bevestigd`);
@@ -31962,10 +32440,18 @@ window.CaCalcApp = {
     const original = state.planningItems.find(en => String(en.id) === String(entryId));
     if(!original || !targetNaam || !targetDateISO) return;
     if(mode === 'pin'){
+      // Ronde 70: oude persoon/datum vastleggen VOOR de update, voor de historiek-rij van/naar --
+      // dit 📌-pad is vandaag de ENIGE manier om een bestaande afspraak te verplaatsen (zie
+      // ipChipActionsHtml()/de toelichting in het projectdocument).
+      const vanPersoon = original.persoon_naam, vanDatum = original.datum;
       try{
         await dbUpdatePlanningItem(entryId, { persoon_naam: targetNaam, datum: targetDateISO });
         original.persoon_naam = targetNaam;
         original.datum = targetDateISO;
+        dbLogPlanningHistoriek({
+          planning_item_id: entryId, actie: 'verplaatst', door: getCurrentUserNaam() || null,
+          van_persoon: vanPersoon, van_datum: vanDatum, naar_persoon: targetNaam, naar_datum: targetDateISO
+        });
         renderIpGrid(); renderIpCapacityTab(); renderIpEntryList(); renderIpConfirmTab();
         showStatus('Afspraak verplaatst');
       }catch(err){ alert('Kon niet verplaatsen: ' + err.message); }
@@ -31981,6 +32467,102 @@ window.CaCalcApp = {
       }catch(err){ alert('Kon niet kopiëren: ' + err.message); }
     }
   }
+
+  // ---- Geschiedenis/"ongedaan maken" op 1 afspraak (2026-10-08, ronde 70) ----
+  // Op vraag van Peter: "Wie heeft ze gemaakt, wie heeft ze verplaatst, wanneer geplaatst, wanneer
+  // verplaatst, ongedaan maken van verplaatsing." Geopend via het nieuwe 🕘-icoontje in
+  // ipChipActionsHtml() (zie de [data-action="historiek"]-afhandeling bij de #ip-grid-click-
+  // listener hieronder); toont de volledige tijdlijn uit planning_items_historiek, nieuwste eerst.
+  // Bevestigd met Peter via AskUserQuestion: ELKE "verplaatst"-rij in de tijdlijn krijgt een eigen
+  // "Ongedaan maken"-knop (niet enkel de laatste), en een undo zet de afspraak terug op "niet
+  // bevestigd" (moet opnieuw expliciet bevestigd worden) -- zie ipHistoriekOngedaanMaken() hieronder.
+  const IP_HISTORIEK_ACTIE_LABELS = {
+    aangemaakt: '✨ Aangemaakt',
+    verplaatst: '↔️ Verplaatst',
+    bevestigd: '✓ Bevestigd',
+    ontbevestigd: '↩ Ontbevestigd',
+    verwijderd: '🗑️ Verwijderd',
+    ongedaan_gemaakt: '⟲ Ongedaan gemaakt'
+  };
+  function ipHistoriekWhenLabel(iso){
+    if(!iso) return '';
+    const d = new Date(iso);
+    if(isNaN(d.getTime())) return '';
+    return d.toLocaleString('nl-BE', { dateStyle: 'medium', timeStyle: 'short' });
+  }
+  async function renderIpHistoriekModal(itemId){
+    const body = el('ip-historiek-body');
+    body.innerHTML = '<p class="hint">Laden…</p>';
+    try{
+      const rows = await dbListPlanningHistoriek(itemId);
+      if(!rows.length){
+        body.innerHTML = '<p class="hint">Nog geen geschiedenis voor deze afspraak.</p>';
+        return;
+      }
+      const magOngedaanMaken = ipIsPlanner(); // zelfde toegangsvlag als de rest van de rooster-mutaties
+      body.innerHTML = rows.map(r => {
+        const label = IP_HISTORIEK_ACTIE_LABELS[r.actie] || r.actie;
+        const when = ipHistoriekWhenLabel(r.op);
+        const door = r.door ? ` door ${escapeHtml(r.door)}` : '';
+        let detail = '';
+        if(r.actie === 'verplaatst' || r.actie === 'ongedaan_gemaakt'){
+          detail = `<div class="ip-historiek-detail">${escapeHtml(r.van_persoon || '?')} / ${escapeHtml(r.van_datum || '?')} → ${escapeHtml(r.naar_persoon || '?')} / ${escapeHtml(r.naar_datum || '?')}</div>`;
+        }
+        const undoBtn = (r.actie === 'verplaatst' && magOngedaanMaken)
+          ? `<button type="button" class="btn btn-secondary ip-historiek-undo-btn" data-historiek-undo="${r.id}">Ongedaan maken</button>`
+          : '';
+        return `<div class="ip-historiek-rij"><div><strong>${label}</strong>${door} — <span class="hint">${when}</span></div>${detail}${undoBtn}</div>`;
+      }).join('');
+    }catch(err){
+      body.innerHTML = `<p class="hint" style="color:#b3261e;">Kon geschiedenis niet laden: ${escapeHtml(err.message)}</p>`;
+    }
+  }
+  async function openIpHistoriekModal(entryId){
+    state.ip.historiekItemId = entryId;
+    el('ip-historiek-modal').style.display = 'flex';
+    await renderIpHistoriekModal(entryId);
+  }
+  function closeIpHistoriekModal(){
+    el('ip-historiek-modal').style.display = 'none';
+    state.ip.historiekItemId = null;
+  }
+  // Enkel zinvol op een 'verplaatst'-rij: zet de afspraak terug naar de persoon/datum van VOOR die
+  // verplaatsing, en terug op "niet bevestigd" (bevestigd:false -- bevestigd via AskUserQuestion).
+  // Logt zelf een nieuwe 'ongedaan_gemaakt'-rij (met ongedaan_van_id) zodat ook de undo zelf netjes
+  // in de tijdlijn blijft staan -- en een oudere verplaatsing kan daardoor in principe ook een 2de
+  // keer ongedaan gemaakt worden nadat er al eens een undo op gebeurd is.
+  async function ipHistoriekOngedaanMaken(historiekId){
+    if(!ipIsPlanner()) return;
+    try{
+      const { data: rows, error } = await sb.from('planning_items_historiek').select('*').eq('id', historiekId);
+      if(error) throw error;
+      const hrow = (rows || [])[0];
+      if(!hrow || hrow.actie !== 'verplaatst') return;
+      await dbUpdatePlanningItem(hrow.planning_item_id, { persoon_naam: hrow.van_persoon, datum: hrow.van_datum, bevestigd: false });
+      const it = state.planningItems.find(en => String(en.id) === String(hrow.planning_item_id));
+      if(it){ it.persoon_naam = hrow.van_persoon; it.datum = hrow.van_datum; it.bevestigd = false; }
+      dbLogPlanningHistoriek({
+        planning_item_id: hrow.planning_item_id, actie: 'ongedaan_gemaakt', door: getCurrentUserNaam() || null,
+        ongedaan_van_id: hrow.id,
+        van_persoon: hrow.naar_persoon, van_datum: hrow.naar_datum, naar_persoon: hrow.van_persoon, naar_datum: hrow.van_datum
+      });
+      renderIpGrid(); renderIpCapacityTab(); renderIpEntryList(); renderIpConfirmTab();
+      if(state.ip.historiekItemId != null && String(state.ip.historiekItemId) === String(hrow.planning_item_id)){
+        await renderIpHistoriekModal(hrow.planning_item_id);
+      }
+      showStatus('Verplaatsing ongedaan gemaakt');
+    }catch(err){ alert('Kon niet ongedaan maken: ' + err.message); }
+  }
+  el('ip-historiek-close-btn').addEventListener('click', closeIpHistoriekModal);
+  el('ip-historiek-modal').addEventListener('click', e => { if(e.target.id === 'ip-historiek-modal') closeIpHistoriekModal(); });
+  document.addEventListener('keydown', e => {
+    if(e.key === 'Escape' && el('ip-historiek-modal').style.display !== 'none') closeIpHistoriekModal();
+  });
+  el('ip-historiek-body').addEventListener('click', e => {
+    const btn = e.target.closest('[data-historiek-undo]');
+    if(!btn) return;
+    ipHistoriekOngedaanMaken(btn.dataset.historiekUndo);
+  });
 
   // ---- "Te bevestigen"-overzicht (voorstellen van "enkel planning"-gebruikers) ----
   // Toont alle nog niet bevestigde afspraken (over alle personen/dagen heen), zodat een planner
@@ -32162,6 +32744,12 @@ window.CaCalcApp = {
       const action = actionBtn.dataset.action;
       if(action === 'delete'){
         if(confirm('Deze afspraak verwijderen?')) ipDeleteEntry(entryId);
+        return;
+      }
+      // 🕘 geschiedenis (ronde 70) -- opent meteen de tijdlijn-modal, geen pendingAction-vastpin-
+      // gedrag zoals bij pin/copy hieronder.
+      if(action === 'historiek'){
+        openIpHistoriekModal(entryId);
         return;
       }
       // pin (verplaatsen) of copy (kopiëren): nogmaals op hetzelfde icoontje van dezelfde afspraak

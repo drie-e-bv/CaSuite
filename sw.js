@@ -167,7 +167,21 @@
 // vanaf"/"Uit dienst vanaf" (Bedrijfsgegevens) -- buiten die periode toont het rooster een grijze,
 // niet-klikbare "zone" i.p.v. een gewone cel, zodat niemand per ongeluk buiten zijn dienstperiode
 // ingepland kan worden.
-const CACHE_VERSION = 'casnap-v2026-10-07-r71';
+// Ronde 70 (2026-10-08): geschiedenis/logboek + "ongedaan maken" op een planning-afspraak (nieuwe
+// tabel planning_items_historiek, 🕘-icoontje/#ip-historiek-modal in de Personeelsplanning) + een
+// opmaakbugfix in "+ Nieuw gekoppeld verslag" (projectlijst liep bij genoeg projecten onder de
+// afgeronde kaart uit, zie de toelichting bij #verslag-projectkiezer .ip-proj-list in src2.html).
+// Ronde "plannen-pdf-schets" (2026-10-08, zelfde dag): PDF-plannen + schets op een plan, op vraag
+// van Peter ("1. Bij een project PDF plannen toevoegen. 2. Op die plannen schets te maken (na
+// inzoomen indien nodig) en dit opslaan. Dit als onderdeel van de werfverslag app."). CaDos' tab
+// "Plannen" accepteert nu ook een PDF bij het uploaden (nieuwe paginakiezer, pdf.js rasteriseert
+// de gekozen pagina naar een PNG; 2 nieuwe, nullable kolommen pdf_bron/pdf_pagina op
+// project_plannen onthouden de PDF-oorsprong). Nieuw in het Werfverslag: een "🖊️ Schets op
+// plan"-knop op elk actiepunt (enkel zichtbaar met een gekoppeld project) die een plan van dat
+// project laat kiezen (of meteen een nieuw plan/PDF laat uploaden) en er met zoom/kleur/dikte/
+// ongedaan-maken op laat tekenen -- "Opslaan" gebruikt de schets gewoon als foto bij dat
+// actiepunt (zelfde opslag-/uploadpad als een normale foto).
+const CACHE_VERSION = 'casnap-v2026-10-08-rps';
 const NETWORK_TIMEOUT_MS = 4000;
 
 self.addEventListener('install', () => {
