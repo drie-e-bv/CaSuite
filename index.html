@@ -1390,6 +1390,10 @@
   .ip-status-opt{border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-size:.8rem;cursor:pointer;text-align:left;background:var(--card);}
   /* Ronde 52 (punt 6): "Hele dag / Voormiddag / Namiddag"-chips in het dagpaneel. */
   .ip-dagdeel-chips{display:flex;gap:6px;margin-bottom:8px;}
+  /* Ronde 68: "als voorstel toevoegen"-vinkje in het dagpaneel. */
+  .ip-voorstel-check{display:flex;align-items:center;gap:7px;font-size:.85rem;color:var(--ink-soft);margin-bottom:14px;cursor:pointer;}
+  .ip-voorstel-check input{width:16px;height:16px;flex:0 0 auto;cursor:pointer;}
+  .ip-voorstel-check .ip-voorstel-hint{color:var(--ink-faint);font-size:.78rem;}
   .ip-dagdeel-chip{flex:1 1 0;border:1px solid var(--line);border-radius:999px;padding:7px 8px;font-size:.78rem;font-weight:600;cursor:pointer;background:var(--card);color:var(--ink-soft);text-align:center;}
   .ip-dagdeel-chip.active{background:var(--brand,#1b6b3e);border-color:var(--brand,#1b6b3e);color:#fff;}
   .ip-proj-search{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:6px;font-size:.85rem;margin-bottom:8px;font-family:inherit;box-sizing:border-box;}
@@ -1407,6 +1411,13 @@
   .ip-proj-opt:last-child{border-bottom:none;}
   .ip-proj-opt:hover{background:var(--bg);}
   .ip-proj-opt .ip-tag{font-size:.68rem;color:var(--ink-soft);}
+  /* Ronde 69: geselecteerde rij in de eigen projectkeuzelijst van "Snel een gaatje zoeken"
+     (#ip-qf-proj-select-list) -- de gewone .ip-proj-opt-lijst (dagpaneel) heeft dit nooit nodig
+     gehad (een klik daar plant meteen in i.p.v. enkel te "kiezen"), vandaar deze nieuwe klasse. */
+  .ip-proj-opt.selected{background:var(--brand-soft);border-color:var(--brand);}
+  .ip-qf-result-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r);margin-bottom:8px;}
+  .ip-qf-result-row .ip-qf-result-info{display:flex;flex-direction:column;gap:2px;font-size:.85rem;}
+  .ip-qf-kies-done{color:var(--brand-strong);font-weight:600;font-size:.85rem;white-space:nowrap;}
   /* "▸ Toon ook afgewerkte/onderhoud-projecten"-regel (2026-09-24) -- zelfde rij-stijl, maar
      duidelijk als schakelaar i.p.v. een echt project herkenbaar. */
   .ip-proj-opt.ip-proj-showall{justify-content:flex-start;color:var(--ink-soft);font-style:italic;background:var(--bg);}
@@ -1714,6 +1725,30 @@
   :is(#tab-verslag, #tab-verslagen, #tab-actiepunten, #tab-planning, #tab-projecten) .empty-hint:not([data-ico])::before{content:"ℹ";color:var(--app);font-weight:700;}
   :is(#tab-verslag, #tab-verslagen, #tab-actiepunten, #tab-planning, #tab-projecten) .empty-hint strong{display:block;color:var(--ink);font-weight:700;}
 
+  /* ======================= Ronde 71: keuzescherm + projectkiezer (#tab-verslag) ======================= */
+  .vk-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:14px;}
+  .vk-tile{
+    display:flex;align-items:center;gap:14px;min-height:72px;padding:14px 16px;margin:0;
+    border:1.5px solid var(--line);border-radius:var(--r-lg);background:#fff;color:var(--ink);
+    font:inherit;text-align:left;cursor:pointer;transition:border-color .12s,background .12s,box-shadow .12s;
+  }
+  .vk-tile:hover{border-color:var(--app);background:var(--app-soft);box-shadow:inset 0 0 0 1px var(--app);}
+  .vk-tile-ico{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:12px;background:var(--sunken);font-size:22px;flex:none;}
+  .vk-tile-txt{min-width:0;display:flex;flex-direction:column;gap:2px;}
+  .vk-tile-lbl{font-weight:700;font-size:15px;}
+  .vk-tile-sub{font-size:12.5px;color:var(--ink-soft);}
+  /* De projectkiezer voor "Nieuw gekoppeld verslag" hergebruikt bewust de bestaande .ip-proj-search/
+     .ip-proj-list-stijl van de Personeelsplanning-projectkeuze (zie .ip-proj-opt hierboven) i.p.v.
+     een eigen lijst-stijl te verzinnen -- zelfde look, enkel eigen id's (#vk-proj-search/#vk-proj-list). */
+  #verslag-projectkiezer .ip-proj-list{max-height:420px;}
+  /* De header-projectkiezer (#global-project-select) wordt op het Werfverslag-tabblad alleen-lezen
+     (zie switchTab()/renderGlobalProjectPicker() in het script) -- toont enkel nog welk project het
+     open verslag heeft, niet meer bedienbaar vanop die plek (ronde 71). Lichte visuele aanduiding
+     i.p.v. de normale klikbare pil. */
+  .global-project-picker.picker-readonly{background:transparent;}
+  .global-project-picker.picker-readonly select{cursor:default;opacity:.85;}
+  .global-project-picker.picker-readonly::before{opacity:.6;}
+
   /* ======================= Werfverslag-formulier (#tab-verslag) ======================= */
   /* "Soort verslag": 3 keuzetegels (icoon + label) i.p.v. een tab-rij die op gsm 2+1 wrapte. */
   .vt-field{margin-bottom:16px;}
@@ -2004,6 +2039,9 @@
   /* Ronde 67 -- link+kopieerknop naast elkaar in het schermweergave-instellingenblok. */
   .scherm-link-row{display:flex;gap:8px;}
   .scherm-link-row input{flex:1 1 auto;min-width:0;font-family:var(--font-mono);font-size:.82rem;}
+  .scherm-toepassen-row{display:flex;align-items:center;gap:10px;margin-top:14px;}
+  .scherm-toepassen-status{font-size:.82rem;color:var(--brand-strong);font-weight:600;}
+  .scherm-toepassen-status.is-error{color:#b8402f;}
   .more-info{margin:-6px 0 14px;font-size:13.5px;color:var(--ink-soft);}
   .more-info summary{display:inline-flex;align-items:center;gap:6px;min-height:32px;cursor:pointer;font-weight:600;color:var(--brand);list-style:none;}
   .more-info summary::-webkit-details-marker{display:none;}
@@ -3148,6 +3186,55 @@
   <!-- ===================== TAB: WERFVERSLAG ===================== -->
   <section class="tab-section active" id="tab-verslag">
 
+    <!-- ===================== Ronde 71 (2026-10-07): herontwerp van de start =====================
+         Op vraag van Peter: "Kun je kijken om de start van werfverslag anders te maken. Nu is het
+         verwarrend, wanneer je nieuw of ander project start [...] Kiezen tussen: Nieuw niet gekoppeld
+         verslag, nieuw gekoppeld verslag (gelinkt aan project in het systeem) of verslag bewerken.
+         Een knop om naar deze pagina terug te keren zodra je aan een verslag bezig bent." -- dit
+         tabblad toont voortaan ALTIJD eerst dit keuzescherm bij binnenkomst (geen automatisch
+         herladen van het laatst-geopende verslag meer, geen stille overname van het bovenaan
+         gekozen project meer) -- zie renderVerslagScreen()/state.verslagScreen in het script. De 3
+         keuzes:
+         1) "+ Nieuw niet-gekoppeld verslag" -> meteen een leeg formulier, geen project.
+         2) "+ Nieuw gekoppeld verslag" -> eerst #verslag-projectkiezer (hergebruikt het bestaande
+            zoekveld+lijst-patroon van de Personeelsplanning-projectkeuze, .ip-proj-search/.ip-proj-
+            list) -> na de keuze het leeg formulier, project vast (niet meer wijzigbaar in het
+            formulier zelf -- enkel via "← Terug naar start" opnieuw kiezen).
+         3) "Verslag bewerken" -> het bestaande "Verslagen"-tabblad (ongewijzigd: filters/zoekveld,
+            klikken op "Openen" laadt het verslag zoals voorheen via openVerslag()).
+         Zodra er een formulier openstaat (nieuw of bestaand) verschijnt in de kaartkop hieronder de
+         vaste "← Terug naar start"-knop (#btn-terug-naar-start, vervangt het vroegere "+ Nieuw
+         verslag"-knopje op diezelfde plek). -->
+    <section class="card vk-card" id="verslag-keuzescherm">
+      <h2>Wat wil je doen?</h2>
+      <p class="hint">Kies hieronder hoe je wilt starten. Je kan via "← Terug naar start" altijd naar dit scherm terugkeren.</p>
+      <div class="vk-tiles">
+        <button type="button" class="vk-tile" id="vk-nieuw-los">
+          <span class="vk-tile-ico" aria-hidden="true">＋</span>
+          <span class="vk-tile-txt"><span class="vk-tile-lbl">Nieuw niet-gekoppeld verslag</span><span class="vk-tile-sub">Vrije invoer, geen project</span></span>
+        </button>
+        <button type="button" class="vk-tile" id="vk-nieuw-gekoppeld">
+          <span class="vk-tile-ico" aria-hidden="true">🔗</span>
+          <span class="vk-tile-txt"><span class="vk-tile-lbl">Nieuw gekoppeld verslag</span><span class="vk-tile-sub">Eerst een project kiezen</span></span>
+        </button>
+        <button type="button" class="vk-tile" id="vk-bewerken">
+          <span class="vk-tile-ico" aria-hidden="true">📂</span>
+          <span class="vk-tile-txt"><span class="vk-tile-lbl">Verslag bewerken</span><span class="vk-tile-sub">Een bestaand verslag openen</span></span>
+        </button>
+      </div>
+    </section>
+
+    <section class="card" id="verslag-projectkiezer" style="display:none;">
+      <div class="card-head">
+        <h2>Nieuw gekoppeld verslag — kies een project</h2>
+        <button type="button" class="btn btn-ghost btn-sm" id="vk-proj-terug">← Terug</button>
+      </div>
+      <input type="text" class="ip-proj-search" id="vk-proj-search" placeholder="Zoek een project…">
+      <div class="ip-proj-list" id="vk-proj-list"></div>
+    </section>
+
+    <div id="verslag-form-wrap" style="display:none;">
+
     <!-- Ronde 48 fase B (2026-09-25, ronde 48 — design-herwerking): de 3 verslagtype-knoppen stonden
          los boven het formulier en lazen als een DERDE tab-rij (onder hoofdnav + #werf-subbar). Nu
          een duidelijke "Soort verslag"-keuze BINNEN de eerste kaart (3 keuzetegels met icoon + label,
@@ -3168,7 +3255,7 @@
              werkbalk hier bovenaan, los van de opslaan/exporteer-knoppen. -->
         <div class="verslag-toolbar">
           <button class="btn btn-danger btn-sm" id="btn-delete-verslag" type="button" style="display:none;">Verslag verwijderen</button>
-          <button class="btn btn-secondary btn-sm" id="btn-new-verslag" type="button"><span class="btn-ico" aria-hidden="true">＋</span> Nieuw verslag</button>
+          <button class="btn btn-secondary btn-sm" id="btn-terug-naar-start" type="button"><span class="btn-ico" aria-hidden="true">←</span> Terug naar start</button>
         </div>
       </div>
       <!-- Ronde 51 — Fix 1: dataverlies-vangnet. Verschijnt zodra checkVerslagConceptEnBiedAan()
@@ -3364,6 +3451,8 @@
       Tip: bij "Exporteer PDF" kan je in deze browser ook meteen een map kiezen — bv. de lokaal gesynchroniseerde
       SharePoint/OneDrive-map — zodat er ook daar een kopie klaarstaat.
     </div>
+
+    </div><!-- /#verslag-form-wrap -->
   </section>
 
   <!-- ===================== TAB: VERSLAGEN (overzicht) ===================== -->
@@ -3694,6 +3783,10 @@
             <button id="ip-next-week" type="button" aria-label="Volgende periode" title="Volgende periode">&rarr;</button>
           </div>
           <button class="btn btn-secondary btn-sm" id="ip-export-pdf-btn" type="button"><span class="btn-ico">📄</span><span><span class="ip-exp-long">Rooster </span>exporteren</span></button>
+          <!-- Ronde 69: "Snel een gaatje zoeken" -- zichtbaarheid gekoppeld aan dezelfde
+               "kan_voorstellen_maken"-vlag als de Inschatting-subtab (zie applyAccessRestrictions()
+               in het script, canMakeProposals). -->
+          <button class="btn btn-secondary btn-sm" id="ip-quickfind-btn" type="button">🔍 Snel een gaatje zoeken</button>
         </div>
         <div class="ip-toolbar-sub" id="ip-toolbar-sub">
           <button type="button" class="ip-filters-toggle" id="ip-filters-toggle" aria-expanded="false" aria-controls="ip-role-filter ip-legend">
@@ -3884,6 +3977,17 @@
       <!-- Ronde 52 (punt 6, op vraag van Peter): dagdeel-keuze vóór de status-/projectkeuze -- geldt
            voor de eerstvolgende toevoeging, zie renderIpDagdeelChips()/ipAddEntry() in het script. -->
       <div class="ip-dagdeel-chips" id="ip-dagdeel-chips"></div>
+
+      <!-- Ronde 68 (op vraag van Peter): handmatig een nieuw toegevoegde afspraak als (nog niet
+           bevestigd) voorstel kunnen markeren, i.p.v. altijd meteen definitief -- geldt voor de
+           eerstvolgende toevoeging in dit paneel, zelfde "geldt voor de eerstvolgende toevoeging"-
+           patroon als de dagdeel-keuze hierboven (zie openIpPanel()/ipPendingFieldsForNewEntry()).
+           Wie sowieso al altijd een voorstel aanmaakt (geen verslagentoegang) krijgt dit vinkje niet
+           te zien -- het zou daar toch niets veranderen, zie openIpPanel(). -->
+      <label class="ip-voorstel-check" id="ip-voorstel-wrap">
+        <input type="checkbox" id="ip-markeer-voorstel">
+        Als voorstel toevoegen <span class="ip-voorstel-hint">(nog niet bevestigd — verschijnt bij "Te bevestigen")</span>
+      </label>
 
       <!-- Ronde 58 (op vraag van Peter: "Dat ziet er niet zo professioneel uit. Projecten moeten
            hoger staan. De uitzonderingen (verlof etc) onderaan en kleiner.") -- Project inplannen is
@@ -4129,6 +4233,15 @@
         <label>Welke rollen tonen op het scherm</label>
         <p class="hint">Niets aanvinken = alle rollen tonen.</p>
         <div class="ip-role-filter" id="scherm-rollen-rows"></div>
+      </div>
+      <!-- Ronde 68: eigen, onmiddellijke opslaan-knop voor dagen/rollen (los van de grote
+           "Bedrijfsgegevens opslaan"-knop onderaan de pagina) -- Peter meldde dat het scherm zich
+           niet aanpaste aan een gekozen rol-filter; bleek geen echte bug, maar dat dagen/rollen
+           voorheen enkel via die verre, niet-gerelateerde save-knop bewaard werden, wat onduidelijk
+           was. Nu dezelfde "bewaart meteen"-aanpak als de linkgeneratie hierboven. -->
+      <div class="scherm-toepassen-row">
+        <button type="button" class="btn btn-primary btn-sm" id="btn-scherm-toepassen">Toepassen</button>
+        <span class="scherm-toepassen-status" id="scherm-toepassen-status"></span>
       </div>
     </section>
     <section class="card">
@@ -20669,6 +20782,41 @@ window.CaCalcApp = {
   </div>
 </div>
 
+<!-- Ronde 69: "Snel een gaatje zoeken" -- een klant belt om te vragen of/wanneer een technieker
+     vrij is; dit zoekt de eerste (max. 5) vrije momenten in het bestaande rooster (hele dag of een
+     halve dag) en maakt op de gekozen optie meteen een NIEUW voorstel aan (bevestigd:false, zie
+     ipQfKies() in het script) -- dat voorstel bevestig je zoals gewoonlijk in het rooster/op "Te
+     bevestigen", nooit automatisch vanuit deze modal. Eigen, losse rol-/project-filterstaat
+     (state.ip.qf*), volledig los van het gewone rooster-rolfilter/de projectkeuze in het dagpaneel. -->
+<div class="modal-overlay" id="ip-quickfind-modal" style="display:none;">
+  <div class="modal-box" style="max-width:560px;">
+    <h2>🔍 Snel een gaatje zoeken</h2>
+    <div class="modal-body">
+      <p class="hint">Zoekt de eerstvolgende vrije momenten (ook een halve dag telt mee) en maakt op jouw keuze een voorstel aan — nog niet bevestigd, dat doe je nadien zoals gewoonlijk in het rooster.</p>
+      <div class="field">
+        <label>Vanaf datum</label>
+        <input type="date" id="ip-qf-vanaf">
+      </div>
+      <div class="field">
+        <label>Rol (optioneel — standaard alle rollen)</label>
+        <div class="ip-role-filter" id="ip-qf-role-filter"></div>
+      </div>
+      <div class="field">
+        <label>Project (optioneel — geen keuze = vrije taak)</label>
+        <input type="text" class="ip-proj-search" id="ip-qf-proj-search" placeholder="Zoek een project…">
+        <div class="ip-proj-list" id="ip-qf-proj-select-list"></div>
+        <input type="text" id="ip-qf-omschrijving" placeholder="Omschrijving voor vrije taak" style="display:none;margin-top:8px;width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:6px;font-size:.85rem;font-family:inherit;box-sizing:border-box;">
+        <p class="hint" id="ip-qf-omschrijving-hint" style="display:none;color:#b3261e;font-weight:600;"></p>
+      </div>
+      <button type="button" class="btn btn-primary" id="ip-qf-search-btn">Zoek</button>
+      <div id="ip-qf-results"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="ip-qf-close-btn" type="button">Sluiten</button>
+    </div>
+  </div>
+</div>
+
 <!-- Generieke keuze-modal (op vraag van Peter, 2026-08-21): vervangt een reeks losse confirm()-
      dialogen door een consistente, dynamisch ingevulde modal met eigen knoppen -- gebruikt door
      zowel de verslagtype-wissel-bevestiging als, indirect, de carry-over-bevestiging hieronder. -->
@@ -21096,6 +21244,15 @@ window.CaCalcApp = {
     globalProjectHasCados: null,
     globalProjectHasCacalc: null,
     currentVerslagId: null,
+    // Ronde 71 (2026-10-07, herontwerp start Werfverslag): welk scherm het Werfverslag-tabblad
+    // toont -- 'keuze' (het nieuwe startscherm: niet-gekoppeld/gekoppeld/bewerken), 'kiesProject'
+    // (projectkiezer voor "Nieuw gekoppeld verslag") of 'form' (het eigenlijke formulier, nieuw of
+    // een al bestaand verslag). Start altijd op 'keuze' (zie bootstrapAfterLoginInner()) -- geen
+    // automatisch herladen van het laatst-geopende verslag meer. Blijft nadien "sticky": wie binnen
+    // de Werfverslag-groep even naar Actiepunten/Verslagen/Planning kijkt en teruggaat naar het
+    // Werfverslag-tabblad zelf, verliest een lopend concept niet (enkel "← Terug naar start" of een
+    // nieuwe keuze zet dit terug op 'keuze'). Zie renderVerslagScreen() verderop.
+    verslagScreen: 'keuze',
     standVanZaken: [], // "Stand van zaken per vakgebied" -- {vakgebied, tekst}, zie ArchiSnapper-voorbeeldverslag (2026-08-21)
     verslagenList: [],
     actiepuntenList: [],
@@ -21139,6 +21296,11 @@ window.CaCalcApp = {
       // dagdeel erft. Kan ook vooraf ingesteld worden door op de lege helft van een gesplitste cel
       // te klikken (zie ipCellInner()/click-listener op #ip-grid).
       panelDagdeel: 'dag',
+      // Ronde 68: handmatig "als voorstel toevoegen"-vinkje in het dagpaneel -- geldt, net als
+      // panelDagdeel hierboven, voor de eerstvolgende NIEUW toegevoegde afspraak. Teruggezet op
+      // false bij elke openIpPanel(). Zie ipPendingFieldsForNewEntry()/het #ip-markeer-voorstel-
+      // vinkje in de HTML.
+      panelMarkeerVoorstel: false,
       projListShowAll: false, // 2026-09-24: snelle projectkeuze in het dagpaneel toont enkel "Actief" tot dit aangezet wordt
       subview: 'rooster',
       // Inschatting: voor wie is deze inschatting? (2026-09-23, op vraag van Peter: "bovenaan alle
@@ -21161,7 +21323,16 @@ window.CaCalcApp = {
       // je op een ingeplande afspraak gaat staan") -- {entryId, mode:'pin'|'copy'} zolang er op
       // een 📌/📋-icoontje geklikt is en er nog op een doelvakje geklikt moet worden, anders null.
       // Zie ipCellInner() (icoontjes per afspraak) en de click-afhandeling op #ip-grid hieronder.
-      pendingAction: null
+      pendingAction: null,
+      // Ronde 69: "Snel een gaatje zoeken" -- eigen, losse filter-/selectiestaat voor die modal,
+      // BEWUST niet state.ip.selectedRoles/showOA/projListShowAll hierboven hergebruikt (die
+      // horen bij het gewone rooster-rolfilter/dagpaneel-projectkeuze en mogen door deze modal
+      // niet stilzwijgend gewijzigd worden). Alle 4 worden bij elke ipOpenQf() terugezet naar hun
+      // standaardwaarde hieronder. Zie renderIpQfRoleFilter()/renderIpQfProjList()/ipQfOpties().
+      qfSelectedRoles: null, // null = "nog niet geïnitialiseerd" (zie renderIpQfRoleFilter()), zelfde opzet als state.ip.selectedRoles
+      qfShowOA: false,
+      qfProjectId: null, // null = vrije taak ("— Geen project —" staat standaard geselecteerd)
+      qfProjListShowAll: false
     },
     offlineQueue: [],
     verslagType: 'werf', // 'werf' | 'telefoon' -- zie de verslagtype-toggle bovenaan het formulier
@@ -22575,19 +22746,14 @@ window.CaCalcApp = {
     catch(err){ console.error('Kon planning_notities niet laden (tabel misschien nog niet aangemaakt):', err); state.planningNotities = []; }
     await refreshVerslagenList();
     resetVerslagEditor();
+    // Ronde 71 (2026-10-07, herontwerp start Werfverslag): bij elke (her)opstart altijd het nieuwe
+    // keuzescherm tonen op het Werfverslag-tabblad -- GEEN automatisch heropenen van het laatst-
+    // geopende verslag meer (t/m ronde 70 gebeurde dat hier via leesOpenVerslag()/openVerslagKey()).
+    // Die localStorage-functies zelf blijven wel bestaan (onthoudOpenVerslag() schrijft nog altijd
+    // bij pagehide/visibilitychange, zie verderop) voor eventueel ander toekomstig gebruik, enkel
+    // deze automatische heropen-trigger bij het opstarten is weg.
+    state.verslagScreen = 'keuze';
     applyAccessRestrictions();
-    // Ronde 48e: stond je bij het herladen in een bestaand werfverslag, dan dat verslag terug openen
-    // (enkel als je op het Werfverslag-tabblad terechtkomt en dat verslag nog bestaat).
-    const openId = leesOpenVerslag();
-    const actief = document.querySelector('.tab-section.active');
-    if(openId && actief && actief.id === 'tab-verslag'){
-      // Enkel heropenen als dat verslag nog bestaat en zichtbaar is voor deze gebruiker (in de lijst,
-      // of als nog niet gesynchroniseerd offline-verslag) -- anders stil vergeten, geen foutmelding.
-      const bekend = (state.verslagenList || []).find(v => String(v.id) === openId)
-        || (state.offlineQueue || []).find(e => String(e.localId) === openId);
-      if(bekend) await openVerslag(bekend.id != null ? bekend.id : bekend.localId);
-      else { try{ localStorage.removeItem(openVerslagKey()); }catch(e){} }
-    }
   }
 
   async function bootstrapAfterLogin(){
@@ -22650,6 +22816,10 @@ window.CaCalcApp = {
     const canMakeProposals = !state.currentPerson || !!state.currentPerson.kan_voorstellen_maken;
     const proposeTabBtn = el('ip-subtab-inschatting');
     if(proposeTabBtn) proposeTabBtn.style.display = canMakeProposals ? '' : 'none';
+    // Ronde 69: "Snel een gaatje zoeken"-knop in de rooster-toolbar -- zelfde vlag/zelfde
+    // zichtbaarheidsregel als de Inschatting-subtab hierboven (ook dit maakt enkel voorstellen).
+    const quickfindBtn = el('ip-quickfind-btn');
+    if(quickfindBtn) quickfindBtn.style.display = canMakeProposals ? '' : 'none';
     // De centrale projectkeuze in de header heeft enkel nut als er ook een tabblad bereikbaar is
     // dat er iets mee doet (Dossier/Werfverslag) -- bv. in de losse Planning-app (planning.html)
     // of voor een "enkel planning"-persoon is ze zinloos, dus dan verbergen.
@@ -23336,7 +23506,10 @@ window.CaCalcApp = {
       }
     }
     const koppel = el('global-project-koppel');
-    if(koppel) koppel.style.display = isConceptProject(p) ? '' : 'none';
+    // Ronde 71: "Koppelen" wijzigt in feite WELK project er gekoppeld is (de vrije invoer verdwijnt,
+    // het doelproject neemt over) -- op het Werfverslag-tabblad is dat precies wat niet meer zomaar
+    // kan vanaf de (daar alleen-lezen) header-picker, dus ook deze knop daar verbergen.
+    if(koppel) koppel.style.display = (isConceptProject(p) && actiefTabblad() !== 'verslag') ? '' : 'none';
     const pill = el('global-project-picker');
     if(pill) pill.classList.toggle('is-concept', isConceptProject(p));
   }
@@ -23503,14 +23676,39 @@ window.CaCalcApp = {
     sel.value = id;
     renderGlobalProjectShortcut();
   }
-  // Ronde 49: bij het binnenkomen op het Werfverslag-tabblad. Leeg nieuw verslag (geen currentVerslagId,
-  // geen project in het formulier) + een project in de picker -> overnemen (zelfde als "+ Nieuw verslag");
-  // anders toont de picker gewoon het project van het verslag dat open staat. (2026-09-26, ronde 49)
-  function verslagTabBinnengekomen(){
-    if(!state.currentVerslagId && !el('f-actief-project').value && state.globalProjectId){
-      zetVerslagProjectVanuitPicker(state.globalProjectId, false);
-    }
-    syncGlobalPickerMetVerslag();
+  // ===================== Ronde 71 (2026-10-07): keuzescherm bij het Werfverslag-tabblad =====================
+  // Vervangt verslagTabBinnengekomen() (t/m ronde 70): die kopieerde bij elke binnenkomst stilzwijgend
+  // het bovenaan gekozen project in een leeg concept -- precies de verwarring die Peter meldde ("Nu is
+  // het verwarrend, wanneer je nieuw of ander project start"). Toont nu simpelweg het scherm dat
+  // state.verslagScreen al aangeeft: 'keuze' (het nieuwe startscherm), 'kiesProject' (projectkiezer
+  // voor "Nieuw gekoppeld verslag") of 'form' (het formulier zelf, nieuw of een bestaand verslag).
+  function renderVerslagScreen(){
+    const scherm = state.verslagScreen || 'keuze';
+    const keuzeEl = el('verslag-keuzescherm');
+    const kiezerEl = el('verslag-projectkiezer');
+    const formEl = el('verslag-form-wrap');
+    if(keuzeEl) keuzeEl.style.display = (scherm === 'keuze') ? '' : 'none';
+    if(kiezerEl) kiezerEl.style.display = (scherm === 'kiesProject') ? '' : 'none';
+    if(formEl) formEl.style.display = (scherm === 'form') ? '' : 'none';
+    if(scherm === 'kiesProject') renderVkProjList(el('vk-proj-search') ? el('vk-proj-search').value : '');
+    // De header-picker blijft gewoon het project van het (eventueel) open verslag volgen, ook op de
+    // keuze-/projectkiezer-schermen (bv. nog het project van CaDos erop) -- enkel alleen-lezen zolang
+    // je op dit tabblad zit (zie switchTab()).
+    if(scherm === 'form') syncGlobalPickerMetVerslag();
+  }
+  // Projectkiezer voor "Nieuw gekoppeld verslag" -- zelfde zoekveld+lijst-patroon als de bestaande
+  // projectkeuze in het Personeelsplanning-dagpaneel (zie renderIpProjSelectList() verderop in dit
+  // bestand), maar dan over ALLE (niet-concept) projecten zonder de rol-/AP-badges die daar specifiek
+  // zijn. Klikken op een rij start meteen een nieuw, gekoppeld verslag (zie de click-listener hieronder).
+  function renderVkProjList(filter){
+    const list = el('vk-proj-list');
+    if(!list) return;
+    const q = (filter || '').toLowerCase();
+    const kandidaten = state.projects.filter(p => p.id && p.actief !== false && (p.naam || '').toLowerCase().includes(q))
+      .slice().sort((a, b) => (a.naam || '').localeCompare(b.naam || ''));
+    list.innerHTML = kandidaten.map(p =>
+      `<div class="ip-proj-opt" data-proj="${p.id}"><span>${escapeHtml(p.naam || '(naamloos)')}</span><span>${isConceptProject(p) ? '<span class="ip-tag">Vrije invoer</span>' : ''}</span></div>`
+    ).join('') || '<div class="ip-proj-opt">Geen projecten gevonden</div>';
   }
   // Gemeenschappelijk pad voor een projectkeuze in de header (ook na het aanmaken van een vrije invoer).
   // Staat er een opgeslagen verslag open op het Werfverslag-tabblad, dan wijzigt dit het project VAN DAT
@@ -24136,6 +24334,21 @@ window.CaCalcApp = {
     const appForTab = { verslag: 'werf', verslagen: 'werf', actiepunten: 'werf', planning: 'werf', uren: 'werf', inzet: 'planning', cados: 'dossier', cacalc: 'calc' }[tab];
     if(appForTab) document.body.dataset.app = appForTab;
     document.body.dataset.tab = tab;
+    // Ronde 71 (2026-10-07): de header-projectkiezer blijft bestaan (nodig voor Dossier/
+    // Kabelberekening), maar wordt op het Werfverslag-tabblad specifiek alleen-lezen -- ze toont
+    // daar enkel nog welk project het open verslag heeft, niet meer bedienbaar vanop die plek (het
+    // project van een verslag ligt sinds dit herontwerp vast zodra het gekozen is; wie een ander
+    // project wil, gaat via "← Terug naar start" terug naar het keuzescherm). `disabled` blokkeert
+    // zowel klikken/openen als het 'change'-event van de picker zelf vanzelf mee; de interne
+    // zet-functies (syncGlobalPickerMetVerslag() e.a.) zetten de waarde nog altijd programmatisch,
+    // wat ook op een disabled <select> gewoon blijft werken. Op elk ander tabblad (incl. Dossier/
+    // Kabelberekening) blijft de picker gewoon normaal bedienbaar, exact als voorheen.
+    (function(){
+      const gpSel = el('global-project-select');
+      const gpPill = el('global-project-picker');
+      if(gpSel) gpSel.disabled = (tab === 'verslag');
+      if(gpPill) gpPill.classList.toggle('picker-readonly', tab === 'verslag');
+    })();
     closeAppMenu(false);
     if(tab === 'verslagen') refreshVerslagenList();
     if(tab === 'actiepunten') refreshActiepunten();
@@ -24144,8 +24357,11 @@ window.CaCalcApp = {
     if(tab === 'inzet') refreshInzetPlanning();
     if(tab === 'cados') refreshCadosTab();
     if(tab === 'cacalc') refreshCacalcTab();
-    // Ronde 49 (2026-09-26): op het Werfverslag-formulier is de header-picker de projectkeuze van het verslag.
-    if(tab === 'verslag') verslagTabBinnengekomen();
+    // Ronde 71 (herontwerp start Werfverslag): toont gewoon het scherm dat state.verslagScreen al
+    // aangeeft (keuze/kiesProject/form) -- GEEN automatische overname meer van het bovenaan gekozen
+    // project in een leeg concept (dat was verslagTabBinnengekomen()'s taak t/m ronde 70) en geen
+    // auto-herladen van het laatst-geopende verslag meer (zie bootstrapAfterLoginInner()).
+    if(tab === 'verslag') renderVerslagScreen();
     // Ronde 52 (punt 1): "Mijn planning"-pseudo-tab voor een gekoppeld Onderaannemer-account.
     if(tab === 'mijn-planning') renderMijnPlanningTab();
     pushHistoryState(); // ronde 59: terugknop toont voortaan de vorige tab i.p.v. de app te sluiten
@@ -24242,6 +24458,28 @@ window.CaCalcApp = {
       renderSchermInstellingen();
       showStatus('Nieuwe link aangemaakt');
     }catch(err){ alert('Aanmaken mislukt: ' + err.message); }
+  });
+  // Ronde 68 -- "Toepassen" bewaart dagen+rollen meteen, zonder de grote, verderop-op-de-pagina
+  // staande "Bedrijfsgegevens opslaan"-knop nodig te hebben (zie toelichting bij de HTML hierboven).
+  el('btn-scherm-toepassen').addEventListener('click', async () => {
+    const dagen = Math.min(30, Math.max(1, parseInt(el('scherm-dagen').value, 10) || 5));
+    const rollen = state.company.scherm_rollen || [];
+    const statusEl = el('scherm-toepassen-status');
+    const knop = el('btn-scherm-toepassen');
+    knop.disabled = true;
+    try{
+      await dbSaveBedrijf({ scherm_dagen: dagen, scherm_rollen: rollen });
+      state.company.scherm_dagen = dagen;
+      renderSchermInstellingen();
+      statusEl.textContent = '✓ Toegepast';
+      statusEl.classList.remove('is-error');
+      setTimeout(() => { statusEl.textContent = ''; }, 4000);
+    }catch(err){
+      statusEl.textContent = 'Mislukt: ' + err.message;
+      statusEl.classList.add('is-error');
+    }finally{
+      knop.disabled = false;
+    }
   });
 
   // Team leden (naam + M365 e-mailadres) -- zie de toelichting bij het veld zelf in de HTML.
@@ -27966,37 +28204,50 @@ window.CaCalcApp = {
     autoFillVerslagnr();
     checkVerslagConceptEnBiedAan(); // ronde 51, Fix 1 -- evt. lokaal concept van een vorige, niet-afgeronde poging aanbieden
   }
-  // Op vraag van Peter (2026-08-21): duidelijker onderscheid tussen "een nog niet opgeslagen,
-  // leeg begonnen verslag verlaten" (kans op écht verlies van intypwerk) en "een al opgeslagen
-  // verslag verlaten om een nieuw verslag te beginnen" (niets verloren, het oude verslag blijft
-  // gewoon bewaard -- enkel de editor zelf wordt leeggemaakt). Voorheen werd in het tweede geval
-  // hetzelfde "zonder op te slaan?"-bericht getoond, wat onterecht ongerust maakte.
-  el('btn-new-verslag').addEventListener('click', () => {
-    // Ronde 49: vóór resetVerslagEditor() onthouden -- die maakt de header-picker (= projectkeuze van het
-    // verslag) sinds ronde 49 mee leeg.
-    const pickerProjectId = state.globalProjectId;
-    if(state.currentVerslagId){
-      if(!confirm('Je bewerkt nu een al opgeslagen verslag. Nieuw, leeg verslag starten? Het huidige verslag blijft gewoon bewaard, je verlaat enkel de editor ervan.')) return;
-    } else if(state.items.length || el('f-project').value){
+  // ===================== Ronde 71 (2026-10-07): keuzescherm-knoppen =====================
+  // Vervangt het vroegere "+ Nieuw verslag"-knopje (btn-new-verslag): starten van een nieuw verslag
+  // gaat voortaan altijd via het keuzescherm (#verslag-keuzescherm), niet meer vanuit een al open
+  // formulier. "← Terug naar start" (btn-terug-naar-start, zelfde plek in de kaartkop) brengt je
+  // daar terug -- zie hieronder.
+  function gaNaarVerslagKeuzescherm(){
+    state.verslagScreen = 'keuze';
+    renderVerslagScreen();
+  }
+  el('vk-nieuw-los').addEventListener('click', () => {
+    state.verslagScreen = 'form';
+    resetVerslagEditor(); // start altijd volledig leeg (bewust GEEN overname van de header-projectkeuze, dat was precies de verwarring)
+    renderVerslagScreen();
+    showStatus('Nieuw, niet-gekoppeld verslag gestart');
+  });
+  el('vk-nieuw-gekoppeld').addEventListener('click', () => {
+    state.verslagScreen = 'kiesProject';
+    if(el('vk-proj-search')) el('vk-proj-search').value = ''; // eerst wissen, vóór renderVerslagScreen() de lijst (met deze waarde) tekent
+    renderVerslagScreen();
+  });
+  el('vk-bewerken').addEventListener('click', () => { switchTab('verslagen'); });
+  el('vk-proj-terug').addEventListener('click', gaNaarVerslagKeuzescherm);
+  el('vk-proj-search').addEventListener('input', e => renderVkProjList(e.target.value));
+  el('vk-proj-list').addEventListener('click', (e) => {
+    const opt = e.target.closest('.ip-proj-opt[data-proj]');
+    if(!opt) return;
+    const projectId = opt.dataset.proj;
+    state.verslagScreen = 'form';
+    resetVerslagEditor(); // eerst volledig leeg (zet ook f-actief-project terug op ''), dan het gekozen project vast zetten
+    renderVerslagScreen();
+    zetVerslagProjectVanuitPicker(projectId, true); // doorGebruiker:true -> triggert f-project/f-locatie + evt. carry-over-venster
+    syncGlobalPickerMetVerslag(); // header-picker (alleen-lezen op dit tabblad) moet het net gekozen project meteen tonen
+    showStatus('Nieuw verslag gestart, gekoppeld aan project');
+  });
+  // "← Terug naar start": dezelfde bevestiging als voorheen bij "+ Nieuw verslag" ZOLANG er nog
+  // onopgeslagen inhoud in een NIEUW (nog niet bewaard) verslag staat; een AL OPGESLAGEN verslag
+  // verlaten vraagt bewust geen bevestiging meer (niets verloren, het verslag blijft gewoon bewaard
+  // -- op vraag van Peter, bevestigd ontwerpbeslissing bij dit herontwerp).
+  el('btn-terug-naar-start').addEventListener('click', () => {
+    if(!state.currentVerslagId && (state.items.length || el('f-project').value)){
       if(!confirm('Huidig verslag in het formulier verlaten zonder op te slaan?')) return;
     }
     resetVerslagEditor();
-    // Op vraag van Peter (2026-09-23): het bovenaan in de header gekozen project meteen
-    // vooringevuld laten staan bij het starten van een nieuw werfverslag -- blijft hier gewoon
-    // aanpasbaar/leegmaakbaar in het formulier zelf, net als voorheen bij een manuele keuze.
-    if(pickerProjectId){
-      // f-actief-project gebruikt projectKey() ("db-<id>") als option-waarde, niet het kale
-      // project-id zoals de header-picker -- vandaar hier expliciet omgezet.
-      const key = 'db-' + pickerProjectId;
-      const sel = el('f-actief-project');
-      if(Array.from(sel.options).some(o => o.value === key)){
-        sel.value = key;
-        sel.dispatchEvent(new Event('change'));
-      }
-    }
-    // Ronde 49: header-picker volgt het formulier (terug op het overgenomen project, of leeg).
-    if(actiefTabblad() === 'verslag') syncGlobalPickerMetVerslag();
-    showStatus('Nieuw, leeg verslag gestart');
+    gaNaarVerslagKeuzescherm();
   });
   el('btn-delete-verslag').addEventListener('click', () => {
     if(state.currentVerslagId) deleteVerslagRow(state.currentVerslagId);
@@ -28282,6 +28533,7 @@ window.CaCalcApp = {
       renderSharePointBanner();
       renderWaGroupLink();
       updateResponsibleDatalist();
+      state.verslagScreen = 'form'; // ronde 71: een verslag openen gaat altijd rechtstreeks naar het formulier, niet het keuzescherm
       switchTab('verslag');
       checkVerslagConceptEnBiedAan(); // ronde 51, Fix 1 -- evt. lokaal concept van dit verslag aanbieden
       showStatus(pendingEntry ? 'Nog niet gesynchroniseerd verslag geopend' : 'Verslag geopend');
@@ -28300,7 +28552,9 @@ window.CaCalcApp = {
       if(!confirm(msg)) return;
       try{
         await offlineQueueRemove(id);
-        if(state.currentVerslagId === id) resetVerslagEditor();
+        // Ronde 71: was dit het open verslag, dan is er na verwijderen geen "open verslag" meer --
+        // terug naar het keuzescherm i.p.v. stil in een nieuw leeg concept te belanden.
+        if(state.currentVerslagId === id){ resetVerslagEditor(); gaNaarVerslagKeuzescherm(); }
         await refreshVerslagenList();
         await updateOfflineIndicator();
         showStatus('Wachtende wijziging verwijderd');
@@ -28310,7 +28564,7 @@ window.CaCalcApp = {
     if(!confirm('Dit werfverslag definitief verwijderen? Dit kan niet ongedaan gemaakt worden.')) return;
     try{
       await dbDeleteVerslag(id);
-      if(state.currentVerslagId === id) resetVerslagEditor();
+      if(state.currentVerslagId === id){ resetVerslagEditor(); gaNaarVerslagKeuzescherm(); }
       await refreshVerslagenList();
       showStatus('Verslag verwijderd');
     }catch(err){ alert('Verwijderen mislukt: ' + err.message); }
@@ -29890,7 +30144,11 @@ window.CaCalcApp = {
     const naam = getCurrentUserNaam() || (state.session && state.session.user && state.session.user.email) || null;
     const p = state.currentPerson;
     const heeftVerslagenToegang = !p || p.kan_verslagen_zien || p.kan_verslagen_maken;
-    const needsConfirm = !heeftVerslagenToegang;
+    // Ronde 68: ook een voorstel als de gebruiker dat zelf handmatig aanvinkte in het dagpaneel
+    // (zie #ip-markeer-voorstel/state.ip.panelMarkeerVoorstel) -- bovenop de bestaande, automatische
+    // reden hierboven (geen verslagentoegang). Allebei resulteren in exact hetzelfde: bevestigd:false,
+    // verschijnt bij "Te bevestigen" tot een planner het goed-/afkeurt.
+    const needsConfirm = !heeftVerslagenToegang || !!state.ip.panelMarkeerVoorstel;
     return { bevestigd: !needsConfirm, aangemaakt_door: naam };
   }
   function ipIsPlanner(){ return !!(state.currentPerson && state.currentPerson.is_planner); }
@@ -30098,19 +30356,30 @@ window.CaCalcApp = {
     try{ await outlookSyncRoster({ manual: true }); }
     finally{ btn.disabled = false; btn.textContent = origLabel; }
   });
-  el('ip-myweek-pos-btn').addEventListener('click', () => {
+  // RONDE 68 (bugfix, bevestigd door Peter: "als je Mijn week openklapt en dan weer dichtklapt/
+  // sluit, springt de pagina terug naar boven"): elk van deze 3 knopjes verandert de CSS `display`
+  // (of, bij het ⇅-knopje, de DOM-positie) van een element dat op dat moment nog net de keyboard-
+  // focus heeft (de knop zelf, net aangeklikt). Een focused element dat verborgen/verplaatst wordt
+  // verliest in de meeste browsers meteen zijn focus, en de browser scrollt dan impliciet terug
+  // naar het (nieuwe) focus-doel -- in dit geval <body>, dus bovenaan de pagina. We voorkomen dat
+  // gewoon door de knop zelf eerst expliciet te blur()-en, vóór renderIpMyWeek() de zichtbaarheid/
+  // positie aanpast -- de klik zelf is dan al verwerkt, dus niets functioneels verandert.
+  el('ip-myweek-pos-btn').addEventListener('click', e => {
+    e.currentTarget.blur();
     const pref = ipMyWeekPref();
     pref.pos = pref.pos === 'onder' ? 'boven' : 'onder';
     ipSaveMyWeekPref(pref);
     renderIpMyWeek();
   });
-  el('ip-myweek-hide-btn').addEventListener('click', () => {
+  el('ip-myweek-hide-btn').addEventListener('click', e => {
+    e.currentTarget.blur();
     const pref = ipMyWeekPref();
     pref.on = false;
     ipSaveMyWeekPref(pref);
     renderIpMyWeek();
   });
-  el('ip-myweek-show-link').addEventListener('click', () => {
+  el('ip-myweek-show-link').addEventListener('click', e => {
+    e.currentTarget.blur();
     const pref = ipMyWeekPref();
     pref.on = true;
     ipSaveMyWeekPref(pref);
@@ -30969,6 +31238,46 @@ window.CaCalcApp = {
     }catch(err){ console.error(err); alert('PDF maken mislukt: ' + err.message); }
   });
 
+  // Ronde 69: "Snel een gaatje zoeken" -- knop/modal-bediening. Open/sluiten-idioom (overlay-klik +
+  // Escape) exact gekopieerd van #beheer-modal/#ip-export-modal hierboven.
+  el('ip-quickfind-btn').addEventListener('click', ipOpenQf);
+  el('ip-qf-close-btn').addEventListener('click', () => { el('ip-quickfind-modal').style.display = 'none'; });
+  el('ip-quickfind-modal').addEventListener('click', e => { if(e.target.id === 'ip-quickfind-modal') el('ip-quickfind-modal').style.display = 'none'; });
+  document.addEventListener('keydown', e => {
+    if(e.key === 'Escape' && el('ip-quickfind-modal').style.display !== 'none') el('ip-quickfind-modal').style.display = 'none';
+  });
+  el('ip-qf-role-filter').addEventListener('click', e => {
+    const chip = e.target.closest('.ip-role-chip'); if(!chip) return;
+    if(chip.dataset.qfOa){ state.ip.qfShowOA = !state.ip.qfShowOA; renderIpQfRoleFilter(); return; }
+    const r = chip.dataset.qfRole; if(!r) return;
+    if(state.ip.qfSelectedRoles.has(r)) state.ip.qfSelectedRoles.delete(r); else state.ip.qfSelectedRoles.add(r);
+    renderIpQfRoleFilter();
+  });
+  el('ip-qf-proj-search').addEventListener('input', e => renderIpQfProjList(e.target.value));
+  el('ip-qf-proj-select-list').addEventListener('click', e => {
+    const toggle = e.target.closest('[data-toggle-qf-proj-statuses]');
+    if(toggle){
+      state.ip.qfProjListShowAll = !state.ip.qfProjListShowAll;
+      renderIpQfProjList(el('ip-qf-proj-search').value);
+      return;
+    }
+    const opt = e.target.closest('.ip-proj-opt[data-proj]'); if(!opt) return;
+    const val = opt.dataset.proj;
+    state.ip.qfProjectId = val === '__vrij__' ? null : val;
+    el('ip-qf-omschrijving').style.display = state.ip.qfProjectId === null ? '' : 'none';
+    el('ip-qf-omschrijving-hint').style.display = 'none';
+    renderIpQfProjList(el('ip-qf-proj-search').value);
+  });
+  el('ip-qf-search-btn').addEventListener('click', () => {
+    const vanaf = el('ip-qf-vanaf').value || todayISO();
+    const opties = ipQfOpties(vanaf, state.ip.qfSelectedRoles, state.ip.qfShowOA, 5);
+    ipQfRenderResults(opties);
+  });
+  el('ip-qf-results').addEventListener('click', e => {
+    const btn = e.target.closest('[data-qf-kies]'); if(!btn) return;
+    ipQfKies(btn.dataset.naam, btn.dataset.datum, btn.dataset.dagdeel);
+  });
+
   function ipEntryPdfLabel(en){
     const voorstelSuffix = en.bevestigd === false ? ' (voorstel)' : '';
     if(en.type === 'status'){
@@ -31150,6 +31459,14 @@ window.CaCalcApp = {
     // helft werd meegegeven (zie hierboven).
     state.ip.panelDagdeel = presetDagdeel || 'dag';
     renderIpDagdeelChips();
+    // Ronde 68: "als voorstel toevoegen"-vinkje terugzetten op uit bij elke paneelopening, en enkel
+    // tonen aan wie anders sowieso al altijd meteen een definitieve afspraak zou aanmaken -- voor
+    // wie dat toch al nooit doet (geen verslagentoegang, zie ipPendingFieldsForNewEntry()) zou het
+    // vinkje niets veranderen en enkel verwarren.
+    state.ip.panelMarkeerVoorstel = false;
+    el('ip-markeer-voorstel').checked = false;
+    const heeftVerslagenToegangVoorVoorstel = !state.currentPerson || state.currentPerson.kan_verslagen_zien || state.currentPerson.kan_verslagen_maken;
+    el('ip-voorstel-wrap').style.display = heeftVerslagenToegangVoorVoorstel ? '' : 'none';
     renderIpProjSelectList('');
     renderIpEntryList();
     el('ip-overlay').classList.add('open');
@@ -31217,6 +31534,183 @@ window.CaCalcApp = {
     }
     el('ip-proj-select-list').innerHTML = html;
   }
+
+  // ===================== Ronde 69: "Snel een gaatje zoeken" =====================
+  // Een klant belt: "heb je iemand vrij, en wanneer?" -- deze tool doorzoekt het bestaande rooster
+  // (planning_items) op de eerste (max. 5) vrije momenten, filterbaar op rol en op project, en
+  // maakt op de gekozen optie een NIEUW voorstel aan (bevestigd altijd false, zie ipQfKies()
+  // hieronder -- nooit automatisch bevestigd, los van ipPendingFieldsForNewEntry()/het
+  // "voorstel"-vinkje van ronde 68, die hier bewust NIET gebruikt worden). Definitief bevestigen
+  // blijft, zoals altijd, een apart stap in het rooster/op "Te bevestigen".
+  // Eigen, losse filterstaat (state.ip.qf*, zie hierboven bij state.ip) -- deelt bewust niets met
+  // het gewone rooster-rolfilter (state.ip.selectedRoles/showOA) of de projectkeuze in het
+  // dagpaneel (state.ip.projListShowAll).
+  //
+  // Verificatie vooraf (zie de opdracht): klikken op een lege rooster-cel in het weekend/op een
+  // feestdag opent gewoon hetzelfde dagpaneel (zie de click-listener op #ip-grid, geen enkele
+  // weekend/holiday-uitsluiting daar buiten de "buiten dienst"-check) -- het rooster laat dus wél
+  // degelijk inplannen op een weekend/feestdag toe, enkel de ghost-voorstellen en de "+
+  // toewijzen"-hint worden er niet getoond (ipCellInner()). Deze zoekfunctie scant daarom BEWUST
+  // ook weekend-/feestdagen mee (geen ipIsWeekend()/ipIsHoliday()-uitsluiting hieronder) -- alles
+  // anders zou hier iets "onvindbaar" maken dat in het rooster zelf wél degelijk inplanbaar is.
+  function renderIpQfRoleFilter(){
+    const roles = ipAlleRoosterRollen();
+    // Zelfde null-als-"nog niet geïnitialiseerd"-opzet als renderIpRoleFilter() (ronde 58), maar
+    // zonder de bewaarde-voorkeur-overname daar: deze modal begint bij elke ipOpenQf() altijd vers
+    // (alle rollen aan, Onderaannemers uit), zie ipOpenQf() hieronder.
+    if(state.ip.qfSelectedRoles === null) state.ip.qfSelectedRoles = new Set(roles);
+    let html = roles.map(r =>
+      `<button type="button" class="ip-role-chip ${state.ip.qfSelectedRoles.has(r) ? 'on' : ''}" data-qf-role="${escapeHtml(r)}">${escapeHtml(r)}</button>`
+    ).join('');
+    html += `<button type="button" class="ip-role-chip ${state.ip.qfShowOA ? 'on' : ''}" data-qf-oa="1">Onderaannemers</button>`;
+    el('ip-qf-role-filter').innerHTML = html;
+  }
+  // Kopie van de projectkeuzelijst-logica van renderIpProjSelectList() hierboven, met 2 verschillen:
+  // (1) eigen staat (state.ip.qfProject*/een eigen DOM-element) i.p.v. die van het dagpaneel, en
+  // (2) een rij klikken SELECTEERT ze enkel (zichtbaar via .selected, zie de CSS) i.p.v. meteen een
+  // afspraak aan te maken -- het "Zoek"-eigen resultaat/"Kies deze optie" doet dat pas nadien, zie
+  // ipQfKies(). Plus de extra pseudo-optie "— Geen project (vrije taak) —" bovenaan (data-proj="__vrij__"),
+  // die er bij de gewone projectkeuzelijst niet is (die heeft de losse "Vrije taak"-knop onderaan
+  // het paneel, zie ipAddEntry()/submitIpVrijeTaak()).
+  function renderIpQfProjList(filter){
+    const q = (filter || '').toLowerCase();
+    const all = ipActiveProjects().filter(p => (p.naam || '').toLowerCase().includes(q));
+    const shown = all.filter(p => state.ip.qfProjListShowAll || (p.planning_status || 'actief') === 'actief');
+    const hiddenCount = all.length - shown.length;
+    const vrijSelected = state.ip.qfProjectId === null;
+    let html = `<div class="ip-proj-opt ${vrijSelected ? 'selected' : ''}" data-proj="__vrij__"><span>— Geen project (vrije taak) —</span></div>`;
+    html += shown.map(p => {
+      const selected = state.ip.qfProjectId !== null && String(state.ip.qfProjectId) === String(p.id);
+      const status = p.planning_status || 'actief';
+      const statusBadge = status !== 'actief' ? `<span class="ip-tag">${escapeHtml(PLANNING_PROJECT_STATUSES.find(s => s.key === status)?.label || status)}</span>` : '';
+      return `<div class="ip-proj-opt ${selected ? 'selected' : ''}" data-proj="${p.id}"><span>${escapeHtml(p.naam)}</span><span>${statusBadge}</span></div>`;
+    }).join('');
+    if(!all.length){ /* geen (actieve) projecten -- "Geen project"-optie blijft hierboven altijd beschikbaar */ }
+    if(!state.ip.qfProjListShowAll && hiddenCount > 0){
+      html += `<div class="ip-proj-opt ip-proj-showall" data-toggle-qf-proj-statuses="1">▸ Toon ook afgewerkte/onderhoud-projecten (${hiddenCount})</div>`;
+    } else if(state.ip.qfProjListShowAll){
+      html += `<div class="ip-proj-opt ip-proj-showall" data-toggle-qf-proj-statuses="1">▾ Enkel actieve projecten tonen</div>`;
+    }
+    el('ip-qf-proj-select-list').innerHTML = html;
+  }
+  // Mirror van ipCurrentPeople() (zie hierboven), maar lezend op state.ip.qfSelectedRoles/qfShowOA
+  // i.p.v. state.ip.selectedRoles/showOA -- bewust exact dezelfde semantiek: `null` (nog niet
+  // geïnitialiseerd) = alle rollen, een (al geïnitialiseerde) LEGE Set = letterlijk 0 rollen
+  // gekozen = niemand van de "gewone" rollen (Onderaannemer loopt er, zoals overal in dit rooster,
+  // als eigen toggle naast).
+  function ipQfCandidatePeople(rollenSet, showOA){
+    return ipActivePeople().filter(p => {
+      if(p.rol === 'Onderaannemer') return showOA;
+      return rollenSet === null || rollenSet.has(p.rol || 'Technieker');
+    });
+  }
+  // De eigenlijke zoekfunctie: dagen vanaf vanDatumISO (max. 60 kalenderdagen, weekend/feestdag
+  // INCLUDED, zie de toelichting hierboven), per dag elke kandidaat (al in volgorde, zie
+  // ipAllPeople()'s sort) checken op een vrij moment -- hele dag, of enkel een vrije voor- of
+  // namiddag (zie ipCellInner()'s vm/nm/dag-opsplitsing hierboven, hier hergebruikt voor de
+  // beschikbaarheids-logica i.p.v. voor de rendering). Stopt zodra maxOpties resultaten gevonden
+  // zijn, scant nooit meer dan 60 dagen.
+  function ipQfOpties(vanDatumISO, rollenSet, showOA, maxOpties){
+    const kandidaten = ipQfCandidatePeople(rollenSet, showOA);
+    const opties = [];
+    let d = new Date(vanDatumISO + 'T00:00:00');
+    for(let dag = 0; dag < 60 && opties.length < maxOpties; dag++){
+      const dISO = ipIso(d);
+      for(const p of kandidaten){
+        if(opties.length >= maxOpties) break;
+        if(!isPersoonInDienst(p, dISO)) continue;
+        const entries = ipEntriesFor(p.naam, dISO);
+        if(entries.length === 0){
+          opties.push({ naam: p.naam, datumISO: dISO, dagdeel: 'dag' });
+          continue;
+        }
+        const vmEntries = entries.filter(en => en.dagdeel === 'vm');
+        const nmEntries = entries.filter(en => en.dagdeel === 'nm');
+        const dagEntries = entries.filter(en => en.dagdeel !== 'vm' && en.dagdeel !== 'nm');
+        if(dagEntries.length) continue; // volledig volzet (een 'dag'-item bezet de hele dag)
+        if(vmEntries.length === 0) opties.push({ naam: p.naam, datumISO: dISO, dagdeel: 'vm' });
+        else if(nmEntries.length === 0) opties.push({ naam: p.naam, datumISO: dISO, dagdeel: 'nm' });
+        // anders: vm EN nm allebei al bezet -> geen optie voor deze persoon/dag
+      }
+      d = ipAddDays(d, 1);
+    }
+    return opties;
+  }
+  // Dutch volledige datumtekst ("maandag 06 oktober") -- zelfde toLocaleDateString('nl-BE',...)-
+  // patroon als openIpPanel() hierboven gebruikt voor de dagpaneel-titel, hier zonder jaartal (de
+  // zoekhorizon is hoogstens 60 dagen, een jaartal voegt daar niets aan toe).
+  function ipQfDateLabel(dateISO){
+    const d = new Date(dateISO + 'T00:00:00');
+    return d.toLocaleDateString('nl-BE', { weekday: 'long', day: '2-digit', month: 'long' });
+  }
+  function ipQfRenderResults(opties){
+    if(!opties.length){
+      el('ip-qf-results').innerHTML = '<p class="hint">Geen beschikbare opties gevonden in de komende 60 dagen met deze filters.</p>';
+      return;
+    }
+    const labelFor = { dag: 'Hele dag vrij', vm: 'Voormiddag vrij', nm: 'Namiddag vrij' };
+    el('ip-qf-results').innerHTML = opties.map(opt => `
+      <div class="ip-qf-result-row">
+        <div class="ip-qf-result-info">
+          <strong>${escapeHtml(ipQfDateLabel(opt.datumISO))}</strong>
+          <span>${escapeHtml(opt.naam)} — ${labelFor[opt.dagdeel] || ''}</span>
+        </div>
+        <button type="button" class="btn btn-sm btn-primary" data-qf-kies data-naam="${escapeHtml(opt.naam)}" data-datum="${opt.datumISO}" data-dagdeel="${opt.dagdeel}">Kies deze optie</button>
+      </div>
+    `).join('');
+  }
+  // Maakt het effectieve voorstel aan voor de gekozen optie -- ALTIJD bevestigd:false (een
+  // voorstel), ongeacht de eigen rechten van de planner of ipPendingFieldsForNewEntry()/het
+  // "voorstel"-vinkje (ronde 40/68): die 2 bestaande, automatische regels gelden hier bewust niet.
+  // Sluit de modal NIET (de planner wil hier mogelijk nog een 2de optie voor een andere collega
+  // uit dezelfde zoekactie kiezen) -- toont in plaats daarvan enkel een kort "✓"-label op de
+  // gekozen rij zelf.
+  async function ipQfKies(naam, datumISO, dagdeel){
+    const btn = Array.from(document.querySelectorAll('#ip-qf-results [data-qf-kies]'))
+      .find(b => b.dataset.naam === naam && b.dataset.datum === datumISO && b.dataset.dagdeel === dagdeel);
+    const fields = { persoon_naam: naam, datum: datumISO, type: 'project', dagdeel, bevestigd: false, aangemaakt_door: getCurrentUserNaam() || null };
+    if(state.ip.qfProjectId !== null){
+      fields.project_id = state.ip.qfProjectId;
+    } else {
+      const tekst = (el('ip-qf-omschrijving').value || '').trim();
+      if(!tekst){
+        // Zelfde boodschap/stijl als renderIpInschattingTab()'s "Typ eerst een omschrijving voor
+        // deze vrije taak." hierboven -- geen alert(), gewoon een inline hint, en de insert gaat
+        // niet door.
+        el('ip-qf-omschrijving-hint').textContent = 'Typ eerst een omschrijving voor deze vrije taak.';
+        el('ip-qf-omschrijving-hint').style.display = '';
+        el('ip-qf-omschrijving').focus();
+        return;
+      }
+      fields.project_id = null;
+      fields.omschrijving = tekst;
+    }
+    try{
+      const row = await dbInsertPlanningItem(fields);
+      state.planningItems.push(row);
+      // Zelfde na-insert-verversingen als ipAddEntry() hierboven, minus renderIpEntryList() (er is
+      // hier geen openstaand dagpaneel om te verversen).
+      renderIpGrid(); renderIpCapacityTab(); renderIpConfirmTab();
+      if(btn) btn.outerHTML = '<span class="ip-qf-kies-done">✓ Voorstel aangemaakt</span>';
+      showStatus('Voorstel aangemaakt');
+    }catch(err){ alert('Kon voorstel niet aanmaken: ' + err.message); }
+  }
+  function ipOpenQf(){
+    state.ip.qfSelectedRoles = null;
+    state.ip.qfShowOA = false;
+    state.ip.qfProjectId = null;
+    state.ip.qfProjListShowAll = false;
+    el('ip-qf-vanaf').value = todayISO();
+    el('ip-qf-proj-search').value = '';
+    el('ip-qf-omschrijving').value = '';
+    el('ip-qf-omschrijving').style.display = ''; // standaard "Geen project" geselecteerd -> veld meteen tonen
+    el('ip-qf-omschrijving-hint').style.display = 'none';
+    renderIpQfRoleFilter();
+    renderIpQfProjList('');
+    el('ip-qf-results').innerHTML = '';
+    el('ip-quickfind-modal').style.display = 'flex';
+  }
+
   function ipOtherPeopleOptions(excludeNaam){
     return ipActivePeople().filter(p => p.naam !== excludeNaam).map(p => `<option value="${escapeHtml(p.naam)}">${escapeHtml(p.naam)} (${escapeHtml(p.rol || '')})</option>`).join('');
   }
@@ -31742,6 +32236,10 @@ window.CaCalcApp = {
     const btn = e.target.closest('.ip-dagdeel-chip'); if(!btn) return;
     state.ip.panelDagdeel = btn.dataset.dagdeel;
     renderIpDagdeelChips();
+  });
+  // Ronde 68: "als voorstel toevoegen"-vinkje -- zie ipPendingFieldsForNewEntry()/openIpPanel().
+  el('ip-markeer-voorstel').addEventListener('change', e => {
+    state.ip.panelMarkeerVoorstel = e.target.checked;
   });
   // Ronde 60: vrije notitie -- zie submitIpNotitie()/flushIpNotitieSave() hierboven. 'input' (met
   // debounce) dekt "gewoon tikken en vergeten", 'blur' zorgt dat een snelle wissel naar een ander

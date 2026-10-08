@@ -45,6 +45,44 @@
 // ("instelbaar in de bedrijfspagina... hoeveel dagen en welke werknemers"). sw.js zelf is
 // inhoudelijk ongewijzigd voor dit onderdeel (scherm.html registreert deze service worker nooit
 // zelf), enkel de cacheversie hieronder opgehoogd zoals bij elke ronde die code aanraakt.
+// ronde 68: scherm.html herwerkt naar een rooster-matrix (dagen als rijen, personen als kolommen,
+// i.p.v. de vroegere verticale dag-kaarten) + een eigen "Toepassen"-knop bij de
+// Schermweergave-instellingen (bewaart dagen/rollen onmiddellijk, los van de grote
+// "Bedrijfsgegevens opslaan"-knop) + een nieuw "als voorstel toevoegen"-vinkje in het dagpaneel
+// (#ip-markeer-voorstel, src2.html) waarmee een planner een nieuwe afspraak zelf, handmatig, als
+// voorstel (bevestigd:false) kan markeren i.p.v. de bestaande automatische regel. sw.js zelf is
+// voor dit onderdeel inhoudelijk ongewijzigd (scherm.html registreert deze service worker nooit
+// zelf), enkel de cacheversie hieronder opgehoogd (geldt voor index.html/werf.html/planning.html/
+// cados.html/cacalc.html, die wel via build-apps.js uit het gewijzigde src2.html opnieuw gegenereerd zijn).
+// ronde 71: herontwerp van de START van het Werfverslag-tabblad, op vraag van Peter: "Nu is het
+// verwarrend, wanneer je nieuw of ander project start [...] Kiezen tussen: Nieuw niet gekoppeld
+// verslag, nieuw gekoppeld verslag (gelinkt aan project in het systeem) of verslag bewerken. Een
+// knop om naar deze pagina terug te keren zodra je aan een verslag bezig bent." Het tabblad toont
+// voortaan ALTIJD eerst een nieuw keuzescherm (#verslag-keuzescherm) bij binnenkomst -- geen
+// automatisch heropenen van het laatst-geopende verslag meer, geen stille overname van het
+// bovenaan gekozen project meer. 3 keuzes: "+ Nieuw niet-gekoppeld verslag" (meteen een leeg
+// formulier, geen project), "+ Nieuw gekoppeld verslag" (eerst een nieuwe projectkiezer, hergebruikt
+// het bestaande zoekveld+lijst-patroon, dan het leeg formulier met dat project vast -- niet meer
+// wijzigbaar binnen het formulier zelf), "Verslag bewerken" (het bestaande Verslagen-overzicht,
+// ongewijzigd). Een vaste "← Terug naar start"-knop (vervangt het vroegere "+ Nieuw verslag"-knopje
+// op dezelfde plek) brengt je vanuit elk open verslag terug naar dit keuzescherm -- vraagt een
+// bevestiging zolang er onopgeslagen inhoud in een NIEUW verslag staat, maar niet meer bij het
+// verlaten van een al opgeslagen verslag. De bovenaan-paginapicker ("Actief project") blijft op
+// Dossier/Kabelberekening gewoon normaal bedienbaar, maar is voortaan alleen-lezen zodra je op het
+// Werfverslag-tabblad zelf zit (toont enkel nog welk project het open verslag heeft). Carry-over
+// van openstaande actiepunten triggert nu pas ná de vaste projectkeuze. Geen SQL-wijziging.
+// ronde 69: nieuwe tool "🔍 Snel een gaatje zoeken" in de rooster-toolbar van Personeelsplanning
+// (naast "Rooster exporteren"), op vraag van Peter: een klant belt om te vragen of/wanneer een
+// technieker vrij is -- deze knop (enkel zichtbaar voor wie "Voorstellen maken" mag, zelfde vlag
+// als de Inschatting-subtab) doorzoekt het bestaande rooster op de eerste 5 vrije momenten (hele
+// dag, of een halve dag die nog vrij is, telt ook mee), filterbaar op rol en op project (geen
+// project gekozen = een vrije taak met eigen omschrijving), en maakt op de gekozen optie meteen een
+// NIEUW voorstel aan (bevestigd altijd false -- nooit automatisch bevestigd, ook niet voor een
+// planner met doorgaans automatische bevestiging). Bevestigen blijft, zoals altijd, een apart,
+// bewuste stap in het rooster zelf. Zie ipQfOpties()/ipQfKies()/#ip-quickfind-modal in src2.html.
+// sw.js zelf is voor dit onderdeel inhoudelijk ongewijzigd, enkel de cacheversie hieronder
+// opgehoogd (geldt voor index.html/werf.html/planning.html/cados.html/cacalc.html, opnieuw
+// gegenereerd via build-apps.js uit het gewijzigde src2.html).
 // ronde 66: Peter: "Kun je bij kabelberekening het nieuwe RZ1 kabeltype ook bij mantel toevoegen
 // en de gegevens ervan opnemen in de tabellen?" -- "RZ1" (RZ1-K(AS)) is zelf XLPE-geïsoleerd, enkel
 // de buitenmantel is halogeenvrij/brandwerend, dus elektrisch dezelfde belastbaarheids-/
@@ -129,7 +167,7 @@
 // vanaf"/"Uit dienst vanaf" (Bedrijfsgegevens) -- buiten die periode toont het rooster een grijze,
 // niet-klikbare "zone" i.p.v. een gewone cel, zodat niemand per ongeluk buiten zijn dienstperiode
 // ingepland kan worden.
-const CACHE_VERSION = 'casnap-v2026-10-03-r67';
+const CACHE_VERSION = 'casnap-v2026-10-07-r71';
 const NETWORK_TIMEOUT_MS = 4000;
 
 self.addEventListener('install', () => {
