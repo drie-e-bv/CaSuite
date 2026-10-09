@@ -212,7 +212,14 @@
 // duplicaat-datumrij meer per personen-groep, via CSS grid-row-span), iets grotere
 // lettergrootte-/celgrenzen, en .scherm-chiprow op flex-direction:column. Enkel scherm.html
 // wijzigt deze ronde, geen src2.html/SQL.
-const CACHE_VERSION = 'casnap-v2026-10-09-schermmax8b';
+// Ronde "scherm-max8-herzien2" (2026-10-09, zelfde dag): Peter zag die gedeelde-datumrij-versie
+// live en stuurde een paint-knip/plak-voorbeeld: "de namen staan nu samen bovenaan en de taken
+// staan nu onderaan, dit zou bij elkaar moeten staan" -- de grid-row-span-oplossing zette alle
+// koprijen samen bovenaan en alle dagrijen daaronder, waardoor een groep se naam ver van zijn eigen
+// taken kwam te staan. scherm.html herbouwd naar GROEP-gewijs geordend (elke groep se koprij
+// onmiddellijk gevolgd door zijn eigen dagrijen, naam+taak dus weer recht onder elkaar), met enkel
+// de 1e groep die de volledige datumtekst toont (geen herhaalde datum). Enkel scherm.html wijzigt.
+const CACHE_VERSION = 'casnap-v2026-10-09-schermmax8c';
 const NETWORK_TIMEOUT_MS = 4000;
 
 self.addEventListener('install', () => {
