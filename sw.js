@@ -196,7 +196,16 @@
 // gecentreerd | export+quickfind samen rechts) via grid-template-areas, zodat alles netjes op 1 rij
 // blijft staan -- enkel tablet/desktop (>640px); de gsm-indeling (ronde "ip-meer-knop") is
 // ongewijzigd.
-const CACHE_VERSION = 'casnap-v2026-10-09-ipctrl';
+// Ronde "scherm-max8" (2026-10-09): Peter stuurde een live screenshot van het wandscherm met 15
+// personen op 1 onleesbaar smalle rij: "Kun je de planning op het scherm verdelen in max 8
+// personen op een rij?" -- scherm.html verdeelt personen nu in groepen van max 8, elke groep met
+// zijn eigen, gestapelde rooster-matrix (bij <=8 personen onveranderd, exact zoals voorheen). De
+// projectchip toont nu de projectnaam, gemeente en (nieuw) projectleider elk op een eigen regel
+// i.p.v. 1 afgekapte regel. 2 nieuwe vinkjes bij Bedrijfsgegevens -> Schermweergave ("Op elke
+// projectchip tonen": Gemeente van het project / Projectleider, beide standaard AAN) laten Peter
+// zelf kiezen welke van die 2 velden op het scherm komen (src2.html, dus alle 5 gebouwde apps +
+// scherm.html wijzigen deze ronde mee).
+const CACHE_VERSION = 'casnap-v2026-10-09-schermmax8';
 const NETWORK_TIMEOUT_MS = 4000;
 
 self.addEventListener('install', () => {

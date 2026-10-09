@@ -4362,6 +4362,17 @@
         <p class="hint">Niets aanvinken = alle rollen tonen.</p>
         <div class="ip-role-filter" id="scherm-rollen-rows"></div>
       </div>
+      <!-- Ronde "scherm-max8" (2026-10-09), op vraag van Peter: "Ik zou bij beheer op de casuite
+           site graag vinkjes zien van welke zaken op de planningscherm moeten komen." Gestart met de
+           2 velden die rechtstreeks op een projectchip staan (gemeente -- ronde "scherm-gemeente",
+           en nu ook de projectleider) -- beide standaard AAN, want dat is exact wat een medewerker
+           bij het binnenkomen nodig heeft: project, waar (gemeente) en bij wie (projectleider).
+           Zelfde opslaanpad als "Aantal dagen"/"Welke rollen" hierboven (de "Toepassen"-knop). -->
+      <div class="field">
+        <label>Op elke projectchip tonen</label>
+        <label class="acct-sync-row"><input type="checkbox" id="scherm-toon-gemeente"> Gemeente van het project</label>
+        <label class="acct-sync-row"><input type="checkbox" id="scherm-toon-projectleider"> Projectleider</label>
+      </div>
       <!-- Ronde 68: eigen, onmiddellijke opslaan-knop voor dagen/rollen (los van de grote
            "Bedrijfsgegevens opslaan"-knop onderaan de pagina) -- Peter meldde dat het scherm zich
            niet aanpaste aan een gekozen rol-filter; bleek geen echte bug, maar dat dagen/rollen
@@ -23242,7 +23253,7 @@ window.CaCalcApp = {
   let bootstrapInFlight = false;
 
   async function bootstrapAfterLoginInner(){
-    state.company = Object.assign({ naam:'Casentis', logo_url:null, adres:'', btw:'', telefoon:'', email:'', website:'', team_leden:[], bureau:[], gemini_model:null, protocollen:null, scherm_token:null, scherm_dagen:5, scherm_rollen:[] }, await dbGetBedrijf());
+    state.company = Object.assign({ naam:'Casentis', logo_url:null, adres:'', btw:'', telefoon:'', email:'', website:'', team_leden:[], bureau:[], gemini_model:null, protocollen:null, scherm_token:null, scherm_dagen:5, scherm_rollen:[], scherm_toon_gemeente:true, scherm_toon_projectleider:true }, await dbGetBedrijf());
     if(!Array.isArray(state.company.team_leden)) state.company.team_leden = [];
     if(!Array.isArray(state.company.bureau)) state.company.bureau = [];
     if(!Array.isArray(state.company.scherm_rollen)) state.company.scherm_rollen = [];
@@ -24965,6 +24976,10 @@ window.CaCalcApp = {
     el('scherm-rollen-rows').innerHTML = IP_ROLES.map(r =>
       `<button type="button" class="ip-role-chip ${rollen.has(r) ? 'on' : ''}" data-role="${escapeHtml(r)}">${escapeHtml(r)}</button>`
     ).join('');
+    // Ronde "scherm-max8": beide standaard AAN (nieuwe/bestaande bedrijven zonder expliciete
+    // keuze), enkel echt uit na een bewuste "Toepassen" met het vinkje leeg.
+    el('scherm-toon-gemeente').checked = state.company.scherm_toon_gemeente !== false;
+    el('scherm-toon-projectleider').checked = state.company.scherm_toon_projectleider !== false;
   }
   el('scherm-rollen-rows').addEventListener('click', e => {
     const chip = e.target.closest('.ip-role-chip'); if(!chip) return;
@@ -24974,11 +24989,18 @@ window.CaCalcApp = {
     // naar de laatst BEWAARDE waarde (state.company.scherm_dagen), dus de net getypte, nog niet
     // opgeslagen waarde expliciet bewaren en erna terugzetten.
     const nogNietBewaardeDagen = el('scherm-dagen').value;
+    // Zelfde reden als hierboven: ook de 2 nieuwe "Op elke projectchip tonen"-vinkjes (ronde
+    // "scherm-max8") mogen een nog niet bewaarde wijziging niet stilzwijgend verliezen bij een
+    // rol-chip-klik.
+    const nogNietBewaardGemeente = el('scherm-toon-gemeente').checked;
+    const nogNietBewaardProjectleider = el('scherm-toon-projectleider').checked;
     const rollen = new Set(state.company.scherm_rollen || []);
     if(rollen.has(r)) rollen.delete(r); else rollen.add(r);
     state.company.scherm_rollen = [...rollen];
     renderSchermInstellingen();
     el('scherm-dagen').value = nogNietBewaardeDagen;
+    el('scherm-toon-gemeente').checked = nogNietBewaardGemeente;
+    el('scherm-toon-projectleider').checked = nogNietBewaardProjectleider;
   });
   el('btn-scherm-copy').addEventListener('click', async () => {
     try{
@@ -25005,12 +25027,18 @@ window.CaCalcApp = {
   el('btn-scherm-toepassen').addEventListener('click', async () => {
     const dagen = Math.min(30, Math.max(1, parseInt(el('scherm-dagen').value, 10) || 5));
     const rollen = state.company.scherm_rollen || [];
+    // Ronde "scherm-max8": de 2 "Op elke projectchip tonen"-vinkjes horen bij dezelfde
+    // "Toepassen"-knop als dagen/rollen hierboven.
+    const toonGemeente = el('scherm-toon-gemeente').checked;
+    const toonProjectleider = el('scherm-toon-projectleider').checked;
     const statusEl = el('scherm-toepassen-status');
     const knop = el('btn-scherm-toepassen');
     knop.disabled = true;
     try{
-      await dbSaveBedrijf({ scherm_dagen: dagen, scherm_rollen: rollen });
+      await dbSaveBedrijf({ scherm_dagen: dagen, scherm_rollen: rollen, scherm_toon_gemeente: toonGemeente, scherm_toon_projectleider: toonProjectleider });
       state.company.scherm_dagen = dagen;
+      state.company.scherm_toon_gemeente = toonGemeente;
+      state.company.scherm_toon_projectleider = toonProjectleider;
       renderSchermInstellingen();
       statusEl.textContent = '✓ Toegepast';
       statusEl.classList.remove('is-error');

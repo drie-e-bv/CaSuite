@@ -49,6 +49,27 @@
   gemeente. Vraagt ook een SQL-wijziging: scherm_data() gaf voorheen enkel `id`/`naam` per project
   mee, nu ook `locatie` (rechtstreeks in Supabase aangepast en geverifieerd, geen nieuwe security-
   waarschuwingen via get_advisors).
+
+  RONDE "scherm-max8" (2026-10-09), op vraag van Peter (met screenshot van 15 personen in 1,
+  onleesbaar smalle rij): "Kun je de planning op het scherm verdelen in max 8 personen op een rij?
+  [...] bedoeling is echt dat de medewerkers in 1 oogopslag bij binnenkomst direct zien waar ze
+  heen moeten. bij het vak van de planning project op 1 rij, eronder de gemeente. mss ook nog de
+  projectleider van het project." Twee aparte wijzigingen:
+  1) MAX_PERSONEN_PER_RIJ (8): `mensen` wordt in groepen van max 8 gehakt; elke groep krijgt zijn
+     eigen volledige mini-rooster (kopregel + alle dagrijen), gestapeld onder elkaar in
+     #scherm-content. Bij <=8 personen (het gewone geval) blijft dit exact 1 groep, dus visueel
+     identiek aan voorheen. scaleSchermGrid() is herwerkt om per groep te werken (elke groep krijgt,
+     via CSS flexbox, een gelijk deel van de beschikbare hoogte) i.p.v. uit te gaan van 1 vast
+     #scherm-grid-element.
+  2) Projectchip toont nu, als dat aan staat (zie scherm_toon_gemeente/scherm_toon_projectleider
+     hieronder), de projectnaam/gemeente/projectleider elk op een eigen regel i.p.v. achter elkaar op
+     1 afgekapte regel (".scherm-chip-detailed") -- enkel bij een echte projecttoewijzing, niet bij
+     Verlof/Keuring/vrije taak.
+  Ook een nieuwe SQL-wijziging: `projecten` geeft nu ook `projectleider_naam` mee, en `bedrijf`
+  kreeg 2 nieuwe kolommen (`scherm_toon_gemeente`/`scherm_toon_projectleider`, beide default true) --
+  instelbaar via 2 nieuwe vinkjes bij Bedrijfsgegevens -> "Schermweergave (planningsbord)" (op
+  Peters vraag naar zelf aan/uit te vinken velden). Enkel deze 2 velden zijn nu instelbaar; verdere
+  velden kunnen later op dezelfde manier toegevoegd worden zodra daar vraag naar is.
 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,500..800&family=Figtree:wght@400..700&family=JetBrains+Mono:wght@400;500&display=swap">
@@ -97,6 +118,13 @@
   #scherm-content{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;}
   .scherm-grid-outer{flex:1 1 auto;min-height:0;border:1px solid var(--line);border-radius:14px;background:var(--card);overflow:hidden;}
   .scherm-grid{height:100%;display:grid;}
+  /* Ronde "scherm-max8" (2026-10-09), op vraag van Peter: "verdelen in max 8 personen op een rij"
+     -- bij meer dan MAX_PERSONEN_PER_RIJ (zie script) personen wordt er niet 1 brede grid meer
+     getekend, maar meerdere, elk met max 8 personen-kolommen, gestapeld onder elkaar. Bij <=8
+     personen (het gewone geval) blijft dit exact 1 groep en dus visueel ongewijzigd t.o.v.
+     voorheen -- deze .multi-regels komen dan simpelweg niet in het spel. */
+  .scherm-grid-outer.scherm-grid-outer-multi{display:flex;flex-direction:column;gap:5px;border:none;background:none;border-radius:0;overflow:visible;}
+  .scherm-grid-outer-multi .scherm-grid{height:auto;flex:1 1 0;min-height:0;border:1px solid var(--line);border-radius:14px;background:var(--card);overflow:hidden;}
   .scherm-cell{border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:3px 7px;overflow:hidden;display:flex;flex-direction:column;min-width:0;min-height:0;}
   .scherm-grid > .scherm-cell:nth-last-child(-n+1000){} /* no-op hook, kolom-/rij-randjes blijven gewoon overal staan -- rustiger dan per-laatste-kolom uitzonderingen */
 
@@ -119,9 +147,17 @@
   .scherm-chiprow{display:flex;flex-wrap:wrap;align-content:flex-start;gap:2px 4px;overflow:hidden;flex:1 1 auto;min-height:0;}
   .scherm-chip{font-size:var(--scherm-chip-fs);padding:1px 6px;border-radius:6px;font-weight:600;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
   .scherm-chip.project{background:var(--brand-soft);color:var(--brand-strong);}
-  /* Ronde "scherm-gemeente" (2026-10-09, op vraag van Peter): gemeente achter de projectnaam --
-     bewust iets lichter/minder zwaar dan de projectnaam zelf, zodat de naam primair blijft. */
-  .scherm-chip-gemeente{font-weight:500;opacity:.72;}
+  /* Ronde "scherm-max8" (2026-10-09, op vraag van Peter: "project op 1 rij, eronder de gemeente,
+     mss ook nog de projectleider") -- vervangt de ronde-"scherm-gemeente"-opzet (gemeente als
+     inline-achtervoegsel op dezelfde regel) door een echte meerregelige kaart binnen de chip:
+     projectnaam bovenaan (vet), gemeente/projectleider elk op hun eigen, iets lichtere regel
+     eronder. Enkel voor chips die effectief iets extra's tonen (scherm_toon_gemeente/
+     scherm_toon_projectleider aan + de waarde is gekend) -- een gewone chip zonder die info blijft
+     gewoon de oude, compacte 1-regelige stijl (zie .scherm-chip hierboven). */
+  .scherm-chip.scherm-chip-detailed{display:flex;flex-direction:column;align-items:flex-start;white-space:normal;gap:0;padding:3px 7px;}
+  .scherm-chip-naam{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;}
+  .scherm-chip-sub{display:block;font-weight:500;opacity:.72;font-size:.84em;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;}
+  .scherm-chip-sub.scherm-chip-leider{opacity:.82;}
   .scherm-chip.vrij{background:#eef0f1;color:var(--ink-soft);font-style:italic;}
   .scherm-chip.verlof{background:var(--st-verlof-bg);color:var(--st-verlof);}
   .scherm-chip.adv{background:var(--st-adv-bg);color:var(--st-adv);}
@@ -173,6 +209,8 @@
   const SCHERM_REFRESH_MS = 3 * 60 * 1000;
   // RONDE 68: breedte van de vaste datumkolom links, zelfde idee als .ip-th-date in de hoofdapp.
   const DATE_COL_W = 92;
+  // RONDE scherm-max8: max. aantal personen naast elkaar in 1 rij-groep; meer personen -> extra gestapelde groepen.
+  const MAX_PERSONEN_PER_RIJ = 8;
 
   const IP_STATUSES = {
     VERLOF: { label: 'Verlof', cls: 'verlof' },
@@ -313,6 +351,7 @@
 
     const projectNaamById = {};
     const projectGemeenteById = {};
+    const projectLeiderById = {};
     (data.projecten || []).forEach(p => {
       projectNaamById[String(p.id)] = p.naam;
       // Ronde "scherm-gemeente" (2026-10-09), op vraag van Peter: "de gemeente waarin het project
@@ -325,7 +364,14 @@
       const loc = (p.locatie || '').trim();
       const idx = loc.lastIndexOf(',');
       projectGemeenteById[String(p.id)] = (idx === -1 ? loc : loc.slice(idx + 1).trim());
+      // Ronde "scherm-max8" (2026-10-09), op vraag van Peter: "mss ook nog de projectleider van het
+      // project" -- rechtstreeks het bestaande `projectleider_naam`-veld van het project.
+      projectLeiderById[String(p.id)] = (p.projectleider_naam || '').trim();
     });
+    // Beide standaard AAN (coalesce gebeurt ook al in scherm_data() zelf, maar defensief ook hier
+    // -- bv. voor een oudere/afwijkende respons zonder deze 2 velden).
+    const toonGemeente = data.scherm_toon_gemeente !== false;
+    const toonProjectleider = data.scherm_toon_projectleider !== false;
     const itemsPerPersoonEnDag = {};
     (data.planning_items || []).forEach(it => {
       const k = it.persoon_naam + '|' + it.datum;
@@ -334,51 +380,63 @@
 
     const vandaag = data.vandaag || isoVandaag();
     const aantalDagen = Math.max(1, data.scherm_dagen || 5);
-    const aantalPersonen = mensen.length;
 
-    // ---- Kopregel (personen) ----
-    let cellsHtml = '<div class="scherm-cell scherm-head-cell scherm-head-corner"></div>';
-    mensen.forEach(p => {
-      cellsHtml += '<div class="scherm-cell scherm-head-cell" title="' + escapeHtml(p.naam) + (p.rol ? ' — ' + escapeHtml(p.rol) : '') + '">'
-        + '<span class="scherm-pname">' + escapeHtml(p.naam) + '</span>'
-        + '<span class="scherm-prol">' + escapeHtml(p.rol || 'Technieker') + '</span>'
-        + '</div>';
-    });
+    // ---- Ronde "scherm-max8": personen in groepen van max MAX_PERSONEN_PER_RIJ -- elke groep
+    //      krijgt zo meteen bredere kolommen i.p.v. steeds smallere kolommen bij meer personen. ----
+    const groepen = [];
+    for(let i = 0; i < mensen.length; i += MAX_PERSONEN_PER_RIJ) groepen.push(mensen.slice(i, i + MAX_PERSONEN_PER_RIJ));
 
-    // ---- Dagrijen ----
-    for(let i = 0; i < aantalDagen; i++){
-      const dateISO = addDagen(vandaag, i);
-      const isVandaag = i === 0;
-      const { weekdag, datumTekst, isWeekend } = datumLabel(dateISO);
-      const rowCls = (isVandaag ? ' scherm-row-today' : '') + (isWeekend ? ' scherm-row-weekend' : '');
-
-      cellsHtml += '<div class="scherm-cell scherm-date-cell' + rowCls + '">'
-        + '<span class="scherm-dow">' + escapeHtml(weekdag) + '</span>'
-        + '<span class="scherm-datenum">' + escapeHtml(datumTekst) + '</span>'
-        + (isVandaag ? '<span class="scherm-vandaag-badge">Vandaag</span>' : '')
-        + '</div>';
-
-      mensen.forEach(p => {
-        if(!persoonIsActief(p, dateISO)){
-          const reden = (p.in_dienst_vanaf && dateISO < p.in_dienst_vanaf) ? 'Nog niet in dienst' : 'Uit dienst';
-          cellsHtml += '<div class="scherm-cell scherm-slot scherm-buitendienst' + rowCls + '" title="' + escapeHtml(reden) + '"><span class="scherm-chip-mini">' + escapeHtml(reden) + '</span></div>';
-          return;
-        }
-        const items = itemsPerPersoonEnDag[p.naam + '|' + dateISO] || [];
-        if(!items.length){
-          cellsHtml += '<div class="scherm-cell scherm-slot' + rowCls + '"><span class="scherm-empty-slot">—</span></div>';
-        } else {
-          cellsHtml += '<div class="scherm-cell scherm-slot' + rowCls + '"><div class="scherm-chiprow">' + items.map(it => chipHtml(it, projectNaamById, projectGemeenteById)).join('') + '</div></div>';
-        }
+    function bouwGroepCellsHtml(groep){
+      // ---- Kopregel (personen van deze groep) ----
+      let html = '<div class="scherm-cell scherm-head-cell scherm-head-corner"></div>';
+      groep.forEach(p => {
+        html += '<div class="scherm-cell scherm-head-cell" title="' + escapeHtml(p.naam) + (p.rol ? ' — ' + escapeHtml(p.rol) : '') + '">'
+          + '<span class="scherm-pname">' + escapeHtml(p.naam) + '</span>'
+          + '<span class="scherm-prol">' + escapeHtml(p.rol || 'Technieker') + '</span>'
+          + '</div>';
       });
+      // ---- Dagrijen (dezelfde dagen voor elke groep) ----
+      for(let i = 0; i < aantalDagen; i++){
+        const dateISO = addDagen(vandaag, i);
+        const isVandaag = i === 0;
+        const { weekdag, datumTekst, isWeekend } = datumLabel(dateISO);
+        const rowCls = (isVandaag ? ' scherm-row-today' : '') + (isWeekend ? ' scherm-row-weekend' : '');
+
+        html += '<div class="scherm-cell scherm-date-cell' + rowCls + '">'
+          + '<span class="scherm-dow">' + escapeHtml(weekdag) + '</span>'
+          + '<span class="scherm-datenum">' + escapeHtml(datumTekst) + '</span>'
+          + (isVandaag ? '<span class="scherm-vandaag-badge">Vandaag</span>' : '')
+          + '</div>';
+
+        groep.forEach(p => {
+          if(!persoonIsActief(p, dateISO)){
+            const reden = (p.in_dienst_vanaf && dateISO < p.in_dienst_vanaf) ? 'Nog niet in dienst' : 'Uit dienst';
+            html += '<div class="scherm-cell scherm-slot scherm-buitendienst' + rowCls + '" title="' + escapeHtml(reden) + '"><span class="scherm-chip-mini">' + escapeHtml(reden) + '</span></div>';
+            return;
+          }
+          const items = itemsPerPersoonEnDag[p.naam + '|' + dateISO] || [];
+          if(!items.length){
+            html += '<div class="scherm-cell scherm-slot' + rowCls + '"><span class="scherm-empty-slot">—</span></div>';
+          } else {
+            html += '<div class="scherm-cell scherm-slot' + rowCls + '"><div class="scherm-chiprow">' + items.map(it => chipHtml(it, projectNaamById, projectGemeenteById, projectLeiderById, toonGemeente, toonProjectleider)).join('') + '</div></div>';
+          }
+        });
+      }
+      return html;
     }
 
-    content.innerHTML = '<div class="scherm-grid-outer"><div class="scherm-grid" id="scherm-grid" style="grid-template-columns:' + DATE_COL_W + 'px repeat(' + aantalPersonen + ', 1fr);grid-template-rows:auto repeat(' + aantalDagen + ', 1fr);">' + cellsHtml + '</div></div>';
+    const isMulti = groepen.length > 1;
+    const groepenHtml = groepen.map((groep, gi) =>
+      '<div class="scherm-grid" id="scherm-grid-' + gi + '" style="grid-template-columns:' + DATE_COL_W + 'px repeat(' + groep.length + ', 1fr);grid-template-rows:auto repeat(' + aantalDagen + ', 1fr);">' + bouwGroepCellsHtml(groep) + '</div>'
+    ).join('');
+    content.innerHTML = '<div class="scherm-grid-outer' + (isMulti ? ' scherm-grid-outer-multi' : '') + '">' + groepenHtml + '</div>';
 
-    // Lettergrootte + overflow-afkap pas berekenen NA dat de grid echt getekend is (anders zijn
-    // clientHeight/clientWidth hieronder nog 0). requestAnimationFrame wacht op die eerste tekenbeurt.
+    // Lettergrootte + overflow-afkap pas berekenen NA dat elke groep-grid echt getekend is (anders
+    // zijn clientHeight/clientWidth hieronder nog 0). requestAnimationFrame wacht op die eerste
+    // tekenbeurt. Elke groep krijgt zijn EIGEN schaalberekening (eigen kolomaantal, en bij meerdere
+    // groepen ook een kleiner aandeel van de schermhoogte, zie .scherm-grid-outer-multi in de CSS).
     requestAnimationFrame(() => {
-      scaleSchermGrid(aantalPersonen, aantalDagen);
+      groepen.forEach((groep, gi) => scaleSchermGrid(document.getElementById('scherm-grid-' + gi), groep.length, aantalDagen));
       document.querySelectorAll('.scherm-chiprow').forEach(fitChipRow);
     });
   }
@@ -386,8 +444,10 @@
   // RONDE 68: lettergrootte van namen/chips afstemmen op de effectieve rij-/kolomhoogte, zodat de
   // matrix -- ongeacht hoeveel dagen/personen ingesteld staan -- altijd leesbaar maar nooit
   // overlopend op 1 scherm past (geen scrollen toegelaten, zie <style> hierboven).
-  function scaleSchermGrid(aantalPersonen, aantalDagen){
-    const grid = document.getElementById('scherm-grid');
+  // Ronde "scherm-max8": neemt nu het grid-element zelf als parameter (i.p.v. een vast element-id
+  // op te zoeken) -- bij meer dan MAX_PERSONEN_PER_RIJ personen bestaan er immers meerdere
+  // grid-elementen, elk met hun eigen schaal.
+  function scaleSchermGrid(grid, aantalPersonen, aantalDagen){
     if(!grid) return;
     const headEl = grid.querySelector('.scherm-head-cell:not(.scherm-head-corner)');
     const headH = headEl ? headEl.getBoundingClientRect().height : 36;
@@ -424,7 +484,7 @@
     }
   }
 
-  function chipHtml(it, projectNaamById, projectGemeenteById){
+  function chipHtml(it, projectNaamById, projectGemeenteById, projectLeiderById, toonGemeente, toonProjectleider){
     const dagdeelPrefix = it.dagdeel === 'vm' ? 'VM · ' : it.dagdeel === 'nm' ? 'NM · ' : '';
     if(it.type === 'status'){
       const st = IP_STATUSES[it.status] || { label: it.status || '?', cls: 'vrij' };
@@ -435,12 +495,22 @@
     }
     const naam = it.project_id ? (projectNaamById[String(it.project_id)] || '(verwijderd)') : (it.omschrijving || '(verwijderd)');
     const cls = it.project_id ? 'project' : 'vrij';
-    // Ronde "scherm-gemeente": gemeente enkel bij een echte projecttoewijzing (niet bij "vrije
-    // invoer"/verwijderd project) en enkel als ze gekend is -- zie projectGemeenteById hierboven.
-    const gemeente = it.project_id ? (projectGemeenteById[String(it.project_id)] || '') : '';
-    const gemeenteHtml = gemeente ? '<span class="scherm-chip-gemeente"> · ' + escapeHtml(gemeente) + '</span>' : '';
-    const title = gemeente ? (naam + ' — ' + gemeente) : naam;
-    return '<span class="scherm-chip ' + cls + '" title="' + escapeHtml(title) + '">' + dagdeelPrefix + escapeHtml(naam) + gemeenteHtml + '</span>';
+    // Ronde "scherm-max8": gemeente/projectleider enkel bij een echte projecttoewijzing (niet bij
+    // "vrije invoer"/verwijderd project), enkel als ze gekend zijn, en enkel als Peter ze via de
+    // nieuwe vinkjes in Bedrijfsgegevens heeft aangezet (toonGemeente/toonProjectleider).
+    const gemeente = (it.project_id && toonGemeente) ? (projectGemeenteById[String(it.project_id)] || '') : '';
+    const leider = (it.project_id && toonProjectleider) ? (projectLeiderById[String(it.project_id)] || '') : '';
+    const subRegels = [];
+    if(gemeente) subRegels.push('<span class="scherm-chip-sub">' + escapeHtml(gemeente) + '</span>');
+    if(leider) subRegels.push('<span class="scherm-chip-sub scherm-chip-leider">' + escapeHtml(leider) + '</span>');
+    if(!subRegels.length){
+      return '<span class="scherm-chip ' + cls + '" title="' + escapeHtml(naam) + '">' + dagdeelPrefix + escapeHtml(naam) + '</span>';
+    }
+    const titleParts = [naam].concat(gemeente ? [gemeente] : [], leider ? [leider] : []);
+    return '<span class="scherm-chip ' + cls + ' scherm-chip-detailed" title="' + escapeHtml(titleParts.join(' — ')) + '">'
+      + '<span class="scherm-chip-naam">' + dagdeelPrefix + escapeHtml(naam) + '</span>'
+      + subRegels.join('')
+      + '</span>';
   }
 
   function tikKlok(){
