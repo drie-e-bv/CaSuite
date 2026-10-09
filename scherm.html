@@ -118,14 +118,15 @@
   #scherm-content{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;}
   .scherm-grid-outer{flex:1 1 auto;min-height:0;border:1px solid var(--line);border-radius:14px;background:var(--card);overflow:hidden;}
   .scherm-grid{height:100%;display:grid;}
-  /* Ronde "scherm-max8" (2026-10-09), op vraag van Peter: "verdelen in max 8 personen op een rij"
-     -- bij meer dan MAX_PERSONEN_PER_RIJ (zie script) personen wordt er niet 1 brede grid meer
-     getekend, maar meerdere, elk met max 8 personen-kolommen, gestapeld onder elkaar. Bij <=8
-     personen (het gewone geval) blijft dit exact 1 groep en dus visueel ongewijzigd t.o.v.
-     voorheen -- deze .multi-regels komen dan simpelweg niet in het spel. */
-  .scherm-grid-outer.scherm-grid-outer-multi{display:flex;flex-direction:column;gap:5px;border:none;background:none;border-radius:0;overflow:visible;}
-  .scherm-grid-outer-multi .scherm-grid{height:auto;flex:1 1 0;min-height:0;border:1px solid var(--line);border-radius:14px;background:var(--card);overflow:hidden;}
-  .scherm-cell{border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:3px 7px;overflow:hidden;display:flex;flex-direction:column;min-width:0;min-height:0;}
+  /* Ronde "scherm-max8" (2026-10-09, herzien dezelfde dag op vraag van Peter: "de kolommen per dag
+     verdelen"/"de 2 rijen van de dag samen"): bij meer dan MAX_PERSONEN_PER_RIJ (zie script)
+     personen is er nog altijd maar 1 ENKELE grid -- de personen worden intern in groepen van max 8
+     kolommen opgedeeld (elke groep krijgt zijn eigen koprij, bovenaan, 1x), maar de DATUMKOLOM
+     wordt nooit herhaald: elke dag krijgt exact 1 gedeelde datumcel (CSS grid-row-span over alle
+     groep-subrijen van die dag), met de groepen als subrijen er recht onder elkaar/naast die ene
+     datumcel. Bij <=8 personen (het gewone geval) is er maar 1 groep, dus dit valt terug op precies
+     dezelfde, eenvoudige 1-subrij-per-dag-opbouw als voorheen. */
+  .scherm-cell{border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:4px 8px;overflow:hidden;display:flex;flex-direction:column;min-width:0;min-height:0;}
   .scherm-grid > .scherm-cell:nth-last-child(-n+1000){} /* no-op hook, kolom-/rij-randjes blijven gewoon overal staan -- rustiger dan per-laatste-kolom uitzonderingen */
 
   .scherm-head-cell{background:var(--bg);justify-content:center;position:sticky;top:0;}
@@ -144,8 +145,16 @@
   .scherm-row-weekend .scherm-date-cell, .scherm-row-weekend.scherm-slot{background:#eef2ef;}
   .scherm-row-weekend.scherm-slot.scherm-row-today{background:#e3f0e8;}
 
-  .scherm-chiprow{display:flex;flex-wrap:wrap;align-content:flex-start;gap:2px 4px;overflow:hidden;flex:1 1 auto;min-height:0;}
-  .scherm-chip{font-size:var(--scherm-chip-fs);padding:1px 6px;border-radius:6px;font-weight:600;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
+  /* Op vraag van Peter: "Als er 2, of meerdere afspraken staan mogen die onder elkaar komen te
+     staan" -- was voorheen flex-wrap (chips naast elkaar, afbrekend naar een nieuwe regel), nu
+     altijd een kolom (elke chip op zijn eigen regel), ongeacht hoeveel er zijn. */
+  .scherm-chiprow{display:flex;flex-direction:column;gap:3px;overflow:hidden;flex:1 1 auto;min-height:0;}
+  /* flex-shrink:0 is nodig sinds de chiprow op flex-direction:column staat (chip-stapeling, zie
+     .scherm-chiprow): zonder dat zou de browser elke chip -- omdat hij ook "overflow:hidden" heeft,
+     wat de automatische flex-minimumhoogte uitschakelt -- bij te veel chips gewoon plat drukken
+     i.p.v. echt te laten overlopen, waardoor fitChipRow() hieronder de overflow nooit zou detecteren
+     en er dus ook nooit een "+N"-badge zou verschijnen. */
+  .scherm-chip{font-size:var(--scherm-chip-fs);padding:2px 7px;border-radius:6px;font-weight:600;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;flex-shrink:0;}
   .scherm-chip.project{background:var(--brand-soft);color:var(--brand-strong);}
   /* Ronde "scherm-max8" (2026-10-09, op vraag van Peter: "project op 1 rij, eronder de gemeente,
      mss ook nog de projectleider") -- vervangt de ronde-"scherm-gemeente"-opzet (gemeente als
@@ -154,7 +163,7 @@
      eronder. Enkel voor chips die effectief iets extra's tonen (scherm_toon_gemeente/
      scherm_toon_projectleider aan + de waarde is gekend) -- een gewone chip zonder die info blijft
      gewoon de oude, compacte 1-regelige stijl (zie .scherm-chip hierboven). */
-  .scherm-chip.scherm-chip-detailed{display:flex;flex-direction:column;align-items:flex-start;white-space:normal;gap:0;padding:3px 7px;}
+  .scherm-chip.scherm-chip-detailed{display:flex;flex-direction:column;align-items:flex-start;white-space:normal;gap:0;padding:4px 8px;}
   .scherm-chip-naam{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;}
   .scherm-chip-sub{display:block;font-weight:500;opacity:.72;font-size:.84em;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;}
   .scherm-chip-sub.scherm-chip-leider{opacity:.82;}
@@ -381,62 +390,77 @@
     const vandaag = data.vandaag || isoVandaag();
     const aantalDagen = Math.max(1, data.scherm_dagen || 5);
 
-    // ---- Ronde "scherm-max8": personen in groepen van max MAX_PERSONEN_PER_RIJ -- elke groep
-    //      krijgt zo meteen bredere kolommen i.p.v. steeds smallere kolommen bij meer personen. ----
+    // ---- Ronde "scherm-max8" (herzien dezelfde dag, op vraag van Peter: "de kolommen per dag
+    //      verdelen"/"de 2 rijen van de dag samen"): personen in groepen van max MAX_PERSONEN_PER_RIJ
+    //      -- maar nu als SUBRIJEN binnen 1 ENKELE, gedeelde grid, niet meer als volledig aparte,
+    //      elk hun eigen datumkolom herhalende grids. Elke groep krijgt zo nog altijd bredere
+    //      kolommen i.p.v. steeds smaller bij meer personen, maar de datumcel van een dag verschijnt
+    //      nu nog maar 1x (met een CSS grid-row-span over alle groep-subrijen van die dag), en de
+    //      koprij (personen) verschijnt ook maar 1x per groep, helemaal bovenaan -- niet per dag. ----
     const groepen = [];
     for(let i = 0; i < mensen.length; i += MAX_PERSONEN_PER_RIJ) groepen.push(mensen.slice(i, i + MAX_PERSONEN_PER_RIJ));
+    const chunksPerDag = groepen.length;
+    // Bij >1 groep altijd MAX_PERSONEN_PER_RIJ kolommen reserveren (ook voor een kleinere laatste
+    // groep, bv. 15 personen -> 8+7) zodat alle groepen dezelfde kolombreedte/-posities delen. Bij
+    // precies 1 groep (het gewone geval) blijft het exacte, eigen personenaantal gebruikt -- anders
+    // zou bv. 3 personen onnodig breed uitgerekt worden over 8 kolombreedtes.
+    const colsPerRow = chunksPerDag > 1 ? MAX_PERSONEN_PER_RIJ : (groepen[0] ? groepen[0].length : 1);
 
-    function bouwGroepCellsHtml(groep){
-      // ---- Kopregel (personen van deze groep) ----
-      let html = '<div class="scherm-cell scherm-head-cell scherm-head-corner"></div>';
-      groep.forEach(p => {
-        html += '<div class="scherm-cell scherm-head-cell" title="' + escapeHtml(p.naam) + (p.rol ? ' — ' + escapeHtml(p.rol) : '') + '">'
+    // ---- Koprijen: 1 per groep, helemaal bovenaan, elk over de volle breedte van die groep. ----
+    let html = '<div class="scherm-cell scherm-head-cell scherm-head-corner" style="grid-row:1 / span ' + chunksPerDag + ';grid-column:1;"></div>';
+    groepen.forEach((groep, gi) => {
+      const row = gi + 1;
+      groep.forEach((p, pi) => {
+        const col = pi + 2;
+        html += '<div class="scherm-cell scherm-head-cell" style="grid-row:' + row + ';grid-column:' + col + ';" title="' + escapeHtml(p.naam) + (p.rol ? ' — ' + escapeHtml(p.rol) : '') + '">'
           + '<span class="scherm-pname">' + escapeHtml(p.naam) + '</span>'
           + '<span class="scherm-prol">' + escapeHtml(p.rol || 'Technieker') + '</span>'
           + '</div>';
       });
-      // ---- Dagrijen (dezelfde dagen voor elke groep) ----
-      for(let i = 0; i < aantalDagen; i++){
-        const dateISO = addDagen(vandaag, i);
-        const isVandaag = i === 0;
-        const { weekdag, datumTekst, isWeekend } = datumLabel(dateISO);
-        const rowCls = (isVandaag ? ' scherm-row-today' : '') + (isWeekend ? ' scherm-row-weekend' : '');
+    });
 
-        html += '<div class="scherm-cell scherm-date-cell' + rowCls + '">'
-          + '<span class="scherm-dow">' + escapeHtml(weekdag) + '</span>'
-          + '<span class="scherm-datenum">' + escapeHtml(datumTekst) + '</span>'
-          + (isVandaag ? '<span class="scherm-vandaag-badge">Vandaag</span>' : '')
-          + '</div>';
+    // ---- Dagrijen: 1 gedeelde datumcel per dag (row-span over alle groep-subrijen), elke groep
+    //      daarna als eigen subrij eronder/erna. ----
+    for(let i = 0; i < aantalDagen; i++){
+      const dateISO = addDagen(vandaag, i);
+      const isVandaag = i === 0;
+      const { weekdag, datumTekst, isWeekend } = datumLabel(dateISO);
+      const rowCls = (isVandaag ? ' scherm-row-today' : '') + (isWeekend ? ' scherm-row-weekend' : '');
+      const dagRowStart = chunksPerDag + i * chunksPerDag + 1;
 
-        groep.forEach(p => {
+      html += '<div class="scherm-cell scherm-date-cell' + rowCls + '" style="grid-row:' + dagRowStart + ' / span ' + chunksPerDag + ';grid-column:1;">'
+        + '<span class="scherm-dow">' + escapeHtml(weekdag) + '</span>'
+        + '<span class="scherm-datenum">' + escapeHtml(datumTekst) + '</span>'
+        + (isVandaag ? '<span class="scherm-vandaag-badge">Vandaag</span>' : '')
+        + '</div>';
+
+      groepen.forEach((groep, gi) => {
+        const row = dagRowStart + gi;
+        groep.forEach((p, pi) => {
+          const col = pi + 2;
           if(!persoonIsActief(p, dateISO)){
             const reden = (p.in_dienst_vanaf && dateISO < p.in_dienst_vanaf) ? 'Nog niet in dienst' : 'Uit dienst';
-            html += '<div class="scherm-cell scherm-slot scherm-buitendienst' + rowCls + '" title="' + escapeHtml(reden) + '"><span class="scherm-chip-mini">' + escapeHtml(reden) + '</span></div>';
+            html += '<div class="scherm-cell scherm-slot scherm-buitendienst' + rowCls + '" style="grid-row:' + row + ';grid-column:' + col + ';" title="' + escapeHtml(reden) + '"><span class="scherm-chip-mini">' + escapeHtml(reden) + '</span></div>';
             return;
           }
           const items = itemsPerPersoonEnDag[p.naam + '|' + dateISO] || [];
           if(!items.length){
-            html += '<div class="scherm-cell scherm-slot' + rowCls + '"><span class="scherm-empty-slot">—</span></div>';
+            html += '<div class="scherm-cell scherm-slot' + rowCls + '" style="grid-row:' + row + ';grid-column:' + col + ';"><span class="scherm-empty-slot">—</span></div>';
           } else {
-            html += '<div class="scherm-cell scherm-slot' + rowCls + '"><div class="scherm-chiprow">' + items.map(it => chipHtml(it, projectNaamById, projectGemeenteById, projectLeiderById, toonGemeente, toonProjectleider)).join('') + '</div></div>';
+            html += '<div class="scherm-cell scherm-slot' + rowCls + '" style="grid-row:' + row + ';grid-column:' + col + ';"><div class="scherm-chiprow">' + items.map(it => chipHtml(it, projectNaamById, projectGemeenteById, projectLeiderById, toonGemeente, toonProjectleider)).join('') + '</div></div>';
           }
         });
-      }
-      return html;
+      });
     }
 
-    const isMulti = groepen.length > 1;
-    const groepenHtml = groepen.map((groep, gi) =>
-      '<div class="scherm-grid" id="scherm-grid-' + gi + '" style="grid-template-columns:' + DATE_COL_W + 'px repeat(' + groep.length + ', 1fr);grid-template-rows:auto repeat(' + aantalDagen + ', 1fr);">' + bouwGroepCellsHtml(groep) + '</div>'
-    ).join('');
-    content.innerHTML = '<div class="scherm-grid-outer' + (isMulti ? ' scherm-grid-outer-multi' : '') + '">' + groepenHtml + '</div>';
+    const templateRows = Array(chunksPerDag).fill('auto').concat(Array(aantalDagen * chunksPerDag).fill('1fr')).join(' ');
+    content.innerHTML = '<div class="scherm-grid-outer"><div class="scherm-grid" id="scherm-grid-0" style="grid-template-columns:' + DATE_COL_W + 'px repeat(' + colsPerRow + ', 1fr);grid-template-rows:' + templateRows + ';">' + html + '</div></div>';
 
-    // Lettergrootte + overflow-afkap pas berekenen NA dat elke groep-grid echt getekend is (anders
-    // zijn clientHeight/clientWidth hieronder nog 0). requestAnimationFrame wacht op die eerste
-    // tekenbeurt. Elke groep krijgt zijn EIGEN schaalberekening (eigen kolomaantal, en bij meerdere
-    // groepen ook een kleiner aandeel van de schermhoogte, zie .scherm-grid-outer-multi in de CSS).
+    // Lettergrootte + overflow-afkap pas berekenen NA dat de grid echt getekend is (anders zijn
+    // clientHeight/clientWidth hieronder nog 0). requestAnimationFrame wacht op die eerste
+    // tekenbeurt.
     requestAnimationFrame(() => {
-      groepen.forEach((groep, gi) => scaleSchermGrid(document.getElementById('scherm-grid-' + gi), groep.length, aantalDagen));
+      scaleSchermGrid(document.getElementById('scherm-grid-0'), colsPerRow, aantalDagen, chunksPerDag);
       document.querySelectorAll('.scherm-chiprow').forEach(fitChipRow);
     });
   }
@@ -444,18 +468,22 @@
   // RONDE 68: lettergrootte van namen/chips afstemmen op de effectieve rij-/kolomhoogte, zodat de
   // matrix -- ongeacht hoeveel dagen/personen ingesteld staan -- altijd leesbaar maar nooit
   // overlopend op 1 scherm past (geen scrollen toegelaten, zie <style> hierboven).
-  // Ronde "scherm-max8": neemt nu het grid-element zelf als parameter (i.p.v. een vast element-id
-  // op te zoeken) -- bij meer dan MAX_PERSONEN_PER_RIJ personen bestaan er immers meerdere
-  // grid-elementen, elk met hun eigen schaal.
-  function scaleSchermGrid(grid, aantalPersonen, aantalDagen){
+  // Ronde "scherm-max8" (herzien): neemt nu ook chunksPerDag mee -- bij meer dan
+  // MAX_PERSONEN_PER_RIJ personen bestaat een "dag" uit meerdere, onder elkaar gestapelde subrijen
+  // (1 per groep van personen) binnen dezelfde ene, gedeelde grid, dus de effectieve hoogte van 1
+  // subrij is (dag-hoogte / chunksPerDag), niet gewoon de volledige dag-hoogte.
+  function scaleSchermGrid(grid, colsPerRow, aantalDagen, chunksPerDag){
     if(!grid) return;
-    const headEl = grid.querySelector('.scherm-head-cell:not(.scherm-head-corner)');
-    const headH = headEl ? headEl.getBoundingClientRect().height : 36;
+    const corner = grid.querySelector('.scherm-head-corner');
+    const headH = corner ? corner.getBoundingClientRect().height : 36;
     const rect = grid.getBoundingClientRect();
-    const rowH = Math.max(16, (rect.height - headH) / Math.max(1, aantalDagen));
-    const colW = Math.max(36, (rect.width - DATE_COL_W) / Math.max(1, aantalPersonen));
-    const nameFs = Math.max(9, Math.min(15, Math.min(rowH * 0.30, colW * 0.15)));
-    const chipFs = Math.max(8.5, Math.min(13, rowH * 0.24));
+    const subRowH = Math.max(14, (rect.height - headH) / Math.max(1, aantalDagen * chunksPerDag));
+    const colW = Math.max(36, (rect.width - DATE_COL_W) / Math.max(1, colsPerRow));
+    // Op vraag van Peter ("planningsVakjes mogen nog wat groter, eventueel lettertype wat groter"):
+    // iets ruimere boven-/ondergrenzen en iets hogere factoren dan voorheen (was 0.30/0.15/0.24,
+    // 9–15/8.5–13), zodat er bij voldoende ruimte effectief groter getoond wordt.
+    const nameFs = Math.max(9.5, Math.min(16, Math.min(subRowH * 0.33, colW * 0.165)));
+    const chipFs = Math.max(9, Math.min(14, subRowH * 0.26));
     grid.style.setProperty('--scherm-name-fs', nameFs.toFixed(1) + 'px');
     grid.style.setProperty('--scherm-chip-fs', chipFs.toFixed(1) + 'px');
   }

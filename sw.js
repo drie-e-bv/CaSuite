@@ -205,7 +205,14 @@
 // projectchip tonen": Gemeente van het project / Projectleider, beide standaard AAN) laten Peter
 // zelf kiezen welke van die 2 velden op het scherm komen (src2.html, dus alle 5 gebouwde apps +
 // scherm.html wijzigen deze ronde mee).
-const CACHE_VERSION = 'casnap-v2026-10-09-schermmax8';
+// Ronde "scherm-max8-herzien" (2026-10-09, zelfde dag): Peter zag de eerste versie live en gaf
+// feedback: de datumkolom herhaalde zich per groep van personen ("de 2 rijen van de dag samen"),
+// de planningsvakjes/het lettertype mochten groter, en meerdere afspraken in 1 vak moesten onder
+// elkaar i.p.v. naast elkaar komen. scherm.html herbouwd naar 1 ENKELE gedeelde grid (geen
+// duplicaat-datumrij meer per personen-groep, via CSS grid-row-span), iets grotere
+// lettergrootte-/celgrenzen, en .scherm-chiprow op flex-direction:column. Enkel scherm.html
+// wijzigt deze ronde, geen src2.html/SQL.
+const CACHE_VERSION = 'casnap-v2026-10-09-schermmax8b';
 const NETWORK_TIMEOUT_MS = 4000;
 
 self.addEventListener('install', () => {
