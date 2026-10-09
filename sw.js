@@ -219,7 +219,7 @@
 // taken kwam te staan. scherm.html herbouwd naar GROEP-gewijs geordend (elke groep se koprij
 // onmiddellijk gevolgd door zijn eigen dagrijen, naam+taak dus weer recht onder elkaar), met enkel
 // de 1e groep die de volledige datumtekst toont (geen herhaalde datum). Enkel scherm.html wijzigt.
-const CACHE_VERSION = 'casnap-v2026-10-09-schermmax8c';
+const CACHE_VERSION = 'casnap-v2026-10-09-schermweekdagen';
 const NETWORK_TIMEOUT_MS = 4000;
 
 self.addEventListener('install', () => {

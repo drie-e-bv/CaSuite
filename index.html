@@ -4356,6 +4356,17 @@
           <input type="number" id="scherm-dagen" min="1" max="30" step="1">
         </div>
       </div>
+      <!-- Ronde "scherm-weekdagen" (2026-10-09), op vraag van Peter: "Er mag in setting 'scherm'
+           ook vinkje voorzien worden welke dagen dienen weer gegeven worden. Meestal mogen
+           zaterdag en zondag uitgevinkt worden." Standaard maandag t/m vrijdag aan, za/zo uit --
+           zelfde chip-toggle-patroon als "Welke rollen" hieronder. "Aantal dagen" blijft het
+           aantal GELDIGE (aangevinkte) dagen dat getoond wordt, niet het aantal kalenderdagen --
+           bij enkel Ma-Vr aan slaat het scherm een weekend dus gewoon over. -->
+      <div class="field">
+        <label>Welke dagen tonen</label>
+        <p class="hint">Minstens 1 dag moet aangevinkt blijven. "Aantal dagen" hierboven telt enkel de aangevinkte dagen -- een weekend wordt bij za/zo uit dus gewoon overgeslagen.</p>
+        <div class="ip-role-filter" id="scherm-weekdagen-rows"></div>
+      </div>
       <div class="field">
         <label>Welke rollen tonen op het scherm</label>
         <p class="hint">Niets aanvinken = alle rollen tonen.</p>
@@ -21591,6 +21602,15 @@ window.CaCalcApp = {
   // kiesbaar in de rol-keuzelijst; Peter kan ze 1x handmatig op de juiste nieuwe rol zetten bij
   // Bedrijfsgegevens.
   const IP_ROLES = ['Technieker', 'Programmeur', 'Service technieker', 'Management', 'Projectleider', 'Administratie', 'Flexi', 'Onderaannemer'];
+  // Ronde "scherm-weekdagen" (2026-10-09): welke dagen het planningsbord-scherm (scherm.html) mag
+  // tonen -- code/label-paar, code wordt zo bewaard in bedrijf.scherm_weekdagen (en door scherm.html
+  // zelf herkend, zie WEEKDAGEN daar). Standaard (nieuwe/bestaande bedrijven zonder expliciete
+  // keuze) maandag t/m vrijdag.
+  const SCHERM_WEEKDAGEN = [
+    { code: 'ma', label: 'Ma' }, { code: 'di', label: 'Di' }, { code: 'wo', label: 'Wo' },
+    { code: 'do', label: 'Do' }, { code: 'vr', label: 'Vr' }, { code: 'za', label: 'Za' }, { code: 'zo', label: 'Zo' }
+  ];
+  const SCHERM_WEEKDAGEN_DEFAULT = ['ma', 'di', 'wo', 'do', 'vr'];
   // Projectstatus (2026-09-24, op vraag van Peter: "Bij project zou een lijst van optie moeten
   // bestaan: Actief, afgewerkt of onderhoud. Zodat voor snelle planning de actieve projecten
   // kunnen gekozen worden. Wanneer je een afgewerkte of een in onderhoud wenst in te plannen moet
@@ -23252,7 +23272,7 @@ window.CaCalcApp = {
   let bootstrapInFlight = false;
 
   async function bootstrapAfterLoginInner(){
-    state.company = Object.assign({ naam:'Casentis', logo_url:null, adres:'', btw:'', telefoon:'', email:'', website:'', team_leden:[], bureau:[], gemini_model:null, protocollen:null, scherm_token:null, scherm_dagen:5, scherm_rollen:[], scherm_toon_gemeente:true, scherm_toon_projectleider:true }, await dbGetBedrijf());
+    state.company = Object.assign({ naam:'Casentis', logo_url:null, adres:'', btw:'', telefoon:'', email:'', website:'', team_leden:[], bureau:[], gemini_model:null, protocollen:null, scherm_token:null, scherm_dagen:5, scherm_rollen:[], scherm_toon_gemeente:true, scherm_toon_projectleider:true, scherm_weekdagen:SCHERM_WEEKDAGEN_DEFAULT.slice() }, await dbGetBedrijf());
     if(!Array.isArray(state.company.team_leden)) state.company.team_leden = [];
     if(!Array.isArray(state.company.bureau)) state.company.bureau = [];
     if(!Array.isArray(state.company.scherm_rollen)) state.company.scherm_rollen = [];
@@ -24979,6 +24999,12 @@ window.CaCalcApp = {
     // keuze), enkel echt uit na een bewuste "Toepassen" met het vinkje leeg.
     el('scherm-toon-gemeente').checked = state.company.scherm_toon_gemeente !== false;
     el('scherm-toon-projectleider').checked = state.company.scherm_toon_projectleider !== false;
+    // Ronde "scherm-weekdagen": welke dagen het scherm mag tonen -- standaard ma-vr, nooit leeg
+    // (zie de click-handler hieronder, die het leegmaken van de laatste dag blokkeert).
+    const weekdagen = new Set(state.company.scherm_weekdagen && state.company.scherm_weekdagen.length ? state.company.scherm_weekdagen : SCHERM_WEEKDAGEN_DEFAULT);
+    el('scherm-weekdagen-rows').innerHTML = SCHERM_WEEKDAGEN.map(w =>
+      `<button type="button" class="ip-role-chip ${weekdagen.has(w.code) ? 'on' : ''}" data-weekdag="${escapeHtml(w.code)}">${escapeHtml(w.label)}</button>`
+    ).join('');
   }
   el('scherm-rollen-rows').addEventListener('click', e => {
     const chip = e.target.closest('.ip-role-chip'); if(!chip) return;
@@ -24993,9 +25019,36 @@ window.CaCalcApp = {
     // rol-chip-klik.
     const nogNietBewaardGemeente = el('scherm-toon-gemeente').checked;
     const nogNietBewaardProjectleider = el('scherm-toon-projectleider').checked;
+    // Ronde "scherm-weekdagen": ook de nog niet bewaarde weekdag-chips mogen niet stilzwijgend
+    // verloren gaan bij een rol-chip-klik.
+    const nogNietBewaardeWeekdagen = [...el('scherm-weekdagen-rows').querySelectorAll('.ip-role-chip.on')].map(b => b.dataset.weekdag);
     const rollen = new Set(state.company.scherm_rollen || []);
     if(rollen.has(r)) rollen.delete(r); else rollen.add(r);
     state.company.scherm_rollen = [...rollen];
+    renderSchermInstellingen();
+    el('scherm-dagen').value = nogNietBewaardeDagen;
+    el('scherm-toon-gemeente').checked = nogNietBewaardGemeente;
+    el('scherm-toon-projectleider').checked = nogNietBewaardProjectleider;
+    if(nogNietBewaardeWeekdagen.length){
+      el('scherm-weekdagen-rows').querySelectorAll('.ip-role-chip').forEach(b => {
+        b.classList.toggle('on', nogNietBewaardeWeekdagen.includes(b.dataset.weekdag));
+      });
+    }
+  });
+  el('scherm-weekdagen-rows').addEventListener('click', e => {
+    const chip = e.target.closest('.ip-role-chip'); if(!chip) return;
+    const w = chip.dataset.weekdag; if(!w) return;
+    const aanChips = el('scherm-weekdagen-rows').querySelectorAll('.ip-role-chip.on');
+    // Minstens 1 dag moet aangevinkt blijven -- anders zou het scherm geen enkele dag meer tonen.
+    if(chip.classList.contains('on') && aanChips.length <= 1) return;
+    // Zelfde "nog niet bewaarde waarde"-bescherming als bij de rol-chips hierboven, nu in de
+    // andere richting: dagen/gemeente/projectleider mogen niet verloren gaan bij een weekdag-klik.
+    const nogNietBewaardeDagen = el('scherm-dagen').value;
+    const nogNietBewaardGemeente = el('scherm-toon-gemeente').checked;
+    const nogNietBewaardProjectleider = el('scherm-toon-projectleider').checked;
+    chip.classList.toggle('on');
+    const weekdagen = [...el('scherm-weekdagen-rows').querySelectorAll('.ip-role-chip.on')].map(b => b.dataset.weekdag);
+    state.company.scherm_weekdagen = weekdagen;
     renderSchermInstellingen();
     el('scherm-dagen').value = nogNietBewaardeDagen;
     el('scherm-toon-gemeente').checked = nogNietBewaardGemeente;
@@ -25030,14 +25083,20 @@ window.CaCalcApp = {
     // "Toepassen"-knop als dagen/rollen hierboven.
     const toonGemeente = el('scherm-toon-gemeente').checked;
     const toonProjectleider = el('scherm-toon-projectleider').checked;
+    // Ronde "scherm-weekdagen": welke dagen aangevinkt staan, met een defensieve terugval naar
+    // ma-vr mocht de set door een onverwacht pad toch leeg zijn (de click-handler voorkomt dit al,
+    // dit is enkel een laatste veiligheidsnet zodat het scherm nooit 0 dagen zou tonen).
+    let weekdagen = [...el('scherm-weekdagen-rows').querySelectorAll('.ip-role-chip.on')].map(b => b.dataset.weekdag);
+    if(!weekdagen.length) weekdagen = SCHERM_WEEKDAGEN_DEFAULT.slice();
     const statusEl = el('scherm-toepassen-status');
     const knop = el('btn-scherm-toepassen');
     knop.disabled = true;
     try{
-      await dbSaveBedrijf({ scherm_dagen: dagen, scherm_rollen: rollen, scherm_toon_gemeente: toonGemeente, scherm_toon_projectleider: toonProjectleider });
+      await dbSaveBedrijf({ scherm_dagen: dagen, scherm_rollen: rollen, scherm_toon_gemeente: toonGemeente, scherm_toon_projectleider: toonProjectleider, scherm_weekdagen: weekdagen });
       state.company.scherm_dagen = dagen;
       state.company.scherm_toon_gemeente = toonGemeente;
       state.company.scherm_toon_projectleider = toonProjectleider;
+      state.company.scherm_weekdagen = weekdagen;
       renderSchermInstellingen();
       statusEl.textContent = '✓ Toegepast';
       statusEl.classList.remove('is-error');

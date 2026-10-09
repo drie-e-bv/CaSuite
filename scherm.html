@@ -249,6 +249,26 @@
     const d = new Date(iso + 'T00:00:00');
     return { weekdag: WEEKDAGEN[d.getDay()], datumTekst: d.getDate() + ' ' + MAANDEN_KORT[d.getMonth()], isWeekend: d.getDay() === 0 || d.getDay() === 6 };
   }
+  // Ronde "scherm-weekdagen" (2026-10-09), op vraag van Peter: "Er mag in setting 'scherm' ook
+  // vinkje voorzien worden welke dagen dienen weer gegeven worden. Meestal mogen zaterdag en zondag
+  // uitgevinkt worden." -- bouwt de lijst van effectief te tonen kalenderdagen op: start vanaf
+  // vandaag, slaat elke dag over waarvan de weekdag niet in de gekozen set zit, tot er precies
+  // `aantalDagen` geldige dagen gevonden zijn (zelfde stap-voor-stap-logica als scherm_data() zelf
+  // server-side gebruikt, zodat beide altijd exact hetzelfde venster berekenen). Nooit een lege set
+  // toelaten (zou een oneindige lus geven) -- defensief terugvallen op alle 7 dagen.
+  function berekenTeTonenDagen(vandaag, aantalDagen, weekdagCodes){
+    let geldigeIndexen = new Set((weekdagCodes || []).map(c => WEEKDAGEN.indexOf(c)).filter(i => i !== -1));
+    if(!geldigeIndexen.size) geldigeIndexen = new Set([0, 1, 2, 3, 4, 5, 6]);
+    const dagen = [];
+    let offset = 0;
+    while(dagen.length < aantalDagen){
+      const iso = addDagen(vandaag, offset);
+      if(geldigeIndexen.has(new Date(iso + 'T00:00:00').getDay())) dagen.push(iso);
+      offset++;
+      if(offset > 370) break; // praktische veiligheidsgrens, zou met een geldige set nooit bereikt worden
+    }
+    return dagen;
+  }
 
   const params = new URLSearchParams(location.search);
   const token = params.get('token');
@@ -389,20 +409,28 @@
 
     const vandaag = data.vandaag || isoVandaag();
     const aantalDagen = Math.max(1, data.scherm_dagen || 5);
+    // Ronde "scherm-weekdagen": welke kalenderdagen effectief getoond worden -- standaard alle
+    // dagen vanaf vandaag, maar op Peters vraag nu instelbaar (meestal za/zo uitgevinkt). Zelfde
+    // stap-voor-stap-berekening als scherm_data() server-side al gebruikt voor zijn datavenster.
+    const teTonenDagen = berekenTeTonenDagen(vandaag, aantalDagen, data.scherm_weekdagen);
 
-    // ---- Ronde "scherm-max8" (2x herzien dezelfde dag -- 1e herziening: datumcel niet meer
-    //      herhalen per groep, via een gedeelde grid-row-span; 2e herziening, op vraag van Peter na
-    //      een live screenshot: "de namen staan nu samen bovenaan en de taken staan nu onderaan, dit
-    //      zou bij elkaar moeten staan" -- de 1e herziening zette ALLE koprijen samen bovenaan en
-    //      ALLE dagrijen daaronder, waardoor groep 2's naamrij ver van groep 2's eigen taakrij kwam
-    //      te staan, met groep 1's taakrij ertussen). Nu dus terug GROEP-gewijs geordend: elke groep
-    //      krijgt zijn eigen koprij ONMIDDELLIJK gevolgd door zijn eigen dagrijen (naam en taak dus
-    //      weer rechtstreeks onder elkaar, net als bij <=8 personen) -- maar om de datumtekst zelf
-    //      niet nutteloos te herhalen (dat was de oorspronkelijke klacht), toont enkel de EERSTE
-    //      groep de volledige datumtekst/"Vandaag"-badge; de overige groepen krijgen op dezelfde dag
-    //      wel dezelfde achtergrondkleur (vandaag/weekend) in hun datumkolom, maar zonder de tekst
-    //      zelf te herhalen -- de kleur maakt de rij-voor-rij-koppeling aan de 1e groep's datumtekst
-    //      duidelijk, zonder de tekst zelf dubbel te tonen. ----
+    // ---- Ronde "scherm-max8" (3x herzien dezelfde dag). 1e herziening: datumcel niet meer herhalen
+    //      per groep, via een gedeelde grid-row-span over alle groepen heen. Dat zette echter ALLE
+    //      koprijen samen bovenaan en ALLE dagrijen daaronder -- Peter: "de namen staan nu samen
+    //      bovenaan en de taken staan nu onderaan, dit zou bij elkaar moeten staan" (groep 2's naam
+    //      stond zo ver van groep 2's eigen taken, met groep 1's taken ertussen). 2e herziening:
+    //      terug GROEP-gewijs geordend (elke groep's koprij onmiddellijk gevolgd door zijn eigen
+    //      dagrijen), met enkel de 1e groep die de datumtekst toont. Maar daardoor stond, bij meer
+    //      dan 1 dag, groep 1's 2de dag (bv. "ZA 10 okt") tussen groep 1's en groep 2's gegevens voor
+    //      "VR 9 okt" in -- Peter: "nu staat de volgende datum er terug tussen". Een datum-as
+    //      (dag-gewijs) EN een personen-as (groep-gewijs) kunnen in een gewone 2D-rooster niet
+    //      allebei perfect aaneengesloten blijven als er zowel >1 groep als >1 dag is; na 2 ronden
+    //      die dat probeerden (en telkens de andere as braken), is de meest voorspelbare, altijd-
+    //      correcte oplossing: elke groep wordt een volledig ZELFSTANDIG mini-rooster (eigen koprij
+    //      + eigen volledige datumkolom + eigen taken, nergens iets van een andere groep/dag ertussen)
+    //      -- dus de datumtekst herhaalt zich nu weer per groep (zoals bij de allereerste versie),
+    //      maar dat is de enige manier om "naam direct boven eigen taak" EN "geen andere dag/groep
+    //      ertussen" tegelijk te garanderen. ----
     const groepen = [];
     for(let i = 0; i < mensen.length; i += MAX_PERSONEN_PER_RIJ) groepen.push(mensen.slice(i, i + MAX_PERSONEN_PER_RIJ));
     const chunksPerDag = groepen.length;
@@ -416,7 +444,6 @@
     let html = '';
     groepen.forEach((groep, gi) => {
       const headerRow = gi * rijenPerGroep + 1;
-      const toontVolledigeDatum = gi === 0;
 
       // ---- Koprij van deze groep, onmiddellijk gevolgd door zijn eigen dagrijen hieronder. ----
       html += '<div class="scherm-cell scherm-head-cell scherm-head-corner" style="grid-row:' + headerRow + ';grid-column:1;"></div>';
@@ -429,18 +456,16 @@
       });
 
       for(let i = 0; i < aantalDagen; i++){
-        const dateISO = addDagen(vandaag, i);
-        const isVandaag = i === 0;
+        const dateISO = teTonenDagen[i];
+        const isVandaag = dateISO === vandaag;
         const { weekdag, datumTekst, isWeekend } = datumLabel(dateISO);
         const rowCls = (isVandaag ? ' scherm-row-today' : '') + (isWeekend ? ' scherm-row-weekend' : '');
         const row = headerRow + 1 + i;
 
         html += '<div class="scherm-cell scherm-date-cell' + rowCls + '" style="grid-row:' + row + ';grid-column:1;">'
-          + (toontVolledigeDatum
-            ? ('<span class="scherm-dow">' + escapeHtml(weekdag) + '</span>'
-              + '<span class="scherm-datenum">' + escapeHtml(datumTekst) + '</span>'
-              + (isVandaag ? '<span class="scherm-vandaag-badge">Vandaag</span>' : ''))
-            : '')
+          + '<span class="scherm-dow">' + escapeHtml(weekdag) + '</span>'
+          + '<span class="scherm-datenum">' + escapeHtml(datumTekst) + '</span>'
+          + (isVandaag ? '<span class="scherm-vandaag-badge">Vandaag</span>' : '')
           + '</div>';
 
         groep.forEach((p, pi) => {
