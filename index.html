@@ -2379,6 +2379,13 @@
   /* Ronde 62: "Filters & legende"-inklapknop -- enkel zichtbaar op gsm (zie media query onderaan);
      op tablet/desktop blijft alles gewoon altijd in 1 rij zichtbaar, vandaar hier display:none. */
   .ip-filters-toggle{display:none;}
+  /* Op vraag van Peter ("exporteren, mijn week en gaatje zoeken pakken veel te veel plaats in op
+     het scherm", "maar klein en discreet", "Er moet zo veel mogelijk zichtbare planning zijn op
+     het scherm"): zelfde idee als de "Filters & legende"-knop hierboven, nu voor "Mijn week
+     tonen"/"Rooster exporteren"/"Snel een gaatje zoeken" -- enkel zichtbaar op gsm (media query
+     onderaan); op tablet/desktop bestaat deze knop niet en blijven de 3 originele knoppen gewoon
+     zoals voorheen zichtbaar. Zie ipToggleMoreMenu()/ipUpdateMoreMenuLabels() in het script. */
+  .ip-more-wrap{display:none;}
 
   /* Team-schakelaar + periode-navigatie: zelfde "segmented"-look als de subtabs (fase A). */
   .ip-team-switch, .ip-week-nav{
@@ -2881,6 +2888,32 @@
     #ip-export-pdf-btn .ip-exp-long{display:none;}
     #ip-export-pdf-btn{flex:none;}
     .ip-week-nav .ip-range{flex:1 1 auto;min-width:0;}
+    /* "Mijn week tonen"/"Rooster exporteren"/"Snel een gaatje zoeken" verdwijnen op gsm achter 1
+       nieuwe, kleine "⋯"-knop (zie .ip-more-wrap hierboven) -- de 3 originele knoppen/het linkje
+       blijven gewoon in de DOM (enkel hun click() wordt aangeroepen vanuit het menu, zie het
+       script), ze worden hier enkel visueel verborgen. */
+    #ip-export-pdf-btn, #ip-quickfind-btn, #ip-myweek-show-link{display:none !important;}
+    .ip-more-wrap{
+      display:inline-flex;position:relative;flex:none;
+    }
+    .ip-more-btn{
+      display:inline-flex;align-items:center;justify-content:center;width:36px;min-height:34px;padding:0;
+      border:0;border-radius:9px;background:var(--card);color:var(--ink-soft);box-shadow:var(--sh-1);
+      font:700 18px/1 var(--font-ui);cursor:pointer;
+    }
+    .ip-more-btn:hover, .ip-more-btn[aria-expanded="true"]{color:var(--ink);background:var(--app-planning-soft);}
+    .ip-more-menu{
+      display:none;position:absolute;top:calc(100% + 6px);right:0;z-index:30;min-width:208px;
+      flex-direction:column;gap:2px;padding:6px;border:1px solid var(--line);border-radius:10px;
+      background:var(--card);box-shadow:var(--sh-2, var(--sh-1));
+    }
+    .ip-more-menu.open{display:flex;}
+    .ip-more-item{
+      display:flex;align-items:center;gap:8px;width:100%;padding:9px 10px;border:0;border-radius:8px;
+      background:none;text-align:left;font:600 13px/1.2 var(--font-ui);color:var(--ink);cursor:pointer;
+      white-space:nowrap;
+    }
+    .ip-more-item:hover{background:var(--bg);}
     /* Ronde 62: rol-filters + legende staan op gsm voortaan samen achter de "Filters & legende"-
        knop, standaard dicht (loutere UI-staat, niet bewaard -- altijd dicht bij opstart/
        tabwissel). De knop zelf staat hierboven (buiten deze media query) op display:none; hier
@@ -3826,6 +3859,18 @@
             <button id="ip-prev-week" type="button" aria-label="Vorige periode" title="Vorige periode">&larr;</button>
             <span class="ip-range" id="ip-week-range"></span>
             <button id="ip-next-week" type="button" aria-label="Volgende periode" title="Volgende periode">&rarr;</button>
+          </div>
+          <!-- Op vraag van Peter: "exporteren, mijn week en gaatje zoeken pakken veel te veel
+               plaats in op het scherm" / "maar klein en discreet" -- op gsm bundelt deze ene,
+               kleine knop de 3 acties hieronder (die blijven zelf gewoon bestaan, enkel verborgen
+               op gsm, zie CSS); op tablet/desktop bestaat deze knop niet (display:none). -->
+          <div class="ip-more-wrap">
+            <button type="button" class="ip-more-btn" id="ip-more-btn" aria-haspopup="true" aria-expanded="false" aria-label="Meer acties">⋯</button>
+            <div class="ip-more-menu" id="ip-more-menu" role="menu">
+              <button type="button" class="ip-more-item" id="ip-more-myweek" role="menuitem">📅 <span id="ip-more-myweek-label">Mijn week tonen</span></button>
+              <button type="button" class="ip-more-item" id="ip-more-export" role="menuitem">📄 Rooster exporteren</button>
+              <button type="button" class="ip-more-item" id="ip-more-quickfind" role="menuitem">🔍 Snel een gaatje zoeken</button>
+            </div>
           </div>
           <button class="btn btn-secondary btn-sm" id="ip-export-pdf-btn" type="button"><span class="btn-ico">📄</span><span><span class="ip-exp-long">Rooster </span>exporteren</span></button>
           <!-- Ronde 69: "Snel een gaatje zoeken" -- zichtbaarheid gekoppeld aan dezelfde
@@ -23273,6 +23318,11 @@ window.CaCalcApp = {
     // zichtbaarheidsregel als de Inschatting-subtab hierboven (ook dit maakt enkel voorstellen).
     const quickfindBtn = el('ip-quickfind-btn');
     if(quickfindBtn) quickfindBtn.style.display = canMakeProposals ? '' : 'none';
+    // Zelfde zichtbaarheidsregel voor het bijbehorende item in de "⋯ Meer"-knop (gsm) -- anders
+    // zou iemand zonder "Voorstellen maken" de functie via dat menu alsnog kunnen bereiken, ook al
+    // is de originele knop zelf (op gsm sowieso altijd verborgen, zie CSS) voor hen dichtgezet.
+    const quickfindMoreItem = el('ip-more-quickfind');
+    if(quickfindMoreItem) quickfindMoreItem.style.display = canMakeProposals ? '' : 'none';
     // De centrale projectkeuze in de header heeft enkel nut als er ook een tabblad bereikbaar is
     // dat er iets mee doet (Dossier/Werfverslag) -- bv. in de losse Planning-app (planning.html)
     // of voor een "enkel planning"-persoon is ze zinloos, dus dan verbergen.
@@ -30755,7 +30805,9 @@ window.CaCalcApp = {
     const syncBtn = el('ip-myweek-sync-btn');
     if(!card || !body) return;
     const naam = getCurrentUserNaam();
-    if(!naam){ card.style.display = 'none'; if(showLink) showLink.style.display = 'none'; if(syncBtn) syncBtn.style.display = 'none'; return; } // geen gekoppeld teamlid-record (bv. de eigenaar)
+    const moreItem = el('ip-more-myweek');
+    if(!naam){ card.style.display = 'none'; if(showLink) showLink.style.display = 'none'; if(syncBtn) syncBtn.style.display = 'none'; if(moreItem) moreItem.style.display = 'none'; return; } // geen gekoppeld teamlid-record (bv. de eigenaar)
+    if(moreItem) moreItem.style.display = '';
     // Ronde 55: "🔄 Synchroniseer"-knop enkel tonen als minstens 1 van de 2 persoonlijke Outlook-
     // sync-vinkjes van de ingelogde gebruiker aan staat (zie #appbar-account-outlook) -- voor
     // wie de sync nooit gebruikt (bijna iedereen, standaard uit) verschijnt dit knopje nooit.
@@ -31354,6 +31406,28 @@ window.CaCalcApp = {
     const open = typeof force === 'boolean' ? force : !sub.classList.contains('ip-filters-open');
     sub.classList.toggle('ip-filters-open', open);
     toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+
+  // "⋯ Meer"-knop (gsm): bundelt "Mijn week tonen/verbergen", "Rooster exporteren" en "Snel een
+  // gaatje zoeken" achter 1 kleine, discrete knop naast de periode-navigatie (op vraag van Peter,
+  // zie de toelichting bij .ip-more-wrap in de CSS). Roept gewoon .click() aan op de bestaande,
+  // enkel-op-gsm-verborgen knoppen/het linkje i.p.v. hun logica te herhalen -- het gedrag blijft
+  // dus overal exact hetzelfde, enkel het ingangspunt verandert. Loutere UI-staat (niet bewaard,
+  // altijd dicht bij opstart/tabwissel), net als de "Filters & legende"-knop hierboven.
+  function ipUpdateMoreMenuLabels(){
+    const label = el('ip-more-myweek-label');
+    const card = el('ip-myweek-card');
+    if(!label || !card) return;
+    label.textContent = card.style.display === 'none' ? 'Mijn week tonen' : 'Mijn week verbergen';
+  }
+  function ipToggleMoreMenu(force){
+    const menu = el('ip-more-menu');
+    const btn = el('ip-more-btn');
+    if(!menu || !btn) return;
+    const open = typeof force === 'boolean' ? force : !menu.classList.contains('open');
+    if(open) ipUpdateMoreMenuLabels();
+    menu.classList.toggle('open', open);
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
   }
 
   function renderIpWeekRange(){
@@ -32694,6 +32768,18 @@ window.CaCalcApp = {
   // Ronde 62: de #ip-team-switch-click-listener die hier stond is verwijderd samen met de
   // Tech/Bureau-schakelaar zelf (zie .ip-toolbar/ipCurrentPeople() hierboven).
   el('ip-filters-toggle').addEventListener('click', () => ipToggleFiltersPanel());
+  // "⋯ Meer"-knop (gsm) -- zie ipToggleMoreMenu()/ipUpdateMoreMenuLabels() hierboven. Sluit ook
+  // vanzelf bij een klik ernaast (document-click) of Escape, zelfde idiomen als elders in de app.
+  el('ip-more-btn').addEventListener('click', e => { e.stopPropagation(); ipToggleMoreMenu(); });
+  document.addEventListener('click', e => { if(!e.target.closest('.ip-more-wrap')) ipToggleMoreMenu(false); });
+  document.addEventListener('keydown', e => { if(e.key === 'Escape') ipToggleMoreMenu(false); });
+  el('ip-more-myweek').addEventListener('click', () => {
+    ipToggleMoreMenu(false);
+    const card = el('ip-myweek-card');
+    (card && card.style.display === 'none' ? el('ip-myweek-show-link') : el('ip-myweek-hide-btn')).click();
+  });
+  el('ip-more-export').addEventListener('click', () => { ipToggleMoreMenu(false); el('ip-export-pdf-btn').click(); });
+  el('ip-more-quickfind').addEventListener('click', () => { ipToggleMoreMenu(false); el('ip-quickfind-btn').click(); });
   el('ip-role-filter').addEventListener('click', e => {
     const chip = e.target.closest('.ip-role-chip'); if(!chip) return;
     // "Onderaannemers"-chip (2026-09-24): eigen toggle, geen normale rol-filter -- zie

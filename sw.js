@@ -181,7 +181,14 @@
 // project laat kiezen (of meteen een nieuw plan/PDF laat uploaden) en er met zoom/kleur/dikte/
 // ongedaan-maken op laat tekenen -- "Opslaan" gebruikt de schets gewoon als foto bij dat
 // actiepunt (zelfde opslag-/uploadpad als een normale foto).
-const CACHE_VERSION = 'casnap-v2026-10-08-rps';
+// Ronde "ip-meer-knop" (2026-10-08, zelfde dag als ronde "plannen-pdf-schets"): Peter, over het
+// mobiele Rooster-scherm van Planning: "exporteren, mijn week en gaatje zoeken pakken veel te
+// veel plaats in op het scherm", gevolgd door "Maar klein en discreet" en "Er moet zo veel
+// mogelijk zichtbare planning zijn op het scherm". Op gsm (<=640px) zijn "Mijn week tonen/
+// verbergen", "Rooster exporteren" en "Snel een gaatje zoeken" voortaan gebundeld achter 1
+// nieuwe, kleine "⋯ Meer"-knop naast de periode-navigatie (zelfde patroon als de bestaande
+// "Filters & legende"-knop uit ronde 62) -- enkel op gsm, desktop/tablet blijven ongewijzigd.
+const CACHE_VERSION = 'casnap-v2026-10-08-ipmeer';
 const NETWORK_TIMEOUT_MS = 4000;
 
 self.addEventListener('install', () => {
