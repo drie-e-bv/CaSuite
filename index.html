@@ -2368,11 +2368,30 @@
      Desktop: team-schakelaar links | periode-navigatie midden | export rechts; eronder de rol-filters
      als kleine schakel-chips en rechts de compacte legende. Gsm: zie het blok onderaan. */
   .ip-toolbar{display:flex;flex-direction:column;gap:12px;margin:0 0 14px;}
-  /* Ronde 62: geen Tech/Bureau-schakelaar meer -- .ip-controls toont nu enkel periode-navigatie
-     (gecentreerd) + export (rechts). */
-  #ipsub-rooster .ip-controls{display:grid;grid-template-columns:1fr auto;align-items:center;gap:12px;margin:0;}
-  #ipsub-rooster .ip-week-nav{justify-self:center;}
-  #ip-export-pdf-btn{justify-self:end;margin-left:0;min-height:42px;padding:0 14px;font-size:14px;border-radius:var(--r);}
+  /* Ronde "ip-controls-desktop" (2026-10-09): Peter, met screenshot van de website/desktop-versie
+     van het Rooster-tabblad: "Kun je deze knoppen ook op de websiteversie beter zetten?" -- op
+     vraag verduidelijkt tot "te los/rommelig verdeeld". Oorzaak: deze grid had maar 2 kolommen
+     (`1fr auto`) terwijl er intussen 4 kinderen in .ip-controls staan (periode-navigatie, het
+     gsm-only "⋯ Meer"-blokje, exportknop, "Snel een gaatje zoeken") -- de 4e knop viel daardoor
+     buiten de 2 kolommen en week dus uit naar een eigen, volle-breedte rij eronder (precies wat op
+     de schermfoto te zien was). Nieuwe opzet: 3 kolommen met vaste rollen via grid-template-areas
+     (`myweek | nav | actions`) i.p.v. louter volgorde-gebaseerde auto-plaatsing -- zo blijft elk
+     stuk op zijn eigen plek staan, ook als "Mijn week tonen" er niet is (zie hieronder, dat linkje
+     stond voorheen trouwens helemaal LOS boven de toolbar, los van alle andere knoppen, vandaar ook
+     de extra witruimte bovenaan op de schermfoto -- het staat nu gewoon mee in dezelfde balk). De
+     2 buitenste kolommen zijn bewust gelijk (`1fr`), zodat de periode-navigatie in het midden altijd
+     echt gecentreerd staat, ongeacht of "Mijn week tonen" er wel/niet is. Enkel deze ene rij
+     (.ip-controls, tablet/desktop); .ip-toolbar-sub (rol-filters/legende) eronder is ongewijzigd,
+     en op gsm (<=640px) verandert er niets -- die media query (zie onderaan) zet hier gewoon een
+     eigen flex-rij overheen, zoals voorheen. */
+  #ipsub-rooster .ip-controls{
+    display:grid;grid-template-columns:1fr auto 1fr;grid-template-areas:"myweek nav actions";
+    align-items:center;gap:12px;margin:0;
+  }
+  #ip-myweek-show-link{grid-area:myweek;justify-self:start;margin:0;}
+  #ipsub-rooster .ip-week-nav{grid-area:nav;justify-self:center;}
+  .ip-actions-group{grid-area:actions;justify-self:end;display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-width:0;}
+  #ip-export-pdf-btn{margin-left:0;min-height:42px;padding:0 14px;font-size:14px;border-radius:var(--r);}
   .ip-toolbar-sub{display:flex;flex-wrap:wrap;align-items:center;gap:10px 24px;}
   .ip-toolbar-sub .ip-role-filter{margin:0;flex:0 1 auto;min-width:0;}
   .ip-toolbar-sub .ip-legend{margin:0 0 0 auto;}
@@ -2893,6 +2912,11 @@
        blijven gewoon in de DOM (enkel hun click() wordt aangeroepen vanuit het menu, zie het
        script), ze worden hier enkel visueel verborgen. */
     #ip-export-pdf-btn, #ip-quickfind-btn, #ip-myweek-show-link{display:none !important;}
+    /* Ronde "ip-controls-desktop": .ip-actions-group (nieuwe wrapper rond export+quickfind, enkel
+       voor de grid-indeling op tablet/desktop) mag op gsm zelf geen vak meer innemen in de flex-rij
+       hierboven -- display:contents laat enkel de (toch al verborgen) knoppen erin tellen, niet de
+       wrapper zelf, dus geen onnodige lege ruimte/gap op gsm. */
+    .ip-actions-group{display:contents;}
     .ip-more-wrap{
       display:inline-flex;position:relative;flex:none;
     }
@@ -3821,7 +3845,6 @@
            zichtbaar") -- enkel de 2 mini-iconknopjes hieronder in de card-head zelf (zelfde
            .ip-mini-btn-stijl als elders in dit tabblad), plus het kleine "tonen"-linkje net hierna
            zodat wie de kaart uitzet, ze ook altijd makkelijk terugvindt. -->
-      <button type="button" class="ip-mini-btn" id="ip-myweek-show-link" style="display:none;margin-bottom:10px;">📅 Mijn week tonen</button>
       <div class="card ip-myweek-card" id="ip-myweek-card" style="display:none;margin-bottom:14px;">
         <div class="card-head">
           <h3>📅 Mijn week</h3>
@@ -3855,6 +3878,12 @@
                niet nodig voor inschattingen"). -->
       <div class="ip-toolbar">
         <div class="ip-controls">
+          <!-- Ronde "ip-controls-desktop" (2026-10-09): dit linkje stond hier voorheen helemaal LOS
+               boven de hele toolbar (eigen rij, eigen margin-bottom) -- op de website/desktop-versie
+               gaf dat extra witruimte en een "rommelig" gevoel (Peters klacht, met screenshot). Nu
+               gewoon het eerste onderdeel van dezelfde .ip-controls-rij (grid-area "myweek", zie
+               CSS) -- zelfde knop, zelfde click-handler, enkel de plek in de layout veranderde. -->
+          <button type="button" class="ip-mini-btn" id="ip-myweek-show-link" style="display:none;">📅 Mijn week tonen</button>
           <div class="ip-week-nav">
             <button id="ip-prev-week" type="button" aria-label="Vorige periode" title="Vorige periode">&larr;</button>
             <span class="ip-range" id="ip-week-range"></span>
@@ -3872,11 +3901,19 @@
               <button type="button" class="ip-more-item" id="ip-more-quickfind" role="menuitem">🔍 Snel een gaatje zoeken</button>
             </div>
           </div>
-          <button class="btn btn-secondary btn-sm" id="ip-export-pdf-btn" type="button"><span class="btn-ico">📄</span><span><span class="ip-exp-long">Rooster </span>exporteren</span></button>
-          <!-- Ronde 69: "Snel een gaatje zoeken" -- zichtbaarheid gekoppeld aan dezelfde
-               "kan_voorstellen_maken"-vlag als de Inschatting-subtab (zie applyAccessRestrictions()
-               in het script, canMakeProposals). -->
-          <button class="btn btn-secondary btn-sm" id="ip-quickfind-btn" type="button">🔍 Snel een gaatje zoeken</button>
+          <!-- Ronde "ip-controls-desktop": export + quickfind nu gegroepeerd in 1 wrapper
+               (grid-area "actions", zie CSS) i.p.v. los als 3e/4e kind van een grid met maar 2
+               kolommen -- dat laatste liet "Snel een gaatje zoeken" voorheen uitwijken naar een
+               eigen, volle-breedte rij (de bug op Peters screenshot). Op gsm (media query onderaan)
+               wordt deze wrapper zelf `display:contents` -- telt niet mee als eigen vak, enkel de
+               (toch al verborgen) knoppen erin blijven bestaan. -->
+          <div class="ip-actions-group">
+            <button class="btn btn-secondary btn-sm" id="ip-export-pdf-btn" type="button"><span class="btn-ico">📄</span><span><span class="ip-exp-long">Rooster </span>exporteren</span></button>
+            <!-- Ronde 69: "Snel een gaatje zoeken" -- zichtbaarheid gekoppeld aan dezelfde
+                 "kan_voorstellen_maken"-vlag als de Inschatting-subtab (zie applyAccessRestrictions()
+                 in het script, canMakeProposals). -->
+            <button class="btn btn-secondary btn-sm" id="ip-quickfind-btn" type="button">🔍 Snel een gaatje zoeken</button>
+          </div>
         </div>
         <div class="ip-toolbar-sub" id="ip-toolbar-sub">
           <button type="button" class="ip-filters-toggle" id="ip-filters-toggle" aria-expanded="false" aria-controls="ip-role-filter ip-legend">

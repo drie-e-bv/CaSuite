@@ -188,7 +188,15 @@
 // verbergen", "Rooster exporteren" en "Snel een gaatje zoeken" voortaan gebundeld achter 1
 // nieuwe, kleine "⋯ Meer"-knop naast de periode-navigatie (zelfde patroon als de bestaande
 // "Filters & legende"-knop uit ronde 62) -- enkel op gsm, desktop/tablet blijven ongewijzigd.
-const CACHE_VERSION = 'casnap-v2026-10-08-ipmeer';
+// Ronde "ip-controls-desktop" (2026-10-09): Peter stuurde een screenshot van de website-/desktop-
+// versie van het Rooster-tabblad: "Kun je deze knoppen ook op de websiteversie beter zetten?" --
+// verduidelijkt tot "te los/rommelig verdeeld". Oorzaak: .ip-controls was een grid met maar 2
+// kolommen terwijl er 4 kinderen in stonden -- "Snel een gaatje zoeken" week daardoor uit naar een
+// eigen, volle-breedte rij. Herbouwd tot 3 vaste kolommen (myweek-linkje | periode-navigatie,
+// gecentreerd | export+quickfind samen rechts) via grid-template-areas, zodat alles netjes op 1 rij
+// blijft staan -- enkel tablet/desktop (>640px); de gsm-indeling (ronde "ip-meer-knop") is
+// ongewijzigd.
+const CACHE_VERSION = 'casnap-v2026-10-09-ipctrl';
 const NETWORK_TIMEOUT_MS = 4000;
 
 self.addEventListener('install', () => {
