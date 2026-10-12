@@ -61,6 +61,10 @@
     --app-planning:#d0443a;  --app-planning-soft:#fbeae8;
     --app-dossier:#2f8a4a;   --app-dossier-soft:#e6f3ea;
     --app-calc:#2563c9;      --app-calc-soft:#e8effb;
+    /* CaFin (Financiële module, fase 1, 2026-10-09, op vraag van Peter) -- eigen paars, nog niet
+       eerder gebruikte kleur in deze reeks, zodat het meteen visueel onderscheiden is van de 4
+       bestaande hoofdapps. */
+    --app-cafin:#7a4fc9;     --app-cafin-soft:#f1ecfa;
     /* Neutraal "info"-blauw voor badges/tags die niet bij een specifieke app horen (beheerder-badge,
        protocol-/vaardigheden-tags in de planning) -- was voorheen via --app-werf. */
     --info:#2563c9;          --info-soft:#e8effb;
@@ -97,6 +101,7 @@
   body[data-app="planning"]{--app:var(--app-planning);--app-soft:var(--app-planning-soft);}
   body[data-app="dossier"]{--app:var(--app-dossier);--app-soft:var(--app-dossier-soft);}
   body[data-app="calc"]{--app:var(--app-calc);--app-soft:var(--app-calc-soft);}
+  body[data-app="cafin"]{--app:var(--app-cafin);--app-soft:var(--app-cafin-soft);}
   *{box-sizing:border-box;}
   /* Basis 15px (desktop) / 16px (gsm, voorkomt iOS-zoom in invoervelden) -- ronde 48. Op html gezet
      zodat ook de vele bestaande rem-maten mee schalen. overflow-x:clip = enkel vangnet, de echte
@@ -203,6 +208,9 @@
     --tile-planning:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.1' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='4' y='5.5' width='16' height='14.5' rx='2'/%3E%3Cpath d='M4 10h16M8.5 3.5v4M15.5 3.5v4'/%3E%3C/svg%3E");
     --tile-dossier:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.1' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 7.5A2 2 0 0 1 5.5 5.5h3.8l2 2h7.2a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z'/%3E%3C/svg%3E");
     --tile-calc:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.1' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M13 3L5.5 13.5H11L10 21l7.5-10.5H12z'/%3E%3C/svg%3E");
+    /* CaFin (fase 1) -- eenvoudig factuur/document-icoon met een "€"-achtig streepje, om het
+       visueel te onderscheiden van het CaDos-documenticoon hierboven. */
+    --tile-cafin:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.1' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 3.5h12v17l-2.5-1.6-2.5 1.6-2.5-1.6-2.5 1.6-2-1.3z'/%3E%3Cpath d='M9 8.5h6M9 12h6M9 15.5h3.5'/%3E%3C/svg%3E");
   }
   header.top{
     position:sticky;top:0;z-index:60;
@@ -495,6 +503,7 @@
   #main-nav [data-tab="inzet"]{--tile:var(--app-planning);--tile-soft:var(--app-planning-soft);--tile-glyph:var(--tile-planning);}
   #main-nav [data-tab="cados"]{--tile:var(--app-dossier);--tile-soft:var(--app-dossier-soft);--tile-glyph:var(--tile-dossier);}
   #main-nav [data-tab="cacalc"]{--tile:var(--app-calc);--tile-soft:var(--app-calc-soft);--tile-glyph:var(--tile-calc);}
+  #main-nav [data-tab="cafin"]{--tile:var(--app-cafin);--tile-soft:var(--app-cafin-soft);--tile-glyph:var(--tile-cafin);}
   body.single-app #main-nav{display:none;}
   body.single-app header.top{margin-bottom:20px;}
   @media (max-width:720px){
@@ -861,6 +870,39 @@
     display:flex;align-items:center;gap:6px;font-size:.82rem;color:var(--ink-soft);white-space:nowrap;cursor:pointer;
   }
   .show-inactive-toggle input{width:auto;}
+  /* CaFin (Financiële module, fase 1, 2026-10-09) -- eigen, lichtgewicht rijstijl, los van
+     .project-row hierboven (geen uit-/inklapbare rij nodig, enkel een platte lijst + acties). */
+  .cafin-row{
+    display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+    border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;margin-bottom:10px;background:#fbfbfc;
+  }
+  .cafin-row-main{flex:1 1 260px;min-width:0;}
+  .cafin-row-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:2px;}
+  .cafin-row-sub{font-size:.85rem;color:var(--ink-soft);}
+  .cafin-row-bedrag{font-weight:700;font-size:1.05rem;white-space:nowrap;}
+  .cafin-row-acties{display:flex;gap:6px;flex-wrap:wrap;}
+  .cafin-badge{
+    display:inline-flex;align-items:center;padding:2px 10px;border-radius:999px;font-size:.78rem;font-weight:600;white-space:nowrap;
+    background:var(--sunken);color:var(--ink-soft);
+  }
+  .cafin-badge-te_koppelen{background:var(--app-cafin-soft);color:var(--app-cafin);}
+  .cafin-badge-gekoppeld{background:var(--info-soft);color:var(--info);}
+  .cafin-badge-in_goedkeuring{background:#fdf2d8;color:#9a6b00;}
+  .cafin-badge-goedgekeurd{background:var(--app-dossier-soft);color:var(--app-dossier);}
+  .cafin-badge-afgekeurd{background:var(--danger-soft);color:var(--danger);}
+  .cafin-badge-betaald{background:var(--app-dossier-soft);color:var(--app-dossier);}
+  .cafin-totaal-row{
+    display:flex;justify-content:space-between;align-items:center;gap:10px;
+    padding:8px 2px;border-bottom:1px solid var(--line);
+  }
+  .cafin-totaal-row:last-child{border-bottom:none;}
+  #cafin-f-match-hint .link-btn, #cafin-f-match-hint button{
+    background:none;border:none;color:var(--info);font-weight:600;cursor:pointer;padding:0;text-decoration:underline;
+  }
+  @media (max-width:720px){
+    .cafin-row{flex-direction:column;align-items:stretch;}
+    .cafin-row-bedrag{order:-1;}
+  }
   .project-row{
     border:1px solid var(--line);border-radius:var(--radius);margin-bottom:10px;background:#fbfbfc;overflow:hidden;
   }
@@ -3269,6 +3311,12 @@
     <button class="tab-btn" data-tab="inzet" type="button">Planning</button>
     <button class="tab-btn" id="main-nav-btn-cados" data-tab="cados" type="button">Dossier</button>
     <button class="tab-btn" id="main-nav-btn-cacalc" data-tab="cacalc" type="button">Kabelberekening</button>
+    <!-- CaFin (Financiële module, fase 1, 2026-10-09, op vraag van Peter: "Een extra toevoeging
+         in de complete app is CaFin - Financiele module. Waarbij we alle inkomende facturen
+         laten passeren.") -- net als Planning altijd zichtbaar zodra iemand toegang heeft (geen
+         project-afhankelijke "aanmaken"-stand zoals Dossier/Kabelberekening hierboven, zie
+         tabsForPersonAccess()/kan_facturen_zien in het script). -->
+    <button class="tab-btn" id="main-nav-btn-cafin" data-tab="cafin" type="button">Facturen</button>
   </nav>
 
   <div class="offline-banner" id="offline-banner" style="display:none;">
@@ -3820,6 +3868,11 @@
       <button class="ip-subtab-btn" data-ipsub="vaardigheden" type="button">Vaardigheden</button>
       <button class="ip-subtab-btn" data-ipsub="inschatting" type="button" id="ip-subtab-inschatting">Inschatting</button>
       <button class="ip-subtab-btn" data-ipsub="bevestigen" type="button" id="ip-subtab-bevestigen" style="display:none;">Te bevestigen<span class="ip-confirm-count" id="ip-confirm-count" style="display:none;">0</span></button>
+      <!-- Ronde "scherm-mededelingen" (2026-10-09), op vraag van Peter: "Extra knop daarvoor op de
+           planningspagina naast inschatting en te bevestigen. Daar kies je om melding toe te
+           voegen." -- geen apart toegangsvinkje (Peters eigen keuze): zichtbaar voor iedereen die
+           hier sowieso al toegang toe heeft, zelfde als Rooster/Capaciteit/Vaardigheden hierboven. -->
+      <button class="ip-subtab-btn" data-ipsub="mededelingen" type="button" id="ip-subtab-mededelingen">Mededelingen</button>
     </div>
 
     <!-- ---- Rooster ---- -->
@@ -4074,7 +4127,50 @@
       </div>
       <div class="empty-hint" id="ip-confirm-empty-hint" data-ico="✅" style="display:none;"><strong>Alles bevestigd</strong>Geen voorstellen in afwachting van bevestiging.</div>
     </section>
+
+    <!-- Ronde "scherm-mededelingen" (2026-10-09) -- berichten die onderaan het publieke
+         planningsbord-scherm (scherm.html) cyclisch verschijnen, zie renderSchermBanner() daar.
+         Elk bericht heeft een eigen wisseltijd en een optionele vervaldatum (Peters keuze: niet
+         "blijft tot je het zelf verwijdert", wel instelbaar per bericht). -->
+    <section class="ip-subview" id="ipsub-mededelingen">
+      <p class="hint">Berichten die onderaan het planningsbord-scherm (het wandscherm, zie Bedrijfsgegevens → "Schermweergave") na elkaar verschijnen, in een lus. Elk bericht heeft zijn eigen wisseltijd en kan optioneel een vervaldatum krijgen.</p>
+      <div id="ip-mededelingen-list"></div>
+      <div class="empty-hint" id="ip-mededelingen-empty-hint" data-ico="📣"><strong>Nog geen mededelingen.</strong> Voeg hieronder het eerste bericht toe.</div>
+      <button class="add-item-btn" id="add-ip-mededeling" type="button">+ Mededeling toevoegen</button>
+    </section>
   </section>
+
+  <!-- Modal: mededeling toevoegen/bewerken (zie renderIpMededelingenTab()/openIpMededelingModal() in het script). -->
+  <div class="modal-overlay" id="ip-mededeling-modal" style="display:none;">
+    <div class="modal-box" style="max-width:520px;">
+      <h2 id="ip-mededeling-modal-title">Mededeling toevoegen</h2>
+      <div class="modal-body">
+        <div class="field">
+          <label>Onderwerp (optioneel)</label>
+          <input type="text" id="ip-med-onderwerp" placeholder="bv. Belangrijk">
+        </div>
+        <div class="field">
+          <label>Boodschap</label>
+          <textarea id="ip-med-boodschap" rows="3" placeholder="De tekst die op het scherm verschijnt"></textarea>
+        </div>
+        <div class="field-row" style="display:flex;gap:10px;">
+          <div class="field" style="flex:1;">
+            <label>Wisseltijd (seconden)</label>
+            <input type="number" min="3" step="1" id="ip-med-duur" placeholder="8">
+          </div>
+          <div class="field" style="flex:1;">
+            <label>Vervaldatum (optioneel)</label>
+            <input type="date" id="ip-med-vervaldatum">
+          </div>
+        </div>
+        <p class="hint">Zonder vervaldatum blijft het bericht gewoon meedraaien in de lus tot je het hier verwijdert.</p>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" id="ip-med-save" type="button">Opslaan</button>
+        <button class="btn btn-ghost" id="ip-med-cancel" type="button">Annuleren</button>
+      </div>
+    </div>
+  </div>
 
   <!-- ---- Zijpaneel: afspraak toevoegen/bewerken (bij het rooster) ---- -->
   <div class="ip-overlay" id="ip-overlay"></div>
@@ -4400,6 +4496,110 @@
       <button class="btn btn-secondary btn-sm" id="btn-backup-export" type="button"><span class="btn-ico" aria-hidden="true">⬇</span> Exporteer volledige back-up (.json)</button>
     </section>
   </section>
+
+  <!-- ===================== TAB: CAFIN (Financiële module, fase 1) ===================== -->
+  <!-- Nieuw tabblad (2026-10-09, op vraag van Peter: "Een extra toevoeging in de complete app is
+       CaFin - Financiele module. Waarbij we alle inkomende facturen laten passeren."). Fase 1 =
+       handmatige invoer + koppelen aan een werf (hergebruikt het bestaande projecten.projectnummer
+       als herkenningscode, geen nieuwe kolom) + een eenvoudige goedkeuringsworkflow. Nog GEEN
+       automatische Peppol-ontvangst (latere fase, afhankelijk van Peters gekozen provider/account) --
+       zie cafin_facturen.bron ('handmatig' nu, 'peppol' gereserveerd voor later).
+       Zichtbaarheid: zie tabsForPersonAccess() (kan_facturen_zien/kan_facturen_goedkeuren) in het
+       script hierboven, en ALL_TABS/WERF_TABS (bewust enkel in de volledige site, geen eigen losse
+       app zoals cados.html/cacalc.html -- zie build-apps.js). -->
+  <section class="tab-section" id="tab-cafin">
+
+    <section class="card">
+      <h2>Facturen</h2>
+      <p class="hint">Binnenkomende facturen van leveranciers, gekoppeld aan de werf waarvoor ze bedoeld zijn. Koppel een nog niet toegewezen factuur aan een project, en keur ze goed/af zodra nodig.</p>
+      <div class="projects-toolbar">
+        <input type="search" id="cafin-search" placeholder="Zoek op leverancier, factuurnummer of referentie...">
+        <select id="cafin-status-filter">
+          <option value="">Alle statussen</option>
+          <option value="te_koppelen">Te koppelen</option>
+          <option value="gekoppeld">Gekoppeld</option>
+          <option value="in_goedkeuring">In goedkeuring</option>
+          <option value="goedgekeurd">Goedgekeurd</option>
+          <option value="afgekeurd">Afgekeurd</option>
+          <option value="betaald">Betaald</option>
+        </select>
+      </div>
+      <div id="cafin-list"></div>
+      <div class="empty-hint" id="cafin-empty-hint" data-ico="🧾"><strong>Nog geen facturen toegevoegd.</strong> Voeg hieronder de eerste factuur toe.</div>
+      <div class="empty-hint" id="cafin-filter-empty-hint" data-ico="🔎" style="display:none;"><strong>Geen facturen gevonden</strong> voor deze zoekopdracht/filter.</div>
+      <button class="add-item-btn" id="add-cafin-factuur" type="button">+ Factuur toevoegen</button>
+    </section>
+
+    <section class="card" id="cafin-totalen-card">
+      <h2>Totaal per werf</h2>
+      <p class="hint">Som van de facturen per gekoppeld project (goedgekeurd + nog in behandeling, afgekeurde facturen tellen niet mee) -- ter vergelijking met de offerte/raming.</p>
+      <div id="cafin-totalen-list"></div>
+      <div class="empty-hint" id="cafin-totalen-empty-hint" data-ico="📊" style="display:none;"><strong>Nog geen enkele factuur aan een project gekoppeld.</strong></div>
+    </section>
+
+    <div class="note">
+      Fase 1: facturen worden hier nog handmatig toegevoegd. Automatische ontvangst via Peppol (de
+      verplichte Belgische e-facturatiestandaard vanaf 2026) is een latere, aparte uitbreiding.
+    </div>
+  </section>
+
+  <!-- Modal: factuur toevoegen/bewerken (zie renderCafinTab()/openCafinModal() in het script). -->
+  <div class="modal-overlay" id="cafin-modal" style="display:none;">
+    <div class="modal-box" style="max-width:560px;">
+      <h2 id="cafin-modal-title">Factuur toevoegen</h2>
+      <div class="modal-body">
+        <div class="field">
+          <label>Leverancier</label>
+          <input type="text" id="cafin-f-leverancier" placeholder="Naam leverancier">
+        </div>
+        <div class="field">
+          <label>Factuurnummer</label>
+          <input type="text" id="cafin-f-factuurnummer">
+        </div>
+        <div class="field-row" style="display:flex;gap:10px;">
+          <div class="field" style="flex:1;">
+            <label>Factuurdatum</label>
+            <input type="date" id="cafin-f-factuurdatum">
+          </div>
+          <div class="field" style="flex:1;">
+            <label>Vervaldatum</label>
+            <input type="date" id="cafin-f-vervaldatum">
+          </div>
+        </div>
+        <div class="field-row" style="display:flex;gap:10px;">
+          <div class="field" style="flex:1;">
+            <label>Bedrag excl. BTW</label>
+            <input type="number" step="0.01" id="cafin-f-excl">
+          </div>
+          <div class="field" style="flex:1;">
+            <label>BTW</label>
+            <input type="number" step="0.01" id="cafin-f-btw">
+          </div>
+          <div class="field" style="flex:1;">
+            <label>Totaal incl. BTW</label>
+            <input type="number" step="0.01" id="cafin-f-incl">
+          </div>
+        </div>
+        <div class="field">
+          <label>Referentie (zoals vermeld op de factuur)</label>
+          <input type="text" id="cafin-f-referentie" placeholder="bv. bestelbonnummer of projectnummer">
+        </div>
+        <div class="field">
+          <label>Project / werf</label>
+          <select id="cafin-f-project"></select>
+          <p class="hint" id="cafin-f-match-hint" style="display:none;"></p>
+        </div>
+        <div class="field">
+          <label>Omschrijving / notitie (optioneel)</label>
+          <textarea id="cafin-f-omschrijving" rows="2"></textarea>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" id="cafin-f-save" type="button">Opslaan</button>
+        <button class="btn btn-ghost" id="cafin-f-cancel" type="button">Annuleren</button>
+      </div>
+    </div>
+  </div>
 
   <!-- ===================== TAB: CADOS (Elektro/Domotica) ===================== -->
   <!-- Samengevoegd op vraag van Peter (2026-09-22) uit zijn losse, kant-en-klare CaDos-tool
@@ -21320,7 +21520,8 @@ window.CaCalcApp = {
   // tabsForPersonAccess() hieronder -- staat bewust in ALLE *_TABS-lijsten (elke losse app-
   // installatie), want een onderaannemer kan in principe overal inloggen (zie de opdracht: "Werkt
   // in alle app-varianten waar Onderaannemers kunnen inloggen").
-  const ALL_TABS = ['verslag', 'verslagen', 'actiepunten', 'planning', 'uren', 'inzet', 'projecten', 'bedrijf', 'cados', 'cacalc', 'mijn-planning'];
+  // 'cafin' toegevoegd (2026-10-09, CaFin-fase 1) -- zie tabsForPersonAccess()/CAFIN_TABS hieronder.
+  const ALL_TABS = ['verslag', 'verslagen', 'actiepunten', 'planning', 'uren', 'inzet', 'projecten', 'bedrijf', 'cados', 'cacalc', 'cafin', 'mijn-planning'];
   // Op vraag van Peter (2026-09-22): "op de site van planning zou ook Projecten & sharepoint en
   // Bedrijfsgegevens moeten zichtbaar worden" -- 'bedrijf' stond hier al, 'projecten' toegevoegd.
   // 'uren' toegevoegd (ronde 52, punt 2): kan_planning_zien geeft ook toegang tot Urenregistratie
@@ -21330,7 +21531,9 @@ window.CaCalcApp = {
   // toont enkel haar EIGEN tabblad(en) + Projecten & SharePoint + Bedrijfsgegevens + "Hoofdsite"-
   // knop, nooit een knop om rechtstreeks naar een ANDERE losse app te switchen -- CaDos/CaCalc
   // hebben intussen elk hun eigen cados.html/cacalc.html, dus die knop hoort hier niet meer thuis).
-  const WERF_TABS = ALL_TABS.filter(t => t !== 'inzet' && t !== 'cados' && t !== 'cacalc');
+  // 'cafin' bewust ook hier uitgesloten (zelfde redenering als cados/cacalc) -- fase 1 toont CaFin
+  // enkel in de volledige site (index.html), nog geen eigen losse app zoals cados.html/cacalc.html.
+  const WERF_TABS = ALL_TABS.filter(t => t !== 'inzet' && t !== 'cados' && t !== 'cacalc' && t !== 'cafin');
   // Eigen installeerbare "CaDos"-app (2026-09-23, op vraag van Peter: "Is er geen html voor
   // cados?"), naast de al bestaande Werf-/Planning-apps -- cados.html (zie build-apps.js) toont
   // enkel het CaDos-tabblad, met zijn eigen naam/icoon/favicon voor een eigen homescherm-
@@ -21399,6 +21602,13 @@ window.CaCalcApp = {
     // "kan_verslagen_zien" alleen, zonder "maken", volstaat bewust niet -- wie enkel mag lezen,
     // hoort ook geen uren te kunnen registreren).
     if(p.kan_planning_zien || p.kan_verslagen_maken) tabs.add('uren');
+    // CaFin (fase 1, 2026-10-09): eigen, afzonderlijk vinkjespaar (kan_facturen_zien/
+    // kan_facturen_goedkeuren) -- bewust NIET gekoppeld aan de bestaande werfverslagen-/
+    // planningvinkjes hierboven, want "facturen zien/koppelen/goedkeuren" is een eigen
+    // verantwoordelijkheid (bv. Administratie of een projectleider), los van wie werfverslagen of
+    // planning mag zien. "Goedkeuren" impliceert altijd ook "zien" (zie buildPermCheckbox()
+    // hieronder, waar dat vinkje enkel zichtbaar is zodra "zien" al aanstaat).
+    if(p.kan_facturen_zien || p.kan_facturen_goedkeuren) tabs.add('cafin');
     // "Projecten"/"Bedrijfsgegevens" blijven, zoals voorheen bij beide oude toegangsniveaus,
     // gewoon zichtbaar zodra er sowieso ergens toegang is (puur "geen enkel vinkje aan" -- bv.
     // een Onderaannemer -- blijft volledig buitengesloten, zie #no-access-screen).
@@ -22219,6 +22429,49 @@ window.CaCalcApp = {
   }
   async function dbDeleteProject(id){
     const { error } = await sb.from('projecten').delete().eq('id', id);
+    if(error) throw error;
+  }
+  // CaFin (Financiële module, fase 1, 2026-10-09) -- binnenkomende facturen, zie tab-cafin
+  // hieronder. Zelfde eenvoudige CRUD-patroon als dbInsertProject/dbUpdateProject hierboven.
+  async function dbListCafinFacturen(){
+    const { data, error } = await sb.from('cafin_facturen').select('*').order('created_at', { ascending: false });
+    if(error) throw error;
+    return data || [];
+  }
+  async function dbInsertCafinFactuur(fields){
+    const { data, error } = await sb.from('cafin_facturen').insert(fields).select().single();
+    if(error) throw error;
+    return data;
+  }
+  async function dbUpdateCafinFactuur(id, fields){
+    const { data, error } = await sb.from('cafin_facturen').update(Object.assign({}, fields, { updated_at: new Date().toISOString() })).eq('id', id).select().single();
+    if(error) throw error;
+    return data;
+  }
+  async function dbDeleteCafinFactuur(id){
+    const { error } = await sb.from('cafin_facturen').delete().eq('id', id);
+    if(error) throw error;
+  }
+  // Scherm-mededelingen (2026-10-09) -- banner onderaan scherm.html, beheerd via het nieuwe
+  // "Mededelingen"-subtabblad bij Personeelsplanning. Zelfde eenvoudige CRUD-patroon als CaFin
+  // hierboven.
+  async function dbListSchermMededelingen(){
+    const { data, error } = await sb.from('scherm_mededelingen').select('*').order('created_at', { ascending: false });
+    if(error) throw error;
+    return data || [];
+  }
+  async function dbInsertSchermMededeling(fields){
+    const { data, error } = await sb.from('scherm_mededelingen').insert(fields).select().single();
+    if(error) throw error;
+    return data;
+  }
+  async function dbUpdateSchermMededeling(id, fields){
+    const { data, error } = await sb.from('scherm_mededelingen').update(fields).eq('id', id).select().single();
+    if(error) throw error;
+    return data;
+  }
+  async function dbDeleteSchermMededeling(id){
+    const { error } = await sb.from('scherm_mededelingen').delete().eq('id', id);
     if(error) throw error;
   }
   // Ronde 49 (2026-09-26): helpers om een vrije invoer (concept-project) aan een echt project te koppelen --
@@ -23697,7 +23950,7 @@ window.CaCalcApp = {
     const visible = Array.from(nav.querySelectorAll('.tab-btn')).filter(b => b.style.display !== 'none');
     document.body.classList.toggle('single-app', visible.length <= 1);
     if(!document.body.dataset.app && visible[0]){
-      document.body.dataset.app = { verslag: 'werf', inzet: 'planning', cados: 'dossier', cacalc: 'calc' }[visible[0].dataset.tab] || '';
+      document.body.dataset.app = { verslag: 'werf', inzet: 'planning', cados: 'dossier', cacalc: 'calc', cafin: 'cafin' }[visible[0].dataset.tab] || '';
     }
   }
 
@@ -24892,8 +25145,8 @@ window.CaCalcApp = {
     // (data-short); updateAppTitleForWidth() hieronder kiest welke van de twee getoond wordt en
     // wordt bij elk resize/rotatie opnieuw uitgevoerd (zie fitAppBar()).
     (function(){
-      const appTitleFull = (tab === 'inzet') ? 'Planning opmaken' : (tab === 'cados') ? 'CaDos — Elektro & Domotica' : (tab === 'cacalc') ? 'CaCalc — Kabelberekening' : (tab === 'projecten') ? 'Projecten' : (tab === 'bedrijf') ? 'Bedrijfsgegevens' : (tab === 'verslagen') ? 'Verslagen' : (tab === 'actiepunten') ? 'Actiepunten' : (tab === 'planning') ? 'Planningspunten' : (tab === 'uren') ? 'Uren' : (tab === 'mijn-planning') ? 'Mijn planning' : 'Werfverslag maken';
-      const appTitleShort = { inzet: 'Planning', cados: 'CaDos', cacalc: 'CaCalc', bedrijf: 'Bedrijf', planning: 'Planning', uren: 'Uren', 'mijn-planning': 'Mijn planning' }[tab] || appTitleFull;
+      const appTitleFull = (tab === 'inzet') ? 'Planning opmaken' : (tab === 'cados') ? 'CaDos — Elektro & Domotica' : (tab === 'cacalc') ? 'CaCalc — Kabelberekening' : (tab === 'cafin') ? 'CaFin — Facturen' : (tab === 'projecten') ? 'Projecten' : (tab === 'bedrijf') ? 'Bedrijfsgegevens' : (tab === 'verslagen') ? 'Verslagen' : (tab === 'actiepunten') ? 'Actiepunten' : (tab === 'planning') ? 'Planningspunten' : (tab === 'uren') ? 'Uren' : (tab === 'mijn-planning') ? 'Mijn planning' : 'Werfverslag maken';
+      const appTitleShort = { inzet: 'Planning', cados: 'CaDos', cacalc: 'CaCalc', cafin: 'CaFin', bedrijf: 'Bedrijf', planning: 'Planning', uren: 'Uren', 'mijn-planning': 'Mijn planning' }[tab] || appTitleFull;
       const h1El = el('app-title');
       h1El.dataset.full = appTitleFull;
       h1El.dataset.short = appTitleShort;
@@ -24903,7 +25156,7 @@ window.CaCalcApp = {
     // Ronde 48: actieve hoofdapp op <body> zetten -> --app/--app-soft (herkenningskleur, zie :root/
     // DESIGN-ronde48.md §2). Projecten/Bedrijfsgegevens horen bij geen enkele app en laten de vorige
     // waarde gewoon staan. data-tab wordt enkel door CSS gebruikt (bv. de terug-chevron in de app-bar).
-    const appForTab = { verslag: 'werf', verslagen: 'werf', actiepunten: 'werf', planning: 'werf', uren: 'werf', inzet: 'planning', cados: 'dossier', cacalc: 'calc' }[tab];
+    const appForTab = { verslag: 'werf', verslagen: 'werf', actiepunten: 'werf', planning: 'werf', uren: 'werf', inzet: 'planning', cados: 'dossier', cacalc: 'calc', cafin: 'cafin' }[tab];
     if(appForTab) document.body.dataset.app = appForTab;
     document.body.dataset.tab = tab;
     // Ronde 71 (2026-10-07): de header-projectkiezer blijft bestaan (nodig voor Dossier/
@@ -24929,6 +25182,7 @@ window.CaCalcApp = {
     if(tab === 'inzet') refreshInzetPlanning();
     if(tab === 'cados') refreshCadosTab();
     if(tab === 'cacalc') refreshCacalcTab();
+    if(tab === 'cafin') refreshCafinTab();
     // Ronde 71 (herontwerp start Werfverslag): toont gewoon het scherm dat state.verslagScreen al
     // aangeeft (keuze/kiesProject/form) -- GEEN automatische overname meer van het bovenaan gekozen
     // project in een leeg concept (dat was verslagTabBinnengekomen()'s taak t/m ronde 70) en geen
@@ -24938,6 +25192,325 @@ window.CaCalcApp = {
     if(tab === 'mijn-planning') renderMijnPlanningTab();
     pushHistoryState(); // ronde 59: terugknop toont voortaan de vorige tab i.p.v. de app te sluiten
   }
+
+  // ---------- CaFin (Financiële module, fase 1, 2026-10-09) ----------
+  // Zie de toelichting bij <section id="tab-cafin"> hierboven voor de volledige achtergrond.
+  // state.cafinFacturen: platte lijst, rechtstreeks uit cafin_facturen (zie dbListCafinFacturen()).
+  // state.cafinFilter: { status, search } -- enkel client-side filtering, zelfde patroon als de
+  // bestaande Projecten-zoekbalk (renderProjects()/el('projects-search')).
+  if(!state.cafinFilter) state.cafinFilter = { status: '', search: '' };
+  let cafinEditId = null; // null = "nieuwe factuur toevoegen"-modus, anders id van de factuur in bewerking
+  const CAFIN_STATUS_LABELS = {
+    te_koppelen: 'Te koppelen', gekoppeld: 'Gekoppeld', in_goedkeuring: 'In goedkeuring',
+    goedgekeurd: 'Goedgekeurd', afgekeurd: 'Afgekeurd', betaald: 'Betaald'
+  };
+  function cafinEuro(n){
+    const v = Number(n);
+    if(n == null || n === '' || isNaN(v)) return '—';
+    return v.toLocaleString('nl-BE', { style: 'currency', currency: 'EUR' });
+  }
+  function cafinDatum(iso){
+    if(!iso) return '—';
+    return new Date(iso + 'T00:00:00').toLocaleDateString('nl-BE');
+  }
+  async function refreshCafinTab(){
+    try{
+      state.cafinFacturen = await dbListCafinFacturen();
+    }catch(e){
+      console.error('Facturen laden mislukt:', e);
+      state.cafinFacturen = state.cafinFacturen || [];
+    }
+    renderCafinTab();
+  }
+  function cafinProjectNaam(projectId){
+    if(!projectId) return null;
+    const p = (state.projects || []).find(x => String(x.id) === String(projectId));
+    return p ? (p.naam || '(naamloos project)') : '(verwijderd project)';
+  }
+  // Mag deze ingelogde persoon goedkeuren/afkeuren? Peter/geen gekoppeld teamlid-record (de vaste
+  // beheerder, zie applyPeterFloor()) mag dat altijd; voor een gekoppeld teamlid hangt het af van
+  // het nieuwe kan_facturen_goedkeuren-vinkje (zie buildPermCheckbox() hierboven).
+  function cafinMagGoedkeuren(){
+    return !state.currentPerson || !!state.currentPerson.kan_facturen_goedkeuren;
+  }
+  function renderCafinTab(){
+    const lijst = state.cafinFacturen || [];
+    const zoek = (state.cafinFilter.search || '').trim().toLowerCase();
+    const statusFilter = state.cafinFilter.status || '';
+    const gefilterd = lijst.filter(f => {
+      if(statusFilter && f.status !== statusFilter) return false;
+      if(!zoek) return true;
+      const projNaam = cafinProjectNaam(f.project_id) || '';
+      return [f.leverancier_naam, f.factuurnummer, f.referentie_tekst, projNaam].some(v => (v || '').toLowerCase().includes(zoek));
+    });
+    el('cafin-empty-hint').style.display = (lijst.length === 0) ? '' : 'none';
+    el('cafin-filter-empty-hint').style.display = (lijst.length > 0 && gefilterd.length === 0) ? '' : 'none';
+    el('cafin-list').innerHTML = gefilterd.map(f => {
+      const projNaam = cafinProjectNaam(f.project_id);
+      const magGoedkeuren = cafinMagGoedkeuren();
+      const acties = [];
+      if(!f.project_id){
+        acties.push(`<button type="button" class="btn btn-ghost btn-sm cafin-act-edit" data-id="${f.id}">Koppelen aan werf</button>`);
+      } else if(f.status === 'gekoppeld'){
+        acties.push(`<button type="button" class="btn btn-secondary btn-sm cafin-act-naar-goedkeuring" data-id="${f.id}">Ter goedkeuring sturen</button>`);
+      } else if(f.status === 'in_goedkeuring' && magGoedkeuren){
+        acties.push(`<button type="button" class="btn btn-primary btn-sm cafin-act-goedkeuren" data-id="${f.id}">✓ Goedkeuren</button>`);
+        acties.push(`<button type="button" class="btn btn-ghost btn-sm cafin-act-afkeuren" data-id="${f.id}">✕ Afkeuren</button>`);
+      } else if(f.status === 'goedgekeurd'){
+        acties.push(`<button type="button" class="btn btn-secondary btn-sm cafin-act-betaald" data-id="${f.id}">Markeer als betaald</button>`);
+      } else if(f.status === 'afgekeurd'){
+        acties.push(`<button type="button" class="btn btn-ghost btn-sm cafin-act-heropenen" data-id="${f.id}">Heropenen</button>`);
+      }
+      acties.push(`<button type="button" class="btn btn-ghost btn-sm cafin-act-edit" data-id="${f.id}">Bewerken</button>`);
+      acties.push(`<button type="button" class="btn btn-ghost btn-sm cafin-act-verwijderen" data-id="${f.id}" title="Verwijderen">🗑️</button>`);
+      return `<div class="cafin-row" data-id="${f.id}">
+        <div class="cafin-row-main">
+          <div class="cafin-row-top">
+            <strong>${escapeHtml(f.leverancier_naam || '(onbekende leverancier)')}</strong>
+            <span class="cafin-badge cafin-badge-${escapeHtml(f.status)}">${escapeHtml(CAFIN_STATUS_LABELS[f.status] || f.status)}</span>
+          </div>
+          <div class="cafin-row-sub">
+            ${f.factuurnummer ? escapeHtml(f.factuurnummer) + ' · ' : ''}${cafinDatum(f.factuurdatum)}
+            ${f.referentie_tekst ? ' · ref. ' + escapeHtml(f.referentie_tekst) : ''}
+          </div>
+          <div class="cafin-row-sub">
+            ${projNaam ? '📍 ' + escapeHtml(projNaam) : '<em>— nog niet gekoppeld aan een werf —</em>'}
+          </div>
+        </div>
+        <div class="cafin-row-bedrag">${cafinEuro(f.bedrag_incl)}</div>
+        <div class="cafin-row-acties">${acties.join('')}</div>
+      </div>`;
+    }).join('');
+    renderCafinTotalen(lijst);
+  }
+  function renderCafinTotalen(lijst){
+    const perProject = new Map();
+    (lijst || []).forEach(f => {
+      if(!f.project_id || f.status === 'afgekeurd') return;
+      const key = String(f.project_id);
+      perProject.set(key, (perProject.get(key) || 0) + (Number(f.bedrag_incl) || 0));
+    });
+    const rows = Array.from(perProject.entries()).map(([projectId, totaal]) => ({ projectId, naam: cafinProjectNaam(projectId), totaal }))
+      .sort((a, b) => b.totaal - a.totaal);
+    el('cafin-totalen-empty-hint').style.display = rows.length ? 'none' : '';
+    el('cafin-totalen-list').innerHTML = rows.map(r => `<div class="cafin-totaal-row"><span>${escapeHtml(r.naam || '—')}</span><strong>${cafinEuro(r.totaal)}</strong></div>`).join('');
+  }
+  // Probeert de ingetypte referentietekst te matchen met het projectnummer van een bestaand
+  // project (hergebruikt dat bestaande veld i.p.v. een nieuwe, aparte "facturatiereferentie"-kolom
+  // -- zie de migratie-toelichting). Simpele, voorspelbare match: de referentietekst bevat het
+  // projectnummer (hoofdletterongevoelig) -- geen "slimme"/fuzzy-matching in fase 1.
+  function cafinVindMatch(referentieTekst){
+    const ref = (referentieTekst || '').trim().toLowerCase();
+    if(!ref) return null;
+    return (state.projects || []).find(p => p.projectnummer && ref.includes(String(p.projectnummer).trim().toLowerCase())) || null;
+  }
+  function cafinVulProjectSelect(selectedId){
+    const sel = el('cafin-f-project');
+    const projecten = (state.projects || []).filter(p => p.actief !== false).sort((a, b) => (a.naam || '').localeCompare(b.naam || ''));
+    sel.innerHTML = '<option value="">— nog niet gekoppeld —</option>' + projecten.map(p =>
+      `<option value="${p.id}" ${String(p.id) === String(selectedId) ? 'selected' : ''}>${escapeHtml(p.naam || '')}${p.projectnummer ? ' (' + escapeHtml(p.projectnummer) + ')' : ''}</option>`
+    ).join('');
+  }
+  function cafinUpdateMatchHint(){
+    const ref = el('cafin-f-referentie').value;
+    const match = cafinVindMatch(ref);
+    const hint = el('cafin-f-match-hint');
+    if(match && el('cafin-f-project').value !== String(match.id)){
+      hint.style.display = '';
+      hint.innerHTML = `Mogelijke match op projectnummer: <strong>${escapeHtml(match.naam || '')}</strong> (${escapeHtml(match.projectnummer || '')}) — <button type="button" class="link-btn" id="cafin-f-match-apply">gebruik dit project</button>`;
+    } else {
+      hint.style.display = 'none';
+      hint.innerHTML = '';
+    }
+  }
+  function openCafinModal(factuur){
+    cafinEditId = factuur ? factuur.id : null;
+    el('cafin-modal-title').textContent = factuur ? 'Factuur bewerken' : 'Factuur toevoegen';
+    el('cafin-f-leverancier').value = factuur ? (factuur.leverancier_naam || '') : '';
+    el('cafin-f-factuurnummer').value = factuur ? (factuur.factuurnummer || '') : '';
+    el('cafin-f-factuurdatum').value = factuur ? (factuur.factuurdatum || '') : '';
+    el('cafin-f-vervaldatum').value = factuur ? (factuur.vervaldatum || '') : '';
+    el('cafin-f-excl').value = (factuur && factuur.bedrag_excl != null) ? factuur.bedrag_excl : '';
+    el('cafin-f-btw').value = (factuur && factuur.bedrag_btw != null) ? factuur.bedrag_btw : '';
+    el('cafin-f-incl').value = (factuur && factuur.bedrag_incl != null) ? factuur.bedrag_incl : '';
+    el('cafin-f-referentie').value = factuur ? (factuur.referentie_tekst || '') : '';
+    el('cafin-f-omschrijving').value = factuur ? (factuur.omschrijving || '') : '';
+    cafinVulProjectSelect(factuur ? factuur.project_id : (cafinVindMatch(factuur ? factuur.referentie_tekst : '') || {}).id);
+    cafinUpdateMatchHint();
+    el('cafin-modal').style.display = 'flex';
+  }
+  function closeCafinModal(){ el('cafin-modal').style.display = 'none'; cafinEditId = null; }
+  async function saveCafinFactuur(){
+    const leverancier = el('cafin-f-leverancier').value.trim();
+    if(!leverancier){ alert('Vul minstens de leverancier in.'); return; }
+    const excl = el('cafin-f-excl').value === '' ? null : Number(el('cafin-f-excl').value);
+    const btwBedrag = el('cafin-f-btw').value === '' ? null : Number(el('cafin-f-btw').value);
+    const incl = el('cafin-f-incl').value === '' ? ((excl != null && btwBedrag != null) ? Math.round((excl + btwBedrag) * 100) / 100 : null) : Number(el('cafin-f-incl').value);
+    const projectId = el('cafin-f-project').value || null;
+    const bestaand = cafinEditId ? (state.cafinFacturen || []).find(f => String(f.id) === String(cafinEditId)) : null;
+    // Status volgt automatisch de koppeling: nog geen project -> blijft/wordt "te_koppelen"; net
+    // gekoppeld (kwam van "te_koppelen") -> "gekoppeld". Een factuur die al verder staat
+    // (in_goedkeuring/goedgekeurd/...) en hier enkel bewerkt wordt (bv. een bedrag corrigeren)
+    // behoudt gewoon zijn status -- bewerken via dit formulier is geen impliciete statuswijziging.
+    let status = bestaand ? bestaand.status : 'te_koppelen';
+    if(!projectId) status = 'te_koppelen';
+    else if(status === 'te_koppelen') status = 'gekoppeld';
+    const fields = {
+      leverancier_naam: leverancier,
+      factuurnummer: el('cafin-f-factuurnummer').value.trim() || null,
+      factuurdatum: el('cafin-f-factuurdatum').value || null,
+      vervaldatum: el('cafin-f-vervaldatum').value || null,
+      bedrag_excl: excl, bedrag_btw: btwBedrag, bedrag_incl: incl,
+      referentie_tekst: el('cafin-f-referentie').value.trim() || null,
+      omschrijving: el('cafin-f-omschrijving').value.trim() || null,
+      project_id: projectId,
+      status
+    };
+    try{
+      if(cafinEditId){
+        await dbUpdateCafinFactuur(cafinEditId, fields);
+      } else {
+        fields.toegevoegd_door = getCurrentUserNaam() || '';
+        await dbInsertCafinFactuur(fields);
+      }
+      closeCafinModal();
+      await refreshCafinTab();
+    }catch(e){ alert('Bewaren mislukt: ' + e.message); }
+  }
+  async function cafinZetStatus(id, nieuweStatus, extraFields){
+    try{
+      await dbUpdateCafinFactuur(id, Object.assign({ status: nieuweStatus }, extraFields || {}));
+      await refreshCafinTab();
+    }catch(e){ alert('Bewaren mislukt: ' + e.message); }
+  }
+  el('add-cafin-factuur').addEventListener('click', () => openCafinModal(null));
+  el('cafin-f-cancel').addEventListener('click', closeCafinModal);
+  el('cafin-modal').addEventListener('click', (e) => { if(e.target.id === 'cafin-modal') closeCafinModal(); });
+  el('cafin-f-save').addEventListener('click', saveCafinFactuur);
+  el('cafin-f-referentie').addEventListener('input', cafinUpdateMatchHint);
+  el('cafin-f-project').addEventListener('change', cafinUpdateMatchHint);
+  el('cafin-f-match-hint').addEventListener('click', (e) => {
+    if(e.target.id !== 'cafin-f-match-apply') return;
+    const match = cafinVindMatch(el('cafin-f-referentie').value);
+    if(match) el('cafin-f-project').value = match.id;
+    cafinUpdateMatchHint();
+  });
+  el('cafin-search').addEventListener('input', e => { state.cafinFilter.search = e.target.value; renderCafinTab(); });
+  el('cafin-status-filter').addEventListener('change', e => { state.cafinFilter.status = e.target.value; renderCafinTab(); });
+  el('cafin-list').addEventListener('click', e => {
+    const btn = e.target.closest('button[data-id]'); if(!btn) return;
+    const id = btn.dataset.id;
+    const factuur = (state.cafinFacturen || []).find(f => String(f.id) === String(id));
+    if(!factuur) return;
+    if(btn.classList.contains('cafin-act-edit')) openCafinModal(factuur);
+    else if(btn.classList.contains('cafin-act-naar-goedkeuring')) cafinZetStatus(id, 'in_goedkeuring');
+    else if(btn.classList.contains('cafin-act-goedkeuren')) cafinZetStatus(id, 'goedgekeurd', { goedgekeurd_door: getCurrentUserNaam() || '', goedgekeurd_op: new Date().toISOString(), afgekeurd_reden: null });
+    else if(btn.classList.contains('cafin-act-afkeuren')){
+      const reden = prompt('Reden van afkeuring (optioneel):') || null;
+      cafinZetStatus(id, 'afgekeurd', { afgekeurd_reden: reden });
+    }
+    else if(btn.classList.contains('cafin-act-betaald')) cafinZetStatus(id, 'betaald');
+    else if(btn.classList.contains('cafin-act-heropenen')) cafinZetStatus(id, 'in_goedkeuring', { afgekeurd_reden: null });
+    else if(btn.classList.contains('cafin-act-verwijderen')){
+      if(!confirm('Deze factuur definitief verwijderen?')) return;
+      dbDeleteCafinFactuur(id).then(refreshCafinTab).catch(e2 => alert('Verwijderen mislukt: ' + e2.message));
+    }
+  });
+
+  // ---------- Scherm-mededelingen (2026-10-09) ----------
+  // Zie de toelichting bij #ipsub-mededelingen hierboven. state.ipMededelingen: platte lijst,
+  // rechtstreeks uit scherm_mededelingen (dbListSchermMededelingen()), nieuwste eerst.
+  let ipMedEditId = null; // null = "nieuwe mededeling"-modus, anders id van de mededeling in bewerking
+  async function refreshIpMededelingenTab(){
+    try{
+      state.ipMededelingen = await dbListSchermMededelingen();
+    }catch(e){
+      console.error('Mededelingen laden mislukt:', e);
+      state.ipMededelingen = state.ipMededelingen || [];
+    }
+    renderIpMededelingenTab();
+  }
+  function ipMedVervalLabel(vervaldatum){
+    if(!vervaldatum) return '';
+    const verlopen = vervaldatum < isoVandaagIp();
+    return ` · ${verlopen ? 'verlopen op' : 'vervalt op'} ${new Date(vervaldatum + 'T00:00:00').toLocaleDateString('nl-BE')}`;
+  }
+  // Kleine, lokale "vandaag als ISO"-helper -- dit script heeft elders al varianten hiervan onder
+  // andere namen (bv. isoVandaag() in scherm.html, een ANDER bestand); eigen naam hier om botsing
+  // met een gelijkaardige helper elders in dit grote bestand te vermijden.
+  function isoVandaagIp(){
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
+  function renderIpMededelingenTab(){
+    const lijst = state.ipMededelingen || [];
+    el('ip-mededelingen-empty-hint').style.display = lijst.length ? 'none' : '';
+    el('ip-mededelingen-list').innerHTML = lijst.map(m => {
+      const verlopen = m.vervaldatum && m.vervaldatum < isoVandaagIp();
+      return `<div class="project-row${verlopen ? ' is-inactive' : ''}" data-id="${m.id}">
+        <div class="project-row-head" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;">
+          <div style="min-width:0;">
+            ${m.onderwerp ? '<strong>' + escapeHtml(m.onderwerp) + '</strong> — ' : ''}<span>${escapeHtml(m.boodschap || '')}</span>
+            <div class="hint" style="margin:2px 0 0;">Wisseltijd: ${Number(m.duur_seconden) || 8}s${ipMedVervalLabel(m.vervaldatum)}${verlopen ? ' <strong>(verlopen, niet meer zichtbaar op het scherm)</strong>' : ''}</div>
+          </div>
+          <div style="display:flex;gap:6px;flex:0 0 auto;">
+            <button type="button" class="btn btn-ghost btn-sm ip-med-edit" data-id="${m.id}">Bewerken</button>
+            <button type="button" class="btn btn-ghost btn-sm ip-med-verwijderen" data-id="${m.id}" title="Verwijderen">🗑️</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  function openIpMededelingModal(med){
+    ipMedEditId = med ? med.id : null;
+    el('ip-mededeling-modal-title').textContent = med ? 'Mededeling bewerken' : 'Mededeling toevoegen';
+    el('ip-med-onderwerp').value = med ? (med.onderwerp || '') : '';
+    el('ip-med-boodschap').value = med ? (med.boodschap || '') : '';
+    el('ip-med-duur').value = med ? (med.duur_seconden || 8) : 8;
+    el('ip-med-vervaldatum').value = med ? (med.vervaldatum || '') : '';
+    el('ip-mededeling-modal').style.display = 'flex';
+  }
+  function closeIpMededelingModal(){ el('ip-mededeling-modal').style.display = 'none'; ipMedEditId = null; }
+  async function saveIpMededeling(){
+    const boodschap = el('ip-med-boodschap').value.trim();
+    if(!boodschap){ alert('Vul een boodschap in.'); return; }
+    const duur = Math.max(3, parseInt(el('ip-med-duur').value, 10) || 8);
+    const fields = {
+      onderwerp: el('ip-med-onderwerp').value.trim() || null,
+      boodschap,
+      duur_seconden: duur,
+      vervaldatum: el('ip-med-vervaldatum').value || null
+    };
+    try{
+      if(ipMedEditId){
+        await dbUpdateSchermMededeling(ipMedEditId, fields);
+      } else {
+        fields.aangemaakt_door = getCurrentUserNaam() || '';
+        // created_at expliciet client-side meegeven (i.p.v. enkel op de SQL-default `now()`
+        // vertrouwen) -- garandeert een betrouwbare nieuwste-eerst-sortering in renderIpMededelingenTab()
+        // ongeacht of de rij via de echte databank of de in-memory testmock aangemaakt wordt.
+        fields.created_at = new Date().toISOString();
+        await dbInsertSchermMededeling(fields);
+      }
+      closeIpMededelingModal();
+      await refreshIpMededelingenTab();
+    }catch(e){ alert('Bewaren mislukt: ' + e.message); }
+  }
+  el('add-ip-mededeling').addEventListener('click', () => openIpMededelingModal(null));
+  el('ip-med-cancel').addEventListener('click', closeIpMededelingModal);
+  el('ip-mededeling-modal').addEventListener('click', (e) => { if(e.target.id === 'ip-mededeling-modal') closeIpMededelingModal(); });
+  el('ip-med-save').addEventListener('click', saveIpMededeling);
+  el('ip-mededelingen-list').addEventListener('click', e => {
+    const btn = e.target.closest('button[data-id]'); if(!btn) return;
+    const id = btn.dataset.id;
+    const med = (state.ipMededelingen || []).find(m => String(m.id) === String(id));
+    if(!med) return;
+    if(btn.classList.contains('ip-med-edit')) openIpMededelingModal(med);
+    else if(btn.classList.contains('ip-med-verwijderen')){
+      if(!confirm('Deze mededeling definitief verwijderen?')) return;
+      dbDeleteSchermMededeling(id).then(refreshIpMededelingenTab).catch(e2 => alert('Verwijderen mislukt: ' + e2.message));
+    }
+  });
 
   // ---------- Bedrijfsgegevens ----------
   function renderCompany(){
@@ -25256,6 +25829,10 @@ window.CaCalcApp = {
     // en bestaand), behalve de vaste beheerder (Peter), zie applyPeterFloor() hieronder. Zelfde
     // jsonb-veld-patroon als is_planner/beheerder hierboven, geen nieuwe SQL-kolom nodig.
     if(person.ziet_alle_projecten == null) person.ziet_alle_projecten = false;
+    // CaFin (fase 1, 2026-10-09) -- zelfde "default uit, los vinkje"-patroon als ziet_alle_projecten
+    // hierboven; geen afleiding uit oude velden nodig, dit is een volledig nieuw vinkjespaar.
+    if(person.kan_facturen_zien == null) person.kan_facturen_zien = false;
+    if(person.kan_facturen_goedkeuren == null) person.kan_facturen_goedkeuren = false;
     // Onderaannemers krijgen nooit app-/planningtoegang (2026-09-23, op vraag van Peter: "Hier ook
     // keuze Personeel of onderaannemer: Die hebben geen rechten in de planning") -- afgedwongen bij
     // elke render, ook voor al langer bestaande rijen waar de rol pas achteraf op Onderaannemer werd
@@ -25417,6 +25994,14 @@ window.CaCalcApp = {
     // (Peter) staat dit vinkje, net als de andere 5, vast aan (zie buildPermCheckbox()/isPeter).
     accessRow.appendChild(buildPermCheckbox('ip-p-alle-projecten', 'ziet_alle_projecten', 'Ziet alle projecten',
       'Ziet werfverslagen/actiepunten/planning van ALLE projecten, ook zonder vaste werfleider/projectleider-koppeling of planningsafspraak. Bedoeld voor een zaakvoerder/projectleider die ook als gewoon teamlid meewerkt.'));
+    // CaFin (Financiële module, fase 1, 2026-10-09) -- eigen vinkjespaar, los van de 5 hierboven
+    // (zie de toelichting bij tabsForPersonAccess()). "Facturen goedkeuren" staat bewust los van
+    // "zien": wie mag goedkeuren moet ook kunnen zien, maar niet omgekeerd (bv. Administratie mag
+    // vaak wel binnenkomende facturen koppelen/klaarzetten, zonder zelf te mogen goedkeuren).
+    accessRow.appendChild(buildPermCheckbox('ip-p-facturen-zien', 'kan_facturen_zien', 'Ziet CaFin (facturen)',
+      'Ziet het Facturen-tabblad (CaFin): binnenkomende facturen, koppelen aan een werf, status opvolgen.'));
+    accessRow.appendChild(buildPermCheckbox('ip-p-facturen-goedkeuren', 'kan_facturen_goedkeuren', 'Mag facturen goedkeuren',
+      'Mag een factuur goedkeuren of afkeuren (bv. de projectleider van de betreffende werf). Vereist ook "Ziet CaFin" om er effectief iets mee te kunnen doen.'));
     // "Beheerder" zelf staat hier BEWUST niet als vinkje bij de rest (2026-09-25) -- enkel
     // aanpasbaar via de nieuwe, gebruikers-/rechtenbeheer-gate #beheer-modal (zie #btn-beheer),
     // anders zou iedereen met toegang tot dit Bedrijfsgegevens-tabblad zichzelf beheerder kunnen
@@ -25681,6 +26266,10 @@ window.CaCalcApp = {
     // scenario dat deze ronde structureel oplost. Peters vinkje staat daarom, net als de andere 5,
     // altijd vast aan.
     person.ziet_alle_projecten = true;
+    // CaFin (fase 1, 2026-10-09) -- zelfde vloer: Peter ziet/mag altijd alles, ook dit nieuwe
+    // vinkjespaar.
+    person.kan_facturen_zien = true;
+    person.kan_facturen_goedkeuren = true;
   }
   // "Ensure admin floor": toegepast op de VOLLEDIGE net-geladen team_leden/bureau-lijst (zie
   // bootstrapAfterLogin() verderop), vóór er ook maar iets mee gerenderd/gebruikt wordt. Dit is
@@ -33226,6 +33815,7 @@ window.CaCalcApp = {
       if(btn.dataset.ipsub === 'capaciteit') renderIpCapacityTab();
       if(btn.dataset.ipsub === 'vaardigheden'){ renderIpSkillsTab(); renderIpProtoChipList(); }
       if(btn.dataset.ipsub === 'bevestigen') renderIpConfirmTab();
+      if(btn.dataset.ipsub === 'mededelingen') refreshIpMededelingenTab();
     });
   });
 

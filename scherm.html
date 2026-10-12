@@ -181,6 +181,25 @@
   .scherm-buitendienst{background:repeating-linear-gradient(135deg, #eef1ee, #eef1ee 7px, #e3e8e3 7px, #e3e8e3 14px);}
   .scherm-buitendienst .scherm-chip-mini{color:var(--ink-faint);font-size:var(--scherm-chip-fs);font-style:italic;}
 
+  /* Ronde "scherm-mededelingen" (2026-10-09) -- banner onderaan, zie de toelichting bij de HTML
+     hierboven. Max. 2 regels tekst (geen afgekapte "..." -- liever een iets langere boodschap
+     gewoon helemaal lezen dan hem te verminken), vaste hoogte zodat de rest van het scherm niet
+     bij elke berichtwissel opnieuw moet herschalen. */
+  .scherm-banner{
+    flex:0 0 auto;display:flex;align-items:center;gap:16px;min-height:58px;max-height:58px;
+    border:1px solid var(--line);border-radius:14px;background:var(--brand-soft);padding:8px 20px;
+  }
+  .scherm-banner-onderwerp{
+    font-family:var(--font-display);font-weight:800;color:var(--brand-strong);font-size:1rem;
+    white-space:nowrap;flex:0 0 auto;
+  }
+  .scherm-banner-boodschap{
+    font-size:1rem;color:var(--ink);flex:1 1 auto;min-width:0;
+    display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;line-height:1.3;
+  }
+  .scherm-banner.scherm-banner-fade{animation:schermBannerFade .5s ease;}
+  @keyframes schermBannerFade{ from{opacity:.15;} to{opacity:1;} }
+
   .scherm-state{max-width:640px;margin:14vh auto;text-align:center;}
   .scherm-state h1{font-size:1.6rem;margin-bottom:12px;}
   .scherm-state p{color:var(--ink-soft);font-size:1.05rem;line-height:1.5;}
@@ -206,6 +225,18 @@
   </div>
 
   <div id="scherm-content"></div>
+  <!-- Ronde "scherm-mededelingen" (2026-10-09), op vraag van Peter: "Kun je op scherm onderaan een
+       banner voorzien waarop berichten verschijnen." -- verborgen (display:none) zolang er geen
+       enkele actieve mededeling is (geen lege balk), zie renderSchermBanner() hieronder. Als een
+       gewone flex-child NA #scherm-content (niet position:fixed, dat is enkel #scherm-errorbar
+       hieronder voor een storingsmelding) -- het rooster erboven (.scherm-grid-outer, flex:1 1 auto)
+       krimpt daardoor vanzelf mee zodra deze balk zichtbaar wordt, zonder dat scaleSchermGrid()
+       hiervoor iets speciaals moet weten: die meet gewoon de werkelijk beschikbare hoogte op het
+       moment zelf. -->
+  <div class="scherm-banner" id="scherm-banner" style="display:none;">
+    <span class="scherm-banner-onderwerp" id="scherm-banner-onderwerp"></span>
+    <span class="scherm-banner-boodschap" id="scherm-banner-boodschap"></span>
+  </div>
   <div class="scherm-errorbar" id="scherm-errorbar"></div>
 
 <script>
@@ -333,6 +364,7 @@
       errorbar.style.display = 'none';
       laatsteSchermData = data;
       renderScherm(data);
+      renderSchermBanner(data.mededelingen);
       refreshNote.textContent = 'laatst bijgewerkt om ' + new Date().toLocaleTimeString('nl-BE', { hour:'2-digit', minute:'2-digit' });
       if(data.bedrijf_naam) document.getElementById('scherm-bedrijfsnaam').textContent = data.bedrijf_naam;
     }catch(err){
@@ -343,6 +375,63 @@
       errorbar.textContent = 'Kan de planning niet verversen (verbindingsprobleem) -- blijft de laatst gekende stand tonen. Nieuwe poging binnen enkele minuten.';
       if(!content.innerHTML) toonState('Kan niet verbinden', 'Geen verbinding met de databank. Wordt automatisch opnieuw geprobeerd.');
     }
+  }
+
+  // ===== Ronde "scherm-mededelingen" (2026-10-09): banner onderaan, cyclisch door de actieve
+  // mededelingen (zie #scherm-banner hierboven). Toegevoegd/beheerd via het nieuwe "Mededelingen"-
+  // subtabblad bij Personeelsplanning (zie src2.html) -- scherm.html zelf toont enkel, beheert niets.
+  // Elke mededeling heeft haar EIGEN wisseltijd (duur_seconden); de server (scherm_data()) filtert
+  // al op vervaldatum, dus alles in data.mededelingen hier is al "nog geldig". Bewust NIET gewoon
+  // telkens herstart bij elke periodieke databankherlading (SCHERM_REFRESH_MS, elke paar minuten) --
+  // enkel als de inhoud/lijst zelf effectief gewijzigd is (schermBannerSleutel()), anders zou de
+  // lopende rotatie/timer bij elke herlading stotterend terugspringen naar het eerste bericht. =====
+  let schermBannerBerichten = [];
+  let schermBannerIndex = 0;
+  let schermBannerTimer = null;
+  let schermBannerLaatsteSleutel = null;
+  function schermBannerSleutel(berichten){
+    return JSON.stringify(berichten.map(m => [m.id, m.onderwerp, m.boodschap, m.duur_seconden]));
+  }
+  function renderSchermBanner(berichten){
+    const banner = document.getElementById('scherm-banner');
+    const lijst = (berichten || []).filter(m => m && m.boodschap);
+    if(!lijst.length){
+      banner.style.display = 'none';
+      clearTimeout(schermBannerTimer);
+      schermBannerTimer = null;
+      schermBannerBerichten = [];
+      schermBannerLaatsteSleutel = null;
+      return;
+    }
+    const sleutel = schermBannerSleutel(lijst);
+    banner.style.display = 'flex';
+    if(sleutel === schermBannerLaatsteSleutel) return; // ongewijzigd -- lopende rotatie met rust laten
+    schermBannerLaatsteSleutel = sleutel;
+    schermBannerBerichten = lijst;
+    schermBannerIndex = 0;
+    toonSchermBannerBericht();
+  }
+  function toonSchermBannerBericht(){
+    clearTimeout(schermBannerTimer);
+    if(!schermBannerBerichten.length) return;
+    const bericht = schermBannerBerichten[schermBannerIndex % schermBannerBerichten.length];
+    const banner = document.getElementById('scherm-banner');
+    const onderwerpEl = document.getElementById('scherm-banner-onderwerp');
+    const boodschapEl = document.getElementById('scherm-banner-boodschap');
+    onderwerpEl.textContent = bericht.onderwerp || '';
+    onderwerpEl.style.display = bericht.onderwerp ? '' : 'none';
+    boodschapEl.textContent = bericht.boodschap || '';
+    // Fade-animatie: klasse weghalen + forceer reflow zodat ze bij elke wissel opnieuw start.
+    banner.classList.remove('scherm-banner-fade');
+    void banner.offsetWidth;
+    banner.classList.add('scherm-banner-fade');
+    // Minimum 3s (veiligheidsgrens tegen een per ongeluk ingevulde 0/negatieve/lege waarde),
+    // standaard 8s zoals elders in deze pagina als redelijke leestijd.
+    const duurMs = Math.max(3, Number(bericht.duur_seconden) || 8) * 1000;
+    schermBannerTimer = setTimeout(() => {
+      schermBannerIndex = (schermBannerIndex + 1) % schermBannerBerichten.length;
+      toonSchermBannerBericht();
+    }, duurMs);
   }
 
   function persoonIsActief(p, dateISO){
