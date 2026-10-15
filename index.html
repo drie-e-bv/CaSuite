@@ -1254,6 +1254,11 @@
     background:var(--panel-soft, #f6f7f9);border-radius:8px;padding:8px 12px;font-size:.88rem;
   }
   .gemini-model-row.is-current{background:var(--green-soft);}
+  .gemini-velden{display:grid;grid-template-columns:1fr 1fr;gap:0 14px;}
+  @media (max-width:640px){ .gemini-velden{grid-template-columns:1fr;} }
+  .gemini-model-acties{display:flex;gap:6px;flex-wrap:wrap;align-items:center;justify-content:flex-end;}
+  .gemini-soort{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;font-size:11px;font-weight:650;background:#eef1ef;color:#5f6b64;}
+  .gemini-soort.is-flash{background:#e7f0fb;color:#1d4ed8;}
   .done-toggle{
     display:none;align-items:center;gap:7px;margin-top:10px;padding-top:10px;border-top:1px dashed var(--line);
     font-size:.85rem;color:var(--ink-soft);
@@ -4644,15 +4649,22 @@
     <section class="card">
       <h2>AI-model (Gemini)</h2>
       <!-- Uitleg ingekort tot 1 zin + "Meer uitleg"-uitklapper (zelfde tekst), ronde 48 fase B. -->
-      <p class="hint">Welk Gemini-model de AI-samenvatting en AI-tekstverbetering gebruiken.</p>
+      <p class="hint">Welke Gemini-modellen de AI gebruikt: één voor tekst (samenvatting, tekst verbeteren) en een sterker model om handschrift uit de kladversie te lezen.</p>
       <details class="more-info">
         <summary>Meer uitleg</summary>
-        <p>Google haalt af en toe een model uit dienst (zoals midden 2026 al gebeurde) — met "Ververs bij Google" zie je meteen of het huidige model nog bestaat, en kan je met "Overnemen" naar een ander beschikbaar model overschakelen zonder dat er iets herbouwd of opnieuw gedeployed moet worden.</p>
+        <p>Google haalt af en toe een model uit dienst (zoals midden 2026 al gebeurde) — met "Ververs bij Google" zie je welke tekstmodellen er nu zijn, en kies je per model "Voor tekst" of "Voor handschrift". Dat wordt meteen bewaard, er moet niets herbouwd worden. "Flash-Lite" is snel en licht; "Flash" is sterker (beter voor handschrift). Beide zijn gratis binnen de limieten van Google. Spraak- en beeldmodellen staan bewust niet in de lijst.</p>
       </details>
-      <div class="field">
-        <label>Huidig ingesteld model</label>
-        <input type="text" id="c-gemini-model" placeholder="bv. gemini-3.5-flash-lite">
+      <div class="gemini-velden">
+        <div class="field">
+          <label>Model voor tekst (samenvatting, tekst verbeteren)</label>
+          <input type="text" id="c-gemini-model" placeholder="bv. gemini-3.5-flash-lite">
+        </div>
+        <div class="field">
+          <label>Model voor handschrift (kladversie)</label>
+          <input type="text" id="c-gemini-model-klad" placeholder="bv. gemini-3.8-flash">
+        </div>
       </div>
+      <p class="hint">Lukt een model niet (uit dienst, of de gratis limiet bij Google is bereikt), dan neemt de app vanzelf een ander gratis model.</p>
       <div class="wa-share-bar ai-summary-bar share-tile st-gemini">
         <div class="st-head"><span class="st-ico" aria-hidden="true">✨</span><div class="st-txt"><div class="st-title">Beschikbaarheid bij Google</div><span class="wa-count" id="gemini-models-status">Nog niet gecontroleerd bij Google.</span></div></div>
         <div class="st-actions">
@@ -22074,6 +22086,10 @@ window.CaCalcApp = {
   // i.p.v. enkel hardcoded in de Edge Function -- zo kan een toekomstige model-deprecation
   // opgelost worden met één klik op "Overnemen", zonder de Edge Function opnieuw te deployen.
   const DEFAULT_GEMINI_MODEL = 'gemini-3.5-flash-lite';
+  // Kladversie (2026-10-15): handschrift lezen vraagt een sterker model -- gewone Flash (geen Lite), ook gratis.
+  const DEFAULT_GEMINI_MODEL_KLAD = 'gemini-3.8-flash';
+  // Modellen die geen gewone tekst geven (spraak, beeld, ...) -- nooit aanbieden om over te nemen.
+  const GEMINI_ONGESCHIKT = /(tts|image|embedding|audio|live|native|robotics|computer-use|aqa|learnlm)/i;
 
   // ---- "Vaste beheerder" (2026-09-25) ----
   // Op vraag van Peter (veiligheidsvraag na de 6-toegangsvinkjes-ronde): er is nu een
@@ -24707,12 +24723,12 @@ window.CaCalcApp = {
   // Eén blad naar een witte JPEG (lange zijde 1600 px -- scherp genoeg voor handschrift, klein
   // genoeg om vlot te versturen en te bewaren).
   function kladBladNaarJpeg(blad){
-    const w = 1600, h = Math.round(1600 * kladSessie.verhouding);
+    const w = 2000, h = Math.round(2000 * kladSessie.verhouding);
     const c = document.createElement('canvas'); c.width = w; c.height = h;
     const ctx = c.getContext('2d');
     ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h);
     blad.lijnen.forEach(l => kladTekenLijn(ctx, Object.assign({}, l, { dikte: (l.dikte || 2) * 1.15 }), w, h));
-    return c.toDataURL('image/jpeg', 0.82);
+    return c.toDataURL('image/jpeg', 0.9);
   }
   function kladNamenVoorAi(){
     const namen = [];
@@ -24722,12 +24738,30 @@ window.CaCalcApp = {
     (state.company.bureau || []).forEach(b => { if(b.naam) namen.push(b.naam); });
     return Array.from(new Set(namen.map(n => String(n).trim()).filter(Boolean)));
   }
+  // Ruimtes van het project (uit het CaDos-dossier: kamers + verdiepingen) als leeshulp voor de AI.
+  // Rechtstreeks gelezen (niet via dbGetCadosDossier) zodat de conflictcontrole van CaDos onaangeroerd blijft.
+  async function kladKamersVoorAi(){
+    const uit = [];
+    (state.items || []).forEach(it => { if(it.kamer) uit.push(it.kamer); });
+    try{
+      if(state.activeProjectId){
+        const { data } = await sb.from('project_elektro_dossiers').select('data').eq('project_id', state.activeProjectId).maybeSingle();
+        const d = data && data.data;
+        if(d){
+          (Array.isArray(d.kamers) ? d.kamers : []).forEach(k => { if(typeof k === 'string' && k.trim()) uit.push(k.trim()); });
+          (Array.isArray(d.verdiepingen) ? d.verdiepingen : []).forEach(v => { if(v && v.label) uit.push(String(v.label)); });
+        }
+      }
+    }catch(e){ /* geen dossier: niet erg */ }
+    return Array.from(new Set(uit)).slice(0, 120);
+  }
   async function kladAiAanroep(images){
-    const model = (state.company && state.company.gemini_model && String(state.company.gemini_model).trim()) || DEFAULT_GEMINI_MODEL;
+    const model = (state.company && state.company.gemini_model_klad && String(state.company.gemini_model_klad).trim()) || DEFAULT_GEMINI_MODEL_KLAD;
+    const textModel = (state.company && state.company.gemini_model && String(state.company.gemini_model).trim()) || DEFAULT_GEMINI_MODEL;
     const { data, error } = await sb.functions.invoke('ai-assist', { body: {
-      task: 'klad-naar-punten', model,
+      task: 'klad-naar-punten', model, textModel,
       images: images.map(d => d.replace(/^data:image\/\w+;base64,/, '')),
-      context: { project: el('f-project').value || '', datum: el('f-datum').value || todayISO(), namen: kladNamenVoorAi(), categorieen: CATEGORIES.slice() }
+      context: { project: el('f-project').value || '', datum: el('f-datum').value || todayISO(), namen: kladNamenVoorAi(), kamers: await kladKamersVoorAi(), categorieen: CATEGORIES.slice() }
     } });
     if(error){
       let detail = '';
@@ -24755,6 +24789,7 @@ window.CaCalcApp = {
     try{
       const res = await kladAiAanroep(images);
       kladVoorstel = res.punten.map(p => Object.assign({ aan: true }, p));
+      el('klad-review-hint').textContent = 'Kijk de punten na. Vink uit wat niet in het verslag moet en pas aan waar nodig. Punten met ⚠ kon de AI niet goed lezen.' + (res.model ? ' (Gelezen met ' + res.model + '.)' : '');
       el('klad-transcriptie').textContent = res.tekst || '';
       el('klad-transcriptie-blok').style.display = res.tekst ? '' : 'none';
       if(!kladVoorstel.length){ alert('De AI vond geen leesbare punten op het kladblad. Schrijf iets duidelijker of in kortere lijnen en probeer opnieuw.'); return; }
@@ -25077,7 +25112,7 @@ window.CaCalcApp = {
   let bootstrapInFlight = false;
 
   async function bootstrapAfterLoginInner(){
-    state.company = Object.assign({ naam:'Casentis', logo_url:null, adres:'', btw:'', telefoon:'', email:'', website:'', team_leden:[], bureau:[], gemini_model:null, protocollen:null, scherm_token:null, scherm_dagen:5, scherm_rollen:[], scherm_toon_gemeente:true, scherm_toon_projectleider:true, scherm_weekdagen:SCHERM_WEEKDAGEN_DEFAULT.slice() }, await dbGetBedrijf());
+    state.company = Object.assign({ naam:'Casentis', logo_url:null, adres:'', btw:'', telefoon:'', email:'', website:'', team_leden:[], bureau:[], gemini_model:null, gemini_model_klad:null, protocollen:null, scherm_token:null, scherm_dagen:5, scherm_rollen:[], scherm_toon_gemeente:true, scherm_toon_projectleider:true, scherm_weekdagen:SCHERM_WEEKDAGEN_DEFAULT.slice() }, await dbGetBedrijf());
     if(!Array.isArray(state.company.team_leden)) state.company.team_leden = [];
     if(!Array.isArray(state.company.bureau)) state.company.bureau = [];
     neemTeamSnapshot(state.company); // fase 1 doorlichting: basis voor het samenvoegen bij bewaren
@@ -27207,6 +27242,7 @@ window.CaCalcApp = {
     el('c-admin-telefoon').value = state.company.administratie_telefoon || '';
     el('c-admin-adres').value = state.company.administratie_adres || '';
     el('c-gemini-model').value = state.company.gemini_model || DEFAULT_GEMINI_MODEL;
+    el('c-gemini-model-klad').value = state.company.gemini_model_klad || DEFAULT_GEMINI_MODEL_KLAD;
     el('gemini-models-status').textContent = 'Nog niet gecontroleerd bij Google.';
     el('gemini-models-list').innerHTML = '';
 
@@ -27996,6 +28032,7 @@ window.CaCalcApp = {
       team_leden: state.company.team_leden || [],
       bureau: state.company.bureau || [],
       gemini_model: el('c-gemini-model').value.trim(),
+      gemini_model_klad: el('c-gemini-model-klad').value.trim() || null,
       protocollen: state.protocollen || [],
       // Ronde 67 -- schermweergave-instellingen (het token zelf wordt apart/onmiddellijk bewaard,
       // zie btn-scherm-genereer hierboven, niet via deze knop).
@@ -28014,21 +28051,31 @@ window.CaCalcApp = {
   // AI-model (Gemini): tonen welk model bij Google nog effectief bestaat, en toelaten om zonder
   // code-wijziging/redeploy over te schakelen (op vraag van Peter, 2026-08-21).
   function renderGeminiModelsList(models){
+    models = (models || []).filter(m => m && m.id && !GEMINI_ONGESCHIKT.test(m.id));
     const container = el('gemini-models-list');
-    const current = (state.company.gemini_model && String(state.company.gemini_model).trim()) || DEFAULT_GEMINI_MODEL;
-    const foundCurrent = models.some(m => m.id === current);
+    const huidig = (state.company.gemini_model && String(state.company.gemini_model).trim()) || DEFAULT_GEMINI_MODEL;
+    const huidigKlad = (state.company.gemini_model_klad && String(state.company.gemini_model_klad).trim()) || DEFAULT_GEMINI_MODEL_KLAD;
     let html = '';
-    if(!foundCurrent){
-      html += `<p class="gemini-model-warning">⚠️ Het huidige model "${escapeHtml(current)}" werd niet gevonden bij Google — waarschijnlijk uit dienst gehaald. Kies hieronder een beschikbaar model.</p>`;
-    }
+    if(GEMINI_ONGESCHIKT.test(huidig)) html += `<p class="gemini-model-warning">⚠️ "${escapeHtml(huidig)}" is geen tekstmodel (spraak/beeld). Kies hieronder een model "Voor tekst".</p>`;
+    else if(models.length && !models.some(m => m.id === huidig)) html += `<p class="gemini-model-warning">⚠️ Het tekstmodel "${escapeHtml(huidig)}" werd niet gevonden bij Google — waarschijnlijk uit dienst gehaald. Kies hieronder een beschikbaar model.</p>`;
+    if(models.length && !models.some(m => m.id === huidigKlad)) html += `<p class="gemini-model-warning">⚠️ Het handschriftmodel "${escapeHtml(huidigKlad)}" werd niet gevonden bij Google. De app valt dan vanzelf terug op een ander gratis model, maar kies er best een "Voor handschrift".</p>`;
     if(!models.length){
-      html += '<p class="hint">Geen "flash-lite"-modellen gevonden bij Google.</p>';
+      html += '<p class="hint">Geen bruikbare modellen gevonden bij Google.</p>';
     } else {
-      html += '<div class="gemini-model-rows">' + models.map(m => {
-        const isCurrent = m.id === current;
-        return `<div class="gemini-model-row${isCurrent ? ' is-current' : ''}">
-          <div><strong>${escapeHtml(m.id)}</strong>${m.displayName ? ' — ' + escapeHtml(m.displayName) : ''}</div>
-          ${isCurrent ? '<span class="badge-done">Huidig model</span>' : `<button class="btn btn-ghost btn-sm gemini-model-adopt" type="button" data-model="${escapeHtml(m.id)}">Overnemen</button>`}
+      // Sterkere "flash"-modellen eerst, daarna "flash-lite"; binnen elke soort nieuwste eerst.
+      const gesorteerd = models.slice().sort((a, b) => {
+        const la = a.id.includes('flash-lite') ? 1 : 0, lb = b.id.includes('flash-lite') ? 1 : 0;
+        return la - lb || b.id.localeCompare(a.id, 'en', { numeric: true });
+      });
+      html += '<div class="gemini-model-rows">' + gesorteerd.map(m => {
+        const isTekst = m.id === huidig, isKlad = m.id === huidigKlad;
+        const lite = m.id.includes('flash-lite');
+        return `<div class="gemini-model-row${(isTekst || isKlad) ? ' is-current' : ''}">
+          <div><strong>${escapeHtml(m.id)}</strong>${m.displayName ? ' — ' + escapeHtml(m.displayName) : ''}<span class="gemini-soort${lite ? '' : ' is-flash'}">${lite ? 'Flash-Lite · snel' : 'Flash · sterker'}</span></div>
+          <div class="gemini-model-acties">
+            ${isTekst ? '<span class="badge-done">Tekstmodel</span>' : `<button class="btn btn-ghost btn-sm gemini-model-adopt" type="button" data-model="${escapeHtml(m.id)}" data-doel="tekst">Voor tekst</button>`}
+            ${isKlad ? '<span class="badge-done">Handschriftmodel</span>' : `<button class="btn btn-ghost btn-sm gemini-model-adopt" type="button" data-model="${escapeHtml(m.id)}" data-doel="klad">Voor handschrift</button>`}
+          </div>
         </div>`;
       }).join('') + '</div>';
     }
@@ -28036,12 +28083,13 @@ window.CaCalcApp = {
     container.querySelectorAll('.gemini-model-adopt').forEach(btn => {
       btn.addEventListener('click', async () => {
         const newModel = btn.getAttribute('data-model');
+        const klad = btn.getAttribute('data-doel') === 'klad';
         btn.disabled = true;
         try{
-          await dbSaveBedrijf({ gemini_model: newModel });
-          state.company.gemini_model = newModel;
-          el('c-gemini-model').value = newModel;
-          showStatus(`AI-model overgenomen: ${newModel}`);
+          await dbSaveBedrijf(klad ? { gemini_model_klad: newModel } : { gemini_model: newModel });
+          if(klad){ state.company.gemini_model_klad = newModel; el('c-gemini-model-klad').value = newModel; }
+          else { state.company.gemini_model = newModel; el('c-gemini-model').value = newModel; }
+          showStatus((klad ? 'Model voor handschrift: ' : 'Model voor tekst: ') + newModel);
           renderGeminiModelsList(models);
         }catch(err){ alert('Overnemen mislukt: ' + err.message); btn.disabled = false; }
       });
@@ -28054,7 +28102,8 @@ window.CaCalcApp = {
     btn.textContent = 'Bezig...';
     try{
       const models = await fetchGeminiModellen();
-      el('gemini-models-status').textContent = `${models.length} "flash-lite"-model(len) gevonden bij Google (laatst gecontroleerd: ${new Date().toLocaleString('nl-BE')}).`;
+      const bruikbaar = models.filter(m => m && m.id && !GEMINI_ONGESCHIKT.test(m.id));
+      el('gemini-models-status').textContent = `${bruikbaar.length} bruikbare tekstmodel(len) gevonden bij Google (laatst gecontroleerd: ${new Date().toLocaleString('nl-BE')}).`;
       renderGeminiModelsList(models);
     }catch(err){
       el('gemini-models-status').textContent = 'Controleren bij Google mislukt: ' + err.message;
