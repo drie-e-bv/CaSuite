@@ -32,6 +32,8 @@
      opslag/pins/schets-stroom). workerSrc wordt verderop, bij de eerste module-initialisatie,
      ingesteld op dezelfde CDN-versie. -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.5.141/pdf.min.js"></script>
+<!-- JSZip: enkel nodig voor "Back-up maken (.zip)" op het tabblad Bedrijfsgegevens. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
   /* Design-tokens -- ronde 48 (2026-09-25, design-herwerking, zie DESIGN-ronde48.md §2): één
@@ -680,6 +682,8 @@
     background:#fff center/cover no-repeat;display:flex;align-items:center;justify-content:center;
     color:var(--ink-soft);font-size:.7rem;text-align:center;flex:none;overflow:hidden;
   }
+  /* Foto opgeruimd (2026-10-15): plaats van de foto blijft, met een rustige melding i.p.v. een gat. */
+  .photo-preview.is-opgeruimd{border-style:solid;background:#f6f8f7;color:#5f6b64;font-size:.66rem;line-height:1.25;padding:4px;}
   .wa-toggle{
     display:flex;align-items:center;gap:7px;margin-top:12px;padding-top:12px;border-top:1px dashed var(--line);
     font-size:.85rem;color:var(--ink-soft);
@@ -752,6 +756,45 @@
   .extra-foto{position:relative;width:64px;height:64px;border-radius:8px;border:1px solid var(--line);background:#fff center/cover no-repeat;}
   .badge-verstuurd{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;background:#e7f3ec;color:#1b6b3e;font-size:11.5px;font-weight:650;white-space:nowrap;}
   .badge-verstuurd.is-gewijzigd{background:#fff3df;color:#9a5b00;}
+  /* ---- Back-up & opslag (2026-10-15) ---- */
+  .opslag-balk{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;background:#f6f8f7;border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin:10px 0;}
+  .opslag-cijfer{display:flex;flex-direction:column;}
+  .opslag-getal{font:700 22px var(--font-ui);font-variant-numeric:tabular-nums;}
+  .opslag-lbl{font-size:12.5px;color:#5f6b64;}
+  .opslag-knoppen{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;}
+  .opslag-waarschuwing{background:#fff3df;border:1px solid #f0b54a;color:#6b4000;border-radius:10px;padding:8px 12px;font-size:13.5px;font-weight:600;margin:8px 0;}
+  .foto-opgeruimd{display:inline-block;padding:6px 10px;border-radius:8px;background:#f1f3f2;color:#5f6b64;font-size:12.5px;}
+  /* ---- Meeluisteren met de vergadering (2026-10-15) ---- */
+  .luister-overlay{position:fixed;inset:0;z-index:2000;background:#12201a;color:#f1f6f3;display:flex;align-items:stretch;justify-content:center;}
+  .luister-binnen{flex:1 1 auto;max-width:620px;display:flex;flex-direction:column;padding:calc(10px + env(safe-area-inset-top)) 18px calc(14px + env(safe-area-inset-bottom));}
+  .luister-kop{flex:none;display:flex;justify-content:space-between;align-items:center;gap:10px;}
+  .luister-kop .klad-btn{background:transparent;border-color:rgba(255,255,255,.25);color:#f1f6f3;}
+  .luister-titel{font-weight:700;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .luister-midden{flex:1 1 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;min-height:0;}
+  .luister-status{font-size:14px;letter-spacing:.06em;text-transform:uppercase;color:#9fd3b6;font-weight:650;}
+  .luister-overlay.is-opname .luister-status::before{content:"";display:inline-block;width:10px;height:10px;border-radius:50%;background:#e5484d;margin-right:8px;vertical-align:middle;animation:luisterpuls 1.6s ease-in-out infinite;}
+  @keyframes luisterpuls{0%,100%{opacity:1;}50%{opacity:.25;}}
+  @media (prefers-reduced-motion: reduce){ .luister-overlay.is-opname .luister-status::before{animation:none;} }
+  .luister-timer{font:700 56px/1.1 var(--font-ui);font-variant-numeric:tabular-nums;}
+  .luister-niveau{width:min(280px,70vw);height:8px;border-radius:999px;background:rgba(255,255,255,.14);overflow:hidden;}
+  .luister-niveau span{display:block;height:100%;width:0;background:#6cc49a;transition:width .12s linear;}
+  .luister-hint, .luister-verwerkt{font-size:13.5px;color:#a8bdb2;margin:0;max-width:34ch;}
+  .luister-waarschuwing{font-size:14px;font-weight:650;color:#ffd7a0;background:rgba(229,72,77,.18);border:1px solid rgba(255,215,160,.45);border-radius:10px;padding:8px 12px;margin:0;max-width:34ch;}
+  .luister-knoppen{flex:none;display:flex;gap:10px;flex-wrap:wrap;justify-content:center;padding:14px 0 6px;}
+  .luister-knop{font:650 16px/1 var(--font-ui);min-height:52px;padding:0 20px;border-radius:14px;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.08);color:#f1f6f3;cursor:pointer;}
+  .luister-knop.is-start{background:#e5484d;border-color:#e5484d;flex:1 1 100%;}
+  .luister-knop.is-einde{background:#1b6b3e;border-color:#1b6b3e;}
+  .luister-knop.is-hervat{background:#1b6b3e;border-color:#1b6b3e;}
+  .luister-knop:disabled{opacity:.45;}
+  .luister-privacy{flex:none;font-size:12px;color:#8aa196;text-align:center;margin:0;}
+  .luister-samenvatting{background:#f6f8f7;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:14px;line-height:1.5;}
+  .luister-afgewerkt{border:1px solid #b9dcc6;background:#f1f9f4;border-radius:10px;padding:10px 12px;margin-bottom:14px;}
+  .luister-afgewerkt h3, .luister-kop3{font-size:15px;margin:0 0 4px;}
+  .la-rij{display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--line);}
+  .la-rij:last-child{border-bottom:0;}
+  .la-rij .la-reden{display:block;font-size:12.5px;color:#5f6b64;}
+  .luister-tijd{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;background:#eef1ef;color:#5f6b64;font-size:11.5px;font-weight:650;font-variant-numeric:tabular-nums;}
+  .luister-ster{color:#c98a00;}
   /* ---- Kladversie (2026-10-15) ---- */
   .klad-overlay{position:fixed;inset:0;z-index:2000;background:#fff;display:flex;flex-direction:column;}
   .klad-bar{flex:none;display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;justify-content:space-between;padding:8px 10px;padding-top:calc(8px + env(safe-area-inset-top));border-bottom:1px solid var(--line);background:#f6f8f7;}
@@ -788,6 +831,7 @@
   .kladbladen-strip{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center;}
   .kladbladen-strip .kb-thumb{width:84px;height:60px;object-fit:cover;object-position:top;border:1px solid var(--line);border-radius:6px;background:#fff;cursor:pointer;}
   .kladbladen-strip .kb-lbl{font-size:12.5px;color:#5f6b64;font-weight:600;}
+  .kladbladen-strip .tr-knop{font:600 13px var(--font-ui);min-height:36px;padding:0 12px;border-radius:10px;border:1px solid var(--line);background:#fff;cursor:pointer;}
   @media (max-width:640px){
     .klad-rij{grid-template-columns:28px 1fr;}
     .klad-rij > .kr-catcel{grid-column:2;}
@@ -3538,6 +3582,10 @@
           <span class="vk-tile-ico" aria-hidden="true">✍️</span>
           <span class="vk-tile-txt"><span class="vk-tile-lbl">Kladversie</span><span class="vk-tile-sub">Schrijf met stylus, AI maakt de punten</span></span>
         </button>
+        <button type="button" class="vk-tile" id="vk-luister">
+          <span class="vk-tile-ico" aria-hidden="true">🎙️</span>
+          <span class="vk-tile-txt"><span class="vk-tile-lbl">Meeluisteren</span><span class="vk-tile-sub">Gsm luistert mee, AI maakt de punten</span></span>
+        </button>
         <button type="button" class="vk-tile" id="vk-bewerken">
           <span class="vk-tile-ico" aria-hidden="true">📂</span>
           <span class="vk-tile-txt"><span class="vk-tile-lbl">Verslag bewerken</span><span class="vk-tile-sub">Een bestaand verslag openen</span></span>
@@ -3550,6 +3598,7 @@
         <h2 id="vk-proj-titel">Nieuw gekoppeld verslag — kies een project</h2>
         <div style="display:flex;gap:6px;flex-wrap:wrap;">
           <button type="button" class="btn btn-secondary btn-sm" id="vk-klad-los" style="display:none;">Zonder project schrijven</button>
+          <button type="button" class="btn btn-secondary btn-sm" id="vk-luister-los" style="display:none;">Zonder project opnemen</button>
           <button type="button" class="btn btn-ghost btn-sm" id="vk-proj-terug">← Terug</button>
         </div>
       </div>
@@ -3692,8 +3741,11 @@
         <button type="button" class="btn btn-secondary btn-sm" id="btn-checklist-toepassen" style="flex:0 0 auto;">🗹 Checklist toepassen</button>
         <!-- Kladversie (2026-10-15): wit blad om met stylus te schrijven, AI maakt er punten van. -->
         <button type="button" class="btn btn-secondary btn-sm" id="btn-kladblad" style="flex:0 0 auto;">✍️ Kladblad</button>
+        <!-- Meeluisteren (2026-10-15): de gsm luistert de vergadering mee, de AI maakt er punten van. -->
+        <button type="button" class="btn btn-secondary btn-sm" id="btn-meeluisteren" style="flex:0 0 auto;">🎙️ Meeluisteren</button>
       </div>
       <div class="kladbladen-strip" id="kladbladen-strip" style="display:none;"></div>
+      <div class="kladbladen-strip" id="transcripties-strip" style="display:none;"></div>
 
       <!-- Ronde 48 fase B (2026-09-25, ronde 48 — design-herwerking): de drie deel-acties
            (WhatsApp / Outlook-agenda / AI-samenvatting) waren losse tekstregels met knoppen op
@@ -4738,10 +4790,27 @@
         <span class="scherm-toepassen-status" id="scherm-toepassen-status"></span>
       </div>
     </section>
-    <section class="card">
-      <h2>Back-up</h2>
-      <p class="hint">Een volledige momentopname van bedrijfsgegevens, projecten en werfverslagen als .json-bestand, puur als extra veiligheidskopie naast de database.</p>
-      <button class="btn btn-secondary btn-sm" id="btn-backup-export" type="button"><span class="btn-ico" aria-hidden="true">⬇</span> Exporteer volledige back-up (.json)</button>
+    <section class="card" id="opslag-card">
+      <h2>Back-up &amp; opslag</h2>
+      <p class="hint">Een volledige kopie van alle gegevens én de foto's, als één zip-bestand. Zet die op de SharePoint- of OneDrive-map van de firma; dan staan de foto's ook buiten de app veilig.</p>
+      <div class="opslag-balk" id="opslag-balk">
+        <div class="opslag-cijfer"><span class="opslag-getal" id="opslag-totaal">—</span><span class="opslag-lbl" id="opslag-detail">Nog niet nagekeken</span></div>
+        <button class="btn btn-ghost btn-sm" id="btn-opslag-check" type="button"><span class="btn-ico" aria-hidden="true">⟳</span> Opslag nakijken</button>
+      </div>
+      <p class="opslag-waarschuwing" id="backup-herinnering" style="display:none;"></p>
+      <div class="opslag-knoppen">
+        <button class="btn btn-primary btn-sm" id="btn-backup-zip" type="button"><span class="btn-ico" aria-hidden="true">📦</span> Back-up maken (.zip, met foto's)</button>
+        <button class="btn btn-secondary btn-sm" id="btn-backup-export" type="button"><span class="btn-ico" aria-hidden="true">⬇</span> Enkel gegevens (.json)</button>
+        <button class="btn btn-secondary btn-sm" id="btn-fotos-verkleinen" type="button"><span class="btn-ico" aria-hidden="true">🗜</span> Bestaande foto's verkleinen</button>
+        <button class="btn btn-ghost btn-sm" id="btn-fotos-opruimen" type="button"><span class="btn-ico" aria-hidden="true">🧹</span> Foto's van afgewerkte projecten opruimen</button>
+      </div>
+      <p class="hint" id="opslag-status"></p>
+      <details class="more-info">
+        <summary>Meer uitleg</summary>
+        <p><strong>Back-up maken (.zip)</strong> bevat alle gegevens als .json én alle foto's, plannen en handtekeningen, per project in een eigen map. Bewaar dat bestand buiten de app.</p>
+        <p><strong>Bestaande foto's verkleinen</strong> is eenmalig: foto's die vóór 15/10/2026 geüpload werden, worden verkleind naar max. 1600 px. De verslagen blijven naar dezelfde foto verwijzen. Nieuwe foto's worden automatisch al verkleind bij het toevoegen.</p>
+        <p><strong>Foto's van afgewerkte projecten opruimen</strong> verwijdert de foto's van projecten met status "Afgewerkt" uit de opslag. De verslagen en punten blijven volledig bestaan; bij het punt staat dan "foto opgeruimd op …". Doe dit enkel nadat je een back-up bewaard hebt — de foto's zitten dan in de zip.</p>
+      </details>
     </section>
   </section>
 
@@ -21668,6 +21737,53 @@ window.CaCalcApp = {
      tabelstijl (.verslagen-table) als elders in de app (o.a. de Catalogus hierboven). -->
 <!-- ===================== Fase 2 doorlichting (2026-10-14) ===================== -->
 <!-- Projectoverzicht ("cockpit") per project: alles van 1 project in 1 scherm. -->
+<!-- ===================== Meeluisteren met de vergadering (2026-10-15) ===================== -->
+<!-- De gsm luistert de hele vergadering mee (in stukjes van ~5 min), de AI maakt er punten van die je
+     nadien aanvinkt zoals bij de kladversie. Zie het "Meeluisteren"-blok in het script. -->
+<div class="luister-overlay" id="luister-overlay" style="display:none;" role="dialog" aria-modal="true" aria-label="Meeluisteren met de vergadering">
+  <div class="luister-binnen">
+    <div class="luister-kop">
+      <span class="luister-titel" id="luister-titel">Vergadering</span>
+      <button type="button" class="klad-btn" id="luister-sluiten" title="Sluiten (opname stopt)">✕</button>
+    </div>
+    <div class="luister-midden">
+      <div class="luister-status" id="luister-status">Klaar om te starten</div>
+      <div class="luister-timer" id="luister-timer">00:00</div>
+      <div class="luister-niveau" aria-hidden="true"><span id="luister-niveau-balk"></span></div>
+      <p class="luister-hint" id="luister-hint">Leg de gsm midden op tafel. Het scherm blijft aan tijdens de opname.</p>
+      <p class="luister-verwerkt" id="luister-verwerkt"></p>
+      <p class="luister-waarschuwing" id="luister-waarschuwing" style="display:none;"></p>
+    </div>
+    <div class="luister-knoppen">
+      <button type="button" class="luister-knop is-start" id="luister-start">● Start</button>
+      <button type="button" class="luister-knop" id="luister-ster" style="display:none;" title="Markeer dit moment als belangrijk">⭐ Belangrijk</button>
+      <button type="button" class="luister-knop" id="luister-pauze" style="display:none;">⏸ Pauze</button>
+      <button type="button" class="luister-knop is-hervat" id="luister-hervat" style="display:none;">▶ Hervat</button>
+      <button type="button" class="luister-knop is-einde" id="luister-einde" style="display:none;">■ Einde</button>
+    </div>
+    <p class="luister-privacy">Laat de aanwezigen weten dat er opgenomen wordt. De opname zelf wordt niet bewaard — enkel de tekst komt bij het verslag.</p>
+  </div>
+</div>
+<div class="modal-overlay" id="luister-review-modal" style="display:none;">
+  <div class="modal-box" style="max-width:980px;">
+    <div class="cp-kop"><h2>🎙 Punten uit de vergadering</h2><button class="btn btn-ghost btn-sm" id="luister-review-sluiten" type="button">Annuleren</button></div>
+    <div class="modal-body">
+      <div class="luister-samenvatting" id="luister-samenvatting" style="display:none;"></div>
+      <div class="luister-afgewerkt" id="luister-afgewerkt" style="display:none;">
+        <h3>Lijken afgewerkt tijdens de vergadering</h3>
+        <p class="hint">Vink aan welke bestaande actiepunten je meteen wil afvinken.</p>
+        <div id="luister-afgewerkt-lijst"></div>
+      </div>
+      <h3 class="luister-kop3">Nieuwe punten</h3>
+      <p class="hint" id="luister-review-hint">Kijk de punten na. Vink uit wat niet in het verslag moet en pas aan waar nodig. Punten met ⚠ waren moeilijk te verstaan.</p>
+      <div id="luister-review-lijst"></div>
+      <details class="klad-transcriptie" id="luister-transcriptie-blok"><summary>Volledige transcriptie</summary><pre id="luister-transcriptie"></pre></details>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" id="luister-review-ok" type="button">Toevoegen aan verslag</button>
+    </div>
+  </div>
+</div>
 <!-- ===================== Kladversie (2026-10-15) ===================== -->
 <!-- Volledig wit blad om met een stylus (of vinger/muis) te schrijven; op het einde zet de AI het
      handschrift om naar verslagpunten (nakijken in #klad-review-modal). Zie het "Kladversie"-blok
@@ -22835,12 +22951,25 @@ window.CaCalcApp = {
     schetsHuidigeCanvas = null;
     schetsHuidigItem = null;
   }
+  // Tekent het schets-canvas over op een canvas van max. FOTO_MAX_ZIJDE px en geeft een JPEG terug.
+  function schetsVerkleind(canvas){
+    const schaal = Math.min(1, FOTO_MAX_ZIJDE / Math.max(canvas.width, canvas.height));
+    if(schaal >= 1) return canvas.toDataURL('image/jpeg', FOTO_KWALITEIT);
+    const c = document.createElement('canvas');
+    c.width = Math.round(canvas.width * schaal);
+    c.height = Math.round(canvas.height * schaal);
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+    ctx.drawImage(canvas, 0, 0, c.width, c.height);
+    return c.toDataURL('image/jpeg', FOTO_KWALITEIT);
+  }
   el('schets-opslaan-btn').addEventListener('click', () => {
     if(!schetsHuidigeCanvas || !schetsHuidigItem) return;
-    const dataUrl = schetsHuidigeCanvas.toDataURL('image/png');
+    // 2026-10-15: als JPEG op max. 1600 px bewaren i.p.v. een volledige PNG (vaak enkele MB).
+    const dataUrl = schetsVerkleind(schetsHuidigeCanvas);
     schetsHuidigItem.photoDataUrl = dataUrl;
     schetsHuidigItem.photoUrl = null; // nieuwe schets vervangt een eventueel eerder bewaarde foto/schets
-    schetsHuidigItem.photoName = 'schets.png';
+    schetsHuidigItem.photoName = 'schets.jpg';
     closeSchetsCanvasModal();
     renderItems();
     showStatus('Schets opgeslagen als foto bij dit punt');
@@ -23398,7 +23527,8 @@ window.CaCalcApp = {
   // is altijd al een kant-en-klaar afbeeldingsbestand; deze functie weet zelf niets van PDF's --
   // bij een PDF-bron wordt de rasterisatie door de aanroeper al via dataUrlNaarFile() gedaan.
   async function uploadNieuwPlan({ projectId, naam, file, pdfBron, pdfPagina }){
-    const url = await dbUploadFile('project-plannen', file);
+    // 2026-10-15: plannen mogen groter blijven dan foto's (je zoomt erop in), maar wel begrensd.
+    const url = await dbUploadFile('project-plannen', await verkleinBestand(file, 2400, 0.85));
     const fields = { project_id: projectId, naam: (naam || '').trim(), afbeelding_url: url, pins: [] };
     if(pdfBron){ fields.pdf_bron = pdfBron; fields.pdf_pagina = pdfPagina || null; }
     return await dbInsertPlan(fields);
@@ -23790,6 +23920,55 @@ window.CaCalcApp = {
   async function dbDeleteUrenRegistratie(id){
     const { error } = await sb.from('uren_registraties').delete().eq('id', id);
     if(error) throw error;
+  }
+
+  // ================================================================
+  // Foto's verkleinen vóór het uploaden (2026-10-15, op vraag van Peter: "die foto's zijn te groot")
+  // ----------------------------------------------------------------
+  // Een gsm-foto is al snel 2-4 MB. Dat vulde de opslag (44 foto's = 99 MB van de 1 GB), maakte de
+  // PDF's zwaar en het uploaden op de werf traag. Elke foto die de gebruiker toevoegt (camera,
+  // galerij, plakken, schets) wordt daarom eerst verkleind tot max. FOTO_MAX_ZIJDE px op de langste
+  // zijde en opnieuw opgeslagen als JPEG -- dat is ruwweg 5 tot 8 keer kleiner, en nog altijd scherp
+  // genoeg om op een detail in te zoomen. Wat de app zelf al klein maakt (handtekeningen in PNG, de
+  // kladbladen) blijft ongemoeid.
+  const FOTO_MAX_ZIJDE = 1600;
+  const FOTO_KWALITEIT = 0.8;
+  // De oriëntatie van een gsm-foto zit in de EXIF-gegevens; createImageBitmap() met
+  // imageOrientation:'from-image' past die meteen toe, zodat een staande foto niet gedraaid eindigt.
+  async function verkleinAfbeelding(bron, maxZijde, kwaliteit){
+    const grens = maxZijde || FOTO_MAX_ZIJDE;
+    const kwal = kwaliteit || FOTO_KWALITEIT;
+    const blob = (bron instanceof Blob) ? bron : dataURLtoBlob(String(bron));
+    if(!blob || !/^image\//.test(blob.type || '')) return null;
+    if(/gif|svg/.test(blob.type)) return null; // animatie/vector: niet aanraken
+    let bitmap = null;
+    try{
+      bitmap = await createImageBitmap(blob, { imageOrientation: 'from-image' });
+    }catch(e){
+      try{ bitmap = await createImageBitmap(blob); }catch(e2){ return null; } // oudere browser: zonder EXIF-rotatie
+    }
+    const schaal = Math.min(1, grens / Math.max(bitmap.width, bitmap.height));
+    const w = Math.max(1, Math.round(bitmap.width * schaal));
+    const h = Math.max(1, Math.round(bitmap.height * schaal));
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h); // doorzichtige PNG's krijgen een witte achtergrond i.p.v. zwart
+    ctx.drawImage(bitmap, 0, 0, w, h);
+    try{ bitmap.close(); }catch(e){}
+    const dataUrl = canvas.toDataURL('image/jpeg', kwal);
+    // Was het origineel al kleiner/zuiniger (bv. een kleine schermafbeelding), dan dat houden.
+    if(schaal >= 1 && dataURLtoBlob(dataUrl).size >= blob.size) return null;
+    return dataUrl;
+  }
+  // Zelfde, maar geeft een File terug (voor de upload-paden die met bestanden werken).
+  async function verkleinBestand(file, maxZijde, kwaliteit){
+    try{
+      const dataUrl = await verkleinAfbeelding(file, maxZijde, kwaliteit);
+      if(!dataUrl) return file;
+      const naam = String(file.name || 'foto.jpg').replace(/\.[a-z0-9]+$/i, '') + '.jpg';
+      return new File([dataURLtoBlob(dataUrl)], naam, { type: 'image/jpeg' });
+    }catch(e){ console.warn('Foto verkleinen mislukt, origineel gebruikt:', e); return file; }
   }
 
   async function dbUploadFile(bucket, file){
@@ -24349,6 +24528,18 @@ window.CaCalcApp = {
         if(p && namen.includes(p.projectleider_naam)) uit.push({ soort: 'factuurmelding', dringend: true, tekst: 'Factuur opmaken voor ' + p.naam, sub: m.drempel + ' ingeplande dagen bereikt' + (p.projectleider_naam !== f2Ik() ? ' (vervanging voor ' + p.projectleider_naam + ')' : '') });
       });
     }catch(e){ /* tabel ontbreekt */ }
+    // Back-up-herinnering (2026-10-15, op vraag van Peter: "mss export/backup voorstellen om de
+    // zoveel tijd"). Enkel voor de eigenaar -- de rest van het team hoeft hier niets mee te doen.
+    // Bewust NIET dringend: het is een herinnering, geen alarm, dus geen rood bolletje.
+    try{
+      const email = (state.session && state.session.user && state.session.user.email) || '';
+      if(isPeterEmail(email)){
+        const laatste = state.company && state.company.laatste_backup_op ? new Date(state.company.laatste_backup_op) : null;
+        const dagen = laatste ? Math.floor((Date.now() - laatste.getTime()) / 86400000) : null;
+        if(dagen == null) uit.push({ soort: 'backup', dringend: false, tekst: 'Nog geen back-up met foto\'s gemaakt', sub: 'Bedrijfsgegevens -> Back-up & opslag' });
+        else if(dagen >= 90) uit.push({ soort: 'backup', dringend: false, tekst: 'Back-up is ' + dagen + ' dagen oud', sub: 'Laatste back-up: ' + laatste.toLocaleDateString('nl-BE') + ' - Bedrijfsgegevens -> Back-up & opslag' });
+      }
+    }catch(e){ /* geen sessie/bedrijf */ }
     uit.sort((a, b) => (b.dringend - a.dringend));
     meldingenCache = uit;
     return uit;
@@ -24369,7 +24560,7 @@ window.CaCalcApp = {
   }
   window.verversMeldingBadge = verversMeldingBadge;
   function renderMeldingenLijst(){
-    const icoon = { actiepunt: '📌', factuur: '🧾', voorstel: '🗓', factuurmelding: '💶' };
+    const icoon = { actiepunt: '📌', factuur: '🧾', voorstel: '🗓', factuurmelding: '💶', backup: '📦' };
     el('meldingen-lijst').innerHTML = meldingenCache.length ? meldingenCache.map((m, i) =>
       `<button type="button" class="meld-rij${m.dringend ? ' is-dringend' : ''}" data-i="${i}"><span class="meld-ico">${icoon[m.soort] || '•'}</span><span class="meld-txt"><span class="meld-titel">${escapeHtml(m.tekst)}${m.teLaat ? ' <span class="badge-overdue">te laat</span>' : ''}</span><span class="meld-sub">${escapeHtml(m.sub || '')}</span></span></button>`).join('')
       : '<p class="hint">Geen meldingen. Alles bij! ✅</p>';
@@ -24401,6 +24592,7 @@ window.CaCalcApp = {
     el('meldingen-modal').style.display = 'none';
     if(m.soort === 'actiepunt') switchTab('actiepunten');
     else if(m.soort === 'factuur') switchTab('cafin');
+    else if(m.soort === 'backup'){ switchTab('bedrijf'); const k = el('opslag-card'); if(k) k.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
     else { switchTab('inzet'); if(m.soort === 'voorstel'){ const b = document.querySelector('.ip-subtab-btn[data-ipsub="bevestigen"]'); if(b) b.click(); } }
   });
   el('verv-bewaar').addEventListener('click', async () => {
@@ -24907,6 +25099,485 @@ window.CaCalcApp = {
     renderVerslagScreen();
     openKlad();
   });
+
+
+  // =====================================================================================
+  // ===================== MEELUISTEREN MET DE VERGADERING (2026-10-15) ===================
+  // Peter: "Ik druk op start, de gsm luistert de ganse vergadering mee, alle punten worden zoveel
+  // mogelijk opgelijst en daarna vink ik aan zoals bij klad wat mee te nemen is."
+  //
+  // Opbouw: MediaRecorder neemt op in stukjes van LUISTER_STUK_SEC (5 min). Elk afgesloten stukje gaat
+  // meteen naar de Edge Function ('audio-naar-tekst') en wordt tekst; mislukt dat (geen bereik, limiet
+  // bij Google), dan blijft het stukje in een lokale wachtrij en wordt het later opnieuw geprobeerd.
+  // Bij "Einde" wacht de app op de laatste stukjes en maakt 'vergadering-naar-punten' de punten, een
+  // samenvatting en voorstellen om bestaande open actiepunten af te vinken. De audio zelf wordt NIET
+  // bewaard (Peter: "niet nodig") -- enkel de transcriptie komt bij het verslag (kolom
+  // verslagen.transcripties), net als de kladbladen niet in de PDF.
+  //
+  // Werkt op iPhone en Android. Een web-app mag niet opnemen met een vergrendeld scherm of op de
+  // achtergrond, dus: Wake Lock houdt het scherm aan, en valt de opname toch stil (oproep, scherm uit,
+  // andere app), dan merkt de app dat en waarschuwt met geluid + trillen + een rode balk, en hervat
+  // automatisch zodra het kan.
+  // =====================================================================================
+  const LUISTER_STUK_SEC = 300;     // lengte van 1 opnamestuk (5 min)
+  const LUISTER_MAX_SEC = 4 * 3600; // veiligheidsgrens: 4 uur
+  let luisterStroom = null, luisterRecorder = null, luisterWakeLock = null, luisterAudioCtx = null, luisterAnalyser = null;
+  let luisterBezigMetStuk = false;
+  let luisterStaat = 'uit';         // uit | opname | pauze | verwerken
+  let luisterStart = 0, luisterVerstreken = 0, luisterStukStart = 0;
+  let luisterTimer = null, luisterNiveauTimer = null;
+  let luisterSterren = [];
+  let luisterStukken = [];          // { i, van, tot, tekst|null, dataUrl|null, mime, bezig }
+  let luisterVoorstel = [], luisterAfgewerkt = [], luisterSamenvatting = '', luisterTranscriptie = '';
+  const luisterMMSS = s => String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+  function luisterSleutel(){ return 'casnap-luister-' + (state.currentVerslagId || 'nieuw'); }
+  function luisterBewaarLokaal(){
+    try{ localStorage.setItem(luisterSleutel(), JSON.stringify({ sterren: luisterSterren, stukken: luisterStukken.map(s => ({ i: s.i, van: s.van, tot: s.tot, tekst: s.tekst, mime: s.mime, dataUrl: s.tekst ? null : s.dataUrl })) })); }
+    catch(e){ /* localStorage vol: de stukjes blijven in het geheugen */ }
+  }
+  function luisterWisLokaal(){ try{ localStorage.removeItem(luisterSleutel()); }catch(e){} }
+
+  function luisterZetStaat(nieuw){
+    luisterStaat = nieuw;
+    const bezigOpname = nieuw === 'opname';
+    el('luister-overlay').classList.toggle('is-opname', bezigOpname);
+    el('luister-start').style.display = nieuw === 'uit' ? '' : 'none';
+    el('luister-ster').style.display = bezigOpname ? '' : 'none';
+    el('luister-pauze').style.display = bezigOpname ? '' : 'none';
+    el('luister-hervat').style.display = nieuw === 'pauze' ? '' : 'none';
+    el('luister-einde').style.display = (bezigOpname || nieuw === 'pauze') ? '' : 'none';
+    el('luister-status').textContent = nieuw === 'opname' ? 'Opname loopt' : nieuw === 'pauze' ? 'Gepauzeerd' : nieuw === 'verwerken' ? 'Bezig met verwerken…' : 'Klaar om te starten';
+    el('luister-sluiten').disabled = nieuw === 'verwerken';
+  }
+  function luisterUpdateTimer(){
+    const sec = luisterVerstreken + (luisterStaat === 'opname' ? (Date.now() - luisterStart) / 1000 : 0);
+    el('luister-timer').textContent = luisterMMSS(sec);
+    if(sec >= LUISTER_MAX_SEC && luisterStaat === 'opname'){ luisterEinde(); }
+    return sec;
+  }
+  function luisterUpdateVerwerkt(){
+    const klaar = luisterStukken.filter(s => s.tekst != null).length;
+    const totaal = luisterStukken.length;
+    el('luister-verwerkt').textContent = totaal ? `${klaar} van ${totaal} stuk${totaal === 1 ? '' : 'ken'} omgezet naar tekst` + (klaar < totaal ? '…' : '') : '';
+  }
+  function luisterWaarschuw(tekst){
+    const w = el('luister-waarschuwing');
+    w.textContent = tekst || '';
+    w.style.display = tekst ? '' : 'none';
+    if(tekst){
+      try{ navigator.vibrate && navigator.vibrate([250, 120, 250]); }catch(e){}
+      luisterPiep();
+    }
+  }
+  // Hoorbaar signaal, ook met de gsm op stil: een korte toon via de Web Audio API. Op iOS speelt die
+  // enkel als het toestel niet op "stil" staat; het trillen en de rode balk blijven dan over.
+  function luisterPiep(){
+    try{
+      const ctx = luisterAudioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      luisterAudioCtx = ctx;
+      if(ctx.state === 'suspended') ctx.resume();
+      [0, 0.35].forEach(vertraging => {
+        const osc = ctx.createOscillator(), gain = ctx.createGain();
+        osc.type = 'sine'; osc.frequency.value = 880;
+        gain.gain.setValueAtTime(0.0001, ctx.currentTime + vertraging);
+        gain.gain.exponentialRampToValueAtTime(0.35, ctx.currentTime + vertraging + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + vertraging + 0.28);
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + vertraging); osc.stop(ctx.currentTime + vertraging + 0.3);
+      });
+    }catch(e){ /* geluid lukt niet: trillen + rode balk blijven */ }
+  }
+  async function luisterSchermAan(){
+    try{ if('wakeLock' in navigator && !luisterWakeLock) luisterWakeLock = await navigator.wakeLock.request('screen'); }
+    catch(e){ /* niet ondersteund of geweigerd */ }
+  }
+  function luisterSchermLos(){ try{ if(luisterWakeLock){ luisterWakeLock.release(); luisterWakeLock = null; } }catch(e){} }
+
+  function luisterMimeType(){
+    const kandidaten = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/aac', 'audio/ogg;codecs=opus'];
+    for(const m of kandidaten){ if(window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) return m; }
+    return '';
+  }
+  function luisterNieuweRecorder(){
+    const mime = luisterMimeType();
+    const rec = new MediaRecorder(luisterStroom, Object.assign({ audioBitsPerSecond: 32000 }, mime ? { mimeType: mime } : {}));
+    const delen = [];
+    const van = luisterVerstreken;
+    rec.ondataavailable = e => { if(e.data && e.data.size) delen.push(e.data); };
+    rec.onstop = () => {
+      const blob = new Blob(delen, { type: (rec.mimeType || mime || 'audio/webm').split(';')[0] });
+      if(blob.size > 2000) luisterStukToevoegen(blob, van, luisterVerstreken);
+      luisterBezigMetStuk = false;
+    };
+    rec.onerror = () => { luisterWaarschuw('De opname werd onderbroken. Tik op Hervat om verder te gaan.'); luisterPauzeDoor('fout'); };
+    return rec;
+  }
+  function luisterStukToevoegen(blob, van, tot){
+    const i = luisterStukken.length;
+    const stuk = { i, van: Math.round(van), tot: Math.round(tot), tekst: null, dataUrl: null, mime: blob.type || 'audio/webm', bezig: false };
+    luisterStukken.push(stuk);
+    luisterUpdateVerwerkt();
+    const lezer = new FileReader();
+    lezer.onload = () => { stuk.dataUrl = String(lezer.result); luisterBewaarLokaal(); luisterVerwerkStukken(); };
+    lezer.readAsDataURL(blob);
+  }
+  async function luisterVerwerkStukken(){
+    for(const stuk of luisterStukken){
+      if(stuk.tekst != null || stuk.bezig || !stuk.dataUrl) continue;
+      if(!navigator.onLine) return;
+      stuk.bezig = true;
+      try{
+        const model = (state.company && state.company.gemini_model_klad && String(state.company.gemini_model_klad).trim()) || DEFAULT_GEMINI_MODEL_KLAD;
+        const textModel = (state.company && state.company.gemini_model && String(state.company.gemini_model).trim()) || DEFAULT_GEMINI_MODEL;
+        const { data, error } = await sb.functions.invoke('ai-assist', { body: {
+          task: 'audio-naar-tekst', model, textModel,
+          audio: stuk.dataUrl.replace(/^data:[^;]+;base64,/, ''), mime: (stuk.mime || 'audio/webm').split(';')[0], offsetSec: stuk.van,
+          context: { project: el('f-project').value || '', namen: kladNamenVoorAi(), kamers: await kladKamersVoorAi() }
+        } });
+        if(error) throw new Error(await foutTekst(error));
+        if(!data || typeof data.tekst !== 'string') throw new Error((data && data.error) || 'Geen tekst ontvangen.');
+        stuk.tekst = data.tekst;
+        stuk.dataUrl = null; // audio niet bijhouden (Peter: opname niet bewaren)
+        luisterBewaarLokaal();
+      }catch(err){
+        console.warn('Opnamestuk omzetten mislukt, later opnieuw:', err);
+        stuk.bezig = false;
+        return; // stoppen; een volgende tik/Einde probeert opnieuw
+      }
+      stuk.bezig = false;
+      luisterUpdateVerwerkt();
+    }
+    luisterUpdateVerwerkt();
+  }
+  async function foutTekst(error){
+    try{ const b = error.context && typeof error.context.json === 'function' ? await error.context.json() : null; if(b && b.error) return b.error; }catch(e){}
+    return error.message || 'AI niet bereikbaar';
+  }
+
+  async function luisterStartOpname(){
+    if(!navigator.mediaDevices || !window.MediaRecorder){ alert('Dit toestel of deze browser kan niet opnemen. Probeer het via Safari (iPhone) of Chrome (Android).'); return; }
+    if(!confirm('Laat je de aanwezigen weten dat er opgenomen wordt?\n\nDe opname zelf wordt niet bewaard: enkel de tekst komt bij het verslag.')) return;
+    try{
+      luisterStroom = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+    }catch(err){
+      alert('Geen toegang tot de microfoon: ' + err.message + '\n\nSta het microfoongebruik toe in de instellingen van je browser.');
+      return;
+    }
+    luisterSterren = []; luisterStukken = []; luisterVerstreken = 0;
+    luisterVoorstel = []; luisterAfgewerkt = []; luisterSamenvatting = ''; luisterTranscriptie = '';
+    luisterWaarschuw('');
+    await luisterSchermAan();
+    luisterPiep(); // ontgrendelt meteen het geluid (nodig op iOS) én bevestigt hoorbaar de start
+    luisterNiveauMeter();
+    luisterStart = Date.now(); luisterStukStart = Date.now();
+    luisterRecorder = luisterNieuweRecorder();
+    luisterRecorder.start();
+    luisterZetStaat('opname');
+    luisterTimer = setInterval(() => {
+      const sec = luisterUpdateTimer();
+      // Stuk afsluiten na 5 minuten -> meteen laten omzetten naar tekst.
+      if(luisterStaat === 'opname' && !luisterBezigMetStuk && (Date.now() - luisterStukStart) / 1000 >= LUISTER_STUK_SEC) luisterNieuwStuk();
+      // Opname stilgevallen (oproep/scherm uit/andere app)? -> waarschuwen en proberen te hervatten.
+      if(luisterStaat === 'opname' && luisterRecorder && luisterRecorder.state === 'inactive' && !luisterBezigMetStuk) luisterOnderbroken();
+      if(luisterStaat === 'opname' && luisterStroom && !luisterStroom.getAudioTracks().some(t => t.readyState === 'live')) luisterOnderbroken();
+    }, 1000);
+  }
+  function luisterNieuwStuk(){
+    if(!luisterRecorder || luisterRecorder.state === 'inactive') return;
+    luisterBezigMetStuk = true;
+    luisterVerstreken += (Date.now() - luisterStart) / 1000;
+    try{ luisterRecorder.stop(); }catch(e){ luisterBezigMetStuk = false; }
+    luisterStart = Date.now(); luisterStukStart = Date.now();
+    if(luisterStaat === 'opname'){
+      try{ luisterRecorder = luisterNieuweRecorder(); luisterRecorder.start(); }
+      catch(e){ luisterOnderbroken(); }
+    }
+  }
+  function luisterOnderbroken(){
+    if(luisterStaat !== 'opname') return;
+    luisterPauzeDoor('onderbroken');
+    luisterWaarschuw('⚠ De opname werd onderbroken (oproep, scherm uit of andere app). Tik op Hervat om verder te gaan — wat al opgenomen is, blijft bewaard.');
+  }
+  function luisterPauzeDoor(reden){
+    if(luisterStaat === 'opname'){
+      luisterVerstreken += (Date.now() - luisterStart) / 1000;
+      luisterBezigMetStuk = true;
+      try{ if(luisterRecorder && luisterRecorder.state !== 'inactive') luisterRecorder.stop(); else luisterBezigMetStuk = false; }catch(e){ luisterBezigMetStuk = false; }
+    }
+    luisterZetStaat('pauze');
+    if(reden === 'gebruiker') luisterWaarschuw('');
+    luisterSchermLos();
+  }
+  async function luisterHervat(){
+    luisterWaarschuw('');
+    try{
+      if(!luisterStroom || !luisterStroom.getAudioTracks().some(t => t.readyState === 'live')){
+        luisterStroom = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+        luisterNiveauMeter();
+      }
+      await luisterSchermAan();
+      luisterStart = Date.now(); luisterStukStart = Date.now();
+      luisterRecorder = luisterNieuweRecorder();
+      luisterRecorder.start();
+      luisterZetStaat('opname');
+    }catch(err){
+      luisterWaarschuw('Hervatten lukt niet: ' + err.message);
+    }
+  }
+  function luisterNiveauMeter(){
+    try{
+      const ctx = luisterAudioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      luisterAudioCtx = ctx;
+      const bron = ctx.createMediaStreamSource(luisterStroom);
+      luisterAnalyser = ctx.createAnalyser();
+      luisterAnalyser.fftSize = 512;
+      bron.connect(luisterAnalyser);
+      const data = new Uint8Array(luisterAnalyser.frequencyBinCount);
+      clearInterval(luisterNiveauTimer);
+      luisterNiveauTimer = setInterval(() => {
+        if(!luisterAnalyser || luisterStaat !== 'opname'){ el('luister-niveau-balk').style.width = '0%'; return; }
+        luisterAnalyser.getByteFrequencyData(data);
+        let som = 0; for(let i = 0; i < data.length; i++) som += data[i];
+        el('luister-niveau-balk').style.width = Math.min(100, Math.round((som / data.length) * 1.8)) + '%';
+      }, 150);
+    }catch(e){ /* niveau tonen is niet essentieel */ }
+  }
+  function luisterAllesStop(){
+    clearInterval(luisterTimer); luisterTimer = null;
+    clearInterval(luisterNiveauTimer); luisterNiveauTimer = null;
+    el('luister-niveau-balk').style.width = '0%';
+    try{ if(luisterRecorder && luisterRecorder.state !== 'inactive') luisterRecorder.stop(); }catch(e){}
+    try{ if(luisterStroom) luisterStroom.getTracks().forEach(t => t.stop()); }catch(e){}
+    luisterStroom = null; luisterAnalyser = null;
+    luisterSchermLos();
+  }
+
+  async function luisterEinde(){
+    if(luisterStaat === 'opname'){ luisterVerstreken += (Date.now() - luisterStart) / 1000; }
+    luisterBezigMetStuk = true;
+    luisterZetStaat('verwerken');
+    luisterAllesStop();
+    el('luister-hint').textContent = 'Even geduld: de laatste stukken worden nog omgezet.';
+    // Wachten tot het laatste stuk in de lijst staat (onstop/FileReader).
+    await new Promise(r => setTimeout(r, 1200));
+    if(!luisterStukken.length){ alert('Er werd niets opgenomen.'); luisterSluit(true); return; }
+    for(let poging = 0; poging < 3; poging++){
+      await luisterVerwerkStukken();
+      if(luisterStukken.every(s => s.tekst != null)) break;
+      await new Promise(r => setTimeout(r, 1500));
+    }
+    const ontbreekt = luisterStukken.filter(s => s.tekst == null).length;
+    if(ontbreekt && !confirm(ontbreekt + ' van de ' + luisterStukken.length + ' opnamestukken kon(den) niet omgezet worden (geen verbinding of limiet bij Google).\n\nToch verdergaan met wat er al is? Kies Annuleren om straks opnieuw te proberen.')){
+      luisterZetStaat('pauze');
+      el('luister-hint').textContent = 'Tik op Einde om het opnieuw te proberen.';
+      return;
+    }
+    luisterTranscriptie = luisterStukken.filter(s => s.tekst).map(s => s.tekst.trim()).filter(Boolean).join('\n');
+    if(!luisterTranscriptie.trim()){ alert('Er kon geen tekst uit de opname gehaald worden.'); luisterSluit(true); return; }
+    el('luister-hint').textContent = 'De AI maakt nu de punten…';
+    try{
+      const model = (state.company && state.company.gemini_model_klad && String(state.company.gemini_model_klad).trim()) || DEFAULT_GEMINI_MODEL_KLAD;
+      const textModel = (state.company && state.company.gemini_model && String(state.company.gemini_model).trim()) || DEFAULT_GEMINI_MODEL;
+      const openPunten = await luisterOpenActiepunten();
+      const { data, error } = await sb.functions.invoke('ai-assist', { body: {
+        task: 'vergadering-naar-punten', model, textModel,
+        tekst: luisterTranscriptie, sterren: luisterSterren, openPunten,
+        context: { project: el('f-project').value || '', datum: el('f-datum').value || todayISO(), namen: kladNamenVoorAi(), kamers: await kladKamersVoorAi(), categorieen: CATEGORIES.slice() }
+      } });
+      if(error) throw new Error(await foutTekst(error));
+      if(!data || !Array.isArray(data.punten)) throw new Error((data && data.error) || 'Geen punten ontvangen.');
+      luisterVoorstel = data.punten.map(p => Object.assign({ aan: true }, p));
+      luisterSamenvatting = data.samenvatting || '';
+      const openMap = new Map(openPunten.map(p => [String(p.id), p]));
+      luisterAfgewerkt = (data.afgewerkt || []).map(a => Object.assign({ aan: true, punt: openMap.get(String(a.id)) || null }, a)).filter(a => a.punt);
+      if(!luisterVoorstel.length && !luisterAfgewerkt.length){ alert('De AI vond geen bruikbare punten in de opname.'); luisterSluit(true); return; }
+      toonLuisterReview();
+    }catch(err){
+      console.error('Vergadering verwerken mislukt:', err);
+      alert('Punten maken mislukt: ' + err.message + '\n\nDe tekst blijft bewaard; tik opnieuw op Einde om het nog eens te proberen.');
+      luisterZetStaat('pauze');
+    }
+  }
+  // Open actiepunten van dit project (om te laten afvinken). Gebruikt dezelfde bron als het tabblad
+  // Actiepunten; punten van het verslag dat nu open staat tellen niet mee (die staan al in het formulier).
+  async function luisterOpenActiepunten(){
+    if(!state.activeProjectId) return [];
+    try{
+      const ap = await dbListActiepunten();
+      return ap.filter(a => !a.afgerond && a.verslagen && String(a.verslagen.project_id) === String(state.activeProjectId) && String(a.verslag_id) !== String(state.currentVerslagId))
+        .slice(0, 150)
+        .map(a => ({ id: String(a.id), punt_uid: a.punt_uid, beschrijving: a.beschrijving || '', verantwoordelijke: a.verantwoordelijke || '', deadline: a.deadline || '' }));
+    }catch(e){ console.warn('Open actiepunten ophalen mislukt:', e); return []; }
+  }
+
+  function toonLuisterReview(){
+    el('luister-samenvatting').innerHTML = luisterSamenvatting ? '<strong>Samenvatting:</strong> ' + escapeHtml(luisterSamenvatting) : '';
+    el('luister-samenvatting').style.display = luisterSamenvatting ? '' : 'none';
+    el('luister-afgewerkt').style.display = luisterAfgewerkt.length ? '' : 'none';
+    el('luister-afgewerkt-lijst').innerHTML = luisterAfgewerkt.map((a, i) => `
+      <label class="la-rij"><input type="checkbox" class="la-aan" data-i="${i}" ${a.aan ? 'checked' : ''}>
+        <span><strong>${escapeHtml(a.punt.beschrijving)}</strong>${a.punt.verantwoordelijke ? ' <span class="hint">(' + escapeHtml(a.punt.verantwoordelijke) + ')</span>' : ''}
+        ${a.reden ? '<span class="la-reden">' + escapeHtml(a.reden) + '</span>' : ''}</span></label>`).join('');
+    el('luister-review-lijst').innerHTML = luisterVoorstel.map((p, i) => `
+      <div class="klad-rij${p.aan ? '' : ' is-uit'}" data-i="${i}">
+        <input type="checkbox" class="kr-aan" ${p.aan ? 'checked' : ''} aria-label="Punt ${i + 1} overnemen">
+        <div class="kr-catcel"><select class="kr-cat">${CATEGORIES.map(c => `<option value="${escapeHtml(c)}"${c === p.categorie ? ' selected' : ''}>${escapeHtml(c)}</option>`).join('')}</select>${p.belangrijk ? '<span class="klad-onzeker luister-ster" title="Jij markeerde dit moment als belangrijk">⭐ belangrijk</span>' : ''}${p.onzeker ? '<span class="klad-onzeker">⚠ moeilijk verstaanbaar</span>' : ''}${p.tijd ? '<span class="luister-tijd">' + escapeHtml(p.tijd) + '</span>' : ''}</div>
+        <textarea class="kr-besch" rows="2">${escapeHtml(p.beschrijving)}</textarea>
+        <div class="klad-rij-velden">
+          <label>Verantwoordelijke<input type="text" class="kr-verantw" list="team-leden-datalist" value="${escapeHtml(p.verantwoordelijke || '')}"></label>
+          <label>Deadline<input type="date" class="kr-deadline" value="${escapeHtml(p.deadline || '')}"></label>
+          <label>Kamer / ruimte<input type="text" class="kr-kamer" value="${escapeHtml(p.kamer || '')}"></label>
+        </div>
+      </div>`).join('');
+    el('luister-transcriptie').textContent = luisterTranscriptie;
+    el('luister-transcriptie-blok').style.display = luisterTranscriptie ? '' : 'none';
+    luisterUpdateReviewKnop();
+    el('luister-overlay').style.display = 'none';
+    document.body.style.overflow = '';
+    el('luister-review-modal').style.display = 'flex';
+  }
+  function luisterUpdateReviewKnop(){
+    const n = luisterVoorstel.filter(p => p.aan).length;
+    const a = luisterAfgewerkt.filter(x => x.aan).length;
+    el('luister-review-ok').textContent = 'Toevoegen aan verslag (' + n + ')' + (a ? ' + ' + a + ' afvinken' : '');
+    el('luister-review-ok').disabled = !n && !a;
+  }
+  function luisterReviewVeld(e){
+    if(e.target.classList.contains('la-aan')){
+      const a = luisterAfgewerkt[Number(e.target.dataset.i)];
+      if(a){ a.aan = e.target.checked; luisterUpdateReviewKnop(); }
+      return;
+    }
+    const rij = e.target.closest('.klad-rij'); if(!rij) return;
+    const p = luisterVoorstel[Number(rij.dataset.i)]; if(!p) return;
+    if(e.target.classList.contains('kr-aan')){ p.aan = e.target.checked; rij.classList.toggle('is-uit', !p.aan); luisterUpdateReviewKnop(); }
+    else if(e.target.classList.contains('kr-cat')) p.categorie = e.target.value;
+    else if(e.target.classList.contains('kr-besch')) p.beschrijving = e.target.value;
+    else if(e.target.classList.contains('kr-verantw')) p.verantwoordelijke = e.target.value;
+    else if(e.target.classList.contains('kr-deadline')) p.deadline = e.target.value;
+    else if(e.target.classList.contains('kr-kamer')) p.kamer = e.target.value;
+  }
+  el('luister-review-lijst').addEventListener('input', luisterReviewVeld);
+  el('luister-review-lijst').addEventListener('change', luisterReviewVeld);
+  el('luister-afgewerkt-lijst').addEventListener('change', luisterReviewVeld);
+  el('luister-review-sluiten').addEventListener('click', () => {
+    if(!confirm('De punten uit deze vergadering niet overnemen? De opname is al gewist.')) return;
+    el('luister-review-modal').style.display = 'none';
+    luisterSluit(true);
+  });
+  el('luister-review-ok').addEventListener('click', async () => {
+    el('luister-review-lijst').querySelectorAll('.klad-rij').forEach(rij => {
+      const p = luisterVoorstel[Number(rij.dataset.i)]; if(!p) return;
+      p.aan = rij.querySelector('.kr-aan').checked;
+      p.categorie = rij.querySelector('.kr-cat').value;
+      p.beschrijving = rij.querySelector('.kr-besch').value.trim();
+      p.verantwoordelijke = rij.querySelector('.kr-verantw').value.trim();
+      p.deadline = rij.querySelector('.kr-deadline').value;
+      p.kamer = rij.querySelector('.kr-kamer').value.trim();
+    });
+    const over = luisterVoorstel.filter(p => p.aan && p.beschrijving);
+    over.forEach(p => addItem({ category: normalizeCategory(p.categorie), description: p.beschrijving, responsible: p.verantwoordelijke || '', deadline: p.deadline || '', kamer: p.kamer || '' }));
+    // Bestaande open actiepunten van dit project afvinken (zelfde weg als het tabblad Actiepunten).
+    const afTeVinken = luisterAfgewerkt.filter(a => a.aan);
+    let afgevinkt = 0;
+    for(const a of afTeVinken){
+      try{ await dbUpdateVerslagpunt(a.punt.id, { afgerond: true, afgerond_op: todayISO() }); afgevinkt++; }
+      catch(err){ console.error('Actiepunt afvinken mislukt:', err); }
+    }
+    state.transcripties = (state.transcripties || []).concat([{ op: new Date().toISOString(), duur: Math.round(luisterStukken.length ? luisterStukken[luisterStukken.length - 1].tot : 0), samenvatting: luisterSamenvatting, tekst: luisterTranscriptie }]);
+    renderTranscriptiesStrip();
+    el('luister-review-modal').style.display = 'none';
+    luisterSluit(true);
+    scheduleAutosave();
+    showStatus(over.length + ' punt' + (over.length === 1 ? '' : 'en') + ' uit de vergadering toegevoegd' + (afgevinkt ? ', ' + afgevinkt + ' actiepunt' + (afgevinkt === 1 ? '' : 'en') + ' afgevinkt' : ''));
+    const laatste = document.querySelector('#items-list .item-card:last-child');
+    if(laatste) laatste.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+
+  function openLuister(){
+    if(state.verslagScreen !== 'form'){ state.verslagScreen = 'form'; renderVerslagScreen(); }
+    el('luister-overlay').style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    const proj = el('f-project').value.trim();
+    el('luister-titel').textContent = '🎙 Vergadering' + (proj ? ' — ' + proj : '');
+    el('luister-timer').textContent = '00:00';
+    el('luister-hint').textContent = 'Leg de gsm midden op tafel. Het scherm blijft aan tijdens de opname.';
+    el('luister-verwerkt').textContent = '';
+    luisterWaarschuw('');
+    luisterZetStaat('uit');
+  }
+  window.openLuister = openLuister; // (ook gebruikt door test-smoke.js)
+  function luisterSluit(gedaan){
+    luisterAllesStop();
+    luisterZetStaat('uit');
+    el('luister-overlay').style.display = 'none';
+    document.body.style.overflow = '';
+    if(gedaan){ luisterStukken = []; luisterSterren = []; luisterWisLokaal(); }
+  }
+  el('luister-sluiten').addEventListener('click', () => {
+    if((luisterStaat === 'opname' || luisterStaat === 'pauze') && !confirm('De opname stoppen en weggooien? Wat al opgenomen is, gaat verloren.')) return;
+    luisterSluit(true);
+  });
+  el('luister-start').addEventListener('click', luisterStartOpname);
+  el('luister-pauze').addEventListener('click', () => luisterPauzeDoor('gebruiker'));
+  el('luister-hervat').addEventListener('click', luisterHervat);
+  el('luister-einde').addEventListener('click', luisterEinde);
+  el('luister-ster').addEventListener('click', () => {
+    const sec = Math.round(luisterVerstreken + (luisterStaat === 'opname' ? (Date.now() - luisterStart) / 1000 : 0));
+    luisterSterren.push(sec);
+    luisterBewaarLokaal();
+    try{ navigator.vibrate && navigator.vibrate(60); }catch(e){}
+    showStatus('⭐ Moment gemarkeerd op ' + luisterMMSS(sec));
+  });
+  el('btn-meeluisteren').addEventListener('click', openLuister);
+  // Terugkomen in de app na een onderbreking: meteen nakijken of de opname nog loopt.
+  document.addEventListener('visibilitychange', () => {
+    if(document.visibilityState !== 'visible' || luisterStaat !== 'opname') return;
+    luisterSchermAan();
+    if(luisterRecorder && luisterRecorder.state === 'inactive') luisterOnderbroken();
+  });
+
+  // ---------- Bewaarde transcripties bij het verslag ----------
+  function renderTranscriptiesStrip(){
+    const wrap = el('transcripties-strip');
+    if(!wrap) return;
+    const lijst = state.transcripties || [];
+    wrap.style.display = lijst.length ? '' : 'none';
+    wrap.innerHTML = lijst.map((t, i) => `<button type="button" class="tr-knop" data-i="${i}">🎙 Vergadering ${lijst.length > 1 ? (i + 1) + ' ' : ''}${t.op ? '· ' + escapeHtml(new Date(t.op).toLocaleDateString('nl-BE')) : ''}${t.duur ? ' · ' + luisterMMSS(t.duur) : ''}</button>`).join('');
+  }
+  window.renderTranscriptiesStrip = renderTranscriptiesStrip;
+  el('transcripties-strip').addEventListener('click', e => {
+    const b = e.target.closest('.tr-knop'); if(!b) return;
+    const t = (state.transcripties || [])[Number(b.dataset.i)]; if(!t) return;
+    luisterTranscriptie = t.tekst || '';
+    luisterSamenvatting = t.samenvatting || '';
+    luisterVoorstel = []; luisterAfgewerkt = [];
+    el('luister-samenvatting').innerHTML = luisterSamenvatting ? '<strong>Samenvatting:</strong> ' + escapeHtml(luisterSamenvatting) : '';
+    el('luister-samenvatting').style.display = luisterSamenvatting ? '' : 'none';
+    el('luister-afgewerkt').style.display = 'none';
+    el('luister-review-lijst').innerHTML = '<p class="hint">De punten van deze vergadering staan al in het verslag.</p>';
+    el('luister-transcriptie').textContent = luisterTranscriptie;
+    el('luister-transcriptie-blok').style.display = ''; el('luister-transcriptie-blok').open = true;
+    el('luister-review-ok').style.display = 'none';
+    el('luister-review-modal').style.display = 'flex';
+  });
+
+  // ---------- Starten vanop het keuzescherm ----------
+  el('vk-luister').addEventListener('click', () => {
+    state.luisterNaProjectkeuze = true;
+    state.kladNaProjectkeuze = false;
+    state.verslagScreen = 'kiesProject';
+    if(el('vk-proj-search')) el('vk-proj-search').value = '';
+    renderVerslagScreen();
+  });
+  el('vk-luister-los').addEventListener('click', () => {
+    state.luisterNaProjectkeuze = false;
+    state.verslagScreen = 'form';
+    resetVerslagEditor();
+    renderVerslagScreen();
+    openLuister();
+  });
+
   updateOfflineIndicator();
 
   // Offline-modus, deel 2: de app zelf (dit ene HTML-bestand) offline kunnen LADEN via een
@@ -26123,8 +26794,9 @@ window.CaCalcApp = {
     if(formEl) formEl.style.display = (scherm === 'form') ? '' : 'none';
     if(scherm === 'kiesProject') renderVkProjList(el('vk-proj-search') ? el('vk-proj-search').value : '');
     // Kladversie: zelfde projectkiezer, andere titel + "Zonder project schrijven".
-    if(el('vk-proj-titel')) el('vk-proj-titel').textContent = state.kladNaProjectkeuze ? 'Kladversie — kies een project' : 'Nieuw gekoppeld verslag — kies een project';
+    if(el('vk-proj-titel')) el('vk-proj-titel').textContent = state.kladNaProjectkeuze ? 'Kladversie — kies een project' : state.luisterNaProjectkeuze ? 'Meeluisteren — kies een project' : 'Nieuw gekoppeld verslag — kies een project';
     if(el('vk-klad-los')) el('vk-klad-los').style.display = state.kladNaProjectkeuze ? '' : 'none';
+    if(el('vk-luister-los')) el('vk-luister-los').style.display = state.luisterNaProjectkeuze ? '' : 'none';
     // De header-picker blijft gewoon het project van het (eventueel) open verslag volgen, ook op de
     // keuze-/projectkiezer-schermen (bv. nog het project van CaDos erop) -- enkel alleen-lezen zolang
     // je op dit tabblad zit (zie switchTab()).
@@ -27266,6 +27938,11 @@ window.CaCalcApp = {
     renderTeamLeden();
     renderBureau();
     renderSchermInstellingen();
+    // Back-up-herinnering (2026-10-15): de kaart "Back-up & opslag" staat op deze pagina, dus
+    // tonen we hier meteen of de laatste back-up te lang geleden is. De opslag zelf wordt NIET
+    // automatisch nagekeken -- dat kost een reeks oproepen naar de opslag en gebeurt enkel op
+    // de knop "Opslag nakijken".
+    try{ if(window.backupHerinneringTonen) window.backupHerinneringTonen(); }catch(e){}
   }
 
   // Ronde 67 -- schermweergave-instellingen (zie het nieuwe #scherm-* blok hierboven en
@@ -28116,7 +28793,7 @@ window.CaCalcApp = {
     if(!file) return;
     try{
       showStatus('Logo uploaden...');
-      const url = await dbUploadFile('logos', file);
+      const url = await dbUploadFile('logos', file); // logo blijft onaangeroerd (klein, en vaak een PNG met doorzichtige achtergrond)
       await dbSaveBedrijf({ logo_url: url });
       state.company.logo_url = url;
       renderCompany();
@@ -28147,6 +28824,245 @@ window.CaCalcApp = {
       classicDownload(blob, `casentis_backup_${todayISO()}.json`);
       showStatus('Back-up gedownload');
     }catch(err){ alert('Back-up maken mislukt: ' + err.message); }
+  });
+
+  // =====================================================================================
+  // ===================== BACK-UP & OPSLAG (2026-10-15) =================================
+  // Op vraag van Peter ("mss export/backup voorstellen om de zoveel tijd zodat we de foto's ergens
+  // vanaf halen?"): één zip met alle gegevens én alle foto's, een herinnering als de laatste back-up
+  // te lang geleden is, een eenmalige verkleining van de foto's die er al stonden, en het opruimen
+  // van foto's van afgewerkte projecten (de verslagen zelf blijven volledig bestaan).
+  // =====================================================================================
+  const OPSLAG_BUCKETS = ['foto-verslagpunten', 'project-plannen', 'handtekeningen', 'logos'];
+  const BACKUP_HERINNERING_DAGEN = 90;
+  const BACKUP_TABELLEN = ['bedrijf', 'projecten', 'verslagen', 'verslagpunten', 'planning_items', 'planning_notities',
+    'planning_items_historiek', 'uren_registraties', 'project_notities', 'project_plannen', 'project_elektro_dossiers',
+    'project_cacalc_data', 'project_factuur_meldingen', 'cafin_facturen', 'checklist_templates', 'punt_reacties',
+    'punt_opmerkingen', 'scherm_mededelingen', 'elektro_catalogus_armaturen', 'elektro_catalogus_drivers'];
+  function opslagLeesbaar(bytes){
+    if(bytes >= 1024 * 1024 * 1024) return (bytes / (1024 * 1024 * 1024)).toFixed(2).replace('.', ',') + ' GB';
+    if(bytes >= 1024 * 1024) return Math.round(bytes / (1024 * 1024)) + ' MB';
+    return Math.max(1, Math.round(bytes / 1024)) + ' kB';
+  }
+  function opslagStatus(tekst){ const e = el('opslag-status'); if(e) e.textContent = tekst || ''; }
+  // Alle bestanden van alle buckets opsommen (naam + grootte). Supabase geeft max. 1000 per oproep.
+  async function opslagBestanden(){
+    const uit = [];
+    for(const bucket of OPSLAG_BUCKETS){
+      let offset = 0;
+      for(;;){
+        const { data, error } = await sb.storage.from(bucket).list('', { limit: 1000, offset, sortBy: { column: 'name', order: 'asc' } });
+        if(error) throw error;
+        (data || []).forEach(f => { if(f && f.name && f.name !== '.emptyFolderPlaceholder') uit.push({ bucket, naam: f.name, grootte: (f.metadata && f.metadata.size) || 0 }); });
+        if(!data || data.length < 1000) break;
+        offset += data.length;
+      }
+    }
+    return uit;
+  }
+  async function opslagNakijken(stil){
+    try{
+      if(!stil) opslagStatus('Bezig met nakijken…');
+      const bestanden = await opslagBestanden();
+      const totaal = bestanden.reduce((s, f) => s + (f.grootte || 0), 0);
+      const fotos = bestanden.filter(f => f.bucket === 'foto-verslagpunten');
+      el('opslag-totaal').textContent = opslagLeesbaar(totaal);
+      el('opslag-detail').textContent = `${bestanden.length} bestanden, waarvan ${fotos.length} foto's (${opslagLeesbaar(fotos.reduce((s, f) => s + f.grootte, 0))}) — gratis grens: 1 GB`;
+      if(!stil) opslagStatus('');
+      return bestanden;
+    }catch(err){
+      el('opslag-detail').textContent = 'Opslag nakijken mislukt: ' + err.message;
+      if(!stil) opslagStatus('');
+      return [];
+    }
+  }
+  el('btn-opslag-check').addEventListener('click', () => opslagNakijken(false));
+  function backupHerinneringTonen(){
+    const e = el('backup-herinnering');
+    if(!e) return;
+    const laatste = state.company && state.company.laatste_backup_op ? new Date(state.company.laatste_backup_op) : null;
+    const dagen = laatste ? Math.floor((Date.now() - laatste.getTime()) / 86400000) : null;
+    if(dagen == null){
+      e.textContent = '⚠ Er is nog geen back-up met foto\'s gemaakt. Maak er een en bewaar ze buiten de app.';
+      e.style.display = '';
+    } else if(dagen >= BACKUP_HERINNERING_DAGEN){
+      e.textContent = `⚠ De laatste back-up is van ${laatste.toLocaleDateString('nl-BE')} (${dagen} dagen geleden). Tijd voor een nieuwe.`;
+      e.style.display = '';
+    } else {
+      e.textContent = '';
+      e.style.display = 'none';
+    }
+    return dagen;
+  }
+  window.backupHerinneringTonen = backupHerinneringTonen;
+
+  // ---------- Back-up maken (.zip met gegevens + foto's) ----------
+  el('btn-backup-zip').addEventListener('click', async () => {
+    const btn = el('btn-backup-zip');
+    if(typeof JSZip === 'undefined'){ alert('De zip-bibliotheek kon niet geladen worden (geen internetverbinding?). Probeer het opnieuw, of gebruik "Enkel gegevens (.json)".'); return; }
+    btn.disabled = true;
+    try{
+      opslagStatus('Gegevens ophalen…');
+      const zip = new JSZip();
+      const data = { type: 'casuite-backup', versie: 2, gemaakt_op: new Date().toISOString(), gemaakt_door: huidigeGebruikerLabel(), tabellen: {} };
+      for(const tabel of BACKUP_TABELLEN){
+        try{
+          const { data: rijen, error } = await sb.from(tabel).select('*');
+          if(error) throw error;
+          data.tabellen[tabel] = rijen || [];
+        }catch(err){ data.tabellen[tabel] = { fout: String(err.message || err) }; }
+      }
+      zip.file('gegevens.json', JSON.stringify(data, null, 2));
+      // Foto's en plannen, per project in een eigen map (zoals je ze op SharePoint zou willen zien).
+      const projectVanUrl = new Map();
+      (data.tabellen.verslagen || []).forEach(v => {
+        const p = (data.tabellen.projecten || []).find(x => String(x.id) === String(v.project_id));
+        const map = p ? (String(p.projectnummer || p.id) + ' ' + String(p.naam || '')).replace(/[^\w \-.]+/g, '').trim() : 'Zonder project';
+        [v.handtekening_bouwheer_url, v.handtekening_aannemer_url].forEach(u => { if(u) projectVanUrl.set(u, map); });
+        (Array.isArray(v.kladbladen) ? v.kladbladen : []).forEach(k => { if(k && k.url) projectVanUrl.set(k.url, map); });
+      });
+      (data.tabellen.verslagpunten || []).forEach(p => {
+        const v = (data.tabellen.verslagen || []).find(x => String(x.id) === String(p.verslag_id));
+        const map = v ? (projectVanUrl.get(v.handtekening_bouwheer_url) || null) : null;
+        const mapNaam = map || (v && v.project_naam ? String(v.project_naam).replace(/[^\w \-.]+/g, '').trim() : 'Zonder project');
+        if(p.foto_url) projectVanUrl.set(p.foto_url, mapNaam);
+        (Array.isArray(p.foto_urls_extra) ? p.foto_urls_extra : []).forEach(u => { if(u) projectVanUrl.set(u, mapNaam); });
+      });
+      (data.tabellen.project_plannen || []).forEach(pl => {
+        const p = (data.tabellen.projecten || []).find(x => String(x.id) === String(pl.project_id));
+        if(pl.url) projectVanUrl.set(pl.url, p ? (String(p.projectnummer || p.id) + ' ' + String(p.naam || '')).replace(/[^\w \-.]+/g, '').trim() : 'Zonder project');
+      });
+      const bestanden = await opslagBestanden();
+      let n = 0, gelukt = 0;
+      for(const f of bestanden){
+        n++;
+        opslagStatus(`Foto's en bestanden ophalen… ${n} van ${bestanden.length}`);
+        try{
+          const { data: blob, error } = await sb.storage.from(f.bucket).download(f.naam);
+          if(error) throw error;
+          const publiek = sb.storage.from(f.bucket).getPublicUrl(f.naam).data.publicUrl;
+          const map = projectVanUrl.get(publiek);
+          const pad = f.bucket === 'foto-verslagpunten'
+            ? 'fotos/' + (map || 'Niet gekoppeld') + '/' + f.naam
+            : f.bucket + '/' + f.naam;
+          zip.file(pad, blob);
+          gelukt++;
+        }catch(err){ console.warn('Bestand niet mee in de back-up:', f.bucket, f.naam, err); }
+      }
+      zip.file('leesmij.txt', [
+        'CaSuite — back-up van ' + new Date().toLocaleString('nl-BE'),
+        '',
+        'gegevens.json  : alle gegevens uit de databank (projecten, verslagen, punten, planning, uren, facturen, dossiers).',
+        'fotos/...      : alle foto\'s van verslagpunten, per project.',
+        'project-plannen/, handtekeningen/, logos/ : de overige bestanden.',
+        '',
+        `Bestanden in deze back-up: ${gelukt} van ${bestanden.length}.`,
+        'Bewaar dit bestand buiten de app (bv. op de SharePoint- of OneDrive-map van de firma).'
+      ].join('\n'));
+      opslagStatus('Zip-bestand samenstellen…');
+      const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 3 } },
+        meta => { if(meta && meta.percent != null) opslagStatus('Zip-bestand samenstellen… ' + Math.round(meta.percent) + '%'); });
+      classicDownload(blob, `casuite_backup_${todayISO()}.zip`);
+      try{
+        await dbSaveBedrijf({ laatste_backup_op: new Date().toISOString() });
+        state.company.laatste_backup_op = new Date().toISOString();
+      }catch(e){ console.warn('Datum van de back-up bewaren mislukt:', e); }
+      backupHerinneringTonen();
+      opslagStatus(`Back-up klaar: ${gelukt} bestanden, ${opslagLeesbaar(blob.size)}.`);
+      showStatus('Back-up gedownload');
+    }catch(err){
+      console.error(err);
+      alert('Back-up maken mislukt: ' + err.message);
+      opslagStatus('');
+    }finally{ btn.disabled = false; }
+  });
+
+  // ---------- Bestaande foto's eenmalig verkleinen ----------
+  el('btn-fotos-verkleinen').addEventListener('click', async () => {
+    const btn = el('btn-fotos-verkleinen');
+    if(!confirm('Alle foto\'s die groter zijn dan nodig worden verkleind naar max. 1600 px.\n\nDe verslagen blijven naar dezelfde foto verwijzen. Dit kan enkele minuten duren — laat dit scherm open staan.\n\nDoorgaan?')) return;
+    btn.disabled = true;
+    try{
+      const bestanden = (await opslagBestanden()).filter(f => f.bucket === 'foto-verslagpunten' && f.grootte > 500 * 1024);
+      if(!bestanden.length){ opslagStatus('Alle foto\'s zijn al klein genoeg.'); btn.disabled = false; return; }
+      let n = 0, gedaan = 0, bespaard = 0;
+      for(const f of bestanden){
+        n++;
+        opslagStatus(`Foto's verkleinen… ${n} van ${bestanden.length}`);
+        try{
+          const { data: blob, error } = await sb.storage.from(f.bucket).download(f.naam);
+          if(error) throw error;
+          const kleiner = await verkleinAfbeelding(blob);
+          if(!kleiner) continue;
+          const nieuweBlob = dataURLtoBlob(kleiner);
+          if(nieuweBlob.size >= blob.size) continue;
+          const { error: upErr } = await sb.storage.from(f.bucket).upload(f.naam, nieuweBlob, { upsert: true, contentType: 'image/jpeg', cacheControl: '3600' });
+          if(upErr) throw upErr;
+          gedaan++; bespaard += (blob.size - nieuweBlob.size);
+        }catch(err){ console.warn('Foto verkleinen mislukt:', f.naam, err); }
+      }
+      await opslagNakijken(true);
+      opslagStatus(`${gedaan} foto's verkleind, ${opslagLeesbaar(bespaard)} vrijgemaakt.`);
+      showStatus(`${gedaan} foto's verkleind`);
+    }catch(err){ alert('Verkleinen mislukt: ' + err.message); opslagStatus(''); }
+    finally{ btn.disabled = false; }
+  });
+
+  // ---------- Foto's van afgewerkte projecten opruimen ----------
+  function padUitPubliekeUrl(url){
+    const m = String(url || '').match(/\/storage\/v1\/object\/public\/([^/]+)\/(.+)$/);
+    return m ? { bucket: m[1], pad: decodeURIComponent(m[2]) } : null;
+  }
+  el('btn-fotos-opruimen').addEventListener('click', async () => {
+    const btn = el('btn-fotos-opruimen');
+    try{
+      const dagen = backupHerinneringTonen();
+      if(dagen == null || dagen > 7){
+        if(!confirm('Je laatste back-up is ' + (dagen == null ? 'er nog niet' : dagen + ' dagen oud') + '.\n\nDe foto\'s worden definitief uit de opslag verwijderd — enkel de kopie in je back-up blijft dan over.\n\nToch doorgaan?')) return;
+      }
+      const afgewerkt = (state.projects || []).filter(p => p.id && p.planning_status === 'afgewerkt');
+      if(!afgewerkt.length){ alert('Geen projecten met status "Afgewerkt". Zet een project eerst op die status bij Projecten.'); return; }
+      const ids = new Set(afgewerkt.map(p => String(p.id)));
+      btn.disabled = true;
+      opslagStatus('Foto\'s van afgewerkte projecten zoeken…');
+      const { data: verslagen, error: vErr } = await sb.from('verslagen').select('id, project_id');
+      if(vErr) throw vErr;
+      const verslagIds = (verslagen || []).filter(v => ids.has(String(v.project_id))).map(v => v.id);
+      if(!verslagIds.length){ opslagStatus('Geen verslagen gevonden bij die projecten.'); btn.disabled = false; return; }
+      const { data: punten, error: pErr } = await sb.from('verslagpunten').select('id, foto_url, foto_urls_extra').in('verslag_id', verslagIds);
+      if(pErr) throw pErr;
+      const metFoto = (punten || []).filter(p => p.foto_url || (Array.isArray(p.foto_urls_extra) && p.foto_urls_extra.length));
+      if(!metFoto.length){ opslagStatus('Bij die projecten staan geen foto\'s meer.'); btn.disabled = false; return; }
+      const aantalFotos = metFoto.reduce((s, p) => s + (p.foto_url ? 1 : 0) + (Array.isArray(p.foto_urls_extra) ? p.foto_urls_extra.length : 0), 0);
+      if(!confirm(`${aantalFotos} foto's van ${afgewerkt.length} afgewerkt${afgewerkt.length === 1 ? ' project' : 'e projecten'} worden uit de opslag verwijderd.\n\nDe verslagen en punten blijven volledig bestaan; bij het punt komt "foto opgeruimd op ${new Date().toLocaleDateString('nl-BE')}".\n\nDefinitief doorgaan?`)) { btn.disabled = false; return; }
+      const perBucket = new Map();
+      metFoto.forEach(p => {
+        [p.foto_url].concat(Array.isArray(p.foto_urls_extra) ? p.foto_urls_extra : []).forEach(u => {
+          const d = padUitPubliekeUrl(u);
+          if(!d) return;
+          if(!perBucket.has(d.bucket)) perBucket.set(d.bucket, []);
+          perBucket.get(d.bucket).push(d.pad);
+        });
+      });
+      let verwijderd = 0;
+      for(const [bucket, paden] of perBucket){
+        for(let i = 0; i < paden.length; i += 50){
+          const deel = paden.slice(i, i + 50);
+          const { error } = await sb.storage.from(bucket).remove(deel);
+          if(error) throw error;
+          verwijderd += deel.length;
+          opslagStatus(`Foto's opruimen… ${verwijderd} van ${aantalFotos}`);
+        }
+      }
+      const nu = new Date().toISOString();
+      for(const p of metFoto){
+        await dbUpdateVerslagpunt(p.id, { foto_url: null, foto_urls_extra: [], foto_opgeruimd_op: nu });
+      }
+      await opslagNakijken(true);
+      opslagStatus(`${verwijderd} foto's opgeruimd. De verslagen zelf zijn ongewijzigd.`);
+      showStatus(`${verwijderd} foto's opgeruimd`);
+    }catch(err){ console.error(err); alert('Opruimen mislukt: ' + err.message); opslagStatus(''); }
+    finally{ btn.disabled = false; }
   });
 
   // ---------- Aanwezigen (tags) ----------
@@ -30472,6 +31388,12 @@ window.CaCalcApp = {
       const previewSrc = item.photoDataUrl || item.photoUrl;
       if(previewSrc){
         preview.style.backgroundImage = `url(${previewSrc})`;
+      } else if(item.fotoOpgeruimdOp){
+        // Foto's van afgewerkte projecten kunnen opgeruimd zijn uit de opslag (zie "Back-up &
+        // opslag" bij Bedrijfsgegevens). Het punt blijft bestaan; we zeggen enkel waar de foto heen is.
+        preview.classList.add('is-opgeruimd');
+        preview.textContent = '📦 Foto opgeruimd op ' + new Date(item.fotoOpgeruimdOp).toLocaleDateString('nl-BE');
+        preview.title = 'De foto staat in de back-up die vóór het opruimen gedownload werd, niet meer in de app.';
       } else {
         preview.textContent = 'Geen foto';
       }
@@ -30496,8 +31418,26 @@ window.CaCalcApp = {
       const photoControls = document.createElement('div');
       photoControls.style.flex = '1';
 
-      function handlePhotoFile(file){
+      async function handlePhotoFile(file){
         if(!file) return;
+        // Eerst verkleinen (2026-10-15): zo staat ook in de offline-wachtrij en het lokale concept
+        // meteen de kleine versie, niet de foto van 3 MB.
+        let verkleind = null;
+        try{ verkleind = await verkleinAfbeelding(file); }
+        catch(e){ console.warn('Foto verkleinen mislukt, origineel gebruikt:', e); }
+        if(verkleind){
+          if(item.photoDataUrl || item.photoUrl){
+            if(!Array.isArray(item.extraFotos)) item.extraFotos = [];
+            item.extraFotos.push({ dataUrl: verkleind, url: null, naam: (file.name || 'foto.jpg').replace(/\.[a-z0-9]+$/i, '') + '.jpg' });
+          } else {
+            item.photoDataUrl = verkleind;
+            item.photoUrl = null;
+            item.photoName = (file.name || 'foto.jpg').replace(/\.[a-z0-9]+$/i, '') + '.jpg';
+          }
+          renderItems();
+          scheduleAutosave();
+          return;
+        }
         const reader = new FileReader();
         reader.onload = () => {
           // Fase 2 doorlichting: heeft dit punt al een foto, dan komt een nieuwe foto ERBIJ (extra
@@ -31298,8 +32238,10 @@ window.CaCalcApp = {
     state.nextItemId = 1;
     state.signatures = { bouwheer: { url: null, dataUrl: null }, aannemer: { url: null, dataUrl: null } };
     state.kladbladen = []; // kladversie
+    state.transcripties = []; // meeluisteren
     if(typeof window.kladBijVerslagWissel === 'function') window.kladBijVerslagWissel();
     if(typeof window.renderKladbladenStrip === 'function') window.renderKladbladenStrip();
+    if(typeof window.renderTranscriptiesStrip === 'function') window.renderTranscriptiesStrip();
     setVerslagType('werf');
     renderActiveProjectDropdown(); // laat evt. gekoppeld-maar-inactief project uit de vorige editie weer weg
     el('f-actief-project').value = '';
@@ -31349,12 +32291,13 @@ window.CaCalcApp = {
   });
   el('vk-nieuw-gekoppeld').addEventListener('click', () => {
     state.kladNaProjectkeuze = false;
+    state.luisterNaProjectkeuze = false;
     state.verslagScreen = 'kiesProject';
     if(el('vk-proj-search')) el('vk-proj-search').value = ''; // eerst wissen, vóór renderVerslagScreen() de lijst (met deze waarde) tekent
     renderVerslagScreen();
   });
   el('vk-bewerken').addEventListener('click', () => { switchTab('verslagen'); });
-  el('vk-proj-terug').addEventListener('click', () => { state.kladNaProjectkeuze = false; gaNaarVerslagKeuzescherm(); });
+  el('vk-proj-terug').addEventListener('click', () => { state.kladNaProjectkeuze = false; state.luisterNaProjectkeuze = false; gaNaarVerslagKeuzescherm(); });
   el('vk-proj-search').addEventListener('input', e => renderVkProjList(e.target.value));
   el('vk-proj-list').addEventListener('click', (e) => {
     const opt = e.target.closest('.ip-proj-opt[data-proj]');
@@ -31366,11 +32309,13 @@ window.CaCalcApp = {
     zetVerslagProjectVanuitPicker(projectId, true); // doorGebruiker:true -> triggert f-project/f-locatie + evt. carry-over-venster
     syncGlobalPickerMetVerslag(); // header-picker (alleen-lezen op dit tabblad) moet het net gekozen project meteen tonen
     showStatus('Nieuw verslag gestart, gekoppeld aan project');
-    if(state.kladNaProjectkeuze){
-      // Kladversie: na een eventuele "openstaande actiepunten overnemen?"-vraag meteen het witte blad.
-      state.kladNaProjectkeuze = false;
+    if(state.kladNaProjectkeuze || state.luisterNaProjectkeuze){
+      // Kladversie/Meeluisteren: na een eventuele "openstaande actiepunten overnemen?"-vraag meteen openen.
+      const luister = !!state.luisterNaProjectkeuze;
+      state.kladNaProjectkeuze = false; state.luisterNaProjectkeuze = false;
       const wachtOpCarryover = () => {
         if(el('carryover-modal') && el('carryover-modal').style.display !== 'none') setTimeout(wachtOpCarryover, 300);
+        else if(luister) openLuister();
         else openKlad();
       };
       setTimeout(wachtOpCarryover, 150);
@@ -31555,7 +32500,9 @@ window.CaCalcApp = {
       handtekening_bouwheer_url: state.signatures.bouwheer.url || null,
       handtekening_aannemer_naam: el('f-hand-aannemer-naam').value,
       handtekening_aannemer_url: state.signatures.aannemer.url || null,
-      kladbladen: (state.kladbladen || []).map(k => ({ sessie: k.sessie || null, blad: k.blad || null, op: k.op || null, url: k.url || k.dataUrl || null })).filter(k => k.url)
+      kladbladen: (state.kladbladen || []).map(k => ({ sessie: k.sessie || null, blad: k.blad || null, op: k.op || null, url: k.url || k.dataUrl || null })).filter(k => k.url),
+      // Meeluisteren: enkel de tekst van de vergadering (de opname zelf wordt niet bewaard).
+      transcripties: (state.transcripties || []).map(t => ({ op: t.op || null, duur: t.duur || null, samenvatting: t.samenvatting || '', tekst: t.tekst || '' })).filter(t => t.tekst)
     };
     const puntenFields = state.items.map(it => ({
       categorie: it.category,
@@ -31674,6 +32621,7 @@ window.CaCalcApp = {
     if(state.signatures.bouwheer.dataUrl || state.signatures.bouwheer.url) return true;
     if(state.signatures.aannemer.dataUrl || state.signatures.aannemer.url) return true;
     if((state.kladbladen || []).length) return true; // kladversie
+    if((state.transcripties || []).length) return true; // meeluisteren
     return state.items.some(it => (it.description || '').trim() || it.photoDataUrl || it.photoUrl);
   }
 
@@ -31797,6 +32745,7 @@ window.CaCalcApp = {
           deadline: p.deadline || '',
           photoDataUrl: pendingPhoto ? pendingPhoto.dataUrl : null,
           photoUrl: p.foto_url || null,
+          fotoOpgeruimdOp: p.foto_opgeruimd_op || null,
           extraFotos: (Array.isArray(p.foto_urls_extra) ? p.foto_urls_extra : []).map(u => String(u).startsWith('data:') ? { dataUrl: u, url: null } : { url: u, dataUrl: null }),
           photoName: pendingPhoto ? pendingPhoto.naam : '',
           whatsapp: !!p.whatsapp,
@@ -31811,8 +32760,10 @@ window.CaCalcApp = {
       state.standVanZaken = Array.isArray(verslag.stand_van_zaken) ? verslag.stand_van_zaken : [];
       // Kladversie: bewaarde handgeschreven bladen bij dit verslag (niet in de PDF).
       state.kladbladen = (Array.isArray(verslag.kladbladen) ? verslag.kladbladen : []).map(k => (k && typeof k === 'object') ? Object.assign({}, k, String(k.url || '').startsWith('data:') ? { dataUrl: k.url, url: null } : {}) : null).filter(Boolean);
+      state.transcripties = (Array.isArray(verslag.transcripties) ? verslag.transcripties : []).filter(t => t && typeof t === 'object');
       if(typeof window.kladBijVerslagWissel === 'function') window.kladBijVerslagWissel();
       if(typeof window.renderKladbladenStrip === 'function') window.renderKladbladenStrip();
+      if(typeof window.renderTranscriptiesStrip === 'function') window.renderTranscriptiesStrip();
       resetAiSummaryFields();
       renderAanwezigen();
       renderAanwezigenChecklist();
@@ -33233,7 +34184,7 @@ window.CaCalcApp = {
         const pendingPhoto = pendingPhotos.find(ph => ph.index === i);
         return {
           category: normalizeCategory(p.categorie), description: p.beschrijving, kamer: p.kamer || '', responsible: p.verantwoordelijke, deadline: p.deadline,
-          photoUrl: p.foto_url, photoDataUrl: pendingPhoto ? pendingPhoto.dataUrl : null, afgerond: !!p.afgerond,
+          photoUrl: p.foto_url, fotoOpgeruimdOp: p.foto_opgeruimd_op || null, photoDataUrl: pendingPhoto ? pendingPhoto.dataUrl : null, afgerond: !!p.afgerond,
           extraFotos: (Array.isArray(p.foto_urls_extra) ? p.foto_urls_extra : []).map(u => String(u).startsWith('data:') ? { dataUrl: u, url: null } : { url: u, dataUrl: null })
         };
       }),
