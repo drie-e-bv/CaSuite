@@ -682,6 +682,14 @@
     background:#fff center/cover no-repeat;display:flex;align-items:center;justify-content:center;
     color:var(--ink-soft);font-size:.7rem;text-align:center;flex:none;overflow:hidden;
   }
+  /* Losse verslagen koppelen (2026-10-16): rustige, niet-alarmerende balk in de verslagkop. */
+  .koppel-balk{
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    background:#f1f6fb;border:1px solid #c6d9ea;border-radius:10px;padding:9px 12px;margin:0 0 14px;
+    font-size:13.5px;color:#2b4a63;
+  }
+  .koppel-balk .koppel-txt{flex:1 1 180px;}
+  @media (max-width:560px){ .koppel-balk{align-items:stretch;} .koppel-balk .btn{width:100%;} }
   /* Foto opgeruimd (2026-10-15): plaats van de foto blijft, met een rustige melding i.p.v. een gat. */
   .photo-preview.is-opgeruimd{border-style:solid;background:#f6f8f7;color:#5f6b64;font-size:.66rem;line-height:1.25;padding:4px;}
   .wa-toggle{
@@ -3670,6 +3678,16 @@
       </div>
       <!-- Fase 2 doorlichting (2026-10-14): contactpersonen van het project meteen bel-/mailbaar. -->
       <div class="verslag-contacten" id="verslag-contacten" style="display:none;"></div>
+      <!-- 2026-10-16, op vraag van Peter ("Ik heb niet gekoppeld werfverslag die ik graag nu wel aan
+           project wens te koppelen?"): een al opgeslagen verslag zonder project kan je nu alsnog
+           koppelen. De machinerie bestond al (f-actief-project -> projectnaam, locatie, contacten,
+           mailbestemmelingen); enkel de ingang ontbrak, want sinds ronde 71 is de projectkiezer
+           bovenaan vergrendeld zolang er een verslag open staat. Die vergrendeling geldt nu enkel
+           nog voor een verslag DAT AL een project heeft; hieronder staat de duidelijke ingang. -->
+      <div class="koppel-balk" id="verslag-koppel-balk" style="display:none;">
+        <span class="koppel-txt">Dit verslag hangt aan <strong>geen project</strong>.</span>
+        <button type="button" class="btn btn-secondary btn-sm" id="btn-verslag-koppelen"><span class="btn-ico" aria-hidden="true">🔗</span> Aan een project koppelen</button>
+      </div>
       <div class="vf-grid">
         <!-- Ronde 49 (2026-09-26): veld verborgen (#f-actief-project-field, zie CSS) -- de projectkeuze
              bovenaan in de header stuurt het nu (1 projectkeuze, keuze van Peter). Select zelf blijft. -->
@@ -26761,6 +26779,9 @@ window.CaCalcApp = {
     if(id && !Array.from(sel.options).some(o => o.value === id)) renderGlobalProjectPicker();
     sel.value = id;
     renderGlobalProjectShortcut();
+    // 2026-10-16: ook hier de vergrendeling/koppelbalk bijwerken (bv. bij het openen van een verslag,
+    // waar het veld programmatisch gezet wordt en er dus geen change-event volgt).
+    if(typeof updateVerslagPickerLock === 'function' && actiefTabblad() === 'verslag') updateVerslagPickerLock('verslag');
   }
   // ===================== Ronde 71 (2026-10-07): keuzescherm bij het Werfverslag-tabblad =====================
   // Vervangt verslagTabBinnengekomen() (t/m ronde 70): die kopieerde bij elke binnenkomst stilzwijgend
@@ -26774,13 +26795,27 @@ window.CaCalcApp = {
   // je vanaf Werfverslag een project kiezen en meteen naar Dossier/Kabelberekening.
   function updateVerslagPickerLock(tab){
     const t = tab || actiefTabblad();
-    const slot = (t === 'verslag' && (state.verslagScreen || 'keuze') === 'form');
+    // 2026-10-16: enkel nog vergrendeld als het open verslag AL een project heeft. Hangt het aan
+    // geen project, dan is de kiezer bovenaan gewoon bedienbaar -- zo kan een los verslag alsnog
+    // gekoppeld worden (zie #verslag-koppel-balk in de verslagkop).
+    const heeftProject = !!(el('f-actief-project') && el('f-actief-project').value);
+    const slot = (t === 'verslag' && (state.verslagScreen || 'keuze') === 'form' && heeftProject);
     const gpSel = el('global-project-select');
     const gpPill = el('global-project-picker');
     if(gpSel) gpSel.disabled = slot;
     if(gpPill) gpPill.classList.toggle('picker-readonly', slot);
     renderGlobalProjectExtras();
+    renderKoppelBalk();
   }
+  // De "nog niet gekoppeld"-balk in de verslagkop: enkel zichtbaar bij een OPGESLAGEN verslag zonder
+  // project (bij een nieuw, nog niet bewaard verslag kies je het project gewoon bovenaan).
+  function renderKoppelBalk(){
+    const balk = el('verslag-koppel-balk');
+    if(!balk) return;
+    const zichtbaar = verslagFormOpen() && !!state.currentVerslagId && !(el('f-actief-project') && el('f-actief-project').value);
+    balk.style.display = zichtbaar ? '' : 'none';
+  }
+  window.renderKoppelBalk = renderKoppelBalk;
   function verslagFormOpen(){
     return actiefTabblad() === 'verslag' && (state.verslagScreen || 'keuze') === 'form';
   }
@@ -26794,7 +26829,7 @@ window.CaCalcApp = {
     if(formEl) formEl.style.display = (scherm === 'form') ? '' : 'none';
     if(scherm === 'kiesProject') renderVkProjList(el('vk-proj-search') ? el('vk-proj-search').value : '');
     // Kladversie: zelfde projectkiezer, andere titel + "Zonder project schrijven".
-    if(el('vk-proj-titel')) el('vk-proj-titel').textContent = state.kladNaProjectkeuze ? 'Kladversie — kies een project' : state.luisterNaProjectkeuze ? 'Meeluisteren — kies een project' : 'Nieuw gekoppeld verslag — kies een project';
+    if(el('vk-proj-titel')) el('vk-proj-titel').textContent = state.koppelNaProjectkeuze ? 'Dit verslag koppelen — kies een project' : state.kladNaProjectkeuze ? 'Kladversie — kies een project' : state.luisterNaProjectkeuze ? 'Meeluisteren — kies een project' : 'Nieuw gekoppeld verslag — kies een project';
     if(el('vk-klad-los')) el('vk-klad-los').style.display = state.kladNaProjectkeuze ? '' : 'none';
     if(el('vk-luister-los')) el('vk-luister-los').style.display = state.luisterNaProjectkeuze ? '' : 'none';
     // De header-picker blijft gewoon het project van het (eventueel) open verslag volgen, ook op de
@@ -26830,6 +26865,16 @@ window.CaCalcApp = {
     // Ronde "projectkeuze-herwerkt": enkel als er effectief een verslag open staat in het formulier
     // (op het startscherm van Werfverslag is de kiezer nu gewoon een vrije projectkeuze).
     const opVerslag = verslagFormOpen();
+    // 2026-10-16: hangt het open, al opgeslagen verslag aan GEEN project en kiest de gebruiker er
+    // hier een, dan is dat een koppeling -> zelfde weg als de knop "Aan een project koppelen"
+    // (projectgegevens overnemen, verslagnummer voorstellen, meteen opslaan).
+    if(opVerslag && state.currentVerslagId && waarde && !(el('f-actief-project') && el('f-actief-project').value)){
+      state.globalProjectId = String(waarde);
+      sel.value = String(waarde);
+      renderGlobalProjectShortcut();
+      koppelVerslagAanProject(waarde);
+      return true;
+    }
     if(opVerslag && state.currentVerslagId && !(opts && opts.bevestigd)){
       const nieuwKey = waarde ? ('db-' + waarde) : '';
       if(el('f-actief-project').value !== nieuwKey){
@@ -30817,6 +30862,9 @@ window.CaCalcApp = {
     renderSharePointBanner();
     renderWaGroupLink();
     renderAanwezigenChecklist();
+    // 2026-10-16: de vergrendeling van de kiezer bovenaan en de "nog niet gekoppeld"-balk hangen
+    // af van dit veld -> meteen bijwerken (voorheen gebeurde dat enkel bij een schermwissel).
+    if(typeof updateVerslagPickerLock === 'function' && actiefTabblad() === 'verslag') updateVerslagPickerLock('verslag');
     // Op vraag van Peter (2026-08-21): een contactpersoon met "Ontvangt verslag" telt meteen mee
     // bij het kiezen van het project, ook zonder dat er iets in de aanwezigen-checklist
     // aangevinkt wordt -- vandaar hier expliciet updateMailBar() aanroepen (voorheen gebeurde
@@ -32297,12 +32345,26 @@ window.CaCalcApp = {
     renderVerslagScreen();
   });
   el('vk-bewerken').addEventListener('click', () => { switchTab('verslagen'); });
-  el('vk-proj-terug').addEventListener('click', () => { state.kladNaProjectkeuze = false; state.luisterNaProjectkeuze = false; gaNaarVerslagKeuzescherm(); });
+  el('vk-proj-terug').addEventListener('click', () => {
+    // In koppelmodus staat het verslag nog gewoon open in het formulier -> daar naartoe terug,
+    // niet naar het startscherm (dat zou het geopende verslag uit beeld halen).
+    if(state.koppelNaProjectkeuze){ state.koppelNaProjectkeuze = false; state.verslagScreen = 'form'; renderVerslagScreen(); return; }
+    state.kladNaProjectkeuze = false; state.luisterNaProjectkeuze = false; gaNaarVerslagKeuzescherm();
+  });
   el('vk-proj-search').addEventListener('input', e => renderVkProjList(e.target.value));
   el('vk-proj-list').addEventListener('click', (e) => {
     const opt = e.target.closest('.ip-proj-opt[data-proj]');
     if(!opt) return;
     const projectId = opt.dataset.proj;
+    // 2026-10-16: een AL OPGESLAGEN, nog niet gekoppeld verslag koppelen -- het verslag blijft open,
+    // enkel het project komt erbij (zie koppelVerslagAanProject()).
+    if(state.koppelNaProjectkeuze){
+      state.koppelNaProjectkeuze = false;
+      state.verslagScreen = 'form';
+      renderVerslagScreen();
+      koppelVerslagAanProject(projectId);
+      return;
+    }
     state.verslagScreen = 'form';
     resetVerslagEditor(); // eerst volledig leeg (zet ook f-actief-project terug op ''), dan het gekozen project vast zetten
     renderVerslagScreen();
@@ -32321,6 +32383,54 @@ window.CaCalcApp = {
       setTimeout(wachtOpCarryover, 150);
     }
   });
+  // ===================== Een los verslag alsnog aan een project koppelen (2026-10-16) =====================
+  // Peter: "Ik heb niet gekoppeld werfverslag die ik graag nu wel aan project wens te koppelen?"
+  // Het verslag blijft volledig bestaan (punten, foto's, handtekeningen, nummer); enkel het project
+  // komt erbij. Projectnaam, locatie, contactpersonen en de mailbestemmelingen volgen automatisch
+  // (dat deed de change-handler van #f-actief-project al). Het verslagnummer wordt NIET stil
+  // overschreven -- dat nummer is mogelijk al naar de bouwheer gecommuniceerd -- maar we stellen
+  // het projectnummer-formaat voor als dat anders zou zijn.
+  el('btn-verslag-koppelen').addEventListener('click', () => {
+    if(!state.currentVerslagId) return;
+    state.koppelNaProjectkeuze = true;
+    state.kladNaProjectkeuze = false;
+    state.luisterNaProjectkeuze = false;
+    state.verslagScreen = 'kiesProject';
+    if(el('vk-proj-search')) el('vk-proj-search').value = '';
+    renderVerslagScreen();
+  });
+  async function koppelVerslagAanProject(projectId){
+    const p = state.projects.find(x => String(x.id) === String(projectId));
+    if(!p){ alert('Project niet gevonden.'); return; }
+    const oudNr = (el('f-verslagnr').value || '').trim();
+    zetVerslagProjectVanuitPicker(projectId, true); // vult projectnaam, locatie, contacten en mailbestemmelingen
+    syncGlobalPickerMetVerslag();
+    updateVerslagPickerLock();
+    // Verslagnummer: enkel voorstellen, nooit stil wijzigen.
+    try{
+      const voorstel = await voorstelVerslagnrVoorProject(p);
+      if(voorstel && voorstel !== oudNr){
+        if(confirm('Verslagnummer aanpassen aan dit project?\n\nNu: ' + (oudNr || '(leeg)') + '\nVoorstel: ' + voorstel + '\n\nKies "Annuleren" om het huidige nummer te houden.')){
+          el('f-verslagnr').value = voorstel;
+        }
+      }
+    }catch(e){ console.warn('Verslagnummer-voorstel mislukt:', e); }
+    try{
+      await saveVerslagToDb();
+      showStatus('Verslag gekoppeld aan ' + (p.naam || 'het project'));
+    }catch(e){ /* saveVerslagToDb meldt zelf */ }
+    renderKoppelBalk();
+  }
+  // Voorstel voor een verslagnummer binnen één project (zelfde logica als autoFillVerslagnr(),
+  // maar zonder de "enkel bij een nieuw verslag"-rem -- hier vraagt de gebruiker er expliciet om).
+  async function voorstelVerslagnrVoorProject(project){
+    const alleVerslagen = await dbListVerslagen();
+    const prefix = ((project && project.projectnummer) || '').trim();
+    const next = nextSeqFromList(alleVerslagen.filter(v => String(v.id) !== String(state.currentVerslagId)), v => String(v.project_id) === String(project.id));
+    const padded = String(next).padStart(3, '0');
+    return prefix ? (prefix + '/' + padded) : padded;
+  }
+
   // "← Terug naar start": dezelfde bevestiging als voorheen bij "+ Nieuw verslag" ZOLANG er nog
   // onopgeslagen inhoud in een NIEUW (nog niet bewaard) verslag staat; een AL OPGESLAGEN verslag
   // verlaten vraagt bewust geen bevestiging meer (niets verloren, het verslag blijft gewoon bewaard
