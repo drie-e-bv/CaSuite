@@ -2856,6 +2856,16 @@
     background:transparent;color:var(--ink-soft);font:600 13px/1.2 var(--font-ui);cursor:pointer;text-align:center;
   }
   .ip-load-more:hover{background:var(--app-planning-soft);color:var(--app-planning);border-color:var(--app-planning);}
+  /* 2026-10-16: de laadzone bovenaan is een rij nette knoppen geworden (geen automatische
+     scroll-zone meer), zodat naar boven scrollen gewoon bij de filters uitkomt. */
+  .ip-load-earlier-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0;}
+  .ip-load-earlier-lbl{font:600 12.5px/1 var(--font-ui);color:var(--ink-soft);}
+  .ip-load-earlier-row .ip-load-more{display:inline-block;width:auto;margin:0;padding:7px 12px;font-size:12.5px;}
+  @media (max-width:560px){
+    .ip-load-earlier-row{gap:6px;}
+    .ip-load-earlier-row .ip-load-more{flex:1 1 0;padding:8px 6px;}
+    .ip-load-earlier-lbl{flex:1 1 100%;}
+  }
   #ipsub-rooster tr.ip-week-start td{border-top:2px solid var(--line-strong, #c9d2cc);}
   #ipsub-rooster .empty-hint{margin-top:12px;}
 
@@ -4291,7 +4301,16 @@
       <!-- Ronde 48 fase C: .ip-grid-frame = rand/schaduw rond het rooster + de vaste (sticky) kopregel
            met namen (#ip-headbar, een kopie van de <thead>, zie ipSyncStickyHead() in het script). De
            horizontale scroll gebeurt enkel binnen .ip-grid-scroll, nooit op de pagina. -->
-      <button type="button" class="ip-load-more ip-load-earlier" id="ip-load-earlier">Eerdere weken tonen</button>
+      <!-- 2026-10-16, op vraag van Peter ("het is onmogelijk om op pc en gsm terug naar boven te
+           scrollen om bijvoorbeeld filter van teams aan te passen"): naar boven scrollen laadt NIETS
+           meer automatisch bij -- zo raak je gewoon weer bij de toolbar en de filters. Eerdere weken
+           haal je nu met deze knoppen; naar onder blijft het rooster wel vanzelf doorlopen. -->
+      <div class="ip-load-earlier-row">
+        <span class="ip-load-earlier-lbl">Eerdere weken:</span>
+        <button type="button" class="ip-load-more ip-load-earlier" id="ip-load-earlier">← 1 week</button>
+        <button type="button" class="ip-load-more ip-load-earlier" id="ip-load-earlier-2">← 2 weken</button>
+        <button type="button" class="ip-load-more ip-load-earlier" id="ip-load-earlier-4">← 4 weken</button>
+      </div>
       <div class="ip-grid-frame" id="ip-grid-frame">
         <div class="ip-headbar" id="ip-headbar" aria-hidden="true"><div class="ip-headbar-inner"><table class="ip-headclone" id="ip-headclone"></table></div></div>
         <div class="ip-grid-scroll">
@@ -36785,14 +36804,23 @@ window.CaCalcApp = {
     ipAnkerHerstellen(anker);
     ipMarkeerLaden();
   }
-  function ipLaadEerdereWeken(n){
+  // 2026-10-16: enkel nog via de knoppen boven het rooster. Na een klik springen we naar de eerste
+  // nieuw bijgeladen dag -- anders staat het nieuwe stuk onzichtbaar boven het beeld.
+  function ipLaadEerdereWeken(n, opts){
     const stap = n || IP_STAP_WEKEN;
     const anker = ipAnkerVastleggen();
+    const vorigeStart = state.ip.weekStart;
     state.ip.weekStart = ipAddDays(state.ip.weekStart, -7 * stap);
     state.ip.weekCount = Math.min(IP_MAX_WEKEN, (state.ip.weekCount || 2) + stap);
     renderIpGrid();
-    ipAnkerHerstellen(anker);
+    if(opts && opts.naarNieuwBegin){
+      const eerste = el('ip-grid').querySelector('tbody tr[data-date]');
+      if(eerste && eerste.scrollIntoView) eerste.scrollIntoView({ block: 'center' });
+    } else {
+      ipAnkerHerstellen(anker);
+    }
     ipMarkeerLaden();
+    return vorigeStart;
   }
   function ipNaarVandaag(){
     state.ip.weekStart = ipMondayOf(new Date());
@@ -36807,7 +36835,9 @@ window.CaCalcApp = {
   window.ipLaadEerdereWeken = ipLaadEerdereWeken;
   el('ip-today-btn').addEventListener('click', ipNaarVandaag);
   el('ip-load-later').addEventListener('click', () => ipLaadLatereWeken());
-  el('ip-load-earlier').addEventListener('click', () => ipLaadEerdereWeken());
+  el('ip-load-earlier').addEventListener('click', () => ipLaadEerdereWeken(1, { naarNieuwBegin: true }));
+  el('ip-load-earlier-2').addEventListener('click', () => ipLaadEerdereWeken(2, { naarNieuwBegin: true }));
+  el('ip-load-earlier-4').addEventListener('click', () => ipLaadEerdereWeken(4, { naarNieuwBegin: true }));
   // Automatisch bijladen bij scrollen: enkel als de gebruiker ZELF net in die richting scrolde
   // (anders zou een laadzone die toevallig al in beeld staat bij het openen meteen beginnen laden).
   let ipLaatsteScrollY = window.scrollY, ipLaatstGeladen = 0, ipScrollRaf = 0;
@@ -36823,13 +36853,13 @@ window.CaCalcApp = {
       const sec = el('ipsub-rooster');
       if(!sec || !sec.offsetParent) return;          // Rooster niet in beeld
       if(Date.now() - ipLaatstGeladen < 300) return;   // net geladen -- layout eerst laten stabiliseren
-      const marge = 150;
+      // Enkel naar ONDER automatisch bijladen (2026-10-16). Naar boven laadde dit vroeger ook bij,
+      // waardoor je -- met het anker dat je beeld op z'n plaats houdt -- nooit voorbij het rooster
+      // tot aan de toolbar/filters raakte (Peters klacht). Eerdere weken: de knoppen boven het rooster.
       if(richting > 0){
+        const marge = 150;
         const r = el('ip-load-later').getBoundingClientRect();
         if(r.top < window.innerHeight + marge) ipLaadLatereWeken();
-      } else {
-        const r = el('ip-load-earlier').getBoundingClientRect();
-        if(r.bottom > -marge) ipLaadEerdereWeken();
       }
     });
   }, { passive: true });
