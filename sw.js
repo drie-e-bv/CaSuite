@@ -219,7 +219,10 @@
 // taken kwam te staan. scherm.html herbouwd naar GROEP-gewijs geordend (elke groep se koprij
 // onmiddellijk gevolgd door zijn eigen dagrijen, naam+taak dus weer recht onder elkaar), met enkel
 // de 1e groep die de volledige datumtekst toont (geen herhaalde datum). Enkel scherm.html wijzigt.
-const CACHE_VERSION = 'casnap-v2026-10-16-rooster-scroll';
+// CaBon (2026-10-19): nieuwe, 6e installeerbare app cabon.html (werkbonnen op tablet) + nieuw
+// tabblad "Werkbonnen" in alle andere builds van src2.html; cacheversie opgehoogd.
+// 2026-10-19 (later): materialen.html (materialendatabase + OCI) + CaBon-materiaalsuggesties uit de materialendatabase.
+const CACHE_VERSION = 'casnap-v2026-10-19-materialen';
 const NETWORK_TIMEOUT_MS = 4000;
 
 self.addEventListener('install', () => {

@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#1b6b3e">
+<title>CaSuite — Materialen</title>
+<!--
+  materialen.html -- Materialendatabase + OCI-punchout (2026-10-19), op vraag van Peter:
+  "Kunnen we een website draaien, maar daarin een webshop, alles die we in het winkelmandje
+  stoppen kunnen we dan ophalen" / "Kunnen we dit gewoon implementeren en zo een
+  materialendatabase opmaken? Rexel, Cebeo en DistriCompany werken zo bij Plenion."
+
+  Losstaande pagina (zoals scherm.html), NIET via build-apps.js uit src2.html: zo kan ze
+  geüpload worden zonder index.html aan te raken. Ze staat op hetzelfde adres als de rest van
+  CaSuite (GitHub Pages), dus de Microsoft-aanmelding van CaSuite geldt hier ook (Supabase bewaart
+  de sessie per website, niet per pagina).
+
+  OCI-verloop:
+   1. "Ophalen bij Cebeo" -> rij in oci_sessies met eenmalig geheim token -> formulier naar de
+      OCI-URL van de groothandel met o.a. USERNAME/PASSWORD (uit Instellingen) en
+      HOOK_URL = .../functions/v1/oci-hook?t=<token>.
+   2. In de webshop het mandje vullen en "Overnemen/Terug naar systeem" klikken.
+   3. De webshop stuurt het mandje naar de Edge Function oci-hook, die de artikels via
+      materialen_verwerk() in de tabel `materialen` zet (nieuw / prijs gewijzigd / ongewijzigd,
+      met prijshistoriek) en terugstuurt naar deze pagina met ?oci=<sessie-id>.
+   4. Deze pagina toont het mandje; de regels kunnen als klaargezet materiaal op een open
+      werkbon (CaBon) gezet worden.
+  Daarnaast: importeren uit Excel/CSV (prijslijst of export van de groothandel) en manueel.
+
+  Databank: migratie `materialen_database_oci` (leveranciers, materialen, materiaal_prijzen,
+  oci_sessies, + werkbon_materialen.materiaal_id/artikelnr/prijs).
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,500..800&family=Figtree:wght@400..700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --ink:#15241c; --ink-soft:#5b6b62; --ink-faint:#8a988f;
+    --bg:#f2f5f3; --card:#ffffff; --line:#dde5e0; --line-strong:#c7d2cb;
+    --brand:#1b6b3e; --brand-strong:#135230; --brand-soft:#e5f1e9;
+    --warn:#a4632a; --warn-soft:#fbf1e6; --bad:#b3362b; --bad-soft:#fbecea; --info:#2f6690; --info-soft:#e8f0f7;
+    --font-display:"Archivo","Figtree",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --font-ui:"Figtree",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --font-mono:"JetBrains Mono","SF Mono",Consolas,Menlo,"Liberation Mono",monospace;
+    --radius:12px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--font-ui);font-size:15px;line-height:1.45;}
+  h1,h2,h3{font-family:var(--font-display);font-stretch:110%;letter-spacing:-.005em;margin:0;}
+  button,input,select,textarea{font:inherit;color:inherit;}
+  a{color:var(--brand-strong);}
+  [hidden]{display:none !important;}
+
+  .top{position:sticky;top:0;z-index:20;background:var(--card);border-bottom:1px solid var(--line);}
+  .top-in{max-width:1180px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:12px;}
+  .brand{display:flex;align-items:center;gap:9px;text-decoration:none;color:inherit;min-width:0;}
+  .brand-dot{width:11px;height:11px;border-radius:50%;background:var(--brand);flex:0 0 auto;}
+  .brand-naam{font-family:var(--font-display);font-weight:800;font-stretch:112%;color:var(--brand-strong);font-size:1.1rem;white-space:nowrap;}
+  .brand-sub{color:var(--ink-faint);font-weight:600;font-size:.95rem;white-space:nowrap;}
+  .top-sp{flex:1;}
+  .top-user{font-size:.82rem;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;}
+
+  main{max-width:1180px;margin:0 auto;padding:16px 16px 60px;}
+
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--line-strong);background:var(--card);border-radius:9px;padding:8px 13px;cursor:pointer;font-weight:600;font-size:.9rem;white-space:nowrap;text-decoration:none;color:var(--ink);}
+  .btn:hover{border-color:var(--brand);}
+  .btn:disabled{opacity:.5;cursor:not-allowed;}
+  .btn.primary{background:var(--brand);border-color:var(--brand);color:#fff;}
+  .btn.primary:hover{background:var(--brand-strong);}
+  .btn.ghost{border-color:transparent;background:transparent;}
+  .btn.ghost:hover{background:var(--brand-soft);}
+  .btn.danger{color:var(--bad);}
+  .btn.sm{padding:5px 9px;font-size:.82rem;}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px;}
+  .muted{color:var(--ink-soft);}
+  .faint{color:var(--ink-faint);font-size:.85rem;}
+  .mono{font-family:var(--font-mono);font-size:.85em;}
+
+  /* Ophalen-balk */
+  .ophalen{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:14px;}
+  .ophalen h2{font-size:1.05rem;margin-right:6px;}
+  .lev-btn{display:flex;flex-direction:column;align-items:flex-start;gap:0;padding:9px 14px;min-width:150px;}
+  .lev-btn small{font-weight:500;color:var(--ink-faint);font-size:.75rem;}
+  .lev-btn.klaar small{color:var(--brand);}
+
+  /* Tabs */
+  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:14px;overflow-x:auto;}
+  .tab{border:0;background:none;padding:9px 12px;font-weight:600;color:var(--ink-soft);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;}
+  .tab[aria-selected="true"]{color:var(--brand-strong);border-bottom-color:var(--brand);}
+  .tab .tel{font-size:.75rem;background:var(--brand-soft);color:var(--brand-strong);border-radius:10px;padding:0 7px;margin-left:4px;}
+
+  /* Zoeken */
+  .zoekbalk{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;}
+  .zoek{flex:1 1 260px;position:relative;}
+  .zoek input{width:100%;padding:10px 12px 10px 36px;border:1px solid var(--line-strong);border-radius:10px;background:var(--card);}
+  .zoek input:focus{outline:2px solid var(--brand-soft);border-color:var(--brand);}
+  .zoek svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--ink-faint);}
+  select,.inp{padding:8px 10px;border:1px solid var(--line-strong);border-radius:9px;background:var(--card);}
+  .chk{display:inline-flex;align-items:center;gap:6px;font-size:.9rem;color:var(--ink-soft);cursor:pointer;}
+
+  table.tbl{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;}
+  .tbl th{text-align:left;font-size:.75rem;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-faint);font-weight:600;padding:9px 10px;border-bottom:1px solid var(--line);background:#f8faf9;white-space:nowrap;}
+  .tbl td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top;}
+  .tbl tr:last-child td{border-bottom:0;}
+  .tbl tbody tr.klik{cursor:pointer;}
+  .tbl tbody tr.klik:hover td{background:#f7faf8;}
+  .tbl .num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}
+  .oms{font-weight:600;}
+  .oms-sub{font-size:.8rem;color:var(--ink-faint);}
+  .ster{border:0;background:none;cursor:pointer;font-size:1.1rem;line-height:1;color:var(--line-strong);padding:0 2px;}
+  .ster.aan{color:#d29a1c;}
+
+  .badge{display:inline-block;font-size:.72rem;font-weight:700;letter-spacing:.02em;padding:2px 8px;border-radius:20px;background:var(--bg);color:var(--ink-soft);white-space:nowrap;}
+  .badge.nieuw{background:var(--brand-soft);color:var(--brand-strong);}
+  .badge.prijs_gewijzigd{background:var(--warn-soft);color:var(--warn);}
+  .badge.ongewijzigd{background:var(--bg);color:var(--ink-faint);}
+  .badge.fout{background:var(--bad-soft);color:var(--bad);}
+  .badge.wacht{background:var(--info-soft);color:var(--info);}
+  .lev-tag{font-size:.75rem;font-weight:700;color:var(--ink-soft);}
+  .op{color:var(--bad);} .neer{color:var(--brand);}
+
+  .leeg{padding:36px 16px;text-align:center;color:var(--ink-soft);}
+  .leeg h3{font-size:1.05rem;color:var(--ink);margin-bottom:6px;}
+  .meer{display:flex;justify-content:center;margin-top:12px;}
+
+  /* Mandje-resultaat */
+  .mandje{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft);margin-bottom:16px;}
+  .mandje-kop{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:10px;}
+  .mandje-kop h2{font-size:1.1rem;flex:1 1 auto;}
+  .samenvatting{display:flex;flex-wrap:wrap;gap:6px;}
+  .acties{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;}
+
+  /* Drawer / modal */
+  .overlay{position:fixed;inset:0;background:rgba(21,36,28,.35);z-index:50;display:flex;justify-content:flex-end;}
+  .drawer{background:var(--card);width:min(520px,100%);height:100%;overflow:auto;padding:18px 18px 30px;box-shadow:-8px 0 30px rgba(0,0,0,.12);}
+  .modal-wrap{align-items:center;justify-content:center;padding:16px;}
+  .modal{background:var(--card);border-radius:14px;width:min(560px,100%);max-height:90vh;overflow:auto;padding:18px;}
+  .drawer-kop{display:flex;align-items:flex-start;gap:10px;margin-bottom:14px;}
+  .drawer-kop h2{font-size:1.15rem;flex:1;}
+  .veld{display:flex;flex-direction:column;gap:4px;margin-bottom:11px;}
+  .veld label{font-size:.78rem;font-weight:600;color:var(--ink-soft);}
+  .veld input,.veld textarea,.veld select{padding:8px 10px;border:1px solid var(--line-strong);border-radius:9px;background:var(--card);width:100%;}
+  .rij2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .historiek{list-style:none;margin:0;padding:0;border:1px solid var(--line);border-radius:10px;}
+  .historiek li{display:flex;justify-content:space-between;padding:7px 10px;border-bottom:1px solid var(--line);font-size:.88rem;}
+  .historiek li:last-child{border-bottom:0;}
+
+  /* Instellingen */
+  .lev-kaart{margin-bottom:14px;}
+  .lev-kaart h3{font-size:1.05rem;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+  .param-rij{display:grid;grid-template-columns:1fr 1.4fr auto;gap:6px;margin-bottom:6px;}
+  .param-rij input{padding:7px 9px;border:1px solid var(--line-strong);border-radius:8px;width:100%;}
+  .uitleg{background:var(--info-soft);border-radius:10px;padding:12px 14px;font-size:.88rem;color:#24425b;margin-bottom:14px;}
+  .uitleg code{font-family:var(--font-mono);font-size:.82em;background:rgba(255,255,255,.7);padding:1px 4px;border-radius:4px;word-break:break-all;}
+
+  /* Import */
+  .drop{border:2px dashed var(--line-strong);border-radius:12px;padding:26px;text-align:center;color:var(--ink-soft);cursor:pointer;background:var(--card);}
+  .drop.over{border-color:var(--brand);background:var(--brand-soft);}
+  .map-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px 12px;margin:12px 0;}
+  .preview-wrap{overflow-x:auto;}
+
+  .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:10px;z-index:80;font-size:.9rem;max-width:calc(100% - 32px);box-shadow:0 6px 20px rgba(0,0,0,.2);}
+  .toast.fout{background:var(--bad);}
+
+  .login{max-width:420px;margin:12vh auto;text-align:center;}
+  .login h1{font-size:1.5rem;margin-bottom:8px;}
+  .login p{color:var(--ink-soft);margin:0 0 18px;}
+
+  @media (max-width:760px){
+    .top-user{display:none;}
+    .brand-sub{display:none;}
+    .tbl.resp thead{display:none;}
+    .tbl.resp,.tbl.resp tbody,.tbl.resp tr,.tbl.resp td{display:block;width:100%;}
+    .tbl.resp tr{border-bottom:1px solid var(--line);padding:8px 4px;position:relative;}
+    .tbl.resp tr:last-child{border-bottom:0;}
+    .tbl.resp td{border:0;padding:2px 8px;}
+    .tbl.resp td.num{text-align:left;}
+    .tbl.resp td[data-l]::before{content:attr(data-l) ": ";color:var(--ink-faint);font-size:.8rem;}
+    .tbl.resp td.c-ster{position:absolute;right:6px;top:8px;width:auto;}
+    .rij2{grid-template-columns:1fr;}
+    .param-rij{grid-template-columns:1fr 1fr auto;}
+    .lev-btn{flex:1 1 140px;min-width:0;}
+  }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="top-in">
+    <a class="brand" href="./index.html" title="Terug naar CaSuite"><span class="brand-dot"></span><span class="brand-naam">CaSuite</span><span class="brand-sub">· Materialen</span></a>
+    <span class="top-sp"></span>
+    <span class="top-user" id="top-user"></span>
+    <a class="btn ghost sm" href="./index.html">← CaSuite</a>
+  </div>
+</header>
+
+<div id="scherm-login" class="login" hidden>
+  <div class="card">
+    <h1>Materialen</h1>
+    <p>Meld je aan met je Casentis-account om de materialendatabase te openen.</p>
+    <button class="btn primary" id="btn-login">Aanmelden met Microsoft</button>
+    <p class="faint" id="login-fout" style="margin-top:12px"></p>
+  </div>
+</div>
+
+<main id="app" hidden>
+  <div id="mandje-plek"></div>
+
+  <div class="ophalen">
+    <h2>Ophalen uit webshop</h2>
+    <div id="lev-knoppen" style="display:contents"></div>
+  </div>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab" role="tab" data-tab="artikels" aria-selected="true">Artikels <span class="tel" id="tel-artikels"></span></button>
+    <button class="tab" role="tab" data-tab="mandjes" aria-selected="false">Opgehaalde mandjes</button>
+    <button class="tab" role="tab" data-tab="import" aria-selected="false">Importeren</button>
+    <button class="tab" role="tab" data-tab="instellingen" aria-selected="false">Instellingen</button>
+  </nav>
+
+  <!-- ARTIKELS -->
+  <section data-paneel="artikels">
+    <div class="zoekbalk">
+      <div class="zoek">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="zoek" type="search" placeholder="Zoek op omschrijving, artikelnummer, EAN of fabrikant…" autocomplete="off">
+      </div>
+      <select id="f-lev" aria-label="Leverancier"><option value="">Alle leveranciers</option></select>
+      <select id="f-sort" aria-label="Sorteren">
+        <option value="omschrijving">A → Z</option>
+        <option value="recent">Laatst opgehaald</option>
+        <option value="prijs_op">Prijs laag → hoog</option>
+        <option value="prijs_neer">Prijs hoog → laag</option>
+      </select>
+      <label class="chk"><input type="checkbox" id="f-fav"> Enkel favorieten</label>
+      <button class="btn" id="btn-nieuw">+ Artikel</button>
+    </div>
+    <div id="lijst"></div>
+    <div class="meer" id="meer-wrap" hidden><button class="btn" id="btn-meer">Meer tonen</button></div>
+  </section>
+
+  <!-- MANDJES -->
+  <section data-paneel="mandjes" hidden>
+    <div id="mandjes-lijst"></div>
+  </section>
+
+  <!-- IMPORT -->
+  <section data-paneel="import" hidden>
+    <div class="uitleg">Heb je (nog) geen OCI-koppeling? Exporteer je mandje, een bestelling of een prijslijst bij de groothandel naar Excel of CSV en sleep het bestand hieronder. Bestaande artikels (zelfde artikelnummer of EAN bij dezelfde leverancier) worden bijgewerkt, nieuwe toegevoegd. Prijswijzigingen komen in de prijshistoriek.</div>
+    <div class="card">
+      <div class="rij2">
+        <div class="veld"><label for="imp-lev">Leverancier</label><select id="imp-lev"></select></div>
+        <div class="veld"><label>Bestand (.xlsx, .xls of .csv)</label><input type="file" id="imp-bestand" accept=".xlsx,.xls,.csv,.txt"></div>
+      </div>
+      <div class="drop" id="imp-drop">Of sleep het bestand hierheen</div>
+      <div id="imp-stap2" hidden>
+        <h3 style="font-size:1rem;margin:16px 0 4px">Kolommen koppelen</h3>
+        <p class="faint" style="margin:0">Automatisch herkend op basis van de kolomtitels — pas aan waar nodig. <span id="imp-telling"></span></p>
+        <div class="map-grid" id="imp-map"></div>
+        <div class="preview-wrap" id="imp-preview"></div>
+        <div class="acties"><button class="btn primary" id="btn-importeer">Importeren</button><span class="faint" id="imp-status"></span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- INSTELLINGEN -->
+  <section data-paneel="instellingen" hidden>
+    <div class="uitleg">
+      <b>OCI-koppeling instellen.</b> Per groothandel heb je de <b>OCI-URL</b> en de <b>parameters</b> (meestal <code>USERNAME</code> en <code>PASSWORD</code>, soms een klantnummer) nodig. Dezelfde gegevens staan in de OCI-instellingen van Plenion, of je vraagt ze aan je accountmanager. Meld daarbij dat het terugkeeradres (HOOK_URL) dit is:<br><code id="hook-url"></code><br>
+      CaSuite vult de HOOK_URL zelf in. Gebruikt een groothandel een andere veldnaam, voeg dan een parameter toe met als waarde <code>{HOOK_URL}</code>.
+    </div>
+    <div id="lev-instellingen"></div>
+  </section>
+</main>
+
+<div id="toast" class="toast" hidden></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script>
+(function(){
+  "use strict";
+  const SUPABASE_URL = 'https://eownpxplsnqbghcggugs.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVvd25weHBsc25xYmdoY2dndWdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxMDg1MDcsImV4cCI6MjEwMjY4NDUwN30.KmzypFOwMvH5Rf_AK9EGDt2593vrqHn1UR-WSiURXZs';
+  const HOOK_BASIS = SUPABASE_URL + '/functions/v1/oci-hook';
+  const PAGINA = 60;
+  const sb = window.CASUITE_SB || window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const $ = (s, r) => (r || document).querySelector(s);
+  const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+  const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const euro = (v, dec) => v == null || v === '' ? '—' : '€ ' + Number(v).toLocaleString('nl-BE', { minimumFractionDigits: 2, maximumFractionDigits: dec == null ? 4 : dec });
+  const datum = v => v ? new Date(v).toLocaleDateString('nl-BE', { day:'numeric', month:'short', year:'numeric' }) : '—';
+  const datumTijd = v => v ? new Date(v).toLocaleString('nl-BE', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) : '—';
+  const STATUS_LABEL = { nieuw:'Nieuw', prijs_gewijzigd:'Prijs gewijzigd', ongewijzigd:'Ongewijzigd' };
+
+  const state = { user:null, leveranciers:[], levById:{}, lijst:[], offset:0, klaar:false, zoekTimer:null, laadNr:0 };
+
+  function toast(tekst, fout){
+    const t = $('#toast'); t.textContent = tekst; t.className = 'toast' + (fout ? ' fout' : ''); t.hidden = false;
+    clearTimeout(toast._t); toast._t = setTimeout(() => { t.hidden = true; }, fout ? 6000 : 3200);
+  }
+  function getal(v){
+    if(v == null) return null;
+    if(typeof v === 'number') return isFinite(v) ? v : null;
+    let s = String(v).trim().replace(/[€\s]/g, '');
+    if(!s) return null;
+    if(s.includes(',') && s.includes('.')){
+      s = s.lastIndexOf(',') > s.lastIndexOf('.') ? s.replace(/\./g,'').replace(',', '.') : s.replace(/,/g,'');
+    } else if(s.includes(',')) s = s.replace(',', '.');
+    const n = Number(s); return isFinite(n) ? n : null;
+  }
+  function randomToken(){
+    const a = new Uint8Array(32); crypto.getRandomValues(a);
+    return Array.from(a, b => b.toString(16).padStart(2,'0')).join('');
+  }
+  function terugUrl(){ return location.origin + location.pathname; }
+
+  // ================= Aanmelden =================
+  $('#btn-login').addEventListener('click', async () => {
+    const { error } = await sb.auth.signInWithOAuth({ provider:'azure', options:{ redirectTo: terugUrl() + location.search, scopes:'email openid profile' } });
+    if(error) $('#login-fout').textContent = 'Aanmelden mislukt: ' + error.message;
+  });
+
+  async function start(){
+    const { data } = await sb.auth.getSession();
+    const sessie = data && data.session;
+    if(!sessie){ $('#scherm-login').hidden = false; $('#app').hidden = true; return; }
+    state.user = sessie.user;
+    $('#top-user').textContent = (sessie.user.user_metadata && (sessie.user.user_metadata.full_name || sessie.user.user_metadata.name)) || sessie.user.email || '';
+    $('#scherm-login').hidden = true; $('#app').hidden = false;
+    $('#hook-url').textContent = HOOK_BASIS;
+    await laadLeveranciers();
+    const ociId = new URLSearchParams(location.search).get('oci');
+    if(ociId){
+      await toonMandje(ociId, true);
+      history.replaceState(null, '', terugUrl());
+    }
+    laadLijst(true);
+    telArtikels();
+  }
+  sb.auth.onAuthStateChange((ev) => { if(ev === 'SIGNED_IN' && !state.user) start(); if(ev === 'SIGNED_OUT'){ state.user = null; start(); } });
+
+  // ================= Leveranciers =================
+  async function laadLeveranciers(){
+    const { data, error } = await sb.from('leveranciers').select('*').order('volgorde').order('naam');
+    if(error){ toast('Leveranciers laden mislukt: ' + error.message, true); return; }
+    state.leveranciers = data || [];
+    state.levById = {}; state.leveranciers.forEach(l => { state.levById[l.id] = l; });
+    renderLevKnoppen(); renderLevSelects(); renderInstellingen();
+  }
+  function levKlaar(l){ return !!(l.oci_url && l.oci_url.trim()); }
+  function renderLevKnoppen(){
+    $('#lev-knoppen').innerHTML = state.leveranciers.filter(l => l.actief).map(l =>
+      `<button class="btn lev-btn ${levKlaar(l) ? 'klaar' : ''}" data-ophalen="${esc(l.id)}">${esc(l.naam)}<small>${levKlaar(l) ? 'Webshop openen' : 'Nog in te stellen'}</small></button>`
+    ).join('');
+  }
+  function renderLevSelects(){
+    const opts = state.leveranciers.map(l => `<option value="${esc(l.id)}">${esc(l.naam)}</option>`).join('');
+    const f = $('#f-lev'), keuze = f.value;
+    f.innerHTML = '<option value="">Alle leveranciers</option>' + opts + '<option value="geen">Zonder leverancier</option>';
+    f.value = keuze;
+    $('#imp-lev').innerHTML = opts;
+  }
+
+  $('#lev-knoppen').addEventListener('click', e => {
+    const b = e.target.closest('[data-ophalen]'); if(!b) return;
+    const l = state.levById[b.dataset.ophalen];
+    if(!levKlaar(l)){ kiesTab('instellingen'); toast('Vul eerst de OCI-gegevens van ' + l.naam + ' in.'); return; }
+    ociStart(l);
+  });
+
+  // OCI-punchout starten: sessie aanmaken en formulier naar de webshop sturen.
+  async function ociStart(l){
+    const token = randomToken();
+    const { error } = await sb.from('oci_sessies').insert({ token, leverancier_id:l.id, terug_url: terugUrl(), aangemaakt_door: state.user.email || null });
+    if(error){ toast('Kon de webshop niet openen: ' + error.message, true); return; }
+    const hook = HOOK_BASIS + '?t=' + token;
+    const params = Array.isArray(l.oci_parameters) ? l.oci_parameters.filter(p => p && p.naam) : [];
+    let hookGebruikt = false;
+    const velden = params.map(p => {
+      let w = String(p.waarde == null ? '' : p.waarde);
+      if(w.includes('{HOOK_URL}')){ hookGebruikt = true; w = w.split('{HOOK_URL}').join(hook); }
+      return [p.naam, w];
+    });
+    let actie = l.oci_url.trim();
+    if(actie.includes('{HOOK_URL}')){ hookGebruikt = true; actie = actie.split('{HOOK_URL}').join(encodeURIComponent(hook)); }
+    if(!hookGebruikt) velden.push(['HOOK_URL', hook]);
+    if(!velden.some(([n]) => n.toUpperCase() === '~TARGET')) velden.push(['~TARGET', '_top']);
+    const form = document.createElement('form');
+    form.method = l.oci_methode === 'GET' ? 'GET' : 'POST';
+    form.action = actie;
+    form.acceptCharset = 'UTF-8';
+    velden.forEach(([n, w]) => { const i = document.createElement('input'); i.type = 'hidden'; i.name = n; i.value = w; form.appendChild(i); });
+    document.body.appendChild(form);
+    window.__laatsteOciForm = { action: form.action, method: form.method, velden };
+    if(window.CASUITE_TEST_GEEN_SUBMIT) return;
+    form.submit();
+  }
+
+  // ================= Artikels =================
+  function zoekFilter(q){
+    // PostgREST or-filter: komma's en haakjes uit de zoekterm halen
+    const woord = q.replace(/[,()*%\\"']/g, ' ').trim();
+    return woord;
+  }
+  async function laadLijst(reset){
+    const nr = ++state.laadNr;
+    if(reset){ state.offset = 0; state.lijst = []; state.klaar = false; }
+    const q = $('#zoek').value.trim();
+    let query = sb.from('materialen').select('*');
+    const lev = $('#f-lev').value;
+    if(lev === 'geen') query = query.is('leverancier_id', null); else if(lev) query = query.eq('leverancier_id', lev);
+    if($('#f-fav').checked) query = query.eq('favoriet', true);
+    if(q){
+      // elk woord moet ergens voorkomen: or=(and(or(..woord1..),or(..woord2..)))
+      const woorden = zoekFilter(q).split(/\s+/).filter(Boolean).slice(0, 5);
+      const groepen = woorden.map(w => `or(omschrijving.ilike.*${w}*,artikelnr.ilike.*${w}*,ean.ilike.*${w}*,fabrikant.ilike.*${w}*,fabrikant_artnr.ilike.*${w}*)`);
+      if(groepen.length) query = query.or(`and(${groepen.join(',')})`);
+    }
+    const s = $('#f-sort').value;
+    if(s === 'recent') query = query.order('laatst_besteld_op', { ascending:false, nullsFirst:false }).order('updated_at', { ascending:false });
+    else if(s === 'prijs_op') query = query.order('prijs', { ascending:true, nullsFirst:false });
+    else if(s === 'prijs_neer') query = query.order('prijs', { ascending:false, nullsFirst:false });
+    else query = query.order('omschrijving', { ascending:true });
+    query = query.range(state.offset, state.offset + PAGINA - 1);
+    const { data, error } = await query;
+    if(nr !== state.laadNr) return;
+    if(error){ $('#lijst').innerHTML = `<div class="card leeg">Laden mislukt: ${esc(error.message)}</div>`; return; }
+    state.lijst = state.lijst.concat(data || []);
+    state.offset += (data || []).length;
+    state.klaar = (data || []).length < PAGINA;
+    renderLijst();
+  }
+  async function telArtikels(){
+    const { count } = await sb.from('materialen').select('id', { count:'exact', head:true });
+    $('#tel-artikels').textContent = count ? count.toLocaleString('nl-BE') : '';
+  }
+  function renderLijst(){
+    const w = $('#lijst');
+    $('#meer-wrap').hidden = state.klaar || !state.lijst.length;
+    if(!state.lijst.length){
+      const zoekt = $('#zoek').value.trim() || $('#f-lev').value || $('#f-fav').checked;
+      w.innerHTML = zoekt
+        ? `<div class="card leeg"><h3>Niets gevonden</h3>Probeer een ander woord of artikelnummer.</div>`
+        : `<div class="card leeg"><h3>Nog geen materialen</h3>Haal een mandje op bij een groothandel hierboven, importeer een Excel-lijst of voeg een artikel manueel toe.</div>`;
+      return;
+    }
+    w.innerHTML = `<table class="tbl resp"><thead><tr><th style="width:28px"></th><th>Omschrijving</th><th>Artikelnr.</th><th>Leverancier</th><th>Eenheid</th><th class="num">Prijs / eenh.</th><th>Laatst opgehaald</th></tr></thead><tbody>` +
+      state.lijst.map(m => {
+        const l = state.levById[m.leverancier_id];
+        return `<tr class="klik" data-id="${esc(m.id)}">
+          <td class="c-ster"><button class="ster ${m.favoriet ? 'aan' : ''}" data-ster="${esc(m.id)}" title="Favoriet" aria-label="Favoriet">★</button></td>
+          <td><div class="oms">${esc(m.omschrijving)}</div>${m.fabrikant || m.fabrikant_artnr ? `<div class="oms-sub">${esc([m.fabrikant, m.fabrikant_artnr].filter(Boolean).join(' · '))}</div>` : ''}</td>
+          <td data-l="Art." class="mono">${esc(m.artikelnr || '—')}</td>
+          <td data-l="Lev."><span class="lev-tag">${esc(l ? l.naam : '—')}</span></td>
+          <td data-l="Eenheid">${esc(m.eenheid || '—')}</td>
+          <td data-l="Prijs" class="num">${euro(m.prijs)}</td>
+          <td data-l="Opgehaald" class="faint">${datum(m.laatst_besteld_op || m.prijs_bijgewerkt_op)}</td>
+        </tr>`;
+      }).join('') + `</tbody></table>`;
+  }
+  $('#zoek').addEventListener('input', () => { clearTimeout(state.zoekTimer); state.zoekTimer = setTimeout(() => laadLijst(true), 250); });
+  ['#f-lev', '#f-sort', '#f-fav'].forEach(s => $(s).addEventListener('change', () => laadLijst(true)));
+  $('#btn-meer').addEventListener('click', () => laadLijst(false));
+  $('#lijst').addEventListener('click', async e => {
+    const st = e.target.closest('[data-ster]');
+    if(st){
+      e.stopPropagation();
+      const m = state.lijst.find(x => x.id === st.dataset.ster); if(!m) return;
+      m.favoriet = !m.favoriet; st.classList.toggle('aan', m.favoriet);
+      const { error } = await sb.from('materialen').update({ favoriet:m.favoriet }).eq('id', m.id);
+      if(error){ m.favoriet = !m.favoriet; st.classList.toggle('aan', m.favoriet); toast('Opslaan mislukt: ' + error.message, true); }
+      return;
+    }
+    const tr = e.target.closest('tr[data-id]');
+    if(tr) openArtikel(state.lijst.find(x => x.id === tr.dataset.id));
+  });
+  $('#btn-nieuw').addEventListener('click', () => openArtikel(null));
+
+  // ----- Artikel-detail -----
+  function sluitOverlay(){ const o = $('.overlay'); if(o) o.remove(); }
+  document.addEventListener('keydown', e => { if(e.key === 'Escape') sluitOverlay(); });
+  async function openArtikel(m){
+    sluitOverlay();
+    const nieuw = !m; m = m || { leverancier_id: state.leveranciers[0] ? state.leveranciers[0].id : null };
+    const o = document.createElement('div'); o.className = 'overlay';
+    const levOpts = '<option value="">— geen —</option>' + state.leveranciers.map(l => `<option value="${esc(l.id)}" ${l.id === m.leverancier_id ? 'selected' : ''}>${esc(l.naam)}</option>`).join('');
+    o.innerHTML = `<div class="drawer" role="dialog" aria-modal="true">
+      <div class="drawer-kop"><h2>${nieuw ? 'Nieuw artikel' : esc(m.omschrijving)}</h2><button class="btn ghost sm" data-sluit>✕</button></div>
+      <div class="veld"><label>Omschrijving</label><input id="a-oms" value="${esc(m.omschrijving || '')}"></div>
+      <div class="rij2">
+        <div class="veld"><label>Leverancier</label><select id="a-lev">${levOpts}</select></div>
+        <div class="veld"><label>Artikelnummer groothandel</label><input id="a-art" value="${esc(m.artikelnr || '')}"></div>
+      </div>
+      <div class="rij2">
+        <div class="veld"><label>Prijs per eenheid (netto, excl. btw)</label><input id="a-prijs" inputmode="decimal" value="${m.prijs == null ? '' : esc(String(Number(m.prijs)).replace('.', ','))}"></div>
+        <div class="veld"><label>Eenheid</label><input id="a-eenh" value="${esc(m.eenheid || '')}" placeholder="st, m, rol…"></div>
+      </div>
+      <div class="rij2">
+        <div class="veld"><label>Fabrikant</label><input id="a-fab" value="${esc(m.fabrikant || '')}"></div>
+        <div class="veld"><label>Fabrikant-artikelnr.</label><input id="a-fabart" value="${esc(m.fabrikant_artnr || '')}"></div>
+      </div>
+      <div class="rij2">
+        <div class="veld"><label>EAN</label><input id="a-ean" inputmode="numeric" value="${esc(m.ean || '')}"></div>
+        <div class="veld"><label>Categorie</label><input id="a-cat" value="${esc(m.categorie || '')}"></div>
+      </div>
+      <div class="veld"><label>Notitie</label><textarea id="a-not" rows="2">${esc(m.notitie || '')}</textarea></div>
+      ${m.lange_omschrijving ? `<p class="faint">${esc(m.lange_omschrijving)}</p>` : ''}
+      <div class="acties" style="margin:4px 0 18px"><button class="btn primary" id="a-opslaan">Opslaan</button>${nieuw ? '' : '<span class="top-sp"></span><button class="btn danger" id="a-verwijder">Verwijderen</button>'}</div>
+      ${nieuw ? '' : `<h3 style="font-size:.95rem;margin-bottom:8px">Prijshistoriek</h3><ul class="historiek" id="a-hist"><li class="faint">Laden…</li></ul>
+      <p class="faint" style="margin-top:12px">Toegevoegd ${datum(m.created_at)} via ${esc(m.bron || 'onbekend')}.</p>`}
+    </div>`;
+    document.body.appendChild(o);
+    o.addEventListener('click', e => { if(e.target === o || e.target.closest('[data-sluit]')) sluitOverlay(); });
+    $('#a-oms', o).focus();
+    $('#a-opslaan', o).addEventListener('click', async () => {
+      const oms = $('#a-oms', o).value.trim();
+      if(!oms){ toast('Geef een omschrijving in.', true); return; }
+      const prijs = getal($('#a-prijs', o).value);
+      const rij = {
+        omschrijving: oms, leverancier_id: $('#a-lev', o).value || null, artikelnr: $('#a-art', o).value.trim() || null,
+        eenheid: $('#a-eenh', o).value.trim() || null, fabrikant: $('#a-fab', o).value.trim() || null,
+        fabrikant_artnr: $('#a-fabart', o).value.trim() || null, ean: $('#a-ean', o).value.trim() || null,
+        categorie: $('#a-cat', o).value.trim() || null, notitie: $('#a-not', o).value.trim() || null,
+        prijs, updated_at: new Date().toISOString()
+      };
+      const prijsAnders = nieuw ? prijs != null : (prijs != null && (m.prijs == null || Number(m.prijs) !== prijs));
+      if(prijsAnders) rij.prijs_bijgewerkt_op = new Date().toISOString();
+      let res;
+      if(nieuw){ rij.bron = 'manueel'; res = await sb.from('materialen').insert(rij).select().single(); }
+      else res = await sb.from('materialen').update(rij).eq('id', m.id).select().single();
+      if(res.error){
+        toast(/materialen_lev_artnr_uniek|duplicate/.test(res.error.message) ? 'Dit artikelnummer bestaat al bij deze leverancier.' : 'Opslaan mislukt: ' + res.error.message, true);
+        return;
+      }
+      if(prijsAnders) await sb.from('materiaal_prijzen').insert({ materiaal_id: res.data.id, prijs, bron:'manueel' });
+      sluitOverlay(); toast('Opgeslagen.'); laadLijst(true); telArtikels();
+    });
+    if(!nieuw){
+      $('#a-verwijder', o).addEventListener('click', async () => {
+        if(!confirm('Dit artikel verwijderen uit de materialendatabase?')) return;
+        const { error } = await sb.from('materialen').delete().eq('id', m.id);
+        if(error){ toast('Verwijderen mislukt: ' + error.message, true); return; }
+        sluitOverlay(); toast('Verwijderd.'); laadLijst(true); telArtikels();
+      });
+      const { data } = await sb.from('materiaal_prijzen').select('*').eq('materiaal_id', m.id).order('datum', { ascending:false }).limit(30);
+      const h = $('#a-hist', o); if(!h) return;
+      h.innerHTML = (data && data.length) ? data.map((p, i) => {
+        const vorige = data[i + 1]; let pijl = '';
+        if(vorige){ const d = Number(p.prijs) - Number(vorige.prijs); if(d > 0) pijl = ' <span class="op">▲</span>'; else if(d < 0) pijl = ' <span class="neer">▼</span>'; }
+        return `<li><span>${datum(p.datum)} <span class="faint">· ${esc(p.bron || '')}</span></span><b>${euro(p.prijs)}${pijl}</b></li>`;
+      }).join('') : '<li class="faint">Nog geen prijzen.</li>';
+    }
+  }
+
+  // ================= Opgehaald mandje =================
+  async function toonMandje(id, vers){
+    const { data: s, error } = await sb.from('oci_sessies').select('*').eq('id', id).maybeSingle();
+    const plek = $('#mandje-plek');
+    if(error || !s){ plek.innerHTML = ''; if(vers) toast('Mandje niet gevonden.', true); return; }
+    const l = state.levById[s.leverancier_id];
+    const naam = l ? l.naam : 'webshop';
+    if(!s.ontvangen_op){
+      plek.innerHTML = `<div class="card mandje"><div class="mandje-kop"><h2>Nog niets ontvangen van ${esc(naam)}</h2><button class="btn ghost sm" data-mandje-sluit>✕</button></div>
+        <p class="muted" style="margin:0">De webshop heeft (nog) geen mandje teruggestuurd. Klik in de webshop op de knop om het mandje over te nemen naar je systeem (vaak “Overnemen”, “Terug naar systeem” of “Transfer”), niet op gewoon bestellen.</p></div>`;
+      return;
+    }
+    if(s.fout && s.fout !== 'leeg' && !s.resultaat){
+      plek.innerHTML = `<div class="card mandje"><div class="mandje-kop"><h2>Mandje van ${esc(naam)} niet verwerkt</h2><button class="btn ghost sm" data-mandje-sluit>✕</button></div>
+        <p class="muted" style="margin:0">${s.fout === 'verlopen' ? 'De sessie was verlopen (meer dan 4 uur oud). Start het ophalen opnieuw.' : 'Fout: ' + esc(s.fout)}</p></div>`;
+      return;
+    }
+    const res = Array.isArray(s.resultaat) ? s.resultaat : [];
+    if(!res.length){
+      plek.innerHTML = `<div class="card mandje"><div class="mandje-kop"><h2>Leeg mandje van ${esc(naam)}</h2><button class="btn ghost sm" data-mandje-sluit>✕</button></div>
+        <p class="muted" style="margin:0">De webshop stuurde geen artikels mee. Waren er artikels in het mandje? Dan herkent CaSuite het formaat van deze groothandel nog niet: geef dit door, de ontvangen gegevens zijn bewaard om de koppeling bij te stellen.</p></div>`;
+      return;
+    }
+    const tel = { nieuw:0, prijs_gewijzigd:0, ongewijzigd:0 };
+    res.forEach(r => { tel[r.status] = (tel[r.status] || 0) + 1; });
+    let totaal = 0;
+    const rijen = res.map((r, i) => {
+      const g = r.regel || {}; const aantal = getal(g.aantal); const prijs = getal(g.prijs);
+      if(aantal != null && prijs != null) totaal += aantal * prijs;
+      let prijsInfo = euro(prijs);
+      if(r.status === 'prijs_gewijzigd' && r.oude_prijs != null){
+        const d = prijs - Number(r.oude_prijs);
+        prijsInfo = `<span class="faint" style="text-decoration:line-through">${euro(r.oude_prijs)}</span> ${euro(prijs)} <span class="${d > 0 ? 'op' : 'neer'}">${d > 0 ? '▲' : '▼'}</span>`;
+      }
+      return `<tr><td class="c-ster"><input type="checkbox" class="m-kies" data-i="${i}" checked aria-label="Selecteren"></td>
+        <td><div class="oms">${esc(g.omschrijving || '')}</div><div class="oms-sub mono">${esc(g.artikelnr || '')}</div></td>
+        <td data-l="Aantal" class="num">${aantal == null ? '—' : aantal.toLocaleString('nl-BE')} ${esc(g.eenheid || '')}</td>
+        <td data-l="Prijs" class="num">${prijsInfo}</td>
+        <td><span class="badge ${esc(r.status)}">${esc(STATUS_LABEL[r.status] || r.status)}</span></td></tr>`;
+    }).join('');
+    plek.innerHTML = `<div class="card mandje" data-sessie="${esc(s.id)}">
+      <div class="mandje-kop"><h2>Mandje van ${esc(naam)} · ${res.length} artikel${res.length === 1 ? '' : 's'}</h2>
+        <div class="samenvatting">${tel.nieuw ? `<span class="badge nieuw">${tel.nieuw} nieuw</span>` : ''}${tel.prijs_gewijzigd ? `<span class="badge prijs_gewijzigd">${tel.prijs_gewijzigd} prijs gewijzigd</span>` : ''}${tel.ongewijzigd ? `<span class="badge ongewijzigd">${tel.ongewijzigd} ongewijzigd</span>` : ''}</div>
+        <button class="btn ghost sm" data-mandje-sluit title="Sluiten">✕</button></div>
+      <p class="faint" style="margin:0 0 10px">Ontvangen ${datumTijd(s.ontvangen_op)}. Alle artikels staan nu in de materialendatabase. Totaal mandje: <b>${euro(totaal, 2)}</b> excl. btw.</p>
+      <table class="tbl resp"><thead><tr><th style="width:28px"></th><th>Artikel</th><th class="num">Aantal</th><th class="num">Prijs / eenh.</th><th>Status</th></tr></thead><tbody>${rijen}</tbody></table>
+      <div class="acties"><button class="btn primary" data-naar-bon>📦 Geselecteerde klaarzetten op een werkbon…</button><span class="faint">Bestellen doe je nog altijd in de webshop zelf of in Plenion.</span></div>
+    </div>`;
+    plek.querySelector('[data-naar-bon]').addEventListener('click', () => {
+      const gekozen = $$('.m-kies', plek).filter(c => c.checked).map(c => res[Number(c.dataset.i)]);
+      if(!gekozen.length){ toast('Selecteer minstens één artikel.', true); return; }
+      kiesWerkbon(gekozen);
+    });
+    plek.scrollIntoView({ behavior:'smooth', block:'start' });
+  }
+  $('#mandje-plek').addEventListener('click', e => { if(e.target.closest('[data-mandje-sluit]')) $('#mandje-plek').innerHTML = ''; });
+
+  // Regels als klaargezet materiaal op een open werkbon zetten (CaBon).
+  async function kiesWerkbon(regels){
+    sluitOverlay();
+    const o = document.createElement('div'); o.className = 'overlay modal-wrap';
+    o.innerHTML = `<div class="modal" role="dialog" aria-modal="true"><div class="drawer-kop"><h2>Klaarzetten op werkbon</h2><button class="btn ghost sm" data-sluit>✕</button></div>
+      <p class="muted" style="margin-top:0">${regels.length} artikel${regels.length === 1 ? '' : 's'} komen als <b>klaargezet materiaal</b> op de bon. De technieker bevestigt de aantallen ter plaatse.</p>
+      <div id="wb-lijst"><p class="faint">Open werkbonnen laden…</p></div></div>`;
+    document.body.appendChild(o);
+    o.addEventListener('click', e => { if(e.target === o || e.target.closest('[data-sluit]')) sluitOverlay(); });
+    const { data: bonnen, error } = await sb.from('werkbonnen').select('id,bon_type,persoon_naam,taak,project_id,klant_naam,created_at,status').eq('status', 'open').order('created_at', { ascending:false }).limit(80);
+    const w = $('#wb-lijst', o); if(!w) return;
+    if(error){ w.innerHTML = `<p class="faint">Werkbonnen laden mislukt: ${esc(error.message)}</p>`; return; }
+    if(!bonnen || !bonnen.length){ w.innerHTML = `<p class="faint">Er zijn geen open werkbonnen. Maak eerst een (regie)bon aan in CaBon of in de planning, en zet de artikels daarna klaar via “Opgehaalde mandjes”.</p>`; return; }
+    const pids = [...new Set(bonnen.map(b => b.project_id).filter(Boolean))];
+    let projNaam = {};
+    if(pids.length){ const { data: pr } = await sb.from('projecten').select('id,naam').in('id', pids); (pr || []).forEach(p => { projNaam[p.id] = p.naam; }); }
+    const sorted = bonnen.slice().sort((a, b) => (a.bon_type === 'regie' ? 0 : 1) - (b.bon_type === 'regie' ? 0 : 1));
+    w.innerHTML = `<table class="tbl"><tbody>${sorted.map(b => `<tr class="klik" data-bon="${esc(b.id)}"><td><div class="oms">${esc(projNaam[b.project_id] || b.klant_naam || 'Zonder project')}</div><div class="oms-sub">${esc([b.taak, b.persoon_naam].filter(Boolean).join(' · '))}</div></td><td><span class="badge ${b.bon_type === 'regie' ? 'wacht' : ''}">${b.bon_type === 'regie' ? 'Regie' : 'Project'}</span></td></tr>`).join('')}</tbody></table>`;
+    w.addEventListener('click', async e => {
+      const tr = e.target.closest('[data-bon]'); if(!tr) return;
+      tr.style.opacity = .5;
+      const rijen = regels.map(r => {
+        const g = r.regel || {};
+        return { werkbon_id: tr.dataset.bon, materiaal_id: r.materiaal_id, artikelnr: g.artikelnr || null, omschrijving: g.omschrijving || g.artikelnr || 'Artikel',
+          eenheid: g.eenheid || null, aantal_voorzien: getal(g.aantal), klaargezet: true, bron: 'groothandel', prijs: getal(g.prijs) };
+      });
+      const { error: e2 } = await sb.from('werkbon_materialen').insert(rijen);
+      if(e2){ tr.style.opacity = 1; toast('Klaarzetten mislukt: ' + e2.message, true); return; }
+      sluitOverlay(); toast(`${rijen.length} artikel${rijen.length === 1 ? '' : 's'} klaargezet op de werkbon.`);
+    });
+  }
+
+  // ================= Opgehaalde mandjes (historiek) =================
+  async function laadMandjes(){
+    const w = $('#mandjes-lijst'); w.innerHTML = '<p class="faint">Laden…</p>';
+    const { data, error } = await sb.from('oci_sessies').select('id,leverancier_id,aangemaakt_door,created_at,ontvangen_op,fout,resultaat').order('created_at', { ascending:false }).limit(40);
+    if(error){ w.innerHTML = `<div class="card leeg">Laden mislukt: ${esc(error.message)}</div>`; return; }
+    const rijen = (data || []).filter(s => s.ontvangen_op || (Date.now() - new Date(s.created_at)) < 4 * 3600e3);
+    if(!rijen.length){ w.innerHTML = `<div class="card leeg"><h3>Nog geen mandjes opgehaald</h3>Gebruik de knoppen bovenaan om de webshop van een groothandel te openen.</div>`; return; }
+    w.innerHTML = `<table class="tbl resp"><thead><tr><th>Wanneer</th><th>Leverancier</th><th>Door</th><th class="num">Artikels</th><th>Status</th></tr></thead><tbody>` +
+      rijen.map(s => {
+        const l = state.levById[s.leverancier_id]; const n = Array.isArray(s.resultaat) ? s.resultaat.length : 0;
+        const st = !s.ontvangen_op ? '<span class="badge wacht">Webshop open</span>' : (s.fout && !n) ? `<span class="badge fout">${s.fout === 'leeg' ? 'Leeg' : s.fout === 'verlopen' ? 'Verlopen' : 'Fout'}</span>` : '<span class="badge nieuw">Ontvangen</span>';
+        return `<tr class="klik" data-sessie="${esc(s.id)}"><td>${datumTijd(s.created_at)}</td><td data-l="Lev.">${esc(l ? l.naam : '—')}</td><td data-l="Door" class="faint">${esc(s.aangemaakt_door || '')}</td><td data-l="Artikels" class="num">${n || '—'}</td><td>${st}</td></tr>`;
+      }).join('') + '</tbody></table>';
+  }
+  $('#mandjes-lijst').addEventListener('click', e => { const tr = e.target.closest('[data-sessie]'); if(tr) toonMandje(tr.dataset.sessie, true); });
+
+  // ================= Instellingen =================
+  function renderInstellingen(){
+    $('#lev-instellingen').innerHTML = state.leveranciers.map(l => {
+      const params = (Array.isArray(l.oci_parameters) && l.oci_parameters.length) ? l.oci_parameters : [{ naam:'USERNAME', waarde:'' }, { naam:'PASSWORD', waarde:'' }];
+      return `<div class="card lev-kaart" data-lev="${esc(l.id)}">
+        <h3>${esc(l.naam)} ${levKlaar(l) ? '<span class="badge nieuw">Ingesteld</span>' : '<span class="badge">Nog niet ingesteld</span>'}</h3>
+        <div class="rij2" style="grid-template-columns:3fr 1fr">
+          <div class="veld"><label>OCI-URL (inlogadres van de webshop)</label><input class="i-url" value="${esc(l.oci_url || '')}" placeholder="https://…" autocomplete="off"></div>
+          <div class="veld"><label>Methode</label><select class="i-meth"><option ${l.oci_methode !== 'GET' ? 'selected' : ''}>POST</option><option ${l.oci_methode === 'GET' ? 'selected' : ''}>GET</option></select></div>
+        </div>
+        <div class="veld"><label>Parameters</label><div class="i-params">${params.map(paramRij).join('')}</div>
+          <div><button class="btn ghost sm i-param-plus" type="button">+ parameter</button></div></div>
+        <div class="acties"><button class="btn primary i-opslaan">Opslaan</button><label class="chk"><input type="checkbox" class="i-actief" ${l.actief ? 'checked' : ''}> Knop tonen</label></div>
+      </div>`;
+    }).join('');
+  }
+  function paramRij(p){
+    const geheim = /PASS|SECRET|WACHTW/i.test(p.naam || '');
+    return `<div class="param-rij"><input class="p-naam" value="${esc(p.naam || '')}" placeholder="naam" autocomplete="off"><input class="p-waarde" type="${geheim ? 'password' : 'text'}" value="${esc(p.waarde || '')}" placeholder="waarde" autocomplete="new-password"><button class="btn ghost sm p-weg" type="button" title="Verwijderen">✕</button></div>`;
+  }
+  $('#lev-instellingen').addEventListener('click', async e => {
+    const kaart = e.target.closest('[data-lev]'); if(!kaart) return;
+    if(e.target.closest('.i-param-plus')){ $('.i-params', kaart).insertAdjacentHTML('beforeend', paramRij({})); return; }
+    if(e.target.closest('.p-weg')){ e.target.closest('.param-rij').remove(); return; }
+    if(e.target.closest('.i-opslaan')){
+      const url = $('.i-url', kaart).value.trim();
+      if(url && !/^https:\/\//i.test(url)){ toast('De OCI-URL moet met https:// beginnen.', true); return; }
+      const params = $$('.param-rij', kaart).map(r => ({ naam: $('.p-naam', r).value.trim(), waarde: $('.p-waarde', r).value })).filter(p => p.naam);
+      const { error } = await sb.from('leveranciers').update({ oci_url: url || null, oci_methode: $('.i-meth', kaart).value, oci_parameters: params, actief: $('.i-actief', kaart).checked, updated_at: new Date().toISOString() }).eq('id', kaart.dataset.lev);
+      if(error){ toast('Opslaan mislukt: ' + error.message, true); return; }
+      toast('Instellingen opgeslagen.'); await laadLeveranciers();
+    }
+  });
+  $('#lev-instellingen').addEventListener('input', e => {
+    if(e.target.classList.contains('p-naam')){ const w = e.target.parentElement.querySelector('.p-waarde'); w.type = /PASS|SECRET|WACHTW/i.test(e.target.value) ? 'password' : 'text'; }
+  });
+
+  // ================= Importeren =================
+  const IMP_VELDEN = [
+    ['artikelnr', 'Artikelnummer', /^(?!.*(fabrikant|merk|manufact|ean|gtin|barcode|prijs|price)).*(artikel|art\.?\s*nr|referentie|\bref\b|code|item|artnr|sku|vendormat)/i],
+    ['omschrijving', 'Omschrijving', /(omschrijving|beschrijving|description|desc|benaming|naam|product)/i],
+    ['eenheid', 'Eenheid', /^(eenheid|eenh|unit|ve|verpakkingseenheid|uom|me)\b/i],
+    ['prijs', 'Prijs (netto)', /(netto|nettoprijs|net price|uw prijs|prijs|price|eenheidsprijs)/i],
+    ['prijs_per', 'Prijs per (aantal)', /(prijs per|per|prijseenheid|price unit|priceunit)$/i],
+    ['aantal', 'Aantal', /^(aantal|qty|quantity|hoeveelheid|aant)/i],
+    ['ean', 'EAN', /(ean|gtin|barcode)/i],
+    ['fabrikant', 'Fabrikant / merk', /(fabrikant|merk|brand|manufacturer|leverancier merk)/i],
+    ['fabrikant_artnr', 'Fabrikant-artikelnr.', /(fabrikant.*(nr|nummer|ref|code)|manufact|type|typenr)/i],
+    ['categorie', 'Categorie', /(categorie|groep|group|familie|productgroep)/i]
+  ];
+  const imp = { kop:[], rijen:[], map:{} };
+  async function leesBestand(bestand){
+    $('#imp-status').textContent = '';
+    try{
+      let rijen;
+      if(/\.(xlsx|xls)$/i.test(bestand.name)){
+        if(!window.XLSX) await laadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+        const wb = window.XLSX.read(await bestand.arrayBuffer(), { type:'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        rijen = window.XLSX.utils.sheet_to_json(ws, { header:1, raw:true, defval:'' });
+      } else {
+        rijen = parseCsv(await leesTekst(bestand));
+      }
+      rijen = rijen.filter(r => r.some(c => String(c).trim() !== ''));
+      // koprij = eerste rij met minstens 2 tekstcellen in de eerste 10 rijen, met een herkende kolom
+      let kopIdx = 0;
+      for(let i = 0; i < Math.min(10, rijen.length); i++){
+        if(rijen[i].filter(c => String(c).trim() && getal(c) == null).length >= 2 && rijen[i].some(c => IMP_VELDEN.some(v => v[2].test(String(c).trim())))){ kopIdx = i; break; }
+      }
+      imp.kop = rijen[kopIdx].map((c, i) => String(c).trim() || ('Kolom ' + (i + 1)));
+      imp.rijen = rijen.slice(kopIdx + 1);
+      imp.map = {};
+      const gebruikt = new Set();
+      IMP_VELDEN.forEach(([veld, , re]) => {
+        const i = imp.kop.findIndex((k, idx) => !gebruikt.has(idx) && re.test(k));
+        if(i >= 0){ imp.map[veld] = i; gebruikt.add(i); }
+      });
+      renderImport();
+    } catch(err){ toast('Bestand lezen mislukt: ' + err.message, true); }
+  }
+  function leesTekst(f){
+    return f.arrayBuffer().then(buf => {
+      try { return new TextDecoder('utf-8', { fatal:true }).decode(buf); } catch(e){ return new TextDecoder('windows-1252').decode(buf); }
+    });
+  }
+  function parseCsv(tekst){
+    tekst = tekst.replace(/^﻿/, '');
+    const eerste = tekst.split(/\r?\n/)[0] || '';
+    const sep = [';', '\t', ','].sort((a, b) => eerste.split(b).length - eerste.split(a).length)[0];
+    const rijen = []; let rij = [], veld = '', inQ = false;
+    for(let i = 0; i < tekst.length; i++){
+      const c = tekst[i];
+      if(inQ){ if(c === '"'){ if(tekst[i + 1] === '"'){ veld += '"'; i++; } else inQ = false; } else veld += c; continue; }
+      if(c === '"') inQ = true;
+      else if(c === sep){ rij.push(veld); veld = ''; }
+      else if(c === '\n' || c === '\r'){ if(c === '\r' && tekst[i + 1] === '\n') i++; rij.push(veld); rijen.push(rij); rij = []; veld = ''; }
+      else veld += c;
+    }
+    if(veld !== '' || rij.length){ rij.push(veld); rijen.push(rij); }
+    return rijen;
+  }
+  function laadScript(src){ return new Promise((ok, nok) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => nok(new Error('Excel-lezer kon niet geladen worden')); document.head.appendChild(s); }); }
+  function renderImport(){
+    $('#imp-stap2').hidden = false;
+    const opts = '<option value="">— niet gebruiken —</option>' + imp.kop.map((k, i) => `<option value="${i}">${esc(k)}</option>`).join('');
+    $('#imp-map').innerHTML = IMP_VELDEN.map(([veld, label]) => `<div class="veld"><label>${esc(label)}</label><select data-map="${veld}">${opts}</select></div>`).join('');
+    $$('#imp-map select').forEach(s => { const v = imp.map[s.dataset.map]; s.value = v == null ? '' : String(v); });
+    renderPreview();
+  }
+  function impRegels(){
+    const m = imp.map; const cel = (r, v) => m[v] == null ? '' : r[m[v]];
+    return imp.rijen.map(r => {
+      let prijs = getal(cel(r, 'prijs')); const per = getal(cel(r, 'prijs_per'));
+      if(prijs != null && per && per > 0) prijs = Math.round(prijs / per * 10000) / 10000;
+      const tekst = v => String(cel(r, v) == null ? '' : cel(r, v)).trim();
+      let ean = tekst('ean'); if(/^\d+(\.0+)?e\+?\d+$/i.test(ean)) ean = String(Math.round(Number(ean)));
+      return { artikelnr: tekst('artikelnr'), omschrijving: tekst('omschrijving'), eenheid: tekst('eenheid'), prijs, aantal: getal(cel(r, 'aantal')),
+        ean, fabrikant: tekst('fabrikant'), fabrikant_artnr: tekst('fabrikant_artnr'), categorie: tekst('categorie') };
+    }).filter(g => g.artikelnr || g.omschrijving);
+  }
+  function renderPreview(){
+    const regels = impRegels();
+    $('#imp-telling').textContent = `${regels.length.toLocaleString('nl-BE')} artikels gevonden.`;
+    $('#imp-preview').innerHTML = regels.length ? `<table class="tbl"><thead><tr><th>Artikelnr.</th><th>Omschrijving</th><th>Eenheid</th><th class="num">Prijs / eenh.</th><th>EAN</th></tr></thead><tbody>${regels.slice(0, 8).map(g => `<tr><td class="mono">${esc(g.artikelnr)}</td><td>${esc(g.omschrijving)}</td><td>${esc(g.eenheid)}</td><td class="num">${euro(g.prijs)}</td><td class="mono">${esc(g.ean)}</td></tr>`).join('')}</tbody></table>${regels.length > 8 ? `<p class="faint">… en ${regels.length - 8} meer</p>` : ''}` : '<p class="faint">Koppel minstens de kolom Artikelnummer of Omschrijving.</p>';
+    $('#btn-importeer').disabled = !regels.length;
+  }
+  $('#imp-map').addEventListener('change', e => { const s = e.target.closest('[data-map]'); if(!s) return; imp.map[s.dataset.map] = s.value === '' ? null : Number(s.value); renderPreview(); });
+  $('#imp-bestand').addEventListener('change', e => { if(e.target.files[0]) leesBestand(e.target.files[0]); });
+  const drop = $('#imp-drop');
+  drop.addEventListener('click', () => $('#imp-bestand').click());
+  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+  drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('over'); if(e.dataTransfer.files[0]) leesBestand(e.dataTransfer.files[0]); });
+  $('#btn-importeer').addEventListener('click', async () => {
+    const regels = impRegels(); const lev = $('#imp-lev').value || null;
+    if(!regels.length) return;
+    const knop = $('#btn-importeer'); knop.disabled = true;
+    const tel = { nieuw:0, prijs_gewijzigd:0, ongewijzigd:0 };
+    try{
+      for(let i = 0; i < regels.length; i += 400){
+        $('#imp-status').textContent = `Bezig… ${Math.min(i + 400, regels.length).toLocaleString('nl-BE')} / ${regels.length.toLocaleString('nl-BE')}`;
+        const { data, error } = await sb.rpc('materialen_verwerk', { p_leverancier_id: lev, p_regels: regels.slice(i, i + 400), p_bron: 'import', p_besteld: false });
+        if(error) throw error;
+        (data || []).forEach(r => { tel[r.status] = (tel[r.status] || 0) + 1; });
+      }
+      $('#imp-status').textContent = `Klaar: ${tel.nieuw} nieuw, ${tel.prijs_gewijzigd} prijs gewijzigd, ${tel.ongewijzigd} ongewijzigd.`;
+      toast('Import klaar.'); laadLijst(true); telArtikels();
+    } catch(err){ $('#imp-status').textContent = ''; toast('Import mislukt: ' + err.message, true); }
+    knop.disabled = false;
+  });
+
+  // ================= Tabs =================
+  function kiesTab(naam){
+    $$('.tab').forEach(t => t.setAttribute('aria-selected', String(t.dataset.tab === naam)));
+    $$('[data-paneel]').forEach(p => { p.hidden = p.dataset.paneel !== naam; });
+    if(naam === 'mandjes') laadMandjes();
+  }
+  $$('.tab').forEach(t => t.addEventListener('click', () => kiesTab(t.dataset.tab)));
+
+  window.__materialen = { state, kiesTab, toonMandje, ociStart };
+  start();
+})();
+</script>
+</body>
+</html>
