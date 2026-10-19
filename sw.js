@@ -222,7 +222,7 @@
 // CaBon (2026-10-19): nieuwe, 6e installeerbare app cabon.html (werkbonnen op tablet) + nieuw
 // tabblad "Werkbonnen" in alle andere builds van src2.html; cacheversie opgehoogd.
 // 2026-10-19 (later): materialen.html (materialendatabase + OCI) + CaBon-materiaalsuggesties uit de materialendatabase.
-const CACHE_VERSION = 'casnap-v2026-10-19-materialen';
+const CACHE_VERSION = 'casnap-v2026-10-19-materialen2';
 const NETWORK_TIMEOUT_MS = 4000;
 
 self.addEventListener('install', () => {

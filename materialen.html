@@ -367,14 +367,17 @@
     const b = e.target.closest('[data-ophalen]'); if(!b) return;
     const l = state.levById[b.dataset.ophalen];
     if(!levKlaar(l)){ kiesTab('instellingen'); toast('Vul eerst de OCI-gegevens van ' + l.naam + ' in.'); return; }
-    ociStart(l);
+    // Tabblad meteen (synchroon, binnen de klik) openen, anders houdt de popup-blokker het tegen.
+    let tab = null;
+    if(!window.CASUITE_TEST_GEEN_SUBMIT){ try { tab = window.open('about:blank', 'casuite_webshop'); } catch(e){ tab = null; } }
+    ociStart(l, tab);
   });
 
   // OCI-punchout starten: sessie aanmaken en formulier naar de webshop sturen.
-  async function ociStart(l){
+  async function ociStart(l, tab){
     const token = randomToken();
-    const { error } = await sb.from('oci_sessies').insert({ token, leverancier_id:l.id, terug_url: terugUrl(), aangemaakt_door: state.user.email || null });
-    if(error){ toast('Kon de webshop niet openen: ' + error.message, true); return; }
+    const { data: sessie, error } = await sb.from('oci_sessies').insert({ token, leverancier_id:l.id, terug_url: terugUrl(), aangemaakt_door: state.user.email || null }).select('id').single();
+    if(error){ if(tab) tab.close(); toast('Kon de webshop niet openen: ' + error.message, true); return; }
     const hook = HOOK_BASIS + '?t=' + token;
     const params = Array.isArray(l.oci_parameters) ? l.oci_parameters.filter(p => p && p.naam) : [];
     let hookGebruikt = false;
@@ -392,11 +395,48 @@
     form.action = actie;
     form.acceptCharset = 'UTF-8';
     velden.forEach(([n, w]) => { const i = document.createElement('input'); i.type = 'hidden'; i.name = n; i.value = w; form.appendChild(i); });
+    // Nieuw tabblad (zoals Plenion); lukt dat niet (popup geblokkeerd), dan in dit venster.
+    const nieuwTab = !!(tab && !tab.closed);
+    if(nieuwTab) form.target = 'casuite_webshop';
     document.body.appendChild(form);
-    window.__laatsteOciForm = { action: form.action, method: form.method, velden };
+    window.__laatsteOciForm = { action: form.action, method: form.method, velden, target: form.target };
+    toonWachten(sessie.id, l);
     if(window.CASUITE_TEST_GEEN_SUBMIT) return;
     form.submit();
+    form.remove();
   }
+
+  // Wachtpaneel terwijl de webshop open staat: "Haal mandje op" + automatisch nakijken.
+  let wachtTimer = null;
+  function stopWachten(){ clearInterval(wachtTimer); wachtTimer = null; }
+  function toonWachten(sessieId, l){
+    stopWachten();
+    const plek = $('#mandje-plek');
+    plek.innerHTML = `<div class="card mandje" data-wacht="${esc(sessieId)}">
+      <div class="mandje-kop"><h2>Webshop van ${esc(l.naam)} is geopend</h2><button class="btn ghost sm" data-wacht-stop title="Annuleren">✕</button></div>
+      <ol class="muted" style="margin:0 0 4px;padding-left:20px">
+        <li>Vul je mandje in het tabblad van ${esc(l.naam)}.</li>
+        <li>Klik daar op de knop om het mandje <b>over te nemen</b> (vaak “Overnemen”, “Terug naar systeem” of “Transfer”), niet op bestellen.</li>
+        <li>Kom terug naar dit tabblad: het mandje verschijnt hier vanzelf, of klik op <b>Haal mandje op</b>.</li>
+      </ol>
+      <div class="acties"><button class="btn primary" data-haal>🛒 Haal mandje op</button><span class="faint" data-wacht-status>Wachten op het mandje…</span></div>
+    </div>`;
+    const check = async (handmatig) => {
+      const { data: s } = await sb.from('oci_sessies').select('id,ontvangen_op').eq('id', sessieId).maybeSingle();
+      if(s && s.ontvangen_op){ stopWachten(); await toonMandje(sessieId, true); laadLijst(true); telArtikels(); return; }
+      if(handmatig){
+        const st = plek.querySelector('[data-wacht-status]');
+        if(st) st.textContent = 'Nog niets ontvangen van ' + l.naam + '. Klikte je in de webshop al op “Overnemen”?';
+      }
+    };
+    plek.querySelector('[data-haal]').addEventListener('click', () => check(true));
+    plek.querySelector('[data-wacht-stop]').addEventListener('click', () => { stopWachten(); plek.innerHTML = ''; });
+    wachtTimer = setInterval(() => check(false), 3000);
+    setTimeout(stopWachten, 4 * 3600e3);
+    window.__wachtCheck = check;
+  }
+  // Terug naar dit tabblad -> meteen nakijken
+  document.addEventListener('visibilitychange', () => { if(!document.hidden && wachtTimer && window.__wachtCheck) window.__wachtCheck(false); });
 
   // ================= Artikels =================
   function zoekFilter(q){

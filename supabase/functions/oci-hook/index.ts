@@ -122,6 +122,20 @@ function htmlPagina(titel: string, tekst: string, status = 400) {
   );
 }
 
+// Na ontvangst: staat de webshop in het aparte tabblad van CaSuite (window.name 'casuite_webshop'),
+// dan tonen we "mandje overgenomen" en sluiten we het tabblad indien de browser dat toelaat; het
+// CaSuite-tabblad pikt het mandje zelf op. Anders (zelfde venster) gewoon terug naar CaSuite.
+function klaarPagina(terug: string, titel: string, tekst: string) {
+  const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
+  const html = `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(titel)}</title>
+<body style="font-family:system-ui,sans-serif;max-width:520px;margin:15vh auto;padding:0 16px;color:#15241c;text-align:center">
+<div style="font-size:44px">🛒</div><h1 style="font-size:22px;margin:8px 0">${esc(titel)}</h1><p style="color:#5b6b62">${esc(tekst)}</p>
+<p><a href="${esc(terug)}" style="display:inline-block;background:#1b6b3e;color:#fff;padding:10px 16px;border-radius:9px;text-decoration:none;font-weight:600">Naar CaSuite</a></p>
+<p style="color:#8a988f;font-size:13px">Je mag dit tabblad sluiten.</p>
+<script>if(window.name!=='casuite_webshop'){location.replace(${JSON.stringify(terug).replace(/</g, "\\u003c")});}else{setTimeout(function(){try{window.close();}catch(e){}},1200);}</script></body>`;
+  return new Response(html, { status: 200, headers: { "content-type": "text/html; charset=utf-8" } });
+}
+
 Deno.serve(async (req) => {
   const url = new URL(req.url);
   if (req.method === "OPTIONS") return new Response(null, { status: 204 });
@@ -147,12 +161,13 @@ Deno.serve(async (req) => {
   const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
   const { data: sessie, error } = await sb.from("oci_sessies").select("*").eq("token", token).maybeSingle();
   if (error || !sessie) return htmlPagina("Sessie niet gevonden", "Start het ophalen opnieuw vanuit CaSuite → Materialen.");
+  if (!/^https:\/\//i.test(sessie.terug_url || "")) return htmlPagina("Ongeldig terugkeeradres", "Start het ophalen opnieuw vanuit CaSuite → Materialen.");
   const terug = new URL(sessie.terug_url);
   terug.searchParams.set("oci", sessie.id);
-  if (sessie.ontvangen_op) return Response.redirect(terug.toString(), 303); // dubbel verstuurd: gewoon terug
+  if (sessie.ontvangen_op) return klaarPagina(terug.toString(), "Mandje al overgenomen", "Dit mandje staat al in CaSuite."); // dubbel verstuurd
   if (Date.now() - new Date(sessie.created_at).getTime() > MAX_LEEFTIJD_MS) {
     await sb.from("oci_sessies").update({ fout: "verlopen", ontvangen_op: new Date().toISOString() }).eq("id", sessie.id);
-    return Response.redirect(terug.toString(), 303);
+    return klaarPagina(terug.toString(), "Sessie verlopen", "Deze sessie was ouder dan 4 uur. Start het ophalen opnieuw vanuit CaSuite.");
   }
 
   const ruw: Record<string, string> = {};
@@ -169,5 +184,8 @@ Deno.serve(async (req) => {
     fout = "leeg";
   }
   await sb.from("oci_sessies").update({ ontvangen_op: new Date().toISOString(), ruwe_data: ruw, regels, resultaat, fout }).eq("id", sessie.id);
-  return Response.redirect(terug.toString(), 303);
+  const n = regels.length;
+  return fout && !resultaat
+    ? klaarPagina(terug.toString(), fout === "leeg" ? "Leeg mandje ontvangen" : "Mandje niet verwerkt", fout === "leeg" ? "De webshop stuurde geen artikels mee." : "Er liep iets mis. Bekijk de details in CaSuite.")
+    : klaarPagina(terug.toString(), "Mandje overgenomen", `${n} artikel${n === 1 ? "" : "s"} staan nu in CaSuite.`);
 });
