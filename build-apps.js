@@ -44,6 +44,9 @@ const FAVICON_CACALC_PATH = path.join(DIR, '..', 'casentis-deliver', 'favicon-ca
 // werfverslagen") kreeg het nu, net als CaPla/CaDos/CaCalc, zijn eigen favicon/apple-touch-icon.
 // Optioneel: valt terug op het gewone CaSuite-favicon zolang dit bestand niet aangeleverd is.
 const FAVICON_CASNAP_PATH = path.join(DIR, '..', 'casentis-deliver', 'favicon-casnap-base64.txt');
+// Favicon voor de CaBon-app (petrol werkbon-icoon, 2026-10-19). Staat (anders dan de oudere
+// favicons) in de repo zelf, in icons/, zodat de build niet van een map buiten de repo afhangt.
+const FAVICON_CABON_PATH = path.join(DIR, 'icons', 'favicon-cabon-base64.txt');
 
 function replaceOnce(str, pattern, replacement, label) {
   if (!pattern.test(str)) {
@@ -219,9 +222,37 @@ function buildCacalc() {
   console.log('cacalc.html geschreven.');
 }
 
+function buildCabon() {
+  // Eigen installeerbare "CaBon"-app (werkbonnen op tablet, 2026-10-19, op vraag van Peter:
+  // "Gebruiker logt in in CaBon en ziet daarin zijn eigen planning. Duidt de werkbon aan en vult
+  // gewerkte uren en materialen in.") -- zelfde opzet als buildCados()/buildCacalc(): eigen naam/
+  // manifest/icoon/theme-color + CASNAP_APP_MODE='cabon' (zie CABON_TABS in src2.html).
+  let html = source;
+  html = replaceOnce(html, /<title>[^<]*<\/title>/, '<title>CaBon – Werkbonnen</title>', 'title (cabon)');
+  html = replaceOnce(html, /<link rel="manifest" href="\.\/manifest\.json">/, '<link rel="manifest" href="./manifest-cabon.json">', 'manifest (cabon)');
+  html = replaceOnce(html, /<meta name="theme-color" content="[^"]*">/, '<meta name="theme-color" content="#0f7480">', 'theme-color (cabon)');
+  html = replaceOnce(html, /<meta name="apple-mobile-web-app-title" content="[^"]*">/, '<meta name="apple-mobile-web-app-title" content="CaBon">', 'apple-mobile-web-app-title (cabon)');
+  html = replaceOnce(html, /<link rel="apple-touch-icon" href="\.\/icons\/icon192\.png">/, '<link rel="apple-touch-icon" href="./icons/cabon-icon-180.png">', 'apple-touch-icon (cabon)');
+  if (fs.existsSync(FAVICON_CABON_PATH)) {
+    const faviconData = fs.readFileSync(FAVICON_CABON_PATH, 'utf-8').trim();
+    html = replaceOnce(html, /<link rel="icon" type="image\/png" href="data:image\/png;base64,[^"]+">/, `<link rel="icon" type="image/png" href="${faviconData}">`, 'favicon (cabon)');
+  } else {
+    console.warn('WAARSCHUWING: favicon-cabon-base64.txt niet gevonden — CaBon-favicon niet aangepast.');
+  }
+  html = replaceOnce(
+    html,
+    /<script src="https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/jspdf\//,
+    `<script>window.CASNAP_APP_MODE = 'cabon';</script>\n<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/`,
+    'CASNAP_APP_MODE injectie (cabon)'
+  );
+  fs.writeFileSync(path.join(DIR, 'cabon.html'), html, 'utf-8');
+  console.log('cabon.html geschreven.');
+}
+
 buildIndex();
 buildWerf();
 buildPlanning();
 buildCados();
 buildCacalc();
+buildCabon();
 console.log('Klaar.');

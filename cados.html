@@ -3294,6 +3294,193 @@
     #ipsub-rooster .ip-chip-mini:is(.ip-add-extra, .ip-confirm-hint){min-height:32px;line-height:30px;}
     #ipsub-rooster .ip-chip-mini:is(.ip-status-weekend, .ip-status-feestdag){min-height:32px;display:flex;align-items:center;justify-content:center;}
   }
+
+  /* ===================== CaBon -- werkbonnen (2026-10-19) =====================
+     Eigen app-kleur (petrol) naast de 5 bestaande hoofdapps. Groot genoeg om op een tablet met
+     werkhandschoenen nog te raken: knoppen/invoer volgen --tap, kaarten met ruime binnenmarge. */
+  :root{
+    --app-cabon:#0f7480;     --app-cabon-soft:#e2f2f3;
+    --tile-cabon:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.1' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='5.5' y='4.5' width='13' height='16.5' rx='2'/%3E%3Cpath d='M9.5 4.5V3h5v1.5'/%3E%3Cpath d='M9 12.5l2.2 2.2L15.5 10'/%3E%3C/svg%3E");
+  }
+  body[data-app="cabon"]{--app:var(--app-cabon);--app-soft:var(--app-cabon-soft);}
+  #main-nav [data-tab="cabon"]{--tile:var(--app-cabon);--tile-soft:var(--app-cabon-soft);--tile-glyph:var(--tile-cabon);}
+
+  .cb-subtabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 16px;}
+  .cb-subtabs button{min-height:var(--tap);padding:0 16px;border-radius:999px;border:1px solid var(--line-strong);background:var(--card);
+    font:600 14px var(--font-ui);color:var(--ink-soft);cursor:pointer;display:inline-flex;align-items:center;gap:8px;}
+  .cb-subtabs button.active{background:var(--app-cabon);border-color:var(--app-cabon);color:#fff;}
+  .cb-subtabs .cb-teller{min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--danger);color:#fff;font-size:12px;
+    display:inline-flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums;}
+  .cb-subtabs button.active .cb-teller{background:#fff;color:var(--app-cabon);}
+
+  .cb-sectie{margin:0 0 22px;}
+  .cb-sectie > h3{font-family:var(--font-display);font-stretch:106%;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--ink-soft);margin:0 0 10px;display:flex;align-items:center;gap:8px;}
+  .cb-sectie > h3 .cb-h3-teller{font-family:var(--font-mono);font-weight:500;letter-spacing:0;color:var(--ink-faint);}
+  .cb-lijst{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;}
+  @media (max-width:720px){ .cb-lijst{grid-template-columns:1fr;} }
+
+  .cb-kaart{position:relative;display:flex;flex-direction:column;gap:6px;text-align:left;width:100%;min-width:0;
+    padding:14px 16px 14px 20px;background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--sh-1);
+    font:inherit;color:inherit;cursor:pointer;transition:border-color .12s,box-shadow .12s;}
+  .cb-kaart::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:4px;border-radius:0 3px 3px 0;background:var(--cb-streep,var(--line-strong));}
+  .cb-kaart:hover{border-color:var(--app-cabon);box-shadow:var(--sh-2);}
+  .cb-kaart:focus-visible{outline:3px solid var(--app-cabon-soft);outline-offset:2px;border-color:var(--app-cabon);}
+  .cb-kaart[data-staat="open"]{--cb-streep:var(--app-cabon);}
+  .cb-kaart[data-staat="ingediend"]{--cb-streep:var(--info);}
+  .cb-kaart[data-staat="goedgekeurd"]{--cb-streep:var(--ok);}
+  .cb-kaart[data-staat="afgekeurd"]{--cb-streep:var(--danger);}
+  .cb-kaart[data-staat="nieuw"]{--cb-streep:var(--line-strong);}
+  .cb-kaart-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;}
+  .cb-kaart-titel{font-family:var(--font-display);font-stretch:104%;font-weight:700;font-size:16px;line-height:1.3;color:var(--ink);overflow-wrap:anywhere;}
+  .cb-kaart-nr{font-family:var(--font-mono);font-size:12px;color:var(--ink-faint);}
+  .cb-kaart-taak{font-size:14px;color:var(--ink);overflow-wrap:anywhere;}
+  .cb-kaart-meta{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:13px;color:var(--ink-soft);}
+  .cb-kaart-meta .cb-num{font-family:var(--font-mono);font-variant-numeric:tabular-nums;color:var(--ink);}
+  .cb-kaart-waarschuwing{font-size:13px;color:var(--warn);font-weight:600;}
+
+  .cb-pill{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;height:24px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:700;
+    background:var(--sunken);color:var(--ink-soft);border:1px solid var(--line);}
+  .cb-pill.is-open{background:var(--app-cabon-soft);color:var(--app-cabon);border-color:transparent;}
+  .cb-pill.is-ingediend{background:var(--info-soft);color:var(--info);border-color:transparent;}
+  .cb-pill.is-goedgekeurd{background:var(--ok-soft);color:var(--ok);border-color:transparent;}
+  .cb-pill.is-afgekeurd{background:var(--danger-soft);color:var(--danger);border-color:transparent;}
+  .cb-pill.is-wacht{background:var(--warn-soft);color:var(--warn);border-color:transparent;}
+  .cb-type{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:6px;font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+    background:var(--sunken);color:var(--ink-soft);}
+  .cb-type.is-regie{background:var(--warn-soft);color:var(--warn);}
+
+  /* ---- Werkbon openen ---- */
+  .cb-bon-kop{display:flex;align-items:flex-start;gap:12px;margin:0 0 14px;}
+  .cb-bon-kop .cb-terug{flex:none;}
+  .cb-bon-kop-tekst{flex:1;min-width:0;}
+  .cb-bon-kop h2{margin:0;font-family:var(--font-display);font-stretch:108%;font-size:22px;line-height:1.2;overflow-wrap:anywhere;}
+  .cb-bon-kop-sub{margin:4px 0 0;font-size:14px;color:var(--ink-soft);display:flex;flex-wrap:wrap;gap:4px 12px;}
+  .cb-banner{padding:12px 14px;border-radius:var(--r);margin:0 0 14px;font-size:14.5px;line-height:1.45;border:1px solid transparent;}
+  .cb-banner.is-info{background:var(--info-soft);color:var(--ink);border-color:#c7d8f5;}
+  .cb-banner.is-ok{background:var(--ok-soft);color:var(--ink);border-color:#bfe3cc;}
+  .cb-banner.is-fout{background:var(--danger-soft);color:var(--ink);border-color:#f0c4be;}
+  .cb-banner.is-wacht{background:var(--warn-soft);color:var(--ink);border-color:#efd8ad;}
+  .cb-banner strong{font-weight:700;}
+
+  .cb-typekeuze{display:inline-flex;border:1px solid var(--line-strong);border-radius:var(--r);overflow:hidden;}
+  .cb-typekeuze button{min-height:var(--tap);padding:0 16px;border:0;background:var(--card);font:600 14px var(--font-ui);color:var(--ink-soft);cursor:pointer;}
+  .cb-typekeuze button + button{border-left:1px solid var(--line-strong);}
+  .cb-typekeuze button.active{background:var(--app-cabon);color:#fff;}
+  .cb-typekeuze button[disabled]{cursor:default;}
+
+  .cb-contacten{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
+  .cb-contact{display:inline-flex;align-items:center;gap:8px;min-height:var(--tap);padding:0 12px;border:1px solid var(--line);border-radius:var(--r);
+    background:var(--sunken);font-size:13.5px;color:var(--ink);text-decoration:none;}
+  .cb-contact b{font-weight:600;}
+  .cb-contact span{color:var(--ink-soft);}
+
+  .cb-voorstellen{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px;}
+  .cb-voorstel{display:inline-flex;align-items:center;gap:8px;min-height:var(--tap);padding:0 14px;border-radius:var(--r);border:1.5px dashed var(--app-cabon);
+    background:var(--app-cabon-soft);color:var(--app-cabon);font:600 14px var(--font-ui);cursor:pointer;}
+  .cb-voorstel:hover{background:#d2ebed;}
+
+  .cb-dagen{display:flex;flex-direction:column;gap:10px;margin:0 0 12px;}
+  .cb-dag{position:relative;display:grid;grid-template-columns:minmax(130px,1.3fr) repeat(3,minmax(84px,1fr)) minmax(84px,1fr) minmax(84px,1fr) auto;gap:8px;align-items:end;
+    padding:12px;border:1px solid var(--line);border-radius:var(--r);background:var(--sunken);}
+  .cb-dag label{font-size:12px;margin-bottom:3px;}
+  .cb-dag input{width:100%;min-width:0;}
+  .cb-dag .cb-dag-uren input{font-family:var(--font-mono);font-weight:500;}
+  .cb-dag.is-geboekt{background:var(--card);opacity:.85;}
+  .cb-dag-slot{grid-column:1/-1;font-size:12.5px;color:var(--ok);font-weight:600;}
+  /* Tablet/gsm: 3 kolommen (datum/van/tot, dan pauze/werkuren/rijtijd), verwijderknop rechtsboven. */
+  @media (max-width:860px){
+    .cb-dag{grid-template-columns:repeat(3,minmax(0,1fr));padding-top:14px;}
+    .cb-dag .cb-dag-del{position:absolute;top:4px;right:4px;}
+    .cb-dag .cb-dag-del .btn{min-height:32px;}
+    .cb-dag .cb-dag-datum{padding-right:36px;}
+  }
+  @media (max-width:520px){
+    .cb-dag{grid-template-columns:repeat(2,minmax(0,1fr));}
+    .cb-dag .cb-dag-datum{grid-column:1/-1;}
+  }
+  .cb-totaal{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:14px;color:var(--ink-soft);margin:4px 0 0;}
+  .cb-totaal b{font-family:var(--font-mono);font-weight:500;color:var(--ink);font-variant-numeric:tabular-nums;}
+
+  .cb-check{display:flex;align-items:center;gap:12px;min-height:var(--tap);padding:10px 14px;border:1px solid var(--line-strong);border-radius:var(--r);
+    background:var(--card);font-size:15px;font-weight:600;cursor:pointer;margin:0 0 12px;}
+  .cb-check input{width:22px;height:22px;accent-color:var(--app-cabon);flex:none;}
+
+  .cb-mw{border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;background:var(--card);display:flex;flex-direction:column;gap:6px;margin:0 0 10px;}
+  .cb-mw-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;}
+  .cb-mw-omschr{font-weight:600;overflow-wrap:anywhere;white-space:pre-wrap;}
+  .cb-mw-meta{font-size:13px;color:var(--ink-soft);display:flex;flex-wrap:wrap;gap:4px 12px;}
+  .cb-mw-fotos{display:flex;gap:6px;flex-wrap:wrap;}
+  .cb-mw-fotos img{width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid var(--line);}
+
+  .cb-mat-tabel{width:100%;border-collapse:collapse;font-size:14px;}
+  .cb-mat-tabel th{text-align:left;font-size:12px;font-weight:600;color:var(--ink-soft);padding:0 6px 6px;}
+  .cb-mat-tabel td{padding:6px;border-top:1px solid var(--line);vertical-align:middle;}
+  .cb-mat-tabel td.cb-num, .cb-mat-tabel th.cb-num{text-align:right;font-family:var(--font-mono);font-variant-numeric:tabular-nums;}
+  .cb-mat-tabel input[type=number]{width:84px;text-align:right;font-family:var(--font-mono);}
+  .cb-mat-tabel .cb-mat-omschr{overflow-wrap:anywhere;}
+  .cb-mat-wrap{overflow-x:auto;margin:0 0 10px;}
+  .cb-mat-verschil{color:var(--warn);font-weight:600;font-size:12px;}
+
+  .cb-mat-toevoegen{display:grid;grid-template-columns:minmax(0,1fr) 92px 92px auto;gap:8px;align-items:end;position:relative;}
+  @media (max-width:560px){ .cb-mat-toevoegen{grid-template-columns:1fr 1fr;} .cb-mat-toevoegen .cb-mat-zoek{grid-column:1/-1;} }
+  .cb-mat-toevoegen input, .cb-mat-toevoegen select{width:100%;min-width:0;}
+  .cb-suggesties{position:absolute;left:0;right:0;top:100%;z-index:20;margin-top:4px;background:var(--card);border:1px solid var(--line-strong);border-radius:var(--r);
+    box-shadow:var(--sh-2);max-height:240px;overflow:auto;}
+  .cb-suggesties button{display:block;width:100%;text-align:left;padding:10px 12px;border:0;background:none;font:14px var(--font-ui);color:var(--ink);cursor:pointer;}
+  .cb-suggesties button:hover, .cb-suggesties button:focus{background:var(--app-cabon-soft);}
+  .cb-suggesties small{color:var(--ink-faint);margin-left:6px;}
+
+  .cb-handtekening{display:flex;flex-direction:column;gap:8px;}
+  .cb-sig-wrap{position:relative;border:1.5px dashed var(--line-strong);border-radius:var(--r);background:#fff;touch-action:none;}
+  .cb-sig-wrap canvas{display:block;width:100%;height:160px;cursor:crosshair;}
+  .cb-sig-wrap::after{content:"Laat de klant hier tekenen";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    color:var(--ink-faint);font-size:14px;pointer-events:none;}
+  .cb-sig-wrap.heeft-tekening::after{display:none;}
+  .cb-sig-img{max-width:320px;border:1px solid var(--line);border-radius:var(--r);background:#fff;}
+
+  .cb-acties{position:sticky;bottom:var(--bnav-offset);z-index:30;display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;align-items:center;
+    padding:12px 0;margin-top:8px;background:var(--card);
+    border-image-source:linear-gradient(to bottom, rgba(21,36,28,0) 0, rgba(21,36,28,.07) 13px, var(--line) 13px 14px, var(--card) 14px);
+    border-image-slice:0 fill;border-image-outset:14px 100vmax 0;}
+  .cb-acties .cb-acties-info{margin-right:auto;font-size:13px;color:var(--ink-soft);}
+  .cb-btn-cabon{background:var(--app-cabon);border-color:var(--app-cabon);color:#fff;}
+  .cb-btn-cabon:hover{background:#0b5d67;border-color:#0b5d67;}
+
+  /* ---- Bureau: controleren / meerwerken ---- */
+  .cb-ctrl{border:1px solid var(--line);border-radius:var(--r-lg);background:var(--card);box-shadow:var(--sh-1);padding:16px;margin:0 0 12px;display:flex;flex-direction:column;gap:10px;}
+  .cb-ctrl-kop{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start;}
+  .cb-ctrl-kop h4{margin:0;font-family:var(--font-display);font-size:16px;font-stretch:104%;overflow-wrap:anywhere;}
+  .cb-ctrl-kop p{margin:2px 0 0;font-size:13px;color:var(--ink-soft);}
+  .cb-ctrl-blok{font-size:14px;}
+  .cb-ctrl-blok h5{margin:0 0 4px;font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-soft);}
+  .cb-ctrl-blok ul{margin:0;padding-left:18px;}
+  .cb-ctrl-blok .cb-num{font-family:var(--font-mono);font-variant-numeric:tabular-nums;}
+  .cb-ctrl-acties{display:flex;flex-wrap:wrap;gap:8px;}
+  .cb-afkeur{display:flex;flex-direction:column;gap:8px;}
+  .cb-afkeur textarea{width:100%;min-height:70px;}
+  .cb-filterbalk{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 14px;align-items:end;}
+  .cb-filterbalk .field{margin:0;min-width:180px;flex:1;}
+  .cb-tabel-wrap{overflow-x:auto;}
+  .cb-tabel{width:100%;border-collapse:collapse;font-size:14px;}
+  .cb-tabel th{text-align:left;font-size:12px;font-weight:600;color:var(--ink-soft);padding:8px;border-bottom:1px solid var(--line-strong);white-space:nowrap;}
+  .cb-tabel td{padding:10px 8px;border-bottom:1px solid var(--line);vertical-align:top;}
+  .cb-tabel td.cb-num{font-family:var(--font-mono);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+  .cb-tabel .cb-tabel-acties{display:flex;gap:6px;flex-wrap:wrap;}
+
+  .cb-leeg{padding:22px 16px;text-align:center;color:var(--ink-soft);border:1.5px dashed var(--line-strong);border-radius:var(--r-lg);background:var(--card);font-size:14.5px;}
+  .cb-leeg strong{display:block;color:var(--ink);font-size:15.5px;margin-bottom:4px;}
+
+  .cb-wachtrij{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:var(--r);background:var(--warn-soft);color:var(--ink);font-size:14px;margin:0 0 14px;}
+
+  /* Planning-zijpaneel: taak + soort bon per afspraak */
+  .ip-cb-wrap{display:grid;grid-template-columns:minmax(0,1fr) 110px;gap:6px;margin:6px 0 2px;align-items:end;}
+  .ip-cb-wrap label{font-size:11.5px;margin-bottom:2px;}
+  .ip-cb-wrap input, .ip-cb-wrap select{width:100%;min-width:0;min-height:34px;padding:4px 8px;font-size:13px;}
+  .ip-cb-wrap .ip-cb-klaar{grid-column:1/-1;justify-self:start;}
+
+  /* Cockpit-tegel met knop */
+  .cp-tile .cp-link{margin-top:8px;}
 </style>
 </head>
 <body>
@@ -3545,6 +3732,8 @@
          project-afhankelijke "aanmaken"-stand zoals Dossier/Kabelberekening hierboven, zie
          tabsForPersonAccess()/kan_facturen_zien in het script). -->
     <button class="tab-btn" id="main-nav-btn-cafin" data-tab="cafin" type="button">Facturen</button>
+    <!-- CaBon (werkbonnen, 2026-10-19) -- zie <section id="tab-cabon"> hieronder. -->
+    <button class="tab-btn" id="main-nav-btn-cabon" data-tab="cabon" type="button"><span class="nav-lang">Werkbonnen</span><span class="nav-kort">Bonnen</span></button>
   </nav>
 
   <div class="offline-banner" id="offline-banner" style="display:none;">
@@ -4951,6 +5140,199 @@
       <div class="modal-actions">
         <button class="btn btn-primary" id="cafin-f-save" type="button">Opslaan</button>
         <button class="btn btn-ghost" id="cafin-f-cancel" type="button">Annuleren</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== TAB: CABON (Werkbonnen, 2026-10-19) =====================
+       Op vraag van Peter: "In de planning zetten we de taken. Gebruiker logt in in CaBon en ziet
+       daarin zijn eigen planning. Duidt de werkbon aan en vult gewerkte uren en materialen in."
+       Volledig binnen CaSuite (zelfde projecten/planning/uren), los van Plenion.
+       - Projectbon (~80%): uren bevestigen + enkel MEERWERK noteren (of "geen meerwerk").
+       - Regiebon: bureau zet materiaal klaar (planning-zijpaneel of hier), technieker bevestigt.
+       - 1 bon per persoon per taak (persoon + project + taak); meerdaagse taak = zelfde bon.
+       - Goedkeuren boekt de uren in uren_registraties (zelfde bron als Uren/cockpit/CSV).
+       Zie het projectdocument claude/cabon-werkbonnen-fase1.md. -->
+  <section class="tab-section" id="tab-cabon">
+    <div class="cb-wachtrij" id="cb-wachtrij" style="display:none;"></div>
+    <div id="cb-lijst-scherm">
+      <div class="cb-subtabs" id="cb-subtabs" role="tablist">
+        <button type="button" data-cbsub="mijn" class="active" role="tab">Mijn werkbonnen</button>
+        <button type="button" data-cbsub="controle" role="tab" style="display:none;">Te controleren <span class="cb-teller" id="cb-teller-controle" style="display:none;"></span></button>
+        <button type="button" data-cbsub="meerwerken" role="tab" style="display:none;">Meerwerken</button>
+        <button type="button" data-cbsub="alle" role="tab" style="display:none;">Alle werkbonnen</button>
+      </div>
+
+      <div class="cb-sub" id="cbsub-mijn">
+        <div id="cb-mijn-inhoud"></div>
+        <button type="button" class="add-item-btn" id="cb-los-starten">+ Werkbon voor werk dat niet ingepland stond</button>
+      </div>
+
+      <div class="cb-sub" id="cbsub-controle" style="display:none;">
+        <div class="cb-filterbalk">
+          <div class="field">
+            <label for="cb-ctrl-project">Project</label>
+            <select id="cb-ctrl-project"></select>
+          </div>
+          <button type="button" class="btn btn-secondary" id="cb-regie-klaarzetten">📦 Regiebon klaarzetten</button>
+        </div>
+        <div id="cb-controle-lijst"></div>
+      </div>
+
+      <div class="cb-sub" id="cbsub-meerwerken" style="display:none;">
+        <div class="cb-filterbalk">
+          <div class="field">
+            <label for="cb-mw-project">Project</label>
+            <select id="cb-mw-project"></select>
+          </div>
+          <div class="field">
+            <label for="cb-mw-status">Status</label>
+            <select id="cb-mw-status">
+              <option value="actief">Nog te factureren</option>
+              <option value="te_bevestigen_klant">Wacht op akkoord klant</option>
+              <option value="akkoord_klant">Akkoord klant</option>
+              <option value="gefactureerd">Gefactureerd</option>
+              <option value="geschrapt">Geschrapt</option>
+              <option value="">Alles</option>
+            </select>
+          </div>
+          <button type="button" class="btn btn-secondary" id="cb-mw-export">Exporteer CSV</button>
+        </div>
+        <div id="cb-mw-lijst"></div>
+      </div>
+
+      <div class="cb-sub" id="cbsub-alle" style="display:none;">
+        <div class="cb-filterbalk">
+          <div class="field">
+            <label for="cb-alle-project">Project</label>
+            <select id="cb-alle-project"></select>
+          </div>
+          <div class="field">
+            <label for="cb-alle-persoon">Persoon</label>
+            <select id="cb-alle-persoon"></select>
+          </div>
+          <div class="field">
+            <label for="cb-alle-status">Status</label>
+            <select id="cb-alle-status">
+              <option value="">Alle statussen</option>
+              <option value="open">Open</option>
+              <option value="ingediend">Ingediend</option>
+              <option value="goedgekeurd">Goedgekeurd</option>
+              <option value="afgekeurd">Afgekeurd</option>
+            </select>
+          </div>
+        </div>
+        <div id="cb-alle-lijst"></div>
+      </div>
+    </div>
+
+    <div id="cb-bon-scherm" style="display:none;"></div>
+  </section>
+
+  <!-- CaBon: meerwerk noteren/bewerken -->
+  <div class="modal-overlay" id="cb-mw-modal" style="display:none;">
+    <div class="modal-box" style="max-width:640px;">
+      <h2 id="cb-mw-modal-titel">Meerwerk noteren</h2>
+      <div class="modal-body">
+        <div class="field">
+          <label for="cb-mw-omschrijving">Wat is er extra gedaan?</label>
+          <textarea id="cb-mw-omschrijving" rows="3" placeholder="bv. Extra stopcontact in de berging op vraag van de klant"></textarea>
+        </div>
+        <div class="field-row" style="display:flex;gap:10px;flex-wrap:wrap;">
+          <div class="field" style="flex:1;min-width:140px;">
+            <label for="cb-mw-datum">Datum</label>
+            <input type="date" id="cb-mw-datum">
+          </div>
+          <div class="field" style="flex:1;min-width:140px;">
+            <label for="cb-mw-uren">Uren voor dit meerwerk</label>
+            <input type="number" id="cb-mw-uren" min="0" step="0.25" inputmode="decimal" placeholder="0">
+          </div>
+        </div>
+        <p class="hint" style="margin-top:-4px;">Deze uren zitten al in je gewerkte uren van die dag. Hier noteer je enkel welk deel extra was, zodat het bureau het kan factureren.</p>
+        <div class="field">
+          <label>Materiaal voor dit meerwerk</label>
+          <div id="cb-mw-materiaal"></div>
+        </div>
+        <div class="field">
+          <label>Foto's</label>
+          <div class="cb-mw-fotos" id="cb-mw-fotos"></div>
+          <div class="photo-buttons" style="margin-top:8px;">
+            <label class="btn btn-secondary btn-sm" style="margin:0;">📷 Foto nemen<input type="file" id="cb-mw-foto-camera" accept="image/*" capture="environment" hidden></label>
+            <label class="btn btn-ghost btn-sm" style="margin:0;">Bestand kiezen<input type="file" id="cb-mw-foto-bestand" accept="image/*" multiple hidden></label>
+          </div>
+        </div>
+        <div class="field">
+          <label>Akkoord van de klant (als het kan)</label>
+          <div id="cb-mw-handtekening"></div>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-danger" id="cb-mw-verwijder" type="button" style="margin-right:auto;">Verwijderen</button>
+        <button class="btn btn-ghost" id="cb-mw-annuleer" type="button">Annuleren</button>
+        <button class="btn btn-primary cb-btn-cabon" id="cb-mw-bewaar" type="button">Meerwerk bewaren</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CaBon: regiebon klaarzetten (bureau) -->
+  <div class="modal-overlay" id="cb-klaar-modal" style="display:none;">
+    <div class="modal-box" style="max-width:640px;">
+      <h2>Regiebon klaarzetten</h2>
+      <div class="modal-body">
+        <p class="hint" id="cb-klaar-uitleg">Zet het materiaal klaar dat de technieker meeneemt. Op de werf bevestigt hij de effectief gebruikte aantallen.</p>
+        <div id="cb-klaar-kies">
+          <div class="field">
+            <label for="cb-klaar-persoon">Technieker</label>
+            <select id="cb-klaar-persoon"></select>
+          </div>
+          <div class="field">
+            <label for="cb-klaar-project">Project</label>
+            <select id="cb-klaar-project"></select>
+          </div>
+          <div class="field">
+            <label for="cb-klaar-taak">Taak</label>
+            <input type="text" id="cb-klaar-taak" placeholder="bv. Herstelling verlichting keuken">
+          </div>
+        </div>
+        <div id="cb-klaar-vast" style="display:none;" class="cb-banner is-info"></div>
+        <div class="field">
+          <label>Klaargezet materiaal</label>
+          <div id="cb-klaar-materiaal"></div>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="cb-klaar-sluit" type="button">Sluiten</button>
+        <button class="btn btn-primary cb-btn-cabon" id="cb-klaar-start" type="button">Regiebon aanmaken</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CaBon: werkbon voor niet-ingepland werk -->
+  <div class="modal-overlay" id="cb-los-modal" style="display:none;">
+    <div class="modal-box" style="max-width:520px;">
+      <h2>Werkbon voor niet-ingepland werk</h2>
+      <div class="modal-body">
+        <p class="hint">Bv. een dringende storing of een klant die onderweg belde. De projectleider ziet dat deze bon niet ingepland stond.</p>
+        <div class="field">
+          <label for="cb-los-project">Project</label>
+          <input type="text" class="ip-proj-search" id="cb-los-zoek" placeholder="Zoek een project…">
+          <select id="cb-los-project" size="6" style="width:100%;"></select>
+        </div>
+        <div class="field">
+          <label for="cb-los-taak">Wat ga je doen?</label>
+          <input type="text" id="cb-los-taak" placeholder="bv. Storing alarm, sirene blijft afgaan">
+        </div>
+        <div class="field">
+          <label>Soort bon</label>
+          <div class="cb-typekeuze" id="cb-los-type">
+            <button type="button" data-type="project" class="active">Projectwerk</button>
+            <button type="button" data-type="regie">Regie</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="cb-los-annuleer" type="button">Annuleren</button>
+        <button class="btn btn-primary cb-btn-cabon" id="cb-los-start" type="button">Werkbon starten</button>
       </div>
     </div>
   </div>
@@ -22060,7 +22442,7 @@ window.CaCalcApp = {
   // van, het per-persoon toegangsniveau (de 6 toegangsvinkjes, zie tabsForPersonAccess()): de
   // uiteindelijk zichtbare tabbladen zijn de doorsnede van wat de geopende app toont EN wat die
   // persoon zelf mag zien.
-  const APP_MODE = (window.CASNAP_APP_MODE || 'full'); // 'full' | 'werf' | 'planning' | 'cados' | 'cacalc'
+  const APP_MODE = (window.CASNAP_APP_MODE || 'full'); // 'full' | 'werf' | 'planning' | 'cados' | 'cacalc' | 'cabon'
   // 'cados'/'cacalc' (samengevoegde CaDos-tool, 2026-09-22; CaCalc, toegevoegd als eigen
   // losstaand tabblad) bewust NIET in PLANNING_TABS -- zelfde behandeling als 'projecten'/
   // 'bedrijf'-die-er-niet-bij-hoorden vóór ronde 25/26: dit is een werf/kantoor-feature, geen
@@ -22070,7 +22452,7 @@ window.CaCalcApp = {
   // installatie), want een onderaannemer kan in principe overal inloggen (zie de opdracht: "Werkt
   // in alle app-varianten waar Onderaannemers kunnen inloggen").
   // 'cafin' toegevoegd (2026-10-09, CaFin-fase 1) -- zie tabsForPersonAccess()/CAFIN_TABS hieronder.
-  const ALL_TABS = ['verslag', 'verslagen', 'actiepunten', 'planning', 'uren', 'inzet', 'projecten', 'bedrijf', 'cados', 'cacalc', 'cafin', 'mijn-planning'];
+  const ALL_TABS = ['verslag', 'verslagen', 'actiepunten', 'planning', 'uren', 'inzet', 'projecten', 'bedrijf', 'cados', 'cacalc', 'cafin', 'cabon', 'mijn-planning'];
   // Op vraag van Peter (2026-09-22): "op de site van planning zou ook Projecten & sharepoint en
   // Bedrijfsgegevens moeten zichtbaar worden" -- 'bedrijf' stond hier al, 'projecten' toegevoegd.
   // 'uren' toegevoegd (ronde 52, punt 2): kan_planning_zien geeft ook toegang tot Urenregistratie
@@ -22082,7 +22464,7 @@ window.CaCalcApp = {
   // hebben intussen elk hun eigen cados.html/cacalc.html, dus die knop hoort hier niet meer thuis).
   // 'cafin' bewust ook hier uitgesloten (zelfde redenering als cados/cacalc) -- fase 1 toont CaFin
   // enkel in de volledige site (index.html), nog geen eigen losse app zoals cados.html/cacalc.html.
-  const WERF_TABS = ALL_TABS.filter(t => t !== 'inzet' && t !== 'cados' && t !== 'cacalc' && t !== 'cafin');
+  const WERF_TABS = ALL_TABS.filter(t => t !== 'inzet' && t !== 'cados' && t !== 'cacalc' && t !== 'cafin' && t !== 'cabon');
   // Eigen installeerbare "CaDos"-app (2026-09-23, op vraag van Peter: "Is er geen html voor
   // cados?"), naast de al bestaande Werf-/Planning-apps -- cados.html (zie build-apps.js) toont
   // enkel het CaDos-tabblad, met zijn eigen naam/icoon/favicon voor een eigen homescherm-
@@ -22097,6 +22479,9 @@ window.CaCalcApp = {
   // patroon als CADOS_TABS hierboven: cacalc.html (zie build-apps.js) toont enkel dit tabblad +
   // de 2 gedeelde tabbladen, met eigen naam/icoon voor een eigen homescherm-snelkoppeling.
   const CACALC_TABS = ['cacalc', 'projecten', 'bedrijf', 'mijn-planning'];
+  // CaBon (werkbonnen, 2026-10-19): eigen installeerbare tablet-app cabon.html (zie build-apps.js),
+  // zelfde patroon als CaDos/CaCalc. In de volledige site staat 'cabon' gewoon in ALL_TABS.
+  const CABON_TABS = ['cabon', 'projecten', 'bedrijf', 'mijn-planning'];
   // De 4 tabbladen die samen onder de "Werfverslag"-hoofdknop in de tabbalk zitten (2026-09-23,
   // zie de nav.tabs/.tabs-secondary-toelichting bij de HTML hierboven) -- gebruikt door
   // switchTab() om (a) de hoofdknop "actief" te tonen zolang je op één van deze 4 zit, en (b) het
@@ -22109,6 +22494,7 @@ window.CaCalcApp = {
     if(APP_MODE === 'werf') return WERF_TABS;
     if(APP_MODE === 'cados') return CADOS_TABS;
     if(APP_MODE === 'cacalc') return CACALC_TABS;
+    if(APP_MODE === 'cabon') return CABON_TABS;
     return ALL_TABS;
   }
   // 2026-09-24 (ronde 40): vervangt de vroegere "Volledige toegang / Enkel Personeelsplanning"-
@@ -22162,6 +22548,9 @@ window.CaCalcApp = {
     // planning mag zien. "Goedkeuren" impliceert altijd ook "zien" (zie buildPermCheckbox()
     // hieronder, waar dat vinkje enkel zichtbaar is zodra "zien" al aanstaat).
     if(p.kan_facturen_zien || p.kan_facturen_goedkeuren) tabs.add('cafin');
+    // CaBon (werkbonnen): wie werfverslagen maakt of de planning ziet, vult ook werkbonnen in; wie
+    // voorstellen goedkeurt, controleert ze (zie cbIsBeoordelaar()).
+    if(p.kan_verslagen_maken || p.kan_planning_zien || p.is_planner || p.beheerder) tabs.add('cabon');
     // "Projecten"/"Bedrijfsgegevens" blijven, zoals voorheen bij beide oude toegangsniveaus,
     // gewoon zichtbaar zodra er sowieso ergens toegang is (puur "geen enkel vinkje aan" -- bv.
     // een Onderaannemer -- blijft volledig buitengesloten, zie #no-access-screen).
@@ -24323,6 +24712,7 @@ window.CaCalcApp = {
       const { data } = await sb.from('project_elektro_dossiers').select('data').eq('project_id', p.id).maybeSingle();
       keuring = data && data.data && data.data.keuring ? data.data.keuring : null;
     }catch(e){ /* geen dossier */ }
+    try{ await cbLaad(); }catch(e){ /* werkbonnen niet beschikbaar: cockpit toont ze gewoon niet */ }
     if(cockpitProjectId !== String(p.id)) return;
     cockpitActiepunten = actiepunten;
     const open = actiepunten.filter(a => !a.afgerond);
@@ -24352,6 +24742,7 @@ window.CaCalcApp = {
     }
     const kLabels = { nog_te_plannen: 'Nog te plannen', gepland: 'Gepland', goedgekeurd: 'Goedgekeurd', afgekeurd: 'Afgekeurd — herkeuring nodig' };
     if(keuring) tegels.push(tegel('Keuring', escapeHtml(kLabels[keuring.resultaat] || keuring.resultaat || '—'), keuring.datumEersteKeuring ? 'op ' + escapeHtml(keuring.datumEersteKeuring) : (keuring.organisme ? escapeHtml(keuring.organisme) : ''), keuring.resultaat === 'afgekeurd' ? 'is-warn' : ''));
+    cbCockpitTegels(p.id).forEach(t => tegels.push(t)); // CaBon: werkbonnen + meerwerken
     el('cockpit-grid').innerHTML = tegels.join('');
     const bb = el('cp-budget-bewaar');
     if(bb) bb.addEventListener('click', async () => {
@@ -25979,7 +26370,9 @@ window.CaCalcApp = {
               ? 'Dit account heeft enkel toegang tot Personeelsplanning, niet tot CaDos.'
               : APP_MODE === 'cacalc'
                 ? 'Dit account heeft enkel toegang tot Personeelsplanning, niet tot CaCalc.'
-                : 'Dit account heeft in deze app geen enkel tabblad beschikbaar.';
+                : APP_MODE === 'cabon'
+                  ? 'Dit account heeft geen toegang tot de werkbonnen — vraag een beheerder om "Verslagen maken" of "Planning zien" aan te zetten.'
+                  : 'Dit account heeft in deze app geen enkel tabblad beschikbaar.';
       }
       return;
     }
@@ -26004,7 +26397,7 @@ window.CaCalcApp = {
     // onthoudLaatsteTab() bij switchTab()), of anders op de eerste hoofdapp die je mag zien.
     // Het #startup-chooser-element blijft in de HTML staan (verborgen) maar wordt niet meer getoond.
     el('startup-chooser').style.display = 'none';
-    const startupChoices = ['verslag', 'inzet', 'cados', 'cacalc'].filter(t => allowed.includes(t));
+    const startupChoices = ['verslag', 'inzet', 'cados', 'cacalc', 'cabon'].filter(t => allowed.includes(t));
     const laatste = leesLaatsteTab();
     switchTab(laatste && allowed.includes(laatste) ? laatste : (startupChoices[0] || allowed[0]));
   }
@@ -26248,7 +26641,7 @@ window.CaCalcApp = {
     const visible = Array.from(nav.querySelectorAll('.tab-btn')).filter(b => b.style.display !== 'none');
     document.body.classList.toggle('single-app', visible.length <= 1);
     if(!document.body.dataset.app && visible[0]){
-      document.body.dataset.app = { verslag: 'werf', inzet: 'planning', cados: 'dossier', cacalc: 'calc', cafin: 'cafin' }[visible[0].dataset.tab] || '';
+      document.body.dataset.app = { verslag: 'werf', inzet: 'planning', cados: 'dossier', cacalc: 'calc', cafin: 'cafin', cabon: 'cabon' }[visible[0].dataset.tab] || '';
     }
   }
 
@@ -27605,8 +27998,8 @@ window.CaCalcApp = {
     // (data-short); updateAppTitleForWidth() hieronder kiest welke van de twee getoond wordt en
     // wordt bij elk resize/rotatie opnieuw uitgevoerd (zie fitAppBar()).
     (function(){
-      const appTitleFull = (tab === 'inzet') ? 'Planning opmaken' : (tab === 'cados') ? 'CaDos — Elektro & Domotica' : (tab === 'cacalc') ? 'CaCalc — Kabelberekening' : (tab === 'cafin') ? 'CaFin — Facturen' : (tab === 'projecten') ? 'Projecten' : (tab === 'bedrijf') ? 'Bedrijfsgegevens' : (tab === 'verslagen') ? 'Verslagen' : (tab === 'actiepunten') ? 'Actiepunten' : (tab === 'planning') ? 'Planningspunten' : (tab === 'uren') ? 'Uren' : (tab === 'mijn-planning') ? 'Mijn planning' : 'Werfverslag maken';
-      const appTitleShort = { inzet: 'Planning', cados: 'CaDos', cacalc: 'CaCalc', cafin: 'CaFin', bedrijf: 'Bedrijf', planning: 'Planning', uren: 'Uren', 'mijn-planning': 'Mijn planning' }[tab] || appTitleFull;
+      const appTitleFull = (tab === 'inzet') ? 'Planning opmaken' : (tab === 'cados') ? 'CaDos — Elektro & Domotica' : (tab === 'cacalc') ? 'CaCalc — Kabelberekening' : (tab === 'cafin') ? 'CaFin — Facturen' : (tab === 'cabon') ? 'CaBon — Werkbonnen' : (tab === 'projecten') ? 'Projecten' : (tab === 'bedrijf') ? 'Bedrijfsgegevens' : (tab === 'verslagen') ? 'Verslagen' : (tab === 'actiepunten') ? 'Actiepunten' : (tab === 'planning') ? 'Planningspunten' : (tab === 'uren') ? 'Uren' : (tab === 'mijn-planning') ? 'Mijn planning' : 'Werfverslag maken';
+      const appTitleShort = { inzet: 'Planning', cados: 'CaDos', cacalc: 'CaCalc', cafin: 'CaFin', cabon: 'CaBon', bedrijf: 'Bedrijf', planning: 'Planning', uren: 'Uren', 'mijn-planning': 'Mijn planning' }[tab] || appTitleFull;
       const h1El = el('app-title');
       h1El.dataset.full = appTitleFull;
       h1El.dataset.short = appTitleShort;
@@ -27616,7 +28009,7 @@ window.CaCalcApp = {
     // Ronde 48: actieve hoofdapp op <body> zetten -> --app/--app-soft (herkenningskleur, zie :root/
     // DESIGN-ronde48.md §2). Projecten/Bedrijfsgegevens horen bij geen enkele app en laten de vorige
     // waarde gewoon staan. data-tab wordt enkel door CSS gebruikt (bv. de terug-chevron in de app-bar).
-    const appForTab = { verslag: 'werf', verslagen: 'werf', actiepunten: 'werf', planning: 'werf', uren: 'werf', inzet: 'planning', cados: 'dossier', cacalc: 'calc', cafin: 'cafin' }[tab];
+    const appForTab = { verslag: 'werf', verslagen: 'werf', actiepunten: 'werf', planning: 'werf', uren: 'werf', inzet: 'planning', cados: 'dossier', cacalc: 'calc', cafin: 'cafin', cabon: 'cabon' }[tab];
     if(appForTab) document.body.dataset.app = appForTab;
     document.body.dataset.tab = tab;
     // Ronde 71 (2026-10-07): de header-projectkiezer blijft bestaan (nodig voor Dossier/
@@ -27638,6 +28031,7 @@ window.CaCalcApp = {
     if(tab === 'cados') refreshCadosTab();
     if(tab === 'cacalc') refreshCacalcTab();
     if(tab === 'cafin') refreshCafinTab();
+    if(tab === 'cabon') refreshCabonTab();
     // Ronde 71 (herontwerp start Werfverslag): toont gewoon het scherm dat state.verslagScreen al
     // aangeeft (keuze/kiesProject/form) -- GEEN automatische overname meer van het bovenaan gekozen
     // project in een leeg concept (dat was verslagTabBinnengekomen()'s taak t/m ronde 70) en geen
@@ -36304,6 +36698,7 @@ window.CaCalcApp = {
       return `<div class="ip-entry-row" data-entry="${en.id}">
         <div class="ip-entry-main"><span class="ip-chip-mini ${lab.cls} ${voorstel ? 'ip-voorstel' : ''}">${escapeHtml(lab.text)}</span>${editBtn}</div>
         ${editWrap}
+        ${cbPlanningBlokHtml(en)}
         ${keuringUurWrap}
         ${voorstelNote}
         ${mismatchNote}
@@ -36369,6 +36764,7 @@ window.CaCalcApp = {
         if(!dup){
           const fields = Object.assign({ persoon_naam: ctx.naam, datum: dISO, type: original.type, dagdeel: original.dagdeel || 'dag' }, ipPendingFieldsForNewEntry());
           if(original.type === 'status') fields.status = original.status; else fields.project_id = original.project_id;
+          cbKopieerTaakVelden(original, fields);
           try{ const row = await dbInsertPlanningItem(fields); state.planningItems.push(row); count++; }
           catch(err){ console.error(err); }
         }
@@ -36468,6 +36864,7 @@ window.CaCalcApp = {
     if(!original || !targetNaam) return;
     const fields = Object.assign({ persoon_naam: targetNaam, datum: ctx.dateISO, type: original.type, dagdeel: original.dagdeel || 'dag' }, ipPendingFieldsForNewEntry());
     if(original.type === 'status') fields.status = original.status; else fields.project_id = original.project_id;
+    cbKopieerTaakVelden(original, fields);
     try{ const row = await dbInsertPlanningItem(fields); state.planningItems.push(row); renderIpGrid(); renderIpCapacityTab(); renderIpConfirmTab(); }
     catch(err){ alert('Kon niet kopiëren: ' + err.message); }
   }
@@ -36499,6 +36896,7 @@ window.CaCalcApp = {
       const fields = Object.assign({ persoon_naam: targetNaam, datum: targetDateISO, type: original.type, dagdeel: original.dagdeel || 'dag' }, ipPendingFieldsForNewEntry());
       if(original.type === 'status') fields.status = original.status;
       else { fields.project_id = original.project_id; if(original.omschrijving) fields.omschrijving = original.omschrijving; }
+      cbKopieerTaakVelden(original, fields);
       try{
         const row = await dbInsertPlanningItem(fields);
         state.planningItems.push(row);
@@ -37179,6 +37577,1415 @@ window.CaCalcApp = {
     catch(err){ alert('Kon protocol niet verwijderen: ' + err.message); state.protocollen = previous; return; }
     renderIpProtoChipList(); renderIpSkillsTab(); renderCompany();
   });
+
+
+  // =====================================================================================
+  // CaBon -- werkbonnen (2026-10-19)
+  // -------------------------------------------------------------------------------------
+  // Peter: "In de planning zetten we de taken. Gebruiker logt in in CaBon en ziet daarin zijn
+  // eigen planning. Duidt de werkbon aan en vult gewerkte uren en materialen in." Nadien:
+  // "80% werkbonnen zijn voor project, daarin moeten enkel meerwerken worden genoteerd.
+  // Regiewerken moeten we op voorhand reeds materialen kunnen klaarzetten in de bon." en
+  // "alles moet zonder Plenion werken, met de projecten en data uit CaSuite, alles gelinkt".
+  //
+  // Datamodel (migratie cabon_werkbonnen_fase1):
+  //   werkbonnen          1 rij per persoon + project + taak (meerdaagse taak = dezelfde bon)
+  //   werkbon_dagen       gewerkte uren per dag (van/tot/pauze -> werkuren, + rijtijd)
+  //   werkbon_meerwerken  meerwerk op een projectbon (uren, foto's, akkoord klant)
+  //   werkbon_materialen  materiaal: klaargezet (regie, aantal_voorzien) of gebruikt (aantal);
+  //                       met meerwerk_id = materiaal van dat meerwerk
+  //   planning_items.taak / .bon_type  -> de taak en soort bon die het bureau inplant
+  // Goedkeuren boekt de nog niet geboekte dagen als gewone rijen in uren_registraties (zelfde
+  // bron als het Uren-tabblad, de cockpit en de CSV-export) -- geen tweede urenadministratie.
+  //
+  // Offline: elke wijziging gaat eerst in de lokale toestand + een kleine wachtrij in
+  // localStorage. Lukt het versturen niet door een netwerkprobleem, dan blijft de wijziging in de
+  // wachtrij en wordt ze automatisch verstuurd zodra er weer verbinding is (alle id's worden op
+  // het toestel zelf aangemaakt, dus opnieuw versturen is veilig).
+  // =====================================================================================
+  const CB_EENHEDEN = ['st', 'm', 'set', 'rol', 'doos', 'u'];
+  const CB_STATUS_LABEL = { nieuw: 'Nog niet gestart', open: 'Open', ingediend: 'Ingediend', goedgekeurd: 'Goedgekeurd', afgekeurd: 'Afgekeurd' };
+  const CB_MW_LABEL = { te_bevestigen_klant: 'Wacht op akkoord klant', akkoord_klant: 'Akkoord klant', gefactureerd: 'Gefactureerd', geschrapt: 'Geschrapt' };
+  const CB_TABEL = { werkbonnen: 'bonnen', werkbon_dagen: 'dagen', werkbon_meerwerken: 'meerwerken', werkbon_materialen: 'materialen' };
+  const CB_WACHTRIJ_KEY = 'casuite-cabon-wachtrij';
+  const CB_CACHE_KEY = 'casuite-cabon-cache';
+  state.cabon = { bonnen: [], dagen: [], meerwerken: [], materialen: [], geladen: false, laadt: null, offline: false,
+    sub: 'mijn', openBonId: null, catalogus: null, afkeurOpen: null };
+
+  // ---------- kleine helpers ----------
+  function cbId(){
+    if(window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16); });
+  }
+  function cbIso(d){ return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function cbVandaag(){ return cbIso(new Date()); }
+  function cbDagPlus(iso, n){ const d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + n); return cbIso(d); }
+  function cbDatumKort(iso){
+    if(!iso) return '';
+    return new Date(iso + 'T00:00:00').toLocaleDateString('nl-BE', { weekday: 'short', day: 'numeric', month: 'short' });
+  }
+  function cbGetal(n){ const v = Math.round((Number(n) || 0) * 100) / 100; return String(v).replace('.', ','); }
+  function cbNum(v){
+    if(v == null || v === '') return null;
+    const n = parseFloat(String(v).replace(',', '.'));
+    return isNaN(n) ? null : n;
+  }
+  function cbNu(){ return new Date().toISOString(); }
+  function cbUur(t){ return t ? String(t).slice(0, 5) : ''; }
+  function cbMijnNaam(){ return getCurrentUserNaam() || urenOwnNaam(); }
+  function cbIsBeoordelaar(){
+    if(urenIsAdminView()) return true;
+    const p = state.currentPerson;
+    return !!(p && (p.is_planner || p.rol === 'Projectleider' || p.rol === 'Management'));
+  }
+  function cbProject(id){ return id ? state.projects.find(p => String(p.id) === String(id)) : null; }
+  function cbBon(id){ return state.cabon.bonnen.find(b => b.id === id) || null; }
+  function cbDagenVan(bonId){ return state.cabon.dagen.filter(d => d.werkbon_id === bonId).sort((a, b) => (a.datum || '').localeCompare(b.datum || '')); }
+  function cbMeerwerkenVan(bonId){ return state.cabon.meerwerken.filter(m => m.werkbon_id === bonId).sort((a, b) => (a.created_at || '').localeCompare(b.created_at || '')); }
+  function cbMaterialenVan(bonId, meerwerkId){
+    return state.cabon.materialen
+      .filter(m => m.werkbon_id === bonId && (meerwerkId === undefined || (m.meerwerk_id || null) === (meerwerkId || null)))
+      .sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''));
+  }
+  function cbZelfdeTaak(b, persoon, projectId, taak){
+    return b.persoon_naam === persoon && String(b.project_id || '') === String(projectId || '') && (b.taak || '').trim() === (taak || '').trim();
+  }
+  function cbTypeLabel(t){ return t === 'regie' ? 'Regie' : 'Project'; }
+  function cbBonNr(bon){ return 'WB-' + String(bon.id || '').replace(/-/g, '').slice(0, 6).toUpperCase(); }
+  function cbBonTitel(bon){ const p = cbProject(bon.project_id); return p ? p.naam : (bon.taak || 'Werkbon zonder project'); }
+  function cbUrenTotaal(bonId){ return cbDagenVan(bonId).reduce((s, d) => s + (Number(d.werk_uren) || 0), 0); }
+
+  // Voorstel voor de uren van een ingeplande dag: halve dag 4 u, ingeplande uren als die er zijn, anders 8 u.
+  function cbUrenVoorstel(it){
+    if(it && it.van_uur && it.tot_uur){
+      const u = cbUrenTussen(cbUur(it.van_uur), cbUur(it.tot_uur), 0);
+      if(u > 0) return u;
+    }
+    if(it && (it.dagdeel === 'vm' || it.dagdeel === 'nm')) return 4;
+    return 8;
+  }
+  function cbUrenTussen(van, tot, pauzeMin){
+    if(!van || !tot) return null;
+    const [vh, vm] = van.split(':').map(Number), [th, tm] = tot.split(':').map(Number);
+    let min = (th * 60 + tm) - (vh * 60 + vm) - (Number(pauzeMin) || 0);
+    if(min < 0) min += 24 * 60; // over middernacht
+    return Math.round(min / 15) / 4; // op een kwartier
+  }
+
+  // ---------- planning -> taken ----------
+  // De taak van een afspraak: het taakveld uit het zijpaneel, of bij een Vrije taak (geen project) de omschrijving.
+  function cbPlanItemTaak(it){ return String(it.taak || (it.project_id ? '' : (it.omschrijving || ''))).trim(); }
+  function cbTakenVoor(naam){
+    const items = (state.planningItems || []).filter(it => it.persoon_naam === naam && it.type === 'project'
+      && it.bevestigd !== false && (it.project_id || it.omschrijving));
+    const map = new Map();
+    items.forEach(it => {
+      const taak = cbPlanItemTaak(it);
+      const k = String(it.project_id || '') + '|' + taak;
+      if(!map.has(k)) map.set(k, { project_id: it.project_id || null, taak, bon_type: 'project', items: [] });
+      const t = map.get(k);
+      t.items.push(it);
+      if(it.bon_type === 'regie') t.bon_type = 'regie';
+    });
+    return Array.from(map.values()).map(t => {
+      t.items.sort((a, b) => (a.datum || '').localeCompare(b.datum || ''));
+      t.bon = state.cabon.bonnen.find(b => cbZelfdeTaak(b, naam, t.project_id, t.taak)) || null;
+      return t;
+    });
+  }
+  // Ingeplande dagen (laatste 3 weken t/m vandaag) waarvoor nog geen uren op de bon staan.
+  function cbOntbrekendeDagen(taak, bon){
+    if(bon && bon.status === 'ingediend') return [];
+    const vandaag = cbVandaag(), terug = cbDagPlus(vandaag, -21);
+    const ingevuld = new Set(bon ? cbDagenVan(bon.id).map(d => d.datum) : []);
+    const uniek = [];
+    taak.items.forEach(it => {
+      if(it.datum >= terug && it.datum <= vandaag && !ingevuld.has(it.datum) && !uniek.some(u => u.datum === it.datum)) uniek.push(it);
+    });
+    return uniek;
+  }
+
+  // ---------- opslag: lokaal + wachtrij ----------
+  function cbWachtrijLees(){ try{ return JSON.parse(localStorage.getItem(CB_WACHTRIJ_KEY) || '[]') || []; }catch(e){ return []; } }
+  function cbWachtrijZet(lijst){ try{ localStorage.setItem(CB_WACHTRIJ_KEY, JSON.stringify(lijst)); }catch(e){} cbRenderWachtrij(); }
+  function cbIsNetwerkFout(err){
+    if(typeof navigator !== 'undefined' && navigator.onLine === false) return true;
+    const m = String((err && (err.message || err.details)) || err || '');
+    return /failed to fetch|networkerror|network request|load failed|fetch failed|timeout|ERR_INTERNET/i.test(m);
+  }
+  async function cbVoerUit(op){
+    let res;
+    if(op.op === 'upsert') res = await sb.from(op.t).upsert(op.row);
+    else if(op.op === 'update') res = await sb.from(op.t).update(op.velden).eq('id', op.id);
+    else if(op.op === 'delete') res = await sb.from(op.t).delete().eq('id', op.id);
+    if(res && res.error) throw res.error;
+  }
+  async function cbSchrijf(op){
+    const wachtrij = cbWachtrijLees();
+    if(wachtrij.length){ wachtrij.push(op); cbWachtrijZet(wachtrij); cbSpoelWachtrij(); return; } // volgorde bewaren
+    try{ await cbVoerUit(op); }
+    catch(err){
+      if(cbIsNetwerkFout(err)){ wachtrij.push(op); cbWachtrijZet(wachtrij); return; }
+      throw err;
+    }
+  }
+  let cbSpoeltBezig = false;
+  async function cbSpoelWachtrij(){
+    if(cbSpoeltBezig) return;
+    cbSpoeltBezig = true;
+    try{
+      let lijst = cbWachtrijLees();
+      while(lijst.length){
+        try{ await cbVoerUit(lijst[0]); }
+        catch(err){
+          if(cbIsNetwerkFout(err)) break;
+          console.error('CaBon: wijziging door de databank geweigerd, overgeslagen:', err, lijst[0]);
+        }
+        lijst.shift();
+        cbWachtrijZet(lijst);
+      }
+    }finally{ cbSpoeltBezig = false; }
+  }
+  window.addEventListener('online', () => { cbSpoelWachtrij(); });
+  function cbStateToepassen(op){
+    const arr = state.cabon[CB_TABEL[op.t]];
+    if(!arr) return;
+    const id = op.row ? op.row.id : op.id;
+    const i = arr.findIndex(r => r.id === id);
+    if(op.op === 'upsert'){ if(i >= 0) arr[i] = Object.assign({}, arr[i], op.row); else arr.push(Object.assign({}, op.row)); }
+    else if(op.op === 'update'){ if(i >= 0) Object.assign(arr[i], op.velden); }
+    else if(op.op === 'delete'){
+      if(i >= 0) arr.splice(i, 1);
+      // cascade zoals in de databank
+      if(op.t === 'werkbonnen'){
+        ['dagen', 'meerwerken', 'materialen'].forEach(k => { state.cabon[k] = state.cabon[k].filter(r => r.werkbon_id !== id); });
+      }
+      if(op.t === 'werkbon_meerwerken') state.cabon.materialen = state.cabon.materialen.filter(r => r.meerwerk_id !== id);
+    }
+  }
+  async function cbOp(op){
+    cbStateToepassen(op);
+    cbBewaarCache();
+    await cbSchrijf(op);
+  }
+  function cbBewaarCache(){
+    try{
+      const naam = cbMijnNaam();
+      const bonnen = state.cabon.bonnen.filter(b => b.persoon_naam === naam);
+      const ids = new Set(bonnen.map(b => b.id));
+      const c = {
+        naam, opgeslagen: cbNu(), bonnen,
+        dagen: state.cabon.dagen.filter(r => ids.has(r.werkbon_id)),
+        meerwerken: state.cabon.meerwerken.filter(r => ids.has(r.werkbon_id)),
+        materialen: state.cabon.materialen.filter(r => ids.has(r.werkbon_id))
+      };
+      localStorage.setItem(CB_CACHE_KEY, JSON.stringify(c));
+    }catch(e){}
+  }
+  function cbLeesCache(){
+    try{
+      const c = JSON.parse(localStorage.getItem(CB_CACHE_KEY) || 'null');
+      if(c && c.naam === cbMijnNaam()) return c;
+    }catch(e){}
+    return null;
+  }
+  async function cbLaad(forceer){
+    if(state.cabon.geladen && !forceer) return;
+    if(state.cabon.laadt) return state.cabon.laadt;
+    state.cabon.laadt = (async () => {
+      try{
+        await cbSpoelWachtrij();
+        const res = await Promise.all(['werkbonnen', 'werkbon_dagen', 'werkbon_meerwerken', 'werkbon_materialen'].map(t => sb.from(t).select('*')));
+        res.forEach(r => { if(r.error) throw r.error; });
+        state.cabon.bonnen = res[0].data || [];
+        state.cabon.dagen = res[1].data || [];
+        state.cabon.meerwerken = res[2].data || [];
+        state.cabon.materialen = res[3].data || [];
+        state.cabon.geladen = true;
+        state.cabon.offline = false;
+        cbWachtrijLees().forEach(cbStateToepassen); // nog niet verstuurde eigen wijzigingen bovenop
+        cbBewaarCache();
+      }catch(err){
+        console.error('CaBon: laden mislukt', err);
+        const c = cbLeesCache();
+        if(!c) throw err;
+        state.cabon.bonnen = c.bonnen || []; state.cabon.dagen = c.dagen || [];
+        state.cabon.meerwerken = c.meerwerken || []; state.cabon.materialen = c.materialen || [];
+        state.cabon.geladen = true;
+        state.cabon.offline = true;
+        cbWachtrijLees().forEach(cbStateToepassen);
+      }finally{ state.cabon.laadt = null; }
+    })();
+    return state.cabon.laadt;
+  }
+  function cbRenderWachtrij(){
+    const w = el('cb-wachtrij');
+    if(!w) return;
+    const n = cbWachtrijLees().length;
+    if(!n && !state.cabon.offline){ w.style.display = 'none'; w.innerHTML = ''; return; }
+    w.style.display = 'flex';
+    w.innerHTML = (n
+      ? `<span>📶 ${n} wijziging${n === 1 ? '' : 'en'} wacht${n === 1 ? '' : 'en'} op verbinding. Ze worden automatisch verstuurd.</span>`
+      : `<span>📶 Geen verbinding: je ziet de laatst bewaarde gegevens van dit toestel.</span>`)
+      + ` <button type="button" class="btn btn-secondary btn-sm" id="cb-wachtrij-nu" style="margin-left:auto;">Nu versturen</button>`;
+    el('cb-wachtrij-nu').addEventListener('click', async () => {
+      await cbSpoelWachtrij();
+      if(!cbWachtrijLees().length){ showStatus('Alles verstuurd'); try{ await cbLaad(true); }catch(e){} refreshCabonTab(); }
+      else showStatus('Nog geen verbinding');
+    });
+  }
+
+  // ---------- bonnen aanmaken / wijzigen ----------
+  async function cbMaakBon(v){
+    const row = {
+      id: cbId(), bon_type: v.bon_type === 'regie' ? 'regie' : 'project', project_id: v.project_id || null,
+      persoon_naam: v.persoon_naam, taak: (v.taak || '').trim(), gepland: v.gepland !== false, status: 'open',
+      geen_meerwerk: false, aangemaakt_door: cbMijnNaam() || null, created_at: cbNu(), updated_at: cbNu()
+    };
+    await cbOp({ op: 'upsert', t: 'werkbonnen', row });
+    return cbBon(row.id);
+  }
+  // Elke wijziging aan een goedgekeurde bon (bv. een nieuwe dag bij een meerdaagse taak) zet die
+  // terug open; de al geboekte dagen blijven vergrendeld en worden niet dubbel geboekt.
+  async function cbBonWijzig(bon, velden){
+    const v = Object.assign({ updated_at: cbNu() }, velden);
+    if(bon.status === 'goedgekeurd' && !('status' in velden)) v.status = 'open';
+    await cbOp({ op: 'update', t: 'werkbonnen', id: bon.id, velden: v });
+  }
+  async function cbVoegDagToe(bon, datum, voorstel){
+    const bestaand = cbDagenVan(bon.id).find(d => d.datum === datum);
+    if(bestaand) return bestaand;
+    const row = {
+      id: cbId(), werkbon_id: bon.id, datum, van_uur: voorstel && voorstel.van_uur ? cbUur(voorstel.van_uur) : null,
+      tot_uur: voorstel && voorstel.tot_uur ? cbUur(voorstel.tot_uur) : null, pauze_min: 0,
+      werk_uren: voorstel ? cbUrenVoorstel(voorstel) : 0, rij_uren: 0, geboekt: false, created_at: cbNu()
+    };
+    await cbOp({ op: 'upsert', t: 'werkbon_dagen', row });
+    await cbBonWijzig(bon, {});
+    return row;
+  }
+
+  // ---------- catalogus voor materiaal-suggesties ----------
+  async function cbLaadCatalogus(){
+    if(state.cabon.catalogus) return;
+    const namen = [];
+    try{
+      const [a, d] = await Promise.all([
+        sb.from('elektro_catalogus_armaturen').select('naam'),
+        sb.from('elektro_catalogus_drivers').select('naam')
+      ]);
+      (a.data || []).forEach(r => r.naam && namen.push({ naam: r.naam, bron: 'catalogus', eenheid: 'st', label: 'armatuur' }));
+      (d.data || []).forEach(r => r.naam && namen.push({ naam: r.naam, bron: 'catalogus', eenheid: 'st', label: 'driver' }));
+    }catch(e){ /* offline: enkel eerder gebruikte omschrijvingen */ }
+    state.cabon.catalogus = namen;
+  }
+  function cbSuggesties(q){
+    const z = (q || '').trim().toLowerCase();
+    if(z.length < 2) return [];
+    const gezien = new Set();
+    const uit = [];
+    const voeg = (s) => { const k = s.naam.toLowerCase(); if(gezien.has(k)) return; gezien.add(k); uit.push(s); };
+    // eerst wat jullie zelf al gebruikten op werkbonnen (met de eenheid die er toen bij stond)
+    state.cabon.materialen.forEach(m => { if(m.omschrijving && m.omschrijving.toLowerCase().includes(z)) voeg({ naam: m.omschrijving, bron: 'eerder', eenheid: m.eenheid || 'st', label: 'eerder gebruikt' }); });
+    (state.cabon.catalogus || []).forEach(s => { if(s.naam.toLowerCase().includes(z)) voeg(s); });
+    return uit.slice(0, 12);
+  }
+
+  // ---------- materiaal-editor (herbruikt in regiebon, meerwerk en klaarzetten) ----------
+  // opts: { regels(): [], modus: 'regie'|'aantal'|'voorzien', bewerkbaar, magVerwijderen(r),
+  //         toevoegen({omschrijving, eenheid, aantal, bron}), wijzig(r, velden), verwijder(r) }
+  function cbMateriaalEditor(wrap, opts){
+    const teken = () => {
+      const regels = opts.regels();
+      const kop = opts.modus === 'regie'
+        ? '<tr><th>Materiaal</th><th class="cb-num">Klaargezet</th><th class="cb-num">Gebruikt</th><th>Eenheid</th><th></th></tr>'
+        : `<tr><th>Materiaal</th><th class="cb-num">${opts.modus === 'voorzien' ? 'Klaar te zetten' : 'Aantal'}</th><th>Eenheid</th><th></th></tr>`;
+      const rijen = regels.map(r => {
+        const eenheidSel = (val) => `<select class="cb-mat-eenheid" data-id="${r.id}" ${opts.bewerkbaar ? '' : 'disabled'}>${CB_EENHEDEN.map(e => `<option value="${e}" ${e === val ? 'selected' : ''}>${e}</option>`).join('')}</select>`;
+        const del = (opts.bewerkbaar && (!opts.magVerwijderen || opts.magVerwijderen(r)))
+          ? `<button type="button" class="btn btn-ghost btn-sm cb-mat-del" data-id="${r.id}" aria-label="Verwijderen">🗑</button>` : '';
+        if(opts.modus === 'regie'){
+          const voorzien = r.klaargezet && r.aantal_voorzien != null ? cbGetal(r.aantal_voorzien) : '—';
+          const verschil = (r.klaargezet && r.aantal != null && r.aantal_voorzien != null && Number(r.aantal) !== Number(r.aantal_voorzien))
+            ? `<div class="cb-mat-verschil">${Number(r.aantal) > Number(r.aantal_voorzien) ? 'meer' : 'minder'} dan klaargezet</div>` : '';
+          const neem = (opts.bewerkbaar && r.klaargezet && r.aantal == null)
+            ? `<button type="button" class="btn btn-secondary btn-sm cb-mat-zoals" data-id="${r.id}" title="Zoals klaargezet">✓ ${voorzien}</button>` : '';
+          return `<tr><td class="cb-mat-omschr">${escapeHtml(r.omschrijving)}${verschil}</td><td class="cb-num">${voorzien}</td>
+            <td class="cb-num"><input type="number" class="cb-mat-aantal" data-id="${r.id}" min="0" step="any" inputmode="decimal" value="${r.aantal != null ? r.aantal : ''}" ${opts.bewerkbaar ? '' : 'disabled'} placeholder="?" aria-label="Gebruikt aantal"></td>
+            <td>${r.klaargezet ? escapeHtml(r.eenheid || 'st') : eenheidSel(r.eenheid || 'st')}</td><td><div style="display:flex;gap:4px;justify-content:flex-end;">${neem}${del}</div></td></tr>`;
+        }
+        const veld = opts.modus === 'voorzien' ? 'aantal_voorzien' : 'aantal';
+        return `<tr><td class="cb-mat-omschr">${escapeHtml(r.omschrijving)}</td>
+          <td class="cb-num"><input type="number" class="cb-mat-aantal" data-veld="${veld}" data-id="${r.id}" min="0" step="any" inputmode="decimal" value="${r[veld] != null ? r[veld] : ''}" ${opts.bewerkbaar ? '' : 'disabled'} aria-label="Aantal"></td>
+          <td>${eenheidSel(r.eenheid || 'st')}</td><td style="text-align:right;">${del}</td></tr>`;
+      }).join('');
+      const toevoeg = opts.bewerkbaar ? `<div class="cb-mat-toevoegen">
+          <div class="cb-mat-zoek" style="position:relative;"><label>Materiaal</label><input type="text" class="cb-mat-nieuw" placeholder="Zoek of typ (bv. stopcontact, kabel 3G2,5)" autocomplete="off"><div class="cb-suggesties" hidden></div></div>
+          <div><label>Aantal</label><input type="number" class="cb-mat-nieuw-aantal" min="0" step="any" inputmode="decimal" value="1"></div>
+          <div><label>Eenheid</label><select class="cb-mat-nieuw-eenheid">${CB_EENHEDEN.map(e => `<option value="${e}">${e}</option>`).join('')}</select></div>
+          <button type="button" class="btn btn-secondary cb-mat-voeg">+ Toevoegen</button>
+        </div>` : '';
+      wrap.innerHTML = (regels.length
+        ? `<div class="cb-mat-wrap"><table class="cb-mat-tabel"><thead>${kop}</thead><tbody>${rijen}</tbody></table></div>`
+        : `<p class="hint" style="margin:0 0 10px;">${opts.leegTekst || 'Nog geen materiaal.'}</p>`) + toevoeg;
+      koppel();
+    };
+    const vind = (id) => opts.regels().find(r => String(r.id) === String(id));
+    const koppel = () => {
+      wrap.querySelectorAll('.cb-mat-aantal').forEach(inp => inp.addEventListener('change', async () => {
+        const r = vind(inp.dataset.id); if(!r) return;
+        const veld = inp.dataset.veld || 'aantal';
+        await opts.wijzig(r, { [veld]: cbNum(inp.value) });
+        teken();
+      }));
+      wrap.querySelectorAll('.cb-mat-eenheid').forEach(sel => sel.addEventListener('change', async () => {
+        const r = vind(sel.dataset.id); if(!r) return;
+        await opts.wijzig(r, { eenheid: sel.value });
+      }));
+      wrap.querySelectorAll('.cb-mat-zoals').forEach(b => b.addEventListener('click', async () => {
+        const r = vind(b.dataset.id); if(!r) return;
+        await opts.wijzig(r, { aantal: r.aantal_voorzien });
+        teken();
+      }));
+      wrap.querySelectorAll('.cb-mat-del').forEach(b => b.addEventListener('click', async () => {
+        const r = vind(b.dataset.id); if(!r) return;
+        await opts.verwijder(r);
+        teken();
+      }));
+      const nieuw = wrap.querySelector('.cb-mat-nieuw');
+      if(!nieuw) return;
+      const sugg = wrap.querySelector('.cb-suggesties');
+      const aantalInp = wrap.querySelector('.cb-mat-nieuw-aantal');
+      const eenheidSel = wrap.querySelector('.cb-mat-nieuw-eenheid');
+      let bron = 'vrij';
+      const toonSugg = () => {
+        const lijst = cbSuggesties(nieuw.value);
+        if(!lijst.length){ sugg.hidden = true; sugg.innerHTML = ''; return; }
+        sugg.innerHTML = lijst.map((s, i) => `<button type="button" data-i="${i}">${escapeHtml(s.naam)}<small>${escapeHtml(s.label)}</small></button>`).join('');
+        sugg.hidden = false;
+        sugg.querySelectorAll('button').forEach(b => b.addEventListener('mousedown', e => {
+          e.preventDefault();
+          const s = lijst[Number(b.dataset.i)];
+          nieuw.value = s.naam; eenheidSel.value = s.eenheid || 'st'; bron = s.bron === 'catalogus' ? 'catalogus' : 'vrij';
+          sugg.hidden = true;
+          aantalInp.focus(); aantalInp.select();
+        }));
+      };
+      nieuw.addEventListener('input', () => { bron = 'vrij'; toonSugg(); });
+      nieuw.addEventListener('focus', () => { cbLaadCatalogus().then(toonSugg); });
+      nieuw.addEventListener('blur', () => setTimeout(() => { sugg.hidden = true; }, 150));
+      const voeg = async () => {
+        const omschrijving = nieuw.value.trim();
+        if(!omschrijving){ nieuw.focus(); return; }
+        const aantal = cbNum(aantalInp.value);
+        await opts.toevoegen({ omschrijving, eenheid: eenheidSel.value, aantal: aantal == null ? 1 : aantal, bron });
+        teken();
+        const n2 = wrap.querySelector('.cb-mat-nieuw'); if(n2) n2.focus();
+      };
+      wrap.querySelector('.cb-mat-voeg').addEventListener('click', voeg);
+      nieuw.addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); voeg(); } });
+      aantalInp.addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); voeg(); } });
+    };
+    teken();
+    return { teken };
+  }
+
+  // ---------- handtekeningveld ----------
+  // opts: { naam, dataUrl, bewerkbaar, opDatum, onChange(naam, dataUrl) }
+  function cbHandtekeningVeld(wrap, opts){
+    let dataUrl = opts.dataUrl || null;
+    let opnieuw = !dataUrl;
+    const teken = () => {
+      const naamVeld = `<div class="field" style="margin:0;"><label>Naam klant</label><input type="text" class="cb-sig-naam" value="${escapeHtml(opts.naam || '')}" ${opts.bewerkbaar ? '' : 'disabled'} placeholder="Naam van wie tekent"></div>`;
+      if(dataUrl && !opnieuw){
+        wrap.innerHTML = `<div class="cb-handtekening">${naamVeld}<img class="cb-sig-img" src="${dataUrl}" alt="Handtekening klant">
+          <p class="hint" style="margin:0;">Getekend${opts.opDatum ? ' op ' + escapeHtml(new Date(opts.opDatum).toLocaleString('nl-BE')) : ''}.</p>
+          ${opts.bewerkbaar ? '<div><button type="button" class="btn btn-ghost btn-sm cb-sig-opnieuw">Opnieuw laten tekenen</button></div>' : ''}</div>`;
+      } else if(!opts.bewerkbaar){
+        wrap.innerHTML = '<p class="hint" style="margin:0;">Niet getekend.</p>';
+        return;
+      } else {
+        wrap.innerHTML = `<div class="cb-handtekening">${naamVeld}<div class="cb-sig-wrap"><canvas width="700" height="220" aria-label="Tekenveld handtekening"></canvas></div>
+          <div style="display:flex;gap:8px;"><button type="button" class="btn btn-ghost btn-sm cb-sig-wis">Wissen</button></div></div>`;
+        const canvas = wrap.querySelector('canvas');
+        const sw = wrap.querySelector('.cb-sig-wrap');
+        const ctx = canvas.getContext('2d');
+        ctx.lineWidth = 2.6; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#15241c';
+        let tekent = false, iets = false;
+        const pos = (e) => { const r = canvas.getBoundingClientRect(); return { x: (e.clientX - r.left) * canvas.width / r.width, y: (e.clientY - r.top) * canvas.height / r.height }; };
+        canvas.addEventListener('pointerdown', e => { tekent = true; const p = pos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); try{ canvas.setPointerCapture(e.pointerId); }catch(x){} e.preventDefault(); });
+        canvas.addEventListener('pointermove', e => { if(!tekent) return; const p = pos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); iets = true; e.preventDefault(); });
+        const stop = () => {
+          if(!tekent) return; tekent = false;
+          if(!iets) return;
+          sw.classList.add('heeft-tekening');
+          dataUrl = canvas.toDataURL('image/png');
+          opts.onChange(wrap.querySelector('.cb-sig-naam').value.trim(), dataUrl, true);
+        };
+        ['pointerup', 'pointerleave', 'pointercancel'].forEach(t => canvas.addEventListener(t, stop));
+        wrap.querySelector('.cb-sig-wis').addEventListener('click', () => {
+          ctx.clearRect(0, 0, canvas.width, canvas.height); iets = false; sw.classList.remove('heeft-tekening');
+          dataUrl = null; opts.onChange(wrap.querySelector('.cb-sig-naam').value.trim(), null, true);
+        });
+      }
+      const nv = wrap.querySelector('.cb-sig-naam');
+      if(nv) nv.addEventListener('change', () => opts.onChange(nv.value.trim(), dataUrl, false));
+      const op = wrap.querySelector('.cb-sig-opnieuw');
+      if(op) op.addEventListener('click', () => { opnieuw = true; dataUrl = null; opts.onChange(wrap.querySelector('.cb-sig-naam').value.trim(), null, true); teken(); });
+    };
+    teken();
+  }
+
+  // ---------- tabblad ----------
+  async function refreshCabonTab(){
+    const beoordelaar = cbIsBeoordelaar();
+    document.querySelectorAll('#cb-subtabs [data-cbsub]').forEach(b => {
+      if(b.dataset.cbsub !== 'mijn') b.style.display = beoordelaar ? '' : 'none';
+    });
+    if(!beoordelaar && state.cabon.sub !== 'mijn') state.cabon.sub = 'mijn';
+    el('cb-subtabs').style.display = beoordelaar ? '' : 'none'; // technieker: enkel zijn eigen bonnen, geen tabjes nodig
+    if(!state.cabon.geladen) el('cb-mijn-inhoud').innerHTML = '<p class="hint">Werkbonnen laden…</p>';
+    try{
+      // planning opnieuw ophalen: wat het bureau net inplande moet meteen op de tablet staan
+      try{ state.planningItems = await dbListPlanningItems(); }catch(e){ /* offline: laatste stand */ }
+      await cbLaad(true);
+    }catch(err){
+      el('cb-mijn-inhoud').innerHTML = `<div class="cb-leeg"><strong>Werkbonnen konden niet geladen worden</strong>${escapeHtml(err.message || String(err))}</div>`;
+      return;
+    }
+    cbRenderWachtrij();
+    if(state.cabon.openBonId && cbBon(state.cabon.openBonId)) cbRenderBon();
+    else { state.cabon.openBonId = null; cbToonLijst(); }
+  }
+  function cbToonLijst(){
+    el('cb-bon-scherm').style.display = 'none';
+    el('cb-lijst-scherm').style.display = '';
+    cbToonSub(state.cabon.sub);
+  }
+  function cbToonSub(sub, projectId){
+    state.cabon.sub = sub;
+    document.querySelectorAll('#cb-subtabs [data-cbsub]').forEach(b => b.classList.toggle('active', b.dataset.cbsub === sub));
+    document.querySelectorAll('#tab-cabon .cb-sub').forEach(s => { s.style.display = s.id === 'cbsub-' + sub ? '' : 'none'; });
+    cbVulProjectFilters(projectId);
+    cbUpdateTeller();
+    if(sub === 'mijn') cbRenderMijn();
+    if(sub === 'controle') cbRenderControle();
+    if(sub === 'meerwerken') cbRenderMeerwerken();
+    if(sub === 'alle') cbRenderAlle();
+  }
+  document.querySelectorAll('#cb-subtabs [data-cbsub]').forEach(b => b.addEventListener('click', () => cbToonSub(b.dataset.cbsub)));
+  function cbUpdateTeller(){
+    const n = state.cabon.bonnen.filter(b => b.status === 'ingediend').length;
+    const t = el('cb-teller-controle');
+    if(t){ t.textContent = String(n); t.style.display = n ? '' : 'none'; }
+  }
+  function cbProjectOpties(leegLabel){
+    return `<option value="">${leegLabel}</option>` + state.projects.filter(p => p.id && p.actief !== false)
+      .slice().sort((a, b) => (a.naam || '').localeCompare(b.naam || '', 'nl'))
+      .map(p => `<option value="${p.id}">${escapeHtml(p.naam)}${p.projectnummer ? ' · ' + escapeHtml(p.projectnummer) : ''}</option>`).join('');
+  }
+  function cbVulProjectFilters(projectId){
+    ['cb-ctrl-project', 'cb-mw-project', 'cb-alle-project'].forEach(id => {
+      const s = el(id); if(!s) return;
+      const prev = projectId !== undefined && projectId !== null ? String(projectId) : s.value;
+      s.innerHTML = cbProjectOpties('Alle projecten');
+      s.value = prev || '';
+    });
+    const ps = el('cb-alle-persoon');
+    if(ps){
+      const prev = ps.value;
+      const namen = Array.from(new Set(state.cabon.bonnen.map(b => b.persoon_naam).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'nl'));
+      ps.innerHTML = '<option value="">Iedereen</option>' + namen.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+      ps.value = prev || '';
+    }
+  }
+
+  // ---------- Mijn werkbonnen ----------
+  function cbKaartHtml(entry, metPersoon){
+    const bon = entry.bon, t = entry.taak;
+    const pid = bon ? bon.project_id : t.project_id;
+    const proj = cbProject(pid);
+    const taak = bon ? bon.taak : t.taak;
+    const type = bon ? bon.bon_type : t.bon_type;
+    const staat = bon ? bon.status : 'nieuw';
+    const titel = proj ? proj.naam : (taak || 'Werkbon zonder project');
+    const meta = [];
+    if(t && t.items.length){
+      const data = Array.from(new Set(t.items.map(i => i.datum)));
+      meta.push(data.length === 1 ? `Gepland ${escapeHtml(cbDatumKort(data[0]))}` : `Gepland ${data.length} dagen · ${escapeHtml(cbDatumKort(data[0]))} – ${escapeHtml(cbDatumKort(data[data.length - 1]))}`);
+    } else if(bon && !cbIsGepland(bon)){
+      meta.push('Niet ingepland');
+    }
+    if(metPersoon && bon) meta.push(escapeHtml(bon.persoon_naam));
+    if(bon){
+      const u = cbUrenTotaal(bon.id);
+      if(u) meta.push(`<span class="cb-num">${cbGetal(u)} u</span>`);
+      if(bon.bon_type === 'project'){
+        const mw = cbMeerwerkenVan(bon.id).length;
+        if(mw) meta.push(`${mw} meerwerk${mw === 1 ? '' : 'en'}`);
+        else if(bon.geen_meerwerk) meta.push('geen meerwerk');
+      } else {
+        const mat = cbMaterialenVan(bon.id).length;
+        if(mat) meta.push(`${mat} materiaal`);
+      }
+    }
+    let waarsch = '';
+    const ontbr = (entry.ontbrekend || []).filter(d => d.datum < cbVandaag()).length;
+    if(ontbr) waarsch = `<div class="cb-kaart-waarschuwing">Nog uren invullen voor ${ontbr} ${ontbr === 1 ? 'dag' : 'dagen'}</div>`;
+    if(bon && bon.status === 'afgekeurd') waarsch += `<div class="cb-kaart-waarschuwing" style="color:var(--danger);">Afgekeurd: ${escapeHtml(bon.afkeur_reden || 'zie werkbon')}</div>`;
+    const data = bon ? `data-bon="${bon.id}"` : `data-nieuw-pid="${escapeHtml(t.project_id || '')}" data-nieuw-taak="${escapeHtml(t.taak)}" data-nieuw-type="${t.bon_type}"`;
+    return `<button type="button" class="cb-kaart" data-staat="${staat}" ${data}>
+      <div class="cb-kaart-top"><div style="min-width:0;"><div class="cb-kaart-titel">${escapeHtml(titel)}</div>${proj && proj.projectnummer ? `<div class="cb-kaart-nr">${escapeHtml(proj.projectnummer)}</div>` : ''}</div>
+        <span class="cb-pill is-${staat === 'nieuw' ? '' : staat}">${CB_STATUS_LABEL[staat]}</span></div>
+      ${proj && taak ? `<div class="cb-kaart-taak">${escapeHtml(taak)}</div>` : ''}
+      <div class="cb-kaart-meta"><span class="cb-type ${type === 'regie' ? 'is-regie' : ''}">${cbTypeLabel(type)}</span>${meta.map(m => `<span>${m}</span>`).join('')}</div>
+      ${waarsch}
+    </button>`;
+  }
+  function cbSectieHtml(titel, kaarten, metPersoon){
+    if(!kaarten.length) return '';
+    return `<div class="cb-sectie"><h3>${titel} <span class="cb-h3-teller">${kaarten.length}</span></h3><div class="cb-lijst">${kaarten.map(k => cbKaartHtml(k, metPersoon)).join('')}</div></div>`;
+  }
+  function cbRenderMijn(){
+    const naam = cbMijnNaam();
+    const vandaag = cbVandaag(), grens = cbDagPlus(vandaag, 7), recent = cbDagPlus(vandaag, -14);
+    const vandaagL = [], openL = [], komendL = [], klaarL = [];
+    const gekoppeld = new Set();
+    cbTakenVoor(naam).forEach(t => {
+      const data = t.items.map(i => i.datum);
+      const bon = t.bon;
+      if(bon) gekoppeld.add(bon.id);
+      const entry = { taak: t, bon, ontbrekend: cbOntbrekendeDagen(t, bon) };
+      const st = bon ? bon.status : 'nieuw';
+      const verleden = entry.ontbrekend.some(d => d.datum < vandaag);
+      if(data.includes(vandaag)) vandaagL.push(entry);
+      else if(st === 'open' || st === 'afgekeurd' || verleden) openL.push(entry);
+      else if(data.some(d => d > vandaag && d <= grens)) komendL.push(entry);
+      else if(bon && (bon.updated_at || '').slice(0, 10) >= recent) klaarL.push(entry);
+    });
+    state.cabon.bonnen.filter(b => b.persoon_naam === naam && !gekoppeld.has(b.id)).forEach(b => {
+      const entry = { taak: null, bon: b, ontbrekend: [] };
+      if(b.status === 'open' || b.status === 'afgekeurd') openL.push(entry);
+      else if((b.updated_at || '').slice(0, 10) >= recent) klaarL.push(entry);
+    });
+    const html = cbSectieHtml('Vandaag', vandaagL) + cbSectieHtml('Nog af te werken', openL) + cbSectieHtml('Komende dagen', komendL) + cbSectieHtml('Ingediend en goedgekeurd', klaarL);
+    el('cb-mijn-inhoud').innerHTML = html || `<div class="cb-leeg"><strong>Geen werkbonnen voor jou</strong>Zodra het bureau je op een project inplant, verschijnt de werkbon hier. Werk dat niet ingepland stond, start je met de knop hieronder.</div>`;
+    if(!naam) el('cb-mijn-inhoud').insertAdjacentHTML('afterbegin', '<div class="cb-banner is-wacht">Je account is niet gekoppeld aan een teamlid. Vraag een beheerder om je e-mailadres bij je naam te zetten (Beheer → Team).</div>');
+  }
+  async function cbKaartKlik(e){
+    const k = e.target.closest('.cb-kaart'); if(!k) return;
+    if(k.dataset.bon){ cbOpenBon(k.dataset.bon); return; }
+    try{
+      const bon = await cbMaakBon({ persoon_naam: cbMijnNaam(), project_id: k.dataset.nieuwPid || null, taak: k.dataset.nieuwTaak || '', bon_type: k.dataset.nieuwType, gepland: true });
+      cbOpenBon(bon.id);
+    }catch(err){ alert('Kon de werkbon niet starten: ' + err.message); }
+  }
+  ['cb-mijn-inhoud', 'cb-alle-lijst'].forEach(id => el(id).addEventListener('click', cbKaartKlik));
+
+  // ---------- Werkbon openen ----------
+  function cbOpenBon(id){
+    state.cabon.openBonId = id;
+    el('cb-lijst-scherm').style.display = 'none';
+    el('cb-bon-scherm').style.display = '';
+    cbRenderBon();
+    window.scrollTo({ top: 0 });
+  }
+  function cbSluitBon(){
+    state.cabon.openBonId = null;
+    cbToonLijst();
+    window.scrollTo({ top: 0 });
+  }
+  function cbPlanItemsVoorBon(bon){
+    return (state.planningItems || []).filter(it => it.persoon_naam === bon.persoon_naam && it.type === 'project' && it.bevestigd !== false
+      && String(it.project_id || '') === String(bon.project_id || '') && cbPlanItemTaak(it) === (bon.taak || '').trim())
+      .sort((a, b) => (a.datum || '').localeCompare(b.datum || ''));
+  }
+  // Een bon telt als ingepland als hij vanuit de planning kwam, of als er (intussen) een afspraak voor die persoon/project/taak in de planning staat.
+  function cbIsGepland(bon){ return !!bon.gepland || cbPlanItemsVoorBon(bon).length > 0; }
+  function cbRenderBon(){
+    const bon = cbBon(state.cabon.openBonId);
+    const scherm = el('cb-bon-scherm');
+    if(!bon){ cbSluitBon(); return; }
+    const eigen = bon.persoon_naam === cbMijnNaam();
+    const bewerkbaar = eigen && bon.status !== 'ingediend';
+    const proj = cbProject(bon.project_id);
+    const vandaag = cbVandaag();
+    const planItems = cbPlanItemsVoorBon(bon);
+    const dagen = cbDagenVan(bon.id);
+    const ingevuld = new Set(dagen.map(d => d.datum));
+    const voorstellen = [];
+    planItems.forEach(it => { if(it.datum <= vandaag && !ingevuld.has(it.datum) && !voorstellen.some(v => v.datum === it.datum)) voorstellen.push(it); });
+
+    const sub = [];
+    if(proj && proj.projectnummer) sub.push(`<span>${escapeHtml(proj.projectnummer)}</span>`);
+    if(proj && proj.locatie) sub.push(`<span>📍 ${escapeHtml(proj.locatie)}</span>`);
+    if(proj && proj.klant) sub.push(`<span>Klant: ${escapeHtml(proj.klant)}</span>`);
+    if(!eigen) sub.push(`<span>👷 ${escapeHtml(bon.persoon_naam)}</span>`);
+    sub.push(`<span class="cb-kaart-nr">${cbBonNr(bon)}</span>`);
+
+    const banners = [];
+    if(bon.status === 'afgekeurd') banners.push(`<div class="cb-banner is-fout"><strong>Afgekeurd${bon.beoordeeld_door ? ' door ' + escapeHtml(bon.beoordeeld_door) : ''}.</strong> ${escapeHtml(bon.afkeur_reden || '')}<br>Pas aan en dien opnieuw in.</div>`);
+    if(bon.status === 'ingediend') banners.push(`<div class="cb-banner is-info"><strong>Ingediend</strong>${bon.ingediend_op ? ' op ' + escapeHtml(new Date(bon.ingediend_op).toLocaleString('nl-BE')) : ''}. De projectleider kijkt de bon na.${eigen ? ' Nog iets vergeten? Trek de bon terug, pas aan en dien opnieuw in.' : ''}</div>`);
+    if(bon.status === 'goedgekeurd') banners.push(`<div class="cb-banner is-ok"><strong>Goedgekeurd</strong>${bon.beoordeeld_door ? ' door ' + escapeHtml(bon.beoordeeld_door) : ''}. De uren staan in de urenregistratie.${eigen ? ' Werk je nog verder aan deze taak? Vul de nieuwe dag gewoon in en dien opnieuw in.' : ''}</div>`);
+    if(!cbIsGepland(bon)) banners.push('<div class="cb-banner is-wacht">Deze werkbon stond niet in de planning.</div>');
+
+    const contacten = (proj && Array.isArray(proj.contactpersonen)) ? proj.contactpersonen.filter(c => c && (c.naam || c.gsm || c.telefoon)) : [];
+    const contactHtml = contacten.length ? `<div class="cb-contacten">${contacten.map(c => {
+      const tel = String(c.gsm || c.telefoon || '').trim();
+      const telLink = tel.replace(/[^0-9+]/g, '');
+      const inhoud = `<b>${escapeHtml(c.naam || 'Contact')}</b>${c.rol ? `<span>${escapeHtml(c.rol)}</span>` : ''}${tel ? `<span>📞 ${escapeHtml(tel)}</span>` : ''}`;
+      return telLink ? `<a class="cb-contact" href="tel:${escapeHtml(telLink)}">${inhoud}</a>` : `<span class="cb-contact">${inhoud}</span>`;
+    }).join('')}</div>` : '';
+
+    const typeKnoppen = `<div class="cb-typekeuze" id="cb-bon-type">${['project', 'regie'].map(t => `<button type="button" data-type="${t}" class="${bon.bon_type === t ? 'active' : ''}" ${bewerkbaar ? '' : 'disabled'}>${t === 'regie' ? 'Regie' : 'Projectwerk'}</button>`).join('')}</div>`;
+    const taakHtml = (bewerkbaar && !bon.gepland)
+      ? `<div class="field"><label for="cb-bon-taak">Taak</label><input type="text" id="cb-bon-taak" value="${escapeHtml(bon.taak || '')}"></div>`
+      : `<p style="margin:0 0 12px;font-size:16px;">${bon.taak ? escapeHtml(bon.taak) : '<span class="hint">Geen taak opgegeven in de planning.</span>'}</p>`;
+
+    const dagenHtml = dagen.map(d => {
+      const slot = d.geboekt || !bewerkbaar;
+      const dis = slot ? 'disabled' : '';
+      return `<div class="cb-dag ${d.geboekt ? 'is-geboekt' : ''}" data-dag="${d.id}">
+        <div class="cb-dag-datum"><label>Datum</label><input type="date" class="cb-d-datum" value="${d.datum}" ${dis}></div>
+        <div><label>Van</label><input type="time" class="cb-d-van" value="${cbUur(d.van_uur)}" ${dis}></div>
+        <div><label>Tot</label><input type="time" class="cb-d-tot" value="${cbUur(d.tot_uur)}" ${dis}></div>
+        <div><label>Pauze (min)</label><input type="number" class="cb-d-pauze" min="0" step="5" inputmode="numeric" value="${d.pauze_min || 0}" ${dis}></div>
+        <div class="cb-dag-uren"><label>Werkuren</label><input type="number" class="cb-d-werk" min="0" step="0.25" inputmode="decimal" value="${d.werk_uren != null ? d.werk_uren : ''}" ${dis}></div>
+        <div class="cb-dag-uren"><label>Rijtijd (u)</label><input type="number" class="cb-d-rij" min="0" step="0.25" inputmode="decimal" value="${d.rij_uren || 0}" ${dis}></div>
+        <div class="cb-dag-del">${slot ? '' : `<button type="button" class="btn btn-ghost btn-sm cb-d-del" aria-label="Dag verwijderen">🗑</button>`}</div>
+        ${d.geboekt ? '<div class="cb-dag-slot">🔒 Goedgekeurd en geboekt in de urenregistratie</div>' : ''}
+      </div>`;
+    }).join('');
+    const werkTot = dagen.reduce((s, d) => s + (Number(d.werk_uren) || 0), 0);
+    const rijTot = dagen.reduce((s, d) => s + (Number(d.rij_uren) || 0), 0);
+    const mwUren = cbMeerwerkenVan(bon.id).filter(m => m.status !== 'geschrapt').reduce((s, m) => s + (Number(m.uren) || 0), 0);
+
+    const urenKaart = `<section class="card"><h2>Gewerkte uren</h2>
+      ${bewerkbaar && voorstellen.length ? `<p class="hint">Volgens de planning werkte je op deze dagen aan deze taak. Tik om je uren te bevestigen; daarna kan je ze nog aanpassen.</p>
+        <div class="cb-voorstellen">${voorstellen.map(v => `<button type="button" class="cb-voorstel" data-datum="${v.datum}">＋ ${escapeHtml(cbDatumKort(v.datum))} · ${cbGetal(cbUrenVoorstel(v))} u</button>`).join('')}</div>` : ''}
+      <div class="cb-dagen">${dagenHtml || '<p class="hint" style="margin:0;">Nog geen uren ingevuld.</p>'}</div>
+      ${bewerkbaar ? `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;">
+          <div class="field" style="margin:0;"><label for="cb-nieuwe-dag">Andere dag</label><input type="date" id="cb-nieuwe-dag" value="${ingevuld.has(vandaag) ? '' : vandaag}"></div>
+          <button type="button" class="btn btn-secondary" id="cb-dag-voeg">+ Dag toevoegen</button></div>` : ''}
+      <div class="cb-totaal"><span>Werkuren <b>${cbGetal(werkTot)} u</b></span><span>Rijtijd <b>${cbGetal(rijTot)} u</b></span>${bon.bon_type === 'project' && mwUren ? `<span>waarvan meerwerk <b>${cbGetal(mwUren)} u</b></span>` : ''}</div>
+    </section>`;
+
+    let werkKaart = '';
+    if(bon.bon_type === 'project'){
+      const mws = cbMeerwerkenVan(bon.id);
+      const mwHtml = mws.map(m => {
+        const mats = cbMaterialenVan(bon.id, m.id);
+        const st = m.status;
+        const pill = st === 'te_bevestigen_klant' ? 'is-wacht' : st === 'akkoord_klant' ? 'is-goedgekeurd' : st === 'gefactureerd' ? 'is-ingediend' : '';
+        return `<div class="cb-mw">
+          <div class="cb-mw-top"><div class="cb-mw-omschr">${escapeHtml(m.omschrijving || '(geen omschrijving)')}</div><span class="cb-pill ${pill}">${CB_MW_LABEL[st] || st}</span></div>
+          <div class="cb-mw-meta">${m.datum ? `<span>${escapeHtml(cbDatumKort(m.datum))}</span>` : ''}<span class="cb-num">${cbGetal(m.uren)} u</span>${mats.length ? `<span>${mats.map(x => `${cbGetal(x.aantal)} ${escapeHtml(x.eenheid || 'st')} ${escapeHtml(x.omschrijving)}`).join(' · ')}</span>` : ''}${m.klant_naam ? `<span>✍️ ${escapeHtml(m.klant_naam)}</span>` : ''}</div>
+          ${(m.foto_urls || []).length ? `<div class="cb-mw-fotos">${m.foto_urls.map(u => `<img src="${escapeHtml(u)}" alt="Foto meerwerk" loading="lazy">`).join('')}</div>` : ''}
+          ${bewerkbaar && st !== 'gefactureerd' ? `<div><button type="button" class="btn btn-ghost btn-sm cb-mw-open" data-mw="${m.id}">Bewerken</button></div>` : ''}
+        </div>`;
+      }).join('');
+      werkKaart = `<section class="card"><h2>Meerwerk</h2>
+        <p class="hint">Enkel werk dat niet in de opdracht zat: extra punten, wijzigingen op vraag van de klant. Gewoon projectwerk hoef je niet te beschrijven.</p>
+        ${mws.length ? '' : `<label class="cb-check"><input type="checkbox" id="cb-geen-meerwerk" ${bon.geen_meerwerk ? 'checked' : ''} ${bewerkbaar ? '' : 'disabled'}> Geen meerwerk</label>`}
+        ${mwHtml}
+        ${bewerkbaar ? '<button type="button" class="add-item-btn" id="cb-mw-nieuw">+ Meerwerk noteren</button>' : ''}
+      </section>`;
+    } else {
+      werkKaart = `<section class="card"><h2>Materiaal</h2>
+        <p class="hint">Bevestig per lijn hoeveel je effectief gebruikte (0 als het niet gebruikt is) en voeg toe wat je extra nodig had.</p>
+        <div id="cb-regie-mat"></div></section>
+        <section class="card"><h2>Handtekening klant</h2><div id="cb-regie-sig"></div></section>`;
+    }
+
+    const opmerking = `<section class="card"><h2>Opmerking</h2>
+      <textarea id="cb-bon-opmerking" rows="3" style="width:100%;" placeholder="bv. Sleutel ligt bij de buren, morgen nog 2 spots plaatsen" ${bewerkbaar ? '' : 'disabled'}>${escapeHtml(bon.opmerking || '')}</textarea></section>`;
+
+    const beoordelaar = cbIsBeoordelaar();
+    const acties = [];
+    acties.push(`<span class="cb-acties-info" id="cb-acties-info"></span>`);
+    acties.push(`<button type="button" class="btn btn-secondary" id="cb-bon-pdf">PDF</button>`);
+    if(eigen && bon.status === 'ingediend') acties.push(`<button type="button" class="btn btn-secondary" id="cb-bon-terugtrekken">Terugtrekken</button>`);
+    if(eigen && bon.status !== 'ingediend') acties.push(`<button type="button" class="btn btn-primary cb-btn-cabon" id="cb-bon-indienen">Indienen</button>`);
+    if(beoordelaar && bon.status === 'ingediend'){
+      acties.push(`<button type="button" class="btn btn-danger" id="cb-bon-afkeuren">Afkeuren</button>`);
+      acties.push(`<button type="button" class="btn btn-primary" id="cb-bon-goedkeuren">Goedkeuren</button>`);
+    }
+
+    scherm.innerHTML = `
+      <div class="cb-bon-kop"><button type="button" class="btn btn-ghost cb-terug" id="cb-terug">← Terug</button>
+        <div class="cb-bon-kop-tekst"><h2>${escapeHtml(cbBonTitel(bon))}</h2><div class="cb-bon-kop-sub">${sub.join('')}</div></div>
+        <span class="cb-pill is-${bon.status}">${CB_STATUS_LABEL[bon.status]}</span></div>
+      ${banners.join('')}
+      <section class="card"><h2>Taak</h2>${taakHtml}
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;"><span class="hint" style="margin:0;">Soort bon</span>${typeKnoppen}</div>
+        ${contactHtml}
+      </section>
+      ${urenKaart}
+      ${werkKaart}
+      ${opmerking}
+      <div id="cb-afkeur-wrap"></div>
+      <div class="cb-acties">${acties.join('')}</div>`;
+    cbKoppelBon(bon, bewerkbaar);
+  }
+
+  function cbKoppelBon(bon, bewerkbaar){
+    el('cb-terug').addEventListener('click', cbSluitBon);
+    el('cb-bon-pdf').addEventListener('click', () => cbPdf(bon).catch(err => { console.error(err); alert('PDF maken mislukt: ' + err.message); }));
+    const info = (t, fout) => { const i = el('cb-acties-info'); if(i){ i.textContent = t; i.style.color = fout ? 'var(--danger)' : ''; } };
+    const ind = el('cb-bon-indienen');
+    if(ind) ind.addEventListener('click', () => cbIndienen(bon, info));
+    const tt = el('cb-bon-terugtrekken');
+    if(tt) tt.addEventListener('click', async () => { await cbBonWijzig(bon, { status: 'open', ingediend_op: null }); cbRenderBon(); });
+    const gk = el('cb-bon-goedkeuren');
+    if(gk) gk.addEventListener('click', async () => { gk.disabled = true; const ok = await cbGoedkeuren(bon.id); if(ok) cbSluitBon(); else gk.disabled = false; });
+    const ak = el('cb-bon-afkeuren');
+    if(ak) ak.addEventListener('click', () => cbToonAfkeur(el('cb-afkeur-wrap'), bon.id, () => cbSluitBon()));
+
+    if(!bewerkbaar){
+      if(bon.bon_type === 'regie') cbKoppelRegie(bon, false);
+      return;
+    }
+    el('cb-bon-type').querySelectorAll('button').forEach(b => b.addEventListener('click', async () => {
+      if(b.dataset.type === bon.bon_type) return;
+      await cbBonWijzig(bon, { bon_type: b.dataset.type });
+      cbRenderBon();
+    }));
+    const taakInp = el('cb-bon-taak');
+    if(taakInp) taakInp.addEventListener('change', () => cbBonWijzig(bon, { taak: taakInp.value.trim() }));
+    el('cb-bon-opmerking').addEventListener('change', e => cbBonWijzig(bon, { opmerking: e.target.value }));
+
+    document.querySelectorAll('#cb-bon-scherm .cb-voorstel').forEach(b => b.addEventListener('click', async () => {
+      const it = cbPlanItemsVoorBon(bon).find(x => x.datum === b.dataset.datum);
+      await cbVoegDagToe(bon, b.dataset.datum, it || {});
+      cbRenderBon();
+    }));
+    const voeg = el('cb-dag-voeg');
+    if(voeg) voeg.addEventListener('click', async () => {
+      const datum = el('cb-nieuwe-dag').value;
+      if(!datum){ el('cb-nieuwe-dag').focus(); return; }
+      if(cbDagenVan(bon.id).some(d => d.datum === datum)){ info('Die dag staat er al.', true); return; }
+      const it = cbPlanItemsVoorBon(bon).find(x => x.datum === datum);
+      await cbVoegDagToe(bon, datum, it || { dagdeel: 'dag' });
+      cbRenderBon();
+    });
+    document.querySelectorAll('#cb-bon-scherm .cb-dag').forEach(rij => {
+      const d = state.cabon.dagen.find(x => x.id === rij.dataset.dag);
+      if(!d || d.geboekt) return;
+      const q = (c) => rij.querySelector(c);
+      const herbereken = () => {
+        const u = cbUrenTussen(q('.cb-d-van').value, q('.cb-d-tot').value, cbNum(q('.cb-d-pauze').value) || 0);
+        if(u != null) q('.cb-d-werk').value = u;
+      };
+      const bewaar = async (velden) => {
+        await cbOp({ op: 'update', t: 'werkbon_dagen', id: d.id, velden });
+        await cbBonWijzig(bon, {});
+        cbUpdateTotalen(bon);
+      };
+      q('.cb-d-van').addEventListener('change', () => { herbereken(); bewaar({ van_uur: q('.cb-d-van').value || null, werk_uren: cbNum(q('.cb-d-werk').value) || 0 }); });
+      q('.cb-d-tot').addEventListener('change', () => { herbereken(); bewaar({ tot_uur: q('.cb-d-tot').value || null, werk_uren: cbNum(q('.cb-d-werk').value) || 0 }); });
+      q('.cb-d-pauze').addEventListener('change', () => { herbereken(); bewaar({ pauze_min: Math.max(0, Math.round(cbNum(q('.cb-d-pauze').value) || 0)), werk_uren: cbNum(q('.cb-d-werk').value) || 0 }); });
+      q('.cb-d-werk').addEventListener('change', () => bewaar({ werk_uren: Math.max(0, cbNum(q('.cb-d-werk').value) || 0) }));
+      q('.cb-d-rij').addEventListener('change', () => bewaar({ rij_uren: Math.max(0, cbNum(q('.cb-d-rij').value) || 0) }));
+      q('.cb-d-datum').addEventListener('change', async () => {
+        const nieuw = q('.cb-d-datum').value;
+        if(!nieuw || cbDagenVan(bon.id).some(x => x.id !== d.id && x.datum === nieuw)){ q('.cb-d-datum').value = d.datum; info('Die dag staat er al.', true); return; }
+        await bewaar({ datum: nieuw });
+        cbRenderBon();
+      });
+      const del = q('.cb-d-del');
+      if(del) del.addEventListener('click', async () => {
+        await cbOp({ op: 'delete', t: 'werkbon_dagen', id: d.id });
+        await cbBonWijzig(bon, {});
+        cbRenderBon();
+      });
+    });
+
+    if(bon.bon_type === 'project'){
+      const gm = el('cb-geen-meerwerk');
+      if(gm) gm.addEventListener('change', () => cbBonWijzig(bon, { geen_meerwerk: gm.checked }));
+      el('cb-mw-nieuw').addEventListener('click', () => cbOpenMeerwerk(bon, null));
+      document.querySelectorAll('#cb-bon-scherm .cb-mw-open').forEach(b => b.addEventListener('click', () => cbOpenMeerwerk(bon, b.dataset.mw)));
+    } else {
+      cbKoppelRegie(bon, true);
+    }
+  }
+  function cbUpdateTotalen(bon){
+    const dagen = cbDagenVan(bon.id);
+    const tot = document.querySelector('#cb-bon-scherm .cb-totaal');
+    if(!tot) return;
+    const b = tot.querySelectorAll('b');
+    if(b[0]) b[0].textContent = cbGetal(dagen.reduce((s, d) => s + (Number(d.werk_uren) || 0), 0)) + ' u';
+    if(b[1]) b[1].textContent = cbGetal(dagen.reduce((s, d) => s + (Number(d.rij_uren) || 0), 0)) + ' u';
+  }
+  function cbKoppelRegie(bon, bewerkbaar){
+    const matWrap = el('cb-regie-mat');
+    if(matWrap) cbMateriaalEditor(matWrap, {
+      regels: () => cbMaterialenVan(bon.id, null),
+      modus: 'regie', bewerkbaar,
+      leegTekst: 'Er werd geen materiaal klaargezet. Voeg hieronder toe wat je gebruikte.',
+      magVerwijderen: r => !r.klaargezet,
+      toevoegen: async (v) => {
+        await cbOp({ op: 'upsert', t: 'werkbon_materialen', row: { id: cbId(), werkbon_id: bon.id, meerwerk_id: null, omschrijving: v.omschrijving, eenheid: v.eenheid, aantal: v.aantal, aantal_voorzien: null, klaargezet: false, bron: v.bron, created_at: cbNu() } });
+        await cbBonWijzig(bon, {});
+      },
+      wijzig: async (r, velden) => { await cbOp({ op: 'update', t: 'werkbon_materialen', id: r.id, velden }); await cbBonWijzig(bon, {}); },
+      verwijder: async (r) => { await cbOp({ op: 'delete', t: 'werkbon_materialen', id: r.id }); await cbBonWijzig(bon, {}); }
+    });
+    const sig = el('cb-regie-sig');
+    if(sig) cbHandtekeningVeld(sig, {
+      naam: bon.klant_naam, dataUrl: bon.handtekening, opDatum: bon.getekend_op, bewerkbaar,
+      onChange: (naam, dataUrl, getekend) => cbBonWijzig(bon, getekend ? { klant_naam: naam || null, handtekening: dataUrl, getekend_op: dataUrl ? cbNu() : null } : { klant_naam: naam || null })
+    });
+  }
+
+  async function cbIndienen(bon, info){
+    const open = cbDagenVan(bon.id).filter(d => !d.geboekt);
+    if(!open.some(d => (Number(d.werk_uren) || 0) > 0)){ info('Vul eerst je gewerkte uren in.', true); return; }
+    if(bon.bon_type === 'project' && !bon.geen_meerwerk && !cbMeerwerkenVan(bon.id).length){
+      info('Noteer je meerwerk, of vink "Geen meerwerk" aan.', true);
+      const gm = el('cb-geen-meerwerk'); if(gm) gm.closest('.cb-check').scrollIntoView({ block: 'center', behavior: 'smooth' });
+      return;
+    }
+    if(bon.bon_type === 'regie' && cbMaterialenVan(bon.id, null).some(m => m.klaargezet && m.aantal == null)){
+      info('Bevestig het gebruikte aantal voor elk klaargezet materiaal (0 als het niet gebruikt is).', true);
+      return;
+    }
+    await cbBonWijzig(bon, { status: 'ingediend', ingediend_op: cbNu(), afkeur_reden: null });
+    showStatus(cbWachtrijLees().length ? 'Ingediend — wordt verstuurd zodra er verbinding is' : 'Werkbon ingediend');
+    cbSluitBon();
+  }
+
+  // ---------- meerwerk-modal ----------
+  let cbMw = null; // { bon, id|null, materialen:[...], fotos:[...], klant_naam, handtekening }
+  async function cbOpenMeerwerk(bon, mwId){
+    const m = mwId ? state.cabon.meerwerken.find(x => x.id === mwId) : null;
+    cbMw = {
+      bon, id: m ? m.id : null,
+      materialen: m ? cbMaterialenVan(bon.id, m.id).map(x => Object.assign({}, x)) : [],
+      verwijderd: [],
+      fotos: m ? (m.foto_urls || []).slice() : [],
+      klant_naam: m ? m.klant_naam : null, handtekening: m ? m.handtekening : null, getekend_op: m ? m.getekend_op : null
+    };
+    el('cb-mw-modal-titel').textContent = m ? 'Meerwerk bewerken' : 'Meerwerk noteren';
+    el('cb-mw-omschrijving').value = m ? (m.omschrijving || '') : '';
+    el('cb-mw-datum').value = m && m.datum ? m.datum : cbVandaag();
+    el('cb-mw-uren').value = m && m.uren != null ? m.uren : '';
+    el('cb-mw-verwijder').style.display = m ? '' : 'none';
+    cbMateriaalEditor(el('cb-mw-materiaal'), {
+      regels: () => cbMw.materialen, modus: 'aantal', bewerkbaar: true,
+      leegTekst: 'Geen extra materiaal.',
+      toevoegen: async (v) => { cbMw.materialen.push({ id: cbId(), omschrijving: v.omschrijving, eenheid: v.eenheid, aantal: v.aantal, bron: v.bron, nieuw: true }); },
+      wijzig: async (r, velden) => { Object.assign(r, velden); },
+      verwijder: async (r) => { cbMw.materialen = cbMw.materialen.filter(x => x !== r); if(!r.nieuw) cbMw.verwijderd.push(r.id); }
+    });
+    cbRenderMwFotos();
+    cbHandtekeningVeld(el('cb-mw-handtekening'), {
+      naam: cbMw.klant_naam, dataUrl: cbMw.handtekening, opDatum: cbMw.getekend_op, bewerkbaar: true,
+      onChange: (naam, dataUrl, getekend) => { cbMw.klant_naam = naam || null; if(getekend){ cbMw.handtekening = dataUrl; cbMw.getekend_op = dataUrl ? cbNu() : null; } }
+    });
+    el('cb-mw-modal').style.display = 'flex';
+    setTimeout(() => el('cb-mw-omschrijving').focus(), 50);
+  }
+  function cbRenderMwFotos(){
+    el('cb-mw-fotos').innerHTML = cbMw.fotos.map((u, i) => `<div style="position:relative;"><img src="${escapeHtml(u)}" alt="Foto meerwerk"><button type="button" class="btn btn-ghost btn-sm cb-mw-foto-del" data-i="${i}" style="position:absolute;top:-6px;right:-6px;min-height:28px;padding:0 6px;background:#fff;border:1px solid var(--line);" aria-label="Foto verwijderen">✕</button></div>`).join('');
+    el('cb-mw-fotos').querySelectorAll('.cb-mw-foto-del').forEach(b => b.addEventListener('click', () => { cbMw.fotos.splice(Number(b.dataset.i), 1); cbRenderMwFotos(); }));
+  }
+  async function cbFotosToevoegen(files){
+    if(!cbMw || !files || !files.length) return;
+    for(const f of Array.from(files)){
+      try{
+        const klein = await verkleinBestand(f);
+        const url = await dbUploadFile('foto-verslagpunten', klein);
+        cbMw.fotos.push(url);
+        cbRenderMwFotos();
+      }catch(err){
+        alert(cbIsNetwerkFout(err) ? 'Foto\'s opladen lukt enkel met verbinding. Neem de foto later opnieuw, of bewaar het meerwerk nu zonder foto.' : 'Foto opladen mislukt: ' + err.message);
+        break;
+      }
+    }
+  }
+  el('cb-mw-foto-camera').addEventListener('change', e => { cbFotosToevoegen(e.target.files); e.target.value = ''; });
+  el('cb-mw-foto-bestand').addEventListener('change', e => { cbFotosToevoegen(e.target.files); e.target.value = ''; });
+  function cbSluitMw(){ el('cb-mw-modal').style.display = 'none'; cbMw = null; }
+  el('cb-mw-annuleer').addEventListener('click', cbSluitMw);
+  el('cb-mw-bewaar').addEventListener('click', async () => {
+    if(!cbMw) return;
+    const omschrijving = el('cb-mw-omschrijving').value.trim();
+    if(!omschrijving){ el('cb-mw-omschrijving').focus(); return; }
+    const bon = cbMw.bon;
+    const bestaand = cbMw.id ? state.cabon.meerwerken.find(x => x.id === cbMw.id) : null;
+    const id = cbMw.id || cbId();
+    let status = cbMw.handtekening ? 'akkoord_klant' : 'te_bevestigen_klant';
+    if(bestaand && bestaand.status === 'gefactureerd') status = 'gefactureerd';
+    const row = Object.assign({}, bestaand || {}, {
+      id, werkbon_id: bon.id, project_id: bon.project_id || null, datum: el('cb-mw-datum').value || cbVandaag(), omschrijving,
+      uren: Math.max(0, cbNum(el('cb-mw-uren').value) || 0), foto_urls: cbMw.fotos.slice(), klant_naam: cbMw.klant_naam || null,
+      handtekening: cbMw.handtekening || null, getekend_op: cbMw.handtekening ? (cbMw.getekend_op || cbNu()) : null, status,
+      aangemaakt_door: bestaand ? bestaand.aangemaakt_door : (cbMijnNaam() || null), created_at: bestaand ? bestaand.created_at : cbNu()
+    });
+    try{
+      const knop = el('cb-mw-bewaar'); knop.disabled = true;
+      await cbOp({ op: 'upsert', t: 'werkbon_meerwerken', row });
+      for(const vid of cbMw.verwijderd) await cbOp({ op: 'delete', t: 'werkbon_materialen', id: vid });
+      for(const mat of cbMw.materialen){
+        await cbOp({ op: 'upsert', t: 'werkbon_materialen', row: {
+          id: mat.id, werkbon_id: bon.id, meerwerk_id: id, omschrijving: mat.omschrijving, eenheid: mat.eenheid || 'st',
+          aantal: mat.aantal, aantal_voorzien: null, klaargezet: false, bron: mat.bron || 'vrij', created_at: mat.created_at || cbNu() } });
+      }
+      await cbBonWijzig(bon, { geen_meerwerk: false });
+      knop.disabled = false;
+      cbSluitMw();
+      cbRenderBon();
+      showStatus('Meerwerk bewaard');
+    }catch(err){ el('cb-mw-bewaar').disabled = false; alert('Meerwerk bewaren mislukt: ' + err.message); }
+  });
+  el('cb-mw-verwijder').addEventListener('click', async () => {
+    if(!cbMw || !cbMw.id) return;
+    if(!confirm('Dit meerwerk verwijderen?')) return;
+    const bon = cbMw.bon;
+    await cbOp({ op: 'delete', t: 'werkbon_meerwerken', id: cbMw.id });
+    await cbBonWijzig(bon, {});
+    cbSluitMw();
+    cbRenderBon();
+  });
+
+  // ---------- bureau: controleren ----------
+  function cbBeoordeelBlokHtml(bon){
+    const dagen = cbDagenVan(bon.id).filter(d => !d.geboekt);
+    const mws = cbMeerwerkenVan(bon.id);
+    const mats = cbMaterialenVan(bon.id, null);
+    const delen = [];
+    delen.push(`<div class="cb-ctrl-blok"><h5>Uren</h5>${dagen.length ? `<ul>${dagen.map(d => `<li>${escapeHtml(cbDatumKort(d.datum))}: <span class="cb-num">${cbGetal(d.werk_uren)} u</span>${d.van_uur && d.tot_uur ? ` (${cbUur(d.van_uur)}–${cbUur(d.tot_uur)}${d.pauze_min ? `, ${d.pauze_min} min pauze` : ''})` : ''}${Number(d.rij_uren) ? ` · rijtijd <span class="cb-num">${cbGetal(d.rij_uren)} u</span>` : ''}</li>`).join('')}</ul>` : '<span class="hint">Geen nieuwe uren.</span>'}</div>`);
+    if(bon.bon_type === 'project'){
+      delen.push(`<div class="cb-ctrl-blok"><h5>Meerwerk</h5>${mws.length ? `<ul>${mws.map(m => `<li>${escapeHtml(m.omschrijving)} · <span class="cb-num">${cbGetal(m.uren)} u</span> · ${escapeHtml(CB_MW_LABEL[m.status] || m.status)}${(m.foto_urls || []).length ? ` · ${m.foto_urls.length} foto${m.foto_urls.length === 1 ? '' : "'s"}` : ''}</li>`).join('')}</ul>` : (bon.geen_meerwerk ? 'Geen meerwerk' : '<span class="hint">—</span>')}</div>`);
+    } else {
+      delen.push(`<div class="cb-ctrl-blok"><h5>Materiaal</h5>${mats.length ? `<ul>${mats.map(m => `<li>${escapeHtml(m.omschrijving)}: <span class="cb-num">${m.aantal != null ? cbGetal(m.aantal) : '?'}</span> ${escapeHtml(m.eenheid || 'st')}${m.klaargezet ? ` (klaargezet ${cbGetal(m.aantal_voorzien)})` : ' (extra)'}</li>`).join('')}</ul>` : '<span class="hint">Geen materiaal.</span>'}</div>`);
+      delen.push(`<div class="cb-ctrl-blok"><h5>Handtekening</h5>${bon.handtekening ? '✍️ ' + escapeHtml(bon.klant_naam || 'getekend') : '<span class="hint">Niet getekend</span>'}</div>`);
+    }
+    if(bon.opmerking) delen.push(`<div class="cb-ctrl-blok"><h5>Opmerking</h5>${escapeHtml(bon.opmerking)}</div>`);
+    return delen.join('');
+  }
+  function cbRenderControle(){
+    const pf = el('cb-ctrl-project').value;
+    const bonnen = state.cabon.bonnen.filter(b => b.status === 'ingediend' && (!pf || String(b.project_id) === pf))
+      .sort((a, b) => (a.ingediend_op || '').localeCompare(b.ingediend_op || ''));
+    const lijst = el('cb-controle-lijst');
+    if(!bonnen.length){ lijst.innerHTML = '<div class="cb-leeg"><strong>Niets te controleren</strong>Ingediende werkbonnen verschijnen hier.</div>'; return; }
+    lijst.innerHTML = bonnen.map(b => `<div class="cb-ctrl" data-bon="${b.id}">
+      <div class="cb-ctrl-kop"><div style="min-width:0;"><h4>${escapeHtml(cbBonTitel(b))}${b.taak && cbProject(b.project_id) ? ' · ' + escapeHtml(b.taak) : ''}</h4>
+        <p>👷 ${escapeHtml(b.persoon_naam)} · <span class="cb-type ${b.bon_type === 'regie' ? 'is-regie' : ''}">${cbTypeLabel(b.bon_type)}</span>${cbIsGepland(b) ? '' : ' · <span class="cb-pill is-wacht">niet ingepland</span>'} · ingediend ${b.ingediend_op ? escapeHtml(new Date(b.ingediend_op).toLocaleString('nl-BE')) : ''}</p></div>
+        <span class="cb-kaart-nr">${cbBonNr(b)}</span></div>
+      ${cbBeoordeelBlokHtml(b)}
+      <div class="cb-afkeur-plek"></div>
+      <div class="cb-ctrl-acties">
+        <button type="button" class="btn btn-ghost btn-sm cb-c-open">Openen</button>
+        <button type="button" class="btn btn-danger btn-sm cb-c-af">Afkeuren</button>
+        <button type="button" class="btn btn-primary btn-sm cb-c-goed">Goedkeuren en uren boeken</button>
+      </div></div>`).join('');
+    lijst.querySelectorAll('.cb-ctrl').forEach(kaart => {
+      const id = kaart.dataset.bon;
+      kaart.querySelector('.cb-c-open').addEventListener('click', () => cbOpenBon(id));
+      kaart.querySelector('.cb-c-af').addEventListener('click', () => cbToonAfkeur(kaart.querySelector('.cb-afkeur-plek'), id, () => cbToonSub('controle')));
+      kaart.querySelector('.cb-c-goed').addEventListener('click', async (e) => {
+        e.target.disabled = true;
+        const ok = await cbGoedkeuren(id);
+        if(ok) cbToonSub('controle'); else e.target.disabled = false;
+      });
+    });
+  }
+  el('cb-ctrl-project').addEventListener('change', cbRenderControle);
+  function cbToonAfkeur(plek, bonId, klaar){
+    plek.innerHTML = `<div class="cb-afkeur"><label>Waarom afkeuren? De technieker ziet dit op zijn werkbon.</label>
+      <textarea class="cb-afkeur-reden" placeholder="bv. Rijtijd ontbreekt, en het meerwerk in de keuken heeft nog een foto nodig"></textarea>
+      <div class="cb-ctrl-acties"><button type="button" class="btn btn-ghost btn-sm cb-afkeur-annuleer">Annuleren</button><button type="button" class="btn btn-danger btn-sm cb-afkeur-ok">Afkeuren</button></div></div>`;
+    const ta = plek.querySelector('.cb-afkeur-reden');
+    ta.focus();
+    plek.querySelector('.cb-afkeur-annuleer').addEventListener('click', () => { plek.innerHTML = ''; });
+    plek.querySelector('.cb-afkeur-ok').addEventListener('click', async () => {
+      const reden = ta.value.trim();
+      if(!reden){ ta.focus(); return; }
+      const bon = cbBon(bonId); if(!bon) return;
+      try{
+        await cbBonWijzig(bon, { status: 'afgekeurd', afkeur_reden: reden, beoordeeld_door: cbMijnNaam() || null, beoordeeld_op: cbNu() });
+        showStatus('Werkbon afgekeurd');
+        klaar();
+      }catch(err){ alert('Afkeuren mislukt: ' + err.message); }
+    });
+  }
+  // Boekt de nog niet geboekte dagen als rijen in uren_registraties (werkuren + rijtijd apart).
+  async function cbGoedkeuren(bonId){
+    try{
+      await cbLaad(true); // verse stand: niet goedkeuren wat de technieker intussen terugtrok
+      const bon = cbBon(bonId);
+      if(!bon || bon.status !== 'ingediend'){ alert('Deze werkbon werd intussen gewijzigd of teruggetrokken.'); return false; }
+      const label = bon.taak ? bon.taak : (bon.bon_type === 'regie' ? 'regie' : 'projectwerk');
+      for(const d of cbDagenVan(bon.id).filter(x => !x.geboekt)){
+        const ids = [];
+        if((Number(d.werk_uren) || 0) > 0){
+          const r = await dbInsertUrenRegistratie({ project_id: bon.project_id || null, persoon_naam: bon.persoon_naam, datum: d.datum, uren: Number(d.werk_uren), omschrijving: 'Werkbon ' + cbBonNr(bon) + ' · ' + label });
+          (state.urenRegistraties = state.urenRegistraties || []).push(r); ids.push(r.id);
+        }
+        if((Number(d.rij_uren) || 0) > 0){
+          const r = await dbInsertUrenRegistratie({ project_id: bon.project_id || null, persoon_naam: bon.persoon_naam, datum: d.datum, uren: Number(d.rij_uren), omschrijving: 'Verplaatsing · werkbon ' + cbBonNr(bon) });
+          state.urenRegistraties.push(r); ids.push(r.id);
+        }
+        await cbOp({ op: 'update', t: 'werkbon_dagen', id: d.id, velden: { geboekt: true, uren_registratie_ids: ids } });
+      }
+      await cbBonWijzig(bon, { status: 'goedgekeurd', beoordeeld_door: cbMijnNaam() || null, beoordeeld_op: cbNu(), afkeur_reden: null });
+      showStatus('Goedgekeurd — uren geboekt');
+      return true;
+    }catch(err){ console.error(err); alert('Goedkeuren mislukt: ' + err.message); return false; }
+  }
+
+  // ---------- bureau: meerwerken ----------
+  function cbGefilterdeMeerwerken(){
+    const pf = el('cb-mw-project').value, sf = el('cb-mw-status').value;
+    return state.cabon.meerwerken.filter(m => {
+      const bon = cbBon(m.werkbon_id);
+      const pid = m.project_id || (bon && bon.project_id);
+      if(pf && String(pid) !== pf) return false;
+      if(sf === 'actief') return m.status === 'te_bevestigen_klant' || m.status === 'akkoord_klant';
+      if(sf) return m.status === sf;
+      return true;
+    }).sort((a, b) => (b.datum || '').localeCompare(a.datum || ''));
+  }
+  function cbRenderMeerwerken(){
+    const rows = cbGefilterdeMeerwerken();
+    const lijst = el('cb-mw-lijst');
+    if(!rows.length){ lijst.innerHTML = '<div class="cb-leeg"><strong>Geen meerwerken</strong>Meerwerk dat techniekers op hun werkbon noteren, verschijnt hier.</div>'; return; }
+    const totU = rows.reduce((s, m) => s + (Number(m.uren) || 0), 0);
+    lijst.innerHTML = `<div class="cb-tabel-wrap"><table class="cb-tabel"><thead><tr><th>Datum</th><th>Project</th><th>Wie</th><th>Meerwerk</th><th class="cb-num">Uren</th><th>Materiaal</th><th>Status</th><th></th></tr></thead><tbody>
+      ${rows.map(m => {
+        const bon = cbBon(m.werkbon_id) || {};
+        const proj = cbProject(m.project_id || bon.project_id);
+        const mats = cbMaterialenVan(m.werkbon_id, m.id);
+        const knoppen = [];
+        if(m.status === 'te_bevestigen_klant') knoppen.push(`<button type="button" class="btn btn-secondary btn-sm cb-mw-zet" data-id="${m.id}" data-status="akkoord_klant">Akkoord ontvangen</button>`);
+        if(m.status === 'te_bevestigen_klant' || m.status === 'akkoord_klant') knoppen.push(`<button type="button" class="btn btn-primary btn-sm cb-mw-zet" data-id="${m.id}" data-status="gefactureerd">Gefactureerd</button>`, `<button type="button" class="btn btn-ghost btn-sm cb-mw-zet" data-id="${m.id}" data-status="geschrapt">Schrappen</button>`);
+        if(m.status === 'gefactureerd' || m.status === 'geschrapt') knoppen.push(`<button type="button" class="btn btn-ghost btn-sm cb-mw-zet" data-id="${m.id}" data-status="${m.handtekening ? 'akkoord_klant' : 'te_bevestigen_klant'}">Terugzetten</button>`);
+        const pill = m.status === 'te_bevestigen_klant' ? 'is-wacht' : m.status === 'akkoord_klant' ? 'is-goedgekeurd' : m.status === 'gefactureerd' ? 'is-ingediend' : '';
+        return `<tr><td>${escapeHtml(cbDatumKort(m.datum))}</td><td>${proj ? escapeHtml(proj.naam) : '—'}</td><td>${escapeHtml(bon.persoon_naam || '')}</td>
+          <td style="min-width:200px;">${escapeHtml(m.omschrijving)}${(m.foto_urls || []).length ? `<div class="cb-mw-fotos" style="margin-top:6px;">${m.foto_urls.map(u => `<a href="${escapeHtml(u)}" target="_blank" rel="noopener"><img src="${escapeHtml(u)}" alt="Foto meerwerk" loading="lazy"></a>`).join('')}</div>` : ''}</td>
+          <td class="cb-num">${cbGetal(m.uren)}</td><td>${mats.map(x => `${cbGetal(x.aantal)} ${escapeHtml(x.eenheid || 'st')} ${escapeHtml(x.omschrijving)}`).join('<br>') || '—'}</td>
+          <td><span class="cb-pill ${pill}">${escapeHtml(CB_MW_LABEL[m.status] || m.status)}</span>${m.klant_naam ? `<div class="hint" style="margin:4px 0 0;">✍️ ${escapeHtml(m.klant_naam)}</div>` : ''}</td>
+          <td><div class="cb-tabel-acties">${knoppen.join('')}</div></td></tr>`;
+      }).join('')}
+      </tbody><tfoot><tr><td colspan="4" style="padding:10px 8px;font-weight:600;">${rows.length} meerwerk${rows.length === 1 ? '' : 'en'}</td><td class="cb-num" style="padding:10px 8px;font-weight:600;">${cbGetal(totU)}</td><td colspan="3"></td></tr></tfoot></table></div>`;
+    lijst.querySelectorAll('.cb-mw-zet').forEach(b => b.addEventListener('click', async () => {
+      b.disabled = true;
+      try{ await cbOp({ op: 'update', t: 'werkbon_meerwerken', id: b.dataset.id, velden: { status: b.dataset.status } }); }
+      catch(err){ alert('Bijwerken mislukt: ' + err.message); }
+      cbRenderMeerwerken();
+    }));
+  }
+  el('cb-mw-project').addEventListener('change', cbRenderMeerwerken);
+  el('cb-mw-status').addEventListener('change', cbRenderMeerwerken);
+  el('cb-mw-export').addEventListener('click', () => {
+    const rows = cbGefilterdeMeerwerken();
+    const q = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+    const lijnen = [['Datum', 'Project', 'Projectnummer', 'Technieker', 'Werkbon', 'Meerwerk', 'Uren', 'Materiaal', 'Status', 'Akkoord klant'].map(q).join(';')];
+    rows.forEach(m => {
+      const bon = cbBon(m.werkbon_id) || {};
+      const proj = cbProject(m.project_id || bon.project_id) || {};
+      const mats = cbMaterialenVan(m.werkbon_id, m.id).map(x => `${cbGetal(x.aantal)} ${x.eenheid || 'st'} ${x.omschrijving}`).join(' | ');
+      lijnen.push([m.datum, proj.naam, proj.projectnummer, bon.persoon_naam, bon.id ? cbBonNr(bon) : '', m.omschrijving, cbGetal(m.uren), mats, CB_MW_LABEL[m.status] || m.status, m.klant_naam].map(q).join(';'));
+    });
+    const blob = new Blob(['﻿' + lijnen.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `Meerwerken_${cbVandaag()}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  });
+
+  // ---------- bureau: alle werkbonnen ----------
+  function cbRenderAlle(){
+    const pf = el('cb-alle-project').value, pers = el('cb-alle-persoon').value, sf = el('cb-alle-status').value;
+    const bonnen = state.cabon.bonnen.filter(b => (!pf || String(b.project_id) === pf) && (!pers || b.persoon_naam === pers) && (!sf || b.status === sf))
+      .sort((a, b) => (b.updated_at || '').localeCompare(a.updated_at || ''));
+    el('cb-alle-lijst').innerHTML = bonnen.length
+      ? `<div class="cb-lijst">${bonnen.slice(0, 200).map(b => cbKaartHtml({ bon: b, taak: null }, true)).join('')}</div>`
+      : '<div class="cb-leeg"><strong>Geen werkbonnen</strong>voor deze filter.</div>';
+  }
+  ['cb-alle-project', 'cb-alle-persoon', 'cb-alle-status'].forEach(id => el(id).addEventListener('change', cbRenderAlle));
+
+  // ---------- regiebon klaarzetten ----------
+  let cbKlaar = null; // { bonId|null, vast:{persoon, project_id, taak}|null }
+  async function cbOpenKlaarzetten(vast){
+    try{ await cbLaad(); }catch(e){ alert('Werkbonnen konden niet geladen worden: ' + e.message); return; }
+    cbKlaar = { bonId: null, vast: vast || null };
+    if(vast){
+      const b = state.cabon.bonnen.find(x => cbZelfdeTaak(x, vast.persoon_naam, vast.project_id, vast.taak));
+      if(b) cbKlaar.bonId = b.id;
+    }
+    el('cb-klaar-persoon').innerHTML = ipActivePeople().map(p => p.naam).filter(Boolean).sort((a, b) => a.localeCompare(b, 'nl')).map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+    el('cb-klaar-project').innerHTML = cbProjectOpties('— kies een project —');
+    el('cb-klaar-taak').value = '';
+    cbRenderKlaar();
+    el('cb-klaar-modal').style.display = 'flex';
+  }
+  function cbRenderKlaar(){
+    const vast = cbKlaar.vast;
+    const bon = cbKlaar.bonId ? cbBon(cbKlaar.bonId) : null;
+    const gekozen = vast || bon;
+    el('cb-klaar-kies').style.display = gekozen ? 'none' : '';
+    el('cb-klaar-start').style.display = gekozen ? 'none' : '';
+    const vastEl = el('cb-klaar-vast');
+    if(gekozen){
+      const pn = vast ? vast.persoon_naam : bon.persoon_naam;
+      const pid = vast ? vast.project_id : bon.project_id;
+      const taak = vast ? vast.taak : bon.taak;
+      const proj = cbProject(pid);
+      vastEl.style.display = '';
+      vastEl.innerHTML = `<strong>${escapeHtml(pn)}</strong> · ${escapeHtml(proj ? proj.naam : 'zonder project')}${taak ? ' · ' + escapeHtml(taak) : ''}${bon && bon.status !== 'open' ? `<br>Status werkbon: ${escapeHtml(CB_STATUS_LABEL[bon.status])}` : ''}`;
+      cbMateriaalEditor(el('cb-klaar-materiaal'), {
+        regels: () => cbKlaar.bonId ? cbMaterialenVan(cbKlaar.bonId, null).filter(m => m.klaargezet) : [],
+        modus: 'voorzien', bewerkbaar: !bon || bon.status === 'open' || bon.status === 'afgekeurd',
+        leegTekst: 'Nog niets klaargezet.',
+        toevoegen: async (v) => {
+          let b = cbKlaar.bonId ? cbBon(cbKlaar.bonId) : null;
+          if(!b){
+            b = await cbMaakBon({ persoon_naam: pn, project_id: pid, taak, bon_type: 'regie', gepland: true });
+            cbKlaar.bonId = b.id;
+          } else if(b.bon_type !== 'regie'){
+            await cbBonWijzig(b, { bon_type: 'regie' });
+          }
+          await cbOp({ op: 'upsert', t: 'werkbon_materialen', row: { id: cbId(), werkbon_id: b.id, meerwerk_id: null, omschrijving: v.omschrijving, eenheid: v.eenheid, aantal_voorzien: v.aantal, aantal: null, klaargezet: true, bron: v.bron, created_at: cbNu() } });
+        },
+        wijzig: async (r, velden) => { await cbOp({ op: 'update', t: 'werkbon_materialen', id: r.id, velden }); },
+        verwijder: async (r) => { await cbOp({ op: 'delete', t: 'werkbon_materialen', id: r.id }); }
+      });
+    } else {
+      vastEl.style.display = 'none';
+      el('cb-klaar-materiaal').innerHTML = '<p class="hint" style="margin:0;">Kies eerst technieker, project en taak.</p>';
+    }
+  }
+  el('cb-klaar-start').addEventListener('click', async () => {
+    const persoon_naam = el('cb-klaar-persoon').value, project_id = el('cb-klaar-project').value || null, taak = el('cb-klaar-taak').value.trim();
+    if(!persoon_naam || !project_id){ alert('Kies een technieker en een project.'); return; }
+    let b = state.cabon.bonnen.find(x => cbZelfdeTaak(x, persoon_naam, project_id, taak) && x.status !== 'goedgekeurd');
+    const ingepland = (state.planningItems || []).some(it => it.persoon_naam === persoon_naam && String(it.project_id || '') === String(project_id) && cbPlanItemTaak(it) === taak);
+    if(!b) b = await cbMaakBon({ persoon_naam, project_id, taak, bon_type: 'regie', gepland: ingepland });
+    else if(b.bon_type !== 'regie') await cbBonWijzig(b, { bon_type: 'regie' });
+    cbKlaar.bonId = b.id;
+    cbRenderKlaar();
+  });
+  el('cb-klaar-sluit').addEventListener('click', () => {
+    el('cb-klaar-modal').style.display = 'none';
+    cbKlaar = null;
+    const actief = document.querySelector('.tab-section.active');
+    if(actief && actief.id === 'tab-cabon') cbToonSub(state.cabon.sub);
+    if(state.ip && state.ip.panelCtx) renderIpEntryList();
+  });
+  el('cb-regie-klaarzetten').addEventListener('click', () => cbOpenKlaarzetten(null));
+
+  // ---------- werkbon voor niet-ingepland werk ----------
+  let cbLosType = 'project';
+  function cbRenderLosProjecten(){
+    const z = (el('cb-los-zoek').value || '').trim().toLowerCase();
+    const sel = el('cb-los-project');
+    const prev = sel.value;
+    const projecten = state.projects.filter(p => p.id && p.actief !== false && (!z || (p.naam || '').toLowerCase().includes(z) || (p.projectnummer || '').toLowerCase().includes(z) || (p.locatie || '').toLowerCase().includes(z)))
+      .sort((a, b) => (a.naam || '').localeCompare(b.naam || '', 'nl'));
+    sel.innerHTML = projecten.map(p => `<option value="${p.id}">${escapeHtml(p.naam)}${p.projectnummer ? ' · ' + escapeHtml(p.projectnummer) : ''}</option>`).join('');
+    if(prev && projecten.some(p => String(p.id) === prev)) sel.value = prev;
+  }
+  el('cb-los-starten').addEventListener('click', () => {
+    el('cb-los-zoek').value = ''; el('cb-los-taak').value = '';
+    cbLosType = 'project';
+    el('cb-los-type').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.type === 'project'));
+    cbRenderLosProjecten();
+    el('cb-los-modal').style.display = 'flex';
+    setTimeout(() => el('cb-los-zoek').focus(), 50);
+  });
+  el('cb-los-zoek').addEventListener('input', cbRenderLosProjecten);
+  el('cb-los-type').querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+    cbLosType = b.dataset.type;
+    el('cb-los-type').querySelectorAll('button').forEach(x => x.classList.toggle('active', x === b));
+  }));
+  el('cb-los-annuleer').addEventListener('click', () => { el('cb-los-modal').style.display = 'none'; });
+  el('cb-los-start').addEventListener('click', async () => {
+    const pid = el('cb-los-project').value;
+    const taak = el('cb-los-taak').value.trim();
+    if(!pid){ alert('Kies een project.'); return; }
+    if(!taak){ el('cb-los-taak').focus(); return; }
+    try{
+      const bon = await cbMaakBon({ persoon_naam: cbMijnNaam(), project_id: pid, taak, bon_type: cbLosType, gepland: false });
+      await cbVoegDagToe(bon, cbVandaag(), null);
+      el('cb-los-modal').style.display = 'none';
+      cbOpenBon(bon.id);
+    }catch(err){ alert('Kon de werkbon niet starten: ' + err.message); }
+  });
+
+  // ---------- PDF ----------
+  async function cbPdf(bon){
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+    const W = 210, M = 16, B = W - 2 * M;
+    let y = 18;
+    const nieuw = (h) => { if(y + h > 282){ doc.addPage(); y = 18; } };
+    const proj = cbProject(bon.project_id);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.setTextColor(21, 36, 28);
+    doc.text(state.company.naam || 'Casentis', M, y);
+    doc.setFontSize(12); doc.text('WERKBON ' + cbBonNr(bon), W - M, y, { align: 'right' });
+    y += 5;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(91, 107, 98);
+    doc.text([state.company.adres, state.company.telefoon, state.company.email].filter(Boolean).join(' · '), M, y);
+    doc.text(cbTypeLabel(bon.bon_type) + 'bon · ' + CB_STATUS_LABEL[bon.status], W - M, y, { align: 'right' });
+    y += 4; doc.setDrawColor(223, 230, 225); doc.line(M, y, W - M, y); y += 7;
+    const veld = (lbl, val) => {
+      if(!val) return;
+      const lines = doc.splitTextToSize(String(val), B - 34);
+      nieuw(lines.length * 5 + 1);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(91, 107, 98); doc.text(lbl, M, y);
+      doc.setFont('helvetica', 'normal'); doc.setTextColor(21, 36, 28); doc.text(lines, M + 34, y);
+      y += lines.length * 5 + 1;
+    };
+    veld('Project', proj ? proj.naam : 'Geen project');
+    veld('Projectnummer', proj && proj.projectnummer);
+    veld('Adres', proj && proj.locatie);
+    veld('Klant', proj && proj.klant);
+    veld('Technieker', bon.persoon_naam);
+    veld('Taak', bon.taak);
+    const kop = (t) => { nieuw(14); y += 4; doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(15, 116, 128); doc.text(t, M, y); y += 2; doc.setDrawColor(15, 116, 128); doc.line(M, y, W - M, y); y += 6; doc.setTextColor(21, 36, 28); };
+    const rij = (cols, xs, vet) => {
+      const wraps = cols.map((c, i) => doc.splitTextToSize(String(c == null ? '' : c), (xs[i + 1] || (W - M)) - xs[i] - 2));
+      const h = Math.max(...wraps.map(w => w.length)) * 4.6 + 1.5;
+      nieuw(h);
+      doc.setFont('helvetica', vet ? 'bold' : 'normal'); doc.setFontSize(9.5);
+      wraps.forEach((w, i) => doc.text(w, xs[i], y));
+      y += h;
+    };
+    kop('Gewerkte uren');
+    const dagen = cbDagenVan(bon.id);
+    const xu = [M, M + 44, M + 80, M + 104, M + 132];
+    rij(['Datum', 'Van – tot', 'Pauze', 'Werkuren', 'Rijtijd'], xu, true);
+    dagen.forEach(d => rij([cbDatumKort(d.datum), d.van_uur && d.tot_uur ? cbUur(d.van_uur) + ' – ' + cbUur(d.tot_uur) : '—', d.pauze_min ? d.pauze_min + ' min' : '—', cbGetal(d.werk_uren) + ' u', Number(d.rij_uren) ? cbGetal(d.rij_uren) + ' u' : '—'], xu));
+    rij(['Totaal', '', '', cbGetal(dagen.reduce((s, d) => s + (Number(d.werk_uren) || 0), 0)) + ' u', cbGetal(dagen.reduce((s, d) => s + (Number(d.rij_uren) || 0), 0)) + ' u'], xu, true);
+    if(bon.bon_type === 'project'){
+      kop('Meerwerk');
+      const mws = cbMeerwerkenVan(bon.id).filter(m => m.status !== 'geschrapt');
+      if(!mws.length) rij([bon.geen_meerwerk ? 'Geen meerwerk.' : '—'], [M]);
+      for(const m of mws){
+        rij([cbDatumKort(m.datum), m.omschrijving, cbGetal(m.uren) + ' u'], [M, M + 30, M + 150], true);
+        cbMaterialenVan(bon.id, m.id).forEach(x => rij(['', '• ' + cbGetal(x.aantal) + ' ' + (x.eenheid || 'st') + '  ' + x.omschrijving], [M, M + 30]));
+        if(m.handtekening){
+          nieuw(24);
+          try{ doc.addImage(m.handtekening, 'PNG', M + 30, y - 2, 60, 19); }catch(e){}
+          doc.setFontSize(8.5); doc.setTextColor(91, 107, 98);
+          doc.text('Akkoord klant: ' + (m.klant_naam || '') + (m.getekend_op ? ' · ' + new Date(m.getekend_op).toLocaleDateString('nl-BE') : ''), M + 94, y + 8);
+          doc.setTextColor(21, 36, 28);
+          y += 21;
+        }
+        y += 2;
+      }
+    } else {
+      kop('Materiaal');
+      const xm = [M, M + 110, M + 136, M + 160];
+      rij(['Omschrijving', 'Gebruikt', 'Eenheid', ''], xm, true);
+      cbMaterialenVan(bon.id, null).forEach(x => rij([x.omschrijving, x.aantal != null ? cbGetal(x.aantal) : '—', x.eenheid || 'st', x.klaargezet ? '' : 'extra'], xm));
+    }
+    if(bon.opmerking){ kop('Opmerking'); rij([bon.opmerking], [M]); }
+    if(bon.bon_type === 'regie'){
+      kop('Handtekening klant');
+      if(bon.handtekening){
+        nieuw(30);
+        try{ doc.addImage(bon.handtekening, 'PNG', M, y - 2, 80, 25); }catch(e){}
+        y += 27;
+        rij([(bon.klant_naam || '') + (bon.getekend_op ? ' · ' + new Date(bon.getekend_op).toLocaleString('nl-BE') : '')], [M]);
+      } else rij(['Niet getekend.'], [M]);
+    }
+    const pages = doc.getNumberOfPages();
+    for(let p = 1; p <= pages; p++){
+      doc.setPage(p); doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(150, 150, 150);
+      doc.text(`${state.company.naam || 'Casentis'} — werkbon ${cbBonNr(bon)}`, M, 290);
+      doc.text(`Pagina ${p} / ${pages}`, W - M, 290, { align: 'right' });
+    }
+    const naam = `Werkbon_${(proj ? proj.naam : 'zonder_project').replace(/[^a-z0-9]+/gi, '_')}_${cbBonNr(bon)}.pdf`;
+    if(deelPdfMogelijk()){
+      try{
+        await navigator.share({ files: [new File([doc.output('blob')], naam, { type: 'application/pdf' })], title: 'Werkbon ' + cbBonNr(bon) });
+        return;
+      }catch(err){ if(err && err.name === 'AbortError') return; }
+    }
+    doc.save(naam);
+  }
+
+  // ---------- planning-zijpaneel: taak + soort bon ----------
+  function cbPlanningBlokHtml(en){
+    if(en.type !== 'project' || en.project_id == null) return '';
+    const regie = en.bon_type === 'regie';
+    return `<div class="ip-cb-wrap">
+      <div><label for="ip-cb-taak-${en.id}">Taak (werkbon)</label><input type="text" class="ip-cb-taak" id="ip-cb-taak-${en.id}" data-entry="${en.id}" value="${escapeHtml(en.taak || '')}" placeholder="bv. Kabels trekken gelijkvloers"></div>
+      <div><label for="ip-cb-type-${en.id}">Soort bon</label><select class="ip-cb-type" id="ip-cb-type-${en.id}" data-entry="${en.id}"><option value="project">Project</option><option value="regie" ${regie ? 'selected' : ''}>Regie</option></select></div>
+      ${regie ? `<button type="button" class="ip-mini-btn ip-cb-klaar" data-entry="${en.id}">📦 Materiaal klaarzetten</button>` : ''}
+    </div>`;
+  }
+  // Bij kopiëren/doorkopiëren van een afspraak de taak en soort bon mee overnemen (1 bon per taak, ook over meerdere dagen).
+  function cbKopieerTaakVelden(original, fields){
+    if(original && original.type === 'project'){
+      if(original.taak) fields.taak = original.taak;
+      if(original.bon_type) fields.bon_type = original.bon_type;
+    }
+    return fields;
+  }
+  el('ip-entry-list').addEventListener('change', async e => {
+    const inp = e.target.closest('.ip-cb-taak, .ip-cb-type');
+    if(!inp) return;
+    const id = inp.dataset.entry;
+    const it = state.planningItems.find(x => String(x.id) === String(id));
+    if(!it) return;
+    const velden = inp.classList.contains('ip-cb-taak') ? { taak: inp.value.trim() || null } : { bon_type: inp.value === 'regie' ? 'regie' : null };
+    try{
+      await dbUpdatePlanningItem(id, velden);
+      Object.assign(it, velden);
+      if('bon_type' in velden) renderIpEntryList();
+      showStatus('Bewaard');
+    }catch(err){ alert('Kon niet bewaren: ' + err.message); }
+  });
+  el('ip-entry-list').addEventListener('click', e => {
+    const b = e.target.closest('.ip-cb-klaar');
+    if(!b) return;
+    const it = state.planningItems.find(x => String(x.id) === String(b.dataset.entry));
+    if(!it) return;
+    cbOpenKlaarzetten({ persoon_naam: it.persoon_naam, project_id: it.project_id, taak: cbPlanItemTaak(it) });
+  });
+
+  // ---------- cockpit ----------
+  function cbCockpitTegels(projectId){
+    if(!state.cabon.geladen) return [];
+    const pid = String(projectId);
+    const bonnen = state.cabon.bonnen.filter(b => String(b.project_id) === pid);
+    const mws = state.cabon.meerwerken.filter(m => String(m.project_id || (cbBon(m.werkbon_id) || {}).project_id) === pid);
+    if(!bonnen.length && !mws.length) return [];
+    const teCtrl = bonnen.filter(b => b.status === 'ingediend').length;
+    const open = bonnen.filter(b => b.status === 'open' || b.status === 'afgekeurd').length;
+    const actief = mws.filter(m => m.status === 'te_bevestigen_klant' || m.status === 'akkoord_klant');
+    const wacht = actief.filter(m => m.status === 'te_bevestigen_klant').length;
+    const mag = cbIsBeoordelaar() && allowedTabs().includes('cabon');
+    const knop = (sub, lbl) => mag ? `<div class="cp-link"><button type="button" class="btn btn-ghost btn-sm cp-cb-link" data-sub="${sub}" data-pid="${pid}">${lbl}</button></div>` : '';
+    return [
+      `<div class="cp-tile ${teCtrl ? 'is-warn' : ''}"><div class="cp-lbl">Werkbonnen</div><div class="cp-val">${teCtrl} te controleren</div><div class="cp-sub">${open} open · ${bonnen.length} in totaal</div>${knop(teCtrl ? 'controle' : 'alle', 'Bekijken')}</div>`,
+      `<div class="cp-tile ${wacht ? 'is-warn' : ''}"><div class="cp-lbl">Meerwerken</div><div class="cp-val">${actief.length} te factureren</div><div class="cp-sub">${cbGetal(actief.reduce((s, m) => s + (Number(m.uren) || 0), 0))} u${wacht ? ` · <span class="cp-warn">${wacht} wacht${wacht === 1 ? '' : 'en'} op akkoord klant</span>` : ''}</div>${knop('meerwerken', 'Bekijken')}</div>`
+    ];
+  }
+  el('cockpit-grid').addEventListener('click', e => {
+    const b = e.target.closest('.cp-cb-link');
+    if(!b) return;
+    sluitCockpit();
+    state.cabon.openBonId = null;
+    switchTab('cabon');
+    setTimeout(() => cbToonSub(b.dataset.sub, b.dataset.pid), 0);
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if(document.visibilityState !== 'visible') return;
+    const actief = document.querySelector('.tab-section.active');
+    if(!actief || actief.id !== 'tab-cabon' || state.cabon.openBonId) return;
+    if(document.querySelector('.modal-overlay[style*="flex"]')) return;
+    refreshCabonTab();
+  });
+  window.cbDebug = { state: () => state.cabon, laad: cbLaad, wachtrij: cbWachtrijLees }; // (voor de tests)
 
   // init
   initAuth();
