@@ -1,0 +1,16 @@
+CaSuite — bestanden voor GitHub (23/10/2026)
+
+Sleep ALLES uit deze map naar github.com/drie-e-bv/CaSuite (Add file -> Upload files).
+De mappen icons/ en screenshots/ sleep je als map mee; GitHub behoudt die structuur.
+
+Hoofdmap van de repo:
+  index.html, werf.html, planning.html, cados.html, cacalc.html, sw.js
+  manifest.json, manifest-werf.json, manifest-planning.json, manifest-cados.json, manifest-cacalc.json
+
+icons/      10 nieuwe "maskable" iconen (de bestaande iconen blijven staan; icon192maskable.png
+            en icon512maskable.png worden overschreven -- dat waren kopieën van de gewone iconen,
+            geen echte maskable versies)
+screenshots/ 5 afbeeldingen voor het installatievenster van Chrome
+
+NA HET UPLOADEN: elke al geïnstalleerde CaSuite-app één keer verwijderen en opnieuw installeren.
+Manifestwijzigingen werken niet door in een bestaande installatie.

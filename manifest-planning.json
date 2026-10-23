@@ -1,24 +1,67 @@
 {
+  "id": "/CaSuite/planning.html",
   "name": "CaPla – personeelsplanning",
   "short_name": "CaPla",
   "description": "Personeelsplanning en capaciteit voor Casentis.",
   "start_url": "./planning.html",
-  "scope": "./",
+  "scope": "./planning.html",
   "display": "standalone",
   "orientation": "any",
+  "lang": "nl",
+  "dir": "ltr",
   "background_color": "#f2f5f3",
   "theme_color": "#f58a14",
-  "lang": "nl",
+  "categories": [
+    "business",
+    "productivity"
+  ],
   "icons": [
     {
       "src": "./icons/capla-icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "./icons/capla-icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/capla-icon-192-maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "./icons/capla-icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "./screenshots/gsm-planning.png",
+      "sizes": "780x1688",
+      "type": "image/png",
+      "label": "Het rooster van de week",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "./screenshots/gsm-start.png",
+      "sizes": "780x1688",
+      "type": "image/png",
+      "label": "Startscherm van CaSuite",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "./screenshots/pc-planning.png",
+      "sizes": "2560x1600",
+      "type": "image/png",
+      "label": "Personeelsplanning op de pc",
+      "form_factor": "wide"
     }
   ]
 }

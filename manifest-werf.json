@@ -1,24 +1,67 @@
 {
+  "id": "/CaSuite/werf.html",
   "name": "CaSnap – werfverslagen",
   "short_name": "CaSnap",
   "description": "Werfverslagen maken, opvolgen en delen voor Casentis.",
   "start_url": "./werf.html",
-  "scope": "./",
+  "scope": "./werf.html",
   "display": "standalone",
   "orientation": "any",
+  "lang": "nl",
+  "dir": "ltr",
   "background_color": "#f2f5f3",
   "theme_color": "#f5790a",
-  "lang": "nl",
+  "categories": [
+    "business",
+    "productivity"
+  ],
   "icons": [
     {
       "src": "./icons/casnap-icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "./icons/casnap-icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/casnap-icon-192-maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "./icons/casnap-icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "./screenshots/gsm-werfverslag.png",
+      "sizes": "780x1688",
+      "type": "image/png",
+      "label": "Een verslagpunt invullen op de werf",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "./screenshots/gsm-start.png",
+      "sizes": "780x1688",
+      "type": "image/png",
+      "label": "Startscherm: nieuw verslag of een bestaand bewerken",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "./screenshots/pc-werfverslag.png",
+      "sizes": "2560x1600",
+      "type": "image/png",
+      "label": "Werfverslag op de pc",
+      "form_factor": "wide"
     }
   ]
 }

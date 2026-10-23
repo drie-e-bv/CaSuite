@@ -219,10 +219,19 @@
 // taken kwam te staan. scherm.html herbouwd naar GROEP-gewijs geordend (elke groep se koprij
 // onmiddellijk gevolgd door zijn eigen dagrijen, naam+taak dus weer recht onder elkaar), met enkel
 // de 1e groep die de volledige datumtekst toont (geen herhaalde datum). Enkel scherm.html wijzigt.
-// CaBon (2026-10-19): nieuwe, 6e installeerbare app cabon.html (werkbonnen op tablet) + nieuw
-// tabblad "Werkbonnen" in alle andere builds van src2.html; cacheversie opgehoogd.
-// 2026-10-19 (later): materialen.html (materialendatabase + OCI) + CaBon-materiaalsuggesties uit de materialendatabase.
-const CACHE_VERSION = 'casnap-v2026-10-19-materialen2';
+// Ronde "foto-tekenen" (2026-10-21): op vraag van Peter ("Kun je toevoegen dat er ook op een foto
+// nog iets kan getekend worden? zoals schets op het scherm?", daarna "Foto mss toch in lagen
+// voorzien") -- een nieuwe tekenlaag op elke foto bij een verslagpunt (#foto-teken-modal in
+// src2.html): vrije lijn, pijl, cirkel en tekst, in zes kleuren en drie diktes. Elke tekening wordt
+// als GEGEVEN bewaard (nieuwe kolom verslagpunten.foto_annotatie, jsonb) met de kale foto als
+// basis, zodat je er later een pijl kan aantikken, verslepen of weggooien. Wat bij het punt (en dus
+// in de PDF/WhatsApp/mail) komt, is de samengestelde, platte foto -- geen enkel bestaand exportpad
+// hoeft iets van lagen te weten. Gevolg voor de opslag: twee bestanden per getekende foto.
+// Deze ronde is ook de werkomgeving opnieuw opgebouwd na een reset (src2.html hersteld uit de
+// geleverde index.html, app-iconen teruggehaald uit werf/planning/cados/cacalc.html) en is er een
+// nieuwe basis-regressiesuite (test-basis.js, 28 controles) + test-fototekenen.js (21 controles),
+// als vervanging voor de verloren suite van 924 controles.
+const CACHE_VERSION = 'casnap-v2026-10-22-installeren';
 const NETWORK_TIMEOUT_MS = 4000;
 
 self.addEventListener('install', () => {

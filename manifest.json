@@ -1,14 +1,20 @@
 {
+  "id": "/CaSuite/",
   "name": "CaSuite",
   "short_name": "CaSuite",
-  "description": "CaSuite — overzicht en snelkoppelingen naar alle Casentis-apps (Werfverslag, Planning, Dossier, Kabelberekening).",
-  "start_url": "./",
-  "scope": "./",
+  "description": "CaSuite — werfverslagen, personeelsplanning, dossiers en kabelberekening voor Casentis.",
+  "start_url": "./index.html",
+  "scope": "./index.html",
   "display": "standalone",
   "orientation": "any",
+  "lang": "nl",
+  "dir": "ltr",
   "background_color": "#f2f5f3",
   "theme_color": "#1b6b3e",
-  "lang": "nl",
+  "categories": [
+    "business",
+    "productivity"
+  ],
   "icons": [
     {
       "src": "./icons/icon192.png",
@@ -33,6 +39,43 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "./screenshots/gsm-werfverslag.png",
+      "sizes": "780x1688",
+      "type": "image/png",
+      "label": "Een verslagpunt invullen op de werf",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "./screenshots/gsm-start.png",
+      "sizes": "780x1688",
+      "type": "image/png",
+      "label": "Startscherm: nieuw verslag of een bestaand bewerken",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "./screenshots/gsm-planning.png",
+      "sizes": "780x1688",
+      "type": "image/png",
+      "label": "Het rooster van de week",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "./screenshots/pc-werfverslag.png",
+      "sizes": "2560x1600",
+      "type": "image/png",
+      "label": "Werfverslag op de pc",
+      "form_factor": "wide"
+    },
+    {
+      "src": "./screenshots/pc-planning.png",
+      "sizes": "2560x1600",
+      "type": "image/png",
+      "label": "Personeelsplanning op de pc",
+      "form_factor": "wide"
     }
   ]
 }
