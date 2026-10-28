@@ -44,6 +44,20 @@ OUTER = r"""
     if(error) throw error;
   };
   window.dbUploadModuleTekening = (file) => dbUploadFile('module-tekeningen', file);
+  // Gedeelde CaDos-instellingen (klemfuncties + aangepaste standaardmodules), tabel elektro_cados_instellingen.
+  window.dbListCadosInstellingen = async function(){
+    const { data, error } = await sb.from('elektro_cados_instellingen').select('*');
+    if(error) throw error;
+    return data || [];
+  };
+  window.dbSaveCadosInstelling = async function(sleutel, waarde){
+    const { error } = await sb.from('elektro_cados_instellingen').upsert({ sleutel, waarde, updated_at: new Date().toISOString() }, { onConflict: 'sleutel' });
+    if(error) throw error;
+  };
+  window.dbDeleteCadosInstelling = async function(sleutel){
+    const { error } = await sb.from('elektro_cados_instellingen').delete().eq('sleutel', sleutel);
+    if(error) throw error;
+  };
   // AI: herkent specs + aansluitklemmen op een foto/tekening (Edge Function "module-analyse",
   // apart van ai-assist). Stuurt hetzelfde "AI-model (handschrift)" mee als de kladversie.
   window.aiModuleAnalyse = async function(image, hint){
@@ -89,6 +103,10 @@ anker_rem = '      <input type="checkbox" class="sq-rem" ${item.isRem?"checked":
 vervang(anker_rem, anker_rem + "\n    ${bibStagingHtml()}", "staging html")
 vervang('  const remChk = box.querySelector(".sq-rem");',
         '  wireBibStaging(box, item, rebuildAll);\n  const remChk = box.querySelector(".sq-rem");', "staging listeners")
+# 6b. layout: benaming + specs leesbaar bij hoveren over een module (enkel een tooltip, verder ongewijzigd)
+vervang("title=\"${isDivider?'Scheidingsteken (0 modules) — onderbreekt de automaat-nummering zonder plaats in te nemen':''}\">",
+        "title=\"${isDivider?'Scheidingsteken (0 modules) — onderbreekt de automaat-nummering zonder plaats in te nemen':escapeHtml(chipTitel(m, code))}\">",
+        "chip-tooltip")
 # 7. export-checklist / volledig dossier
 anker_exp = '  {key:"interlex", label:"Rijgklemmen", fn:()=>exportRijgklemmenVoorWerf'
 vervang(anker_exp,

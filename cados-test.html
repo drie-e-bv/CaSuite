@@ -3548,6 +3548,41 @@
 #cados-app #uvBanner .move-banner.uv-omzet-banner{background:#eef6f1;color:var(--ink);border:1px solid #2F7A4D;box-shadow:none;}
 #cados-app #uvBanner .move-banner.uv-omzet-banner .btn{background:#2F7A4D;color:#fff;border-color:#2F7A4D;}
 
+/* module-ontwerper, tooltips, tabbladen (2026-10-28) */
+#cados-app .uv-tip{position:absolute;z-index:30;pointer-events:none;max-width:280px;white-space:pre-line;background:#14181d;color:#fff;
+  font:500 12px/1.4 var(--sans, "Inter", Arial, sans-serif);padding:7px 10px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.25);}
+.mbib-tabs{display:flex;gap:4px;margin-bottom:12px;border-bottom:1px solid #e3e6ea;flex-wrap:wrap;}
+.mbib-tab{border:0;background:transparent;font:inherit;font-size:13.5px;font-weight:700;color:#5c636b;padding:9px 14px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.mbib-tab.actief{color:#2F7A4D;border-bottom-color:#2F7A4D;}
+.mbib-aangepast{color:#bb5e26;}
+.mod-ontwerper{z-index:4100;}
+.ke-toolbar .mbib-btn{min-height:32px;padding:0 10px;font-size:12.5px;}
+.ke-raster{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:#5c636b;font-weight:600;}
+.ke-raster input{min-height:0;}
+.ke-stage{background:#fff;}
+.ke-svg{display:block;width:100%;height:100%;pointer-events:none;}
+.ke-hint{font-size:11.5px;color:#7a8089;}
+.ke-weergave-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;}
+@media (max-width:520px){ .ke-weergave-grid{grid-template-columns:1fr;} }
+.ke-vinkjes{flex-direction:row !important;flex-wrap:wrap;gap:12px !important;align-items:center;padding-top:18px;}
+.ke-vinkjes label{display:inline-flex;align-items:center;gap:5px;font-weight:600;}
+.ke-vinkjes input{min-height:0;}
+.mo-doelen{display:flex;flex-direction:column;gap:8px;}
+.mo-doel{display:flex;gap:9px;align-items:flex-start;padding:9px 11px;border:1px solid #e3e6ea;border-radius:10px;cursor:pointer;font-size:13.5px;font-weight:600;}
+.mo-doel:has(input:checked){border-color:#2F7A4D;background:#f1f8f3;}
+.mo-doel input{min-height:0;margin-top:3px;}
+.mo-doel small{display:block;font-weight:400;color:#6a7079;font-size:12px;margin-top:2px;}
+.mbib-foto{border:1px solid #e3e6ea;border-radius:10px;padding:8px 12px;}
+.mbib-foto summary{cursor:pointer;font-weight:700;font-size:13px;color:#3b4047;}
+.mbib-foto[open] summary{margin-bottom:10px;}
+.mbib-foto > *:not(summary){margin-top:8px;}
+.kf-tabel td:first-child{width:45%;}
+.kf-staal{display:inline-block;width:14px;height:14px;border-radius:3px;border:1px solid rgba(0,0,0,.3);vertical-align:middle;margin-right:6px;}
+.kf-tabel select{width:calc(100% - 24px) !important;}
+.kf-tabel .mbib-btn{min-height:30px;padding:0 8px;}
+
+.ke-vinkjes input, .ke-raster input, .mo-doel input{width:auto !important;min-height:0 !important;}
+
 </style>
 </head>
 <body>
@@ -8628,7 +8663,7 @@ function renderModuleChip(m, rij, grid, rebuildAll, code, selected, selectModule
   const specHtml = (!isStaging && (lines.a || lines.polen))
     ? `<span class="chip-a">${escapeHtml(lines.a)}</span><span class="chip-polen">${escapeHtml(lines.polen)}</span>`
     : `<span class="chip-sub">${escapeHtml(chipSubText(m))}</span>`;
-  const chip = el(`<div class="modchip cat-${cat} ${selected?'selected':''} ${isStaging?'staging-chip':''} ${isDivider?'divider':''}" style="--breedte:${breedteVal};" data-id="${m.id}" title="${isDivider?'Scheidingsteken (0 modules) — onderbreekt de automaat-nummering zonder plaats in te nemen':''}">
+  const chip = el(`<div class="modchip cat-${cat} ${selected?'selected':''} ${isStaging?'staging-chip':''} ${isDivider?'divider':''}" style="--breedte:${breedteVal};" data-id="${m.id}" title="${isDivider?'Scheidingsteken (0 modules) — onderbreekt de automaat-nummering zonder plaats in te nemen':escapeHtml(chipTitel(m, code))}">
     ${isStaging ? "" : `<button class="chip-add left" title="kopie ervoor invoegen">⧉</button>`}
     <span class="chip-code">${code ? escapeHtml(code) : (isStaging ? "NIEUW" : (CAT_ABBR[cat]||""))}</span>
     ${specHtml}
@@ -15616,7 +15651,6 @@ function laadModuleBib(force){
 const CURVE_OPTIES = ["","B","C","D","K","Z"];
 const KA_OPTIES = ["","3","4.5","6","10","15","25","36","50"];
 const DIFF_TYPE_OPTIES = ["","AC","A","A-SI","F","B"];
-const KLEM_FUNCTIES = ["L","L1","L2","L3","N","PE","+","-","in","uit","bus","contact","andere"];
 const DRAAD_KLEUREN = {
   "Bruin":"#8a4b1f", "Blauw":"#1f63c6", "Zwart":"#1d1d1f", "Grijs":"#8b8f96", "Geel/groen":"#2e9d3a",
   "Rood":"#d0302b", "Oranje":"#ee7d11", "Wit":"#f4f4f4", "Violet":"#7b3fb8"
@@ -15629,6 +15663,8 @@ function normFunctie(f){
   return s;
 }
 function standaardKleurVoorFunctie(f){
+  const t = klemFunctieKleur(f);
+  if(t && DRAAD_KLEUREN[t]) return t;
   const s = normFunctie(f);
   if(s==="N" || s==="-") return "Blauw";
   if(s==="PE") return "Geel/groen";
@@ -15660,6 +15696,22 @@ function standaardKlemmen(m){
     L.forEach((l, i)=>{ const x = (i+0.5)/L.length; add("t"+i, l, l, "boven", x); add("b"+i, l, l, "onder", x); });
     return out;
   }
+  if(cat==="Rijgklemmenmodule" && (m.rijgklemKlemIds||[]).length){
+    // De echte rijgklemmen (tabblad Rijgklemmen): per klem een aansluiting boven en onder,
+    // label = klemnummer, functie afgeleid uit de aderkleur (blauw = N, geel/groen = PE, ...).
+    const items = (state.interlex && state.interlex.items) || [];
+    const ids = m.rijgklemKlemIds;
+    ids.forEach((kid, i)=>{
+      const idx = items.findIndex(k=> k.id===kid);
+      const klem = items[idx] || {};
+      const nr = idx >= 0 ? String(idx+1) : "?";
+      const x = (i+0.5)/ids.length;
+      const tip = (zijde)=> ["Rijgklem "+nr, (klem[zijde]||{}).watwaar, (klem[zijde]||{}).kleur, klem.kamer, klem.info].filter(Boolean).join(" · ");
+      out.push({id: "rb_"+kid, label: nr, functie: functieVoorAderkleur((klem.boven||{}).kleur) || functieVoorAderkleur((klem.onder||{}).kleur) || "contact", zijde: "boven", x, y: 0.06, tip: tip("boven")});
+      out.push({id: "ro_"+kid, label: nr, functie: functieVoorAderkleur((klem.onder||{}).kleur) || "contact", zijde: "onder", x, y: 0.94, tip: tip("onder")});
+    });
+    return out;
+  }
   if(cat==="Rijgklemmenmodule"){
     const n = Math.max(2, Math.min(14, (m.rijgklemKlemIds||[]).length || Math.round((parseInt(m.breedte)||2)*3.5)));
     for(let i=0;i<n;i++){ const x = (i+0.5)/n; add("t"+i, String(i+1), "contact", "boven", x); add("b"+i, String(i+1), "contact", "onder", x); }
@@ -15672,13 +15724,30 @@ function standaardKlemmen(m){
     for(let i=0;i<n;i++) add("q"+i, "Q"+(i+1), "uit", "onder", (i+0.5)/n);
   } else if(cat==="Voeding"){
     add("bP", "+", "+", "onder", 0.3); add("bM", "-", "-", "onder", 0.7);
+  } else if(cat==="DALI"){
+    add("bA", "DA+", "DA+", "onder", 0.3); add("bB", "DA-", "DA-", "onder", 0.7);
   } else {
-    add("bA", "bus+", "bus", "onder", 0.3); add("bB", "bus-", "bus", "onder", 0.7);
+    add("bA", "bus+", "bus+", "onder", 0.3); add("bB", "bus-", "bus-", "onder", 0.7);
   }
   return out;
 }
+function functieVoorAderkleur(kleur){
+  const k = String(kleur||"").toLowerCase();
+  if(!k) return null;
+  if(k.includes("geel") || k.includes("groen")) return "PE";
+  if(k.includes("blauw")) return "N";
+  if(k.includes("bruin") || k.includes("zwart") || k.includes("grijs")) return "L";
+  return null;
+}
+// Volgorde: eigen aanpassing van deze module > bibliotheekmodule > aangepaste standaard
+// (Standaardmodules) > ingebouwde standaard. Een rijgklemmenmodule volgt altijd de echte
+// rijgklemmen (tenzij er een eigen aanpassing is).
 function klemmenVoorModule(m){
+  if(Array.isArray(m.klemmenEigen) && m.klemmenEigen.length) return m.klemmenEigen;
+  if(m.categorie==="Rijgklemmenmodule") return standaardKlemmen(m);
   if(m.bib && Array.isArray(m.bib.klemmen) && m.bib.klemmen.length) return m.bib.klemmen;
+  const sj = sjabloonVoor(m);
+  if(sj && Array.isArray(sj.klemmen) && sj.klemmen.length) return sj.klemmen;
   return standaardKlemmen(m);
 }
 
@@ -15694,7 +15763,7 @@ function normPolen(v){
   return (n>=1 && n<=4) ? n+"P" : "";
 }
 function bibSnapshot(row){
-  return { id: row.id, naam: row.naam||"", tekening_url: row.tekening_url||"", klemmen: Array.isArray(row.klemmen) ? row.klemmen : [], breedte: Number(row.breedte)||0 };
+  return { id: row.id, naam: row.naam||"", tekening_url: row.tekening_url||"", klemmen: Array.isArray(row.klemmen) ? row.klemmen : [], breedte: Number(row.breedte)||0, weergave: (row.specs && row.specs.weergave) || null };
 }
 function bibSpecTekst(row){
   const cat = row.categorie || "";
@@ -15791,6 +15860,7 @@ function bibEditorVeldenHtml(m, cat){
     <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
       <select class="me-bib" style="flex:1 1 220px;min-width:0;"></select>
       <button type="button" class="btn small ghost me-bib-open">🔌 Bibliotheek</button>
+      <button type="button" class="btn small ghost me-ontwerp" title="tekening en aansluitklemmen van deze module aanpassen (Uitvoeringsplan)">✏️ Tekening &amp; klemmen</button>
     </div>
     <div class="hint" style="margin-top:4px;">Kies het exacte toestel: het Uitvoeringsplan gebruikt dan zijn technische tekening en klemmen. Niet gevonden? Voeg het toe via 🔌 Bibliotheek (de AI leest de tekening voor je).</div>
   </div>`;
@@ -15810,6 +15880,8 @@ function wireBibEditorVelden(box, m, rebuildAll){
       if(row){ applyBibOpModule(m, row); save(); rebuildAll(); toast("Gekoppeld aan "+row.naam); }
     });
   }
+  const ow = box.querySelector(".me-ontwerp");
+  if(ow) ow.addEventListener("click", ()=> openModuleOntwerperVoorModule(m, ()=> rebuildAll()));
   const ob = box.querySelector(".me-bib-open");
   if(ob) ob.addEventListener("click", ()=> openModuleBibliotheek({
     preset: moduleNaarBibPreset(m),
@@ -15877,11 +15949,15 @@ function uvSyncEnOpruimen(kast){
       if(JSON.stringify(snap) !== JSON.stringify(m.bib||null)){ m.bib = snap; gewijzigd = true; }
     });
   }
-  const bestaand = new Set();
-  mods.forEach(m=> klemmenVoorModule(m).forEach(k=> bestaand.add(uvKlemKey(m.id, k.id))));
-  const voor = kast.bedrading.length;
-  kast.bedrading = kast.bedrading.filter(w=> w && w.a && w.b && bestaand.has(uvKlemKey(w.a.m, w.a.k)) && bestaand.has(uvKlemKey(w.b.m, w.b.k)));
-  if(kast.bedrading.length !== voor) gewijzigd = true;
+  // Draden naar verdwenen klemmen pas opruimen als de (aangepaste) standaardmodules geladen zijn,
+  // anders zouden draden naar klemmen die enkel in een standaardmodule bestaan onterecht verdwijnen.
+  if(cadosInstGeladen){
+    const bestaand = new Set();
+    mods.forEach(m=> klemmenVoorModule(m).forEach(k=> bestaand.add(uvKlemKey(m.id, k.id))));
+    const voor = kast.bedrading.length;
+    kast.bedrading = kast.bedrading.filter(w=> w && w.a && w.b && bestaand.has(uvKlemKey(w.a.m, w.a.k)) && bestaand.has(uvKlemKey(w.b.m, w.b.k)));
+    if(kast.bedrading.length !== voor) gewijzigd = true;
+  }
   // Kamgeleiders: enkel modules die nog in dezelfde rij staan blijven erop; een lege kam verdwijnt.
   if(!Array.isArray(kast.kamgeleiders)) kast.kamgeleiders = [];
   const rijVan = {};
@@ -15950,33 +16026,28 @@ function uvRoutes(kast, geo){
   }).filter(Boolean);
 }
 
+function chipTitel(m, code){
+  const cat = m.categorie || "Overig";
+  if(cat==="Leeg") return "";
+  const label = MODULE_CATEGORIEEN[cat] ? MODULE_CATEGORIEEN[cat].label : cat;
+  const kop = [code, m.naam].filter(Boolean).join(" — ") || label;
+  const spec = [chipSpecText(m), m.curve ? "curve "+m.curve : "", m.kA ? m.kA+" kA" : "", m.diffType ? "type "+m.diffType : ""].filter(Boolean).join(" · ");
+  return [kop, [label, spec].filter(Boolean).join(": "), m.type, m.kabelType ? "kabel "+m.kabelType : ""].filter(Boolean).join("\n");
+}
 function uvModuleSvg(md){
   const {m, x, y, w, h, code} = md;
   const cat = m.categorie || "Overig";
   if(cat==="Leeg") return `<rect x="${x+2}" y="${y+2}" width="${w-4}" height="${h-4}" rx="3" class="uv-leeg"/>`;
   const sel = uvSelMod===m.id ? " sel" : "";
-  let s = `<g class="uv-mod${sel}" data-mod="${m.id}">`;
+  const wg = weergaveVoorModule(m);
+  let s = `<g class="uv-mod${sel}" data-mod="${m.id}" data-tip="${escapeHtml(chipTitel(m, code))}">`;
   const url = m.bib && m.bib.tekening_url;
-  if(url){
+  if(url && wg.foto !== false){
     s += `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#fff"/>`;
     s += `<image href="${escapeHtml(url)}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="none"/>`;
     s += `<rect x="${x}" y="${y}" width="${w}" height="${h}" class="uv-mod-rand"/>`;
   } else {
-    const kleur = cat==="Differentieel" ? "#FBEEE0" : (["Centrale","Voeding","DALI","HVAC","Relais"].includes(cat) ? "#EAF3F7" : "#ffffff");
-    s += `<rect x="${x+1}" y="${y}" width="${w-2}" height="${h}" rx="4" fill="${kleur}" class="uv-mod-rand"/>`;
-    s += `<rect x="${x+3}" y="${y+2}" width="${w-6}" height="20" rx="2" class="uv-klemstrook"/>`;
-    s += `<rect x="${x+3}" y="${y+h-22}" width="${w-6}" height="20" rx="2" class="uv-klemstrook"/>`;
-    if(["Automaat","Differentieel","Overig"].includes(cat)){
-      s += `<rect x="${x+w/2-6}" y="${y+h/2+12}" width="12" height="26" rx="2" class="uv-hendel"/>`;
-      const lines = chipCompactLines(m);
-      const spec = [ (m.curve||"") + (lines.a||"").replace(/^[RH]·/, ""), cat==="Differentieel" ? (m.mA||"") : "" ].filter(Boolean).join(" ");
-      s += `<text x="${x+w/2}" y="${y+40}" class="uv-spec">${escapeHtml(spec)}</text>`;
-      if(m.polen) s += `<text x="${x+w/2}" y="${y+52}" class="uv-spec dim">${escapeHtml(m.polen)}</text>`;
-    } else {
-      const naam = (m.naam || m.type || (MODULE_CATEGORIEEN[cat] ? MODULE_CATEGORIEEN[cat].label : cat)).slice(0, 22);
-      s += `<text x="${x+w/2}" y="${y+44}" class="uv-spec">${escapeHtml(CAT_ABBR[cat]||"")}</text>`;
-      if(w >= UV.MW*2) s += `<text x="${x+w/2}" y="${y+h-34}" class="uv-spec dim">${escapeHtml(naam.slice(0, Math.floor(w/6)))}</text>`;
-    }
+    s += `<g transform="translate(${x} ${y})">${moduleVectorSvg(m, w, h, wg)}</g>`;
   }
   s += `<rect x="${x+w/2-16}" y="${y+h/2-10}" width="32" height="18" rx="4" class="uv-code-bg"/>`;
   s += `<text x="${x+w/2}" y="${y+h/2+3.5}" class="uv-code">${escapeHtml(code || CAT_ABBR[cat] || "")}</text>`;
@@ -15989,7 +16060,8 @@ function uvWireSvg(r, interactief){
   const kleur = DRAAD_KLEUREN[w.kleur] || DRAAD_KLEUREN.Bruin;
   const bw = draadBreedte(w.sectie);
   const sel = interactief && uvSelWire===w.id;
-  let s = `<g class="uv-draad${sel?" sel":""}" data-w="${w.id}">`;
+  const tip = r.A && r.B ? `${r.A.code||""} · ${r.A.k.label||""} → ${r.B.code||""} · ${r.B.k.label||""}\n${w.kleur||""} ${w.sectie||""} mm²${w.label?" · "+w.label:""}` : "";
+  let s = `<g class="uv-draad${sel?" sel":""}" data-w="${w.id}" data-tip="${escapeHtml(tip)}">`;
   if(interactief) s += `<path d="${r.d}" class="uv-draad-hit"/>`;
   s += `<path d="${r.d}" class="uv-draad-rand" style="stroke-width:${bw+1.6}"/>`;
   s += `<path d="${r.d}" style="stroke:${kleur};stroke-width:${bw}" class="uv-draad-kern"/>`;
@@ -16026,9 +16098,11 @@ function bouwBedradingSvg(kast, interactief){
     const pend = uvPending && uvKlemKey(uvPending.m, uvPending.k)===key;
     const cls = ["uv-klem", verbonden.has(key)?"bezet":"", pend?"pending":""].filter(Boolean).join(" ");
     const ly = p.zijde==="boven" ? p.y-9 : p.y+15;
-    s += `<g class="${cls}" data-m="${p.m.id}" data-k="${escapeHtml(p.k.id)}">`;
+    const ktip = [`${p.code || p.m.naam || p.m.categorie} · klem ${p.k.label||p.k.id} (${p.k.functie||"—"}, ${p.zijde})`, p.k.tip || "", p.m.naam || ""].filter(Boolean).join("\n");
+    const kc = kleurHexVoorFunctie(p.k.functie || p.k.label);
+    s += `<g class="${cls}" data-m="${p.m.id}" data-k="${escapeHtml(p.k.id)}" data-tip="${escapeHtml(ktip)}">`;
     if(interactief) s += `<circle cx="${p.x}" cy="${p.y}" r="11" class="uv-klem-hit"/>`;
-    s += `<circle cx="${p.x}" cy="${p.y}" r="5" class="uv-klem-dot"/>`;
+    s += `<circle cx="${p.x}" cy="${p.y}" r="5" class="uv-klem-dot"${kc ? ` style="stroke:${kc}"` : ""}/>`;
     if(!opKam.has(key)) s += `<text x="${p.x}" y="${ly}" class="uv-klem-label">${escapeHtml(String(p.k.label||"").slice(0,6))}</text>`;
     s += `</g>`;
   });
@@ -16523,8 +16597,9 @@ function renderUitvoeringsplan(){
         <strong>${escapeHtml(codes[md.id]||"")} ${escapeHtml(MODULE_CATEGORIEEN[md.categorie] ? MODULE_CATEGORIEEN[md.categorie].label : md.categorie)}</strong>
         <div class="hint">${escapeHtml([chipSpecText(md), md.curve?("curve "+md.curve):"", md.kA?(md.kA+" kA"):"", md.type, md.naam].filter(Boolean).join(" · ")||"—")}</div>
         <div class="field"><label>Bibliotheekmodule</label><select class="sm-bib"></select></div>
-        <div class="hint">${md.bib && md.bib.klemmen && md.bib.klemmen.length ? `${klemmen.length} klemmen uit de bibliotheek` : `${klemmen.length} standaardklemmen (geen bibliotheekmodule)`}</div>
+        <div class="hint">${klemmen.length} klemmen — ${Array.isArray(md.klemmenEigen) && md.klemmenEigen.length ? "eigen aanpassing" : (md.categorie==="Rijgklemmenmodule" ? "uit het tabblad Rijgklemmen" : (md.bib && md.bib.klemmen && md.bib.klemmen.length ? "uit de bibliotheek" : (sjabloonVoor(md) ? "aangepaste standaard" : "standaard")))}</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
+          <button class="btn small primary sm-ontwerp">✏️ Tekening &amp; klemmen</button>
           <button class="btn small ghost sm-open">🔌 Bibliotheek…</button>
           <button class="btn small ghost sm-layout">In layout openen</button>
           <button class="btn small ghost sm-sluit">Sluiten</button>
@@ -16543,6 +16618,7 @@ function renderUitvoeringsplan(){
         kies: (row)=>{ applyBibOpModule(md, row); save(); uvSyncEnOpruimen(kast); teken(); },
         naSluiten: ()=>{ uvSyncEnOpruimen(kast); teken(); }
       }));
+      box.querySelector(".sm-ontwerp").addEventListener("click", ()=> openModuleOntwerperVoorModule(md, ()=>{ uvSyncEnOpruimen(kast); teken(); }));
       box.querySelector(".sm-layout").addEventListener("click", ()=> selectTab("zekeringen"));
       box.querySelector(".sm-sluit").addEventListener("click", ()=>{ uvSelMod = null; teken(); });
       side.appendChild(box);
@@ -16573,6 +16649,20 @@ function renderUitvoeringsplan(){
         zone.appendChild(c);
       });
       box.querySelector(".uv-rap-sluit").addEventListener("click", ()=>{ uvLaatsteOmzet = null; teken(); });
+      side.appendChild(box);
+    }
+    const losseKlemmen = rijgklemmenZonderModule();
+    if(losseKlemmen.length){
+      const box = el(`<div class="card" style="margin-bottom:12px;"><div class="card-body uv-sidebody">
+        <strong>Rijgklemmen</strong>
+        <div class="hint">${losseKlemmen.length} rijgklem(men) van het tabblad Rijgklemmen staan nog op geen enkele rijgklemmenmodule in een kast.</div>
+        <button class="btn small primary uv-rk-plaats">＋ In deze kast plaatsen</button>
+      </div></div>`);
+      box.querySelector(".uv-rk-plaats").addEventListener("click", ()=>{
+        const n = plaatsRijgklemmenInKast(kast, losseKlemmen.map(k=> k.id));
+        save(); toast(`${losseKlemmen.length} rijgklem(men) geplaatst op ${n} rijgklemmenmodule(s) — ook zichtbaar in de layout.`);
+        selectTab("uitvoering");
+      });
       side.appendChild(box);
     }
     const zonderBib = uvAlleModules(kast).filter(m=> m.categorie!=="Leeg" && !m.bibId).length;
@@ -16631,7 +16721,8 @@ function renderUitvoeringsplan(){
   async function doeOmzet(){
     const heeftAuto = kast.bedrading.some(w=> w.auto) || (kast.kamgeleiders||[]).some(k=> k.auto);
     if(heeftAuto && !confirm("Opnieuw automatisch omzetten? De vorige automatische voorstellen worden vervangen; wat je zelf tekende of aanpaste blijft staan.")) return;
-    try{ await laadModuleBib(); }catch(e){ toast("Bibliotheek niet bereikbaar — omzetting zonder bibliotheekmodules."); }
+    const res = await laadAllesVoorUitvoering();
+    if(res[0].status==="rejected") toast("Bibliotheek niet bereikbaar — omzetting zonder bibliotheekmodules.");
     const r = uvAutoOmzet(kast);
     uvPending = null; uvSelWire = null; uvSelMod = null; uvSelKam = null; uvKamModus = false;
     uvSyncEnOpruimen(kast);
@@ -16748,7 +16839,24 @@ function renderUitvoeringsplan(){
   teken();
   // Bibliotheek op de achtergrond laden zodat gekoppelde modules hun meest
   // recente tekening/klemmen tonen.
-  if(!moduleBibGeladen) laadModuleBib().then(()=>{ uvSyncEnOpruimen(kast); if(document.body.contains(wrap)) teken(); }).catch(()=>{});
+  if(!moduleBibGeladen || !cadosInstGeladen) laadAllesVoorUitvoering().then(()=>{ uvSyncEnOpruimen(kast); if(document.body.contains(wrap)) teken(); });
+  // Zwevende uitleg bij hoveren: benaming + specs van de module, klem, draad.
+  const tipEl = el(`<div class="uv-tip" style="display:none;"></div>`);
+  canvas.parentElement.style.position = "relative";
+  canvas.parentElement.appendChild(tipEl);
+  canvas.addEventListener("pointermove", ev=>{
+    if(ev.pointerType==="touch" || kamSleep){ tipEl.style.display = "none"; return; }
+    const t = ev.target.closest && ev.target.closest("[data-tip]");
+    const tekst = t && t.getAttribute("data-tip");
+    if(!tekst){ tipEl.style.display = "none"; return; }
+    tipEl.textContent = tekst;
+    const rc = canvas.parentElement.getBoundingClientRect();
+    tipEl.style.display = "block";
+    let lx = ev.clientX - rc.left + 14, ly = ev.clientY - rc.top + 16;
+    if(lx + tipEl.offsetWidth > rc.width - 4) lx = Math.max(4, ev.clientX - rc.left - tipEl.offsetWidth - 10);
+    tipEl.style.left = lx + "px"; tipEl.style.top = ly + "px";
+  });
+  canvas.addEventListener("pointerleave", ()=>{ tipEl.style.display = "none"; });
   return wrap;
 }
 
@@ -16908,15 +17016,18 @@ function openModuleBibliotheek(opts){
 window.openModuleBibliotheek = openModuleBibliotheek;
 
 async function toonBibLijst(ctx){
+  laadCadosInst().catch(()=>{});
   const cats = Object.keys(MODULE_CATEGORIEEN).filter(k=> k!=="Leeg");
-  ctx.body.innerHTML = `
-    <p class="mbib-hint">Gedeeld over alle projecten. Elke module heeft zijn technische tekening en aansluitklemmen — die gebruikt het Uitvoeringsplan om de bedrading te tekenen.${ctx.opts.kies ? " <strong>Tik op \"Kiezen\" om de module aan je zekering te koppelen.</strong>" : ""}</p>
+  ctx.tab = "modules";
+  ctx.body.innerHTML = bibTabsHtml(ctx) + `
+    <p class="mbib-hint">Gedeeld over alle projecten. Elke module heeft zijn (zelf getekende) tekening en aansluitklemmen — die gebruikt het Uitvoeringsplan om de bedrading te tekenen.${ctx.opts.kies ? " <strong>Tik op \"Kiezen\" om de module aan je zekering te koppelen.</strong>" : ""}</p>
     <div class="mbib-filter">
       <input type="search" class="mbib-q" placeholder="Zoek op merk, type, artikelnummer…" value="${escapeHtml(ctx.filter.q)}">
       <select class="mbib-cat"><option value="">Alle soorten</option>${cats.map(c=>`<option value="${c}" ${ctx.filter.cat===c?"selected":""}>${escapeHtml(MODULE_CATEGORIEEN[c].label)}</option>`).join("")}</select>
       <button type="button" class="mbib-btn primary mbib-nieuw">+ Nieuwe module</button>
     </div>
     <div class="mbib-grid"><div class="mbib-leeg">Bibliotheek laden…</div></div>`;
+  wireBibTabs(ctx);
   const grid = ctx.body.querySelector(".mbib-grid");
   ctx.body.querySelector(".mbib-q").addEventListener("input", e=>{ ctx.filter.q = e.target.value; renderGrid(); });
   ctx.body.querySelector(".mbib-cat").addEventListener("change", e=>{ ctx.filter.cat = e.target.value; renderGrid(); });
@@ -16941,10 +17052,12 @@ async function toonBibLijst(ctx){
     rows.forEach(r=>{
       const card = document.createElement("div");
       card.className = "mbib-card";
-      card.innerHTML = `<div class="mbib-thumb">${r.tekening_url ? `<img src="${escapeHtml(r.tekening_url)}" alt="">` : bibThumbSvg(r)}</div>
+      const vm = {id: "v", categorie: r.categorie, polen: normPolen(r.polen), A: normA(r.stroom), curve: r.curve, mA: normMA(r.gevoeligheid), naam: r.naam, type: [r.merk, r.artikelnr].filter(Boolean).join(" "), breedte: Number(r.breedte)||1, uitgangen: []};
+      const vwg = Object.assign(standaardWeergave(vm), (r.specs && r.specs.weergave) || {});
+      card.innerHTML = `<div class="mbib-thumb">${r.tekening_url && vwg.foto !== false ? `<img src="${escapeHtml(r.tekening_url)}" alt="">` : miniModuleSvg(vm, r.klemmen||[], vwg)}</div>
         <div class="mbib-card-body"><div class="mbib-card-naam">${escapeHtml(r.naam)}</div>
         <div class="mbib-card-spec">${escapeHtml(bibSpecTekst(r))}</div>
-        <div class="mbib-card-spec dim">${(r.klemmen||[]).length} klemmen${r.tekening_url ? "" : " · geen tekening"}</div>
+        <div class="mbib-card-spec dim">${(r.klemmen||[]).length} klemmen${r.tekening_url ? " · met foto" : " · zelf getekend"}</div>
         <div class="mbib-card-acties">${ctx.opts.kies ? `<button type="button" class="mbib-btn primary mbib-kies">Kiezen</button>` : ""}
           <button type="button" class="mbib-btn ghost mbib-edit">Bewerken</button>
           <button type="button" class="mbib-btn ghost mbib-del" title="verwijderen">🗑</button></div></div>`;
@@ -16980,7 +17093,9 @@ function toonBibEditor(ctx, bestaand){
     <div class="mbib-terug"><button type="button" class="mbib-btn ghost mbib-terugbtn">← Terug naar de lijst</button></div>
     <div class="mbib-edit">
       <div class="mbib-col">
-        <div class="mbib-stap"><span class="mbib-nr">1</span> <strong>Foto, technische tekening of PDF</strong></div>
+        <div class="mbib-stap"><span class="mbib-nr">1</span> <strong>Module tekenen &amp; aansluitklemmen</strong> <span class="mbib-sub">— de snappunten voor de draden</span></div>
+        <div class="mbib-klem-editor"></div>
+        <details class="mbib-foto" ${r.tekening_url ? "open" : ""}><summary>📷 Optioneel: foto, technische tekening of PDF laden — de AI leest specs en klemmen</summary>
         <div class="mbib-rij">
           <label class="mbib-btn">📁 Bestand kiezen<input type="file" class="mbib-file" accept="image/*,application/pdf" hidden></label>
           <label class="mbib-btn">📷 Foto nemen<input type="file" class="mbib-cam" accept="image/*" capture="environment" hidden></label>
@@ -16995,17 +17110,11 @@ function toonBibEditor(ctx, bestaand){
           </div>
           <div class="mbib-ai-status"></div>
         </div>
-        <div class="mbib-stap"><span class="mbib-nr">2</span> <strong>Aansluitklemmen</strong> <span class="mbib-sub">— de snappunten voor de draden</span></div>
-        <div class="mbib-rij">
-          <button type="button" class="mbib-btn ghost mbib-klemmodus">＋ Klem toevoegen</button>
-          <button type="button" class="mbib-btn ghost mbib-standaard" title="klemmen volgens polen/soort plaatsen">Standaardklemmen</button>
-          <button type="button" class="mbib-btn ghost mbib-geenklem">Alle klemmen wissen</button>
-        </div>
-        <div class="mbib-tek-wrap"><div class="mbib-tek"></div></div>
-        <div class="mbib-klemlijst"></div>
+        </details>
+
       </div>
       <div class="mbib-col mbib-form-col">
-        <div class="mbib-stap"><span class="mbib-nr">3</span> <strong>Gegevens</strong></div>
+        <div class="mbib-stap"><span class="mbib-nr">2</span> <strong>Gegevens</strong></div>
         <div class="mbib-vragen"></div>
         <div class="mbib-form"></div>
         <div class="mbib-acties">
@@ -17159,110 +17268,21 @@ function toonBibEditor(ctx, bestaand){
     }
   });
 
-  /* ---- stap 2: klemmen op de tekening ---- */
-  const tek = B(".mbib-tek");
-  function tekenTekening(){
-    const breedte = Math.max(1, Number(r.breedte)||1);
-    tek.innerHTML = e.tekening
-      ? `<img class="mbib-tek-img" src="${escapeHtml(e.tekening)}" alt="" draggable="false">`
-      : `<div class="mbib-tek-leeg" style="aspect-ratio:${breedte*38}/150;">${bibThumbSvg({breedte})}<span>geen tekening — klemmen op standaardvorm</span></div>`;
-    tek.classList.toggle("klemmodus", e.klemModus);
-    B(".mbib-klemmodus").classList.toggle("actief", e.klemModus);
-    B(".mbib-klemmodus").textContent = e.klemModus ? "✓ Tik op de tekening om klemmen te plaatsen" : "＋ Klem toevoegen";
-    e.klemmen.forEach(k=>{
-      const d = document.createElement("div");
-      d.className = "mbib-dot" + (e.selKlem===k.id ? " sel" : "") + (zijdeVanKlem(k)==="onder" ? " onder" : "");
-      d.style.left = (k.x*100)+"%"; d.style.top = (k.y*100)+"%";
-      d.dataset.id = k.id;
-      d.innerHTML = `<span>${escapeHtml(String(k.label||"").slice(0,6))}</span>`;
-      tek.appendChild(d);
-    });
-  }
-  let sleep = null;
-  tek.addEventListener("pointerdown", ev=>{
-    const dot = ev.target.closest(".mbib-dot");
-    const rc = tek.getBoundingClientRect();
-    const px = Math.min(1, Math.max(0, (ev.clientX-rc.left)/rc.width)), py = Math.min(1, Math.max(0, (ev.clientY-rc.top)/rc.height));
-    if(dot){
-      ev.preventDefault();
-      e.selKlem = dot.dataset.id;
-      sleep = {id: dot.dataset.id, moved: false};
-      tek.setPointerCapture(ev.pointerId);
-      tekenTekening(); tekenKlemlijst();
-      return;
-    }
-    if(e.klemModus){
-      ev.preventDefault();
-      let n = e.klemmen.length + 1;
-      while(e.klemmen.some(k=> k.id==="k"+n)) n++;
-      const zijde = py >= 0.5 ? "onder" : "boven";
-      const k = {id: "k"+n, label: String(e.klemmen.length+1), functie: "L", zijde, x: px, y: py};
-      e.klemmen.push(k);
-      e.selKlem = k.id;
-      tekenTekening(); tekenKlemlijst();
-    }
+  /* ---- klemmen + zelf getekende module (gedeelde klem-editor) ---- */
+  e.weergave = Object.assign({}, (r.specs && r.specs.weergave) || {});
+  const bibModule = ()=>({ id: "bib", categorie: r.categorie, polen: normPolen(r.polen) || (r.categorie==="Differentieel" ? "2P" : "1P"),
+    A: normA(r.stroom), curve: r.curve, mA: normMA(r.gevoeligheid), naam: (r.naam||"").trim() || [r.merk, r.artikelnr].filter(Boolean).join(" "),
+    type: [r.merk, r.artikelnr].filter(Boolean).join(" "), breedte: Number(r.breedte) || bibBreedteVoorPolen(r.polen) || 1, uitgangen: [] });
+  const ke = klemEditor(B(".mbib-klem-editor"), {
+    getKlemmen: ()=> e.klemmen, setKlemmen: (v)=>{ e.klemmen = v; },
+    module: bibModule, weergave: ()=> e.weergave,
+    tekening: ()=> (e.tekening && e.weergave.foto !== false) ? e.tekening : null,
+    fotoBeschikbaar: ()=> !!e.tekening,
+    standaard: ()=> standaardKlemmen(bibModule()),
+    onChange: ()=> tekenVragen()
   });
-  tek.addEventListener("pointermove", ev=>{
-    if(!sleep) return;
-    const k = e.klemmen.find(x=> x.id===sleep.id);
-    if(!k) return;
-    const rc = tek.getBoundingClientRect();
-    k.x = Math.min(1, Math.max(0, (ev.clientX-rc.left)/rc.width));
-    k.y = Math.min(1, Math.max(0, (ev.clientY-rc.top)/rc.height));
-    sleep.moved = true;
-    const d = tek.querySelector(`.mbib-dot[data-id="${CSS.escape(k.id)}"]`);
-    if(d){ d.style.left = (k.x*100)+"%"; d.style.top = (k.y*100)+"%"; }
-  });
-  const sleepEinde = ()=>{
-    if(!sleep) return;
-    const k = e.klemmen.find(x=> x.id===sleep.id);
-    if(k && sleep.moved){ k.zijde = k.y >= 0.5 ? "onder" : "boven"; tekenTekening(); tekenKlemlijst(); }
-    sleep = null;
-  };
-  tek.addEventListener("pointerup", sleepEinde);
-  tek.addEventListener("pointercancel", sleepEinde);
-  B(".mbib-klemmodus").addEventListener("click", ()=>{ e.klemModus = !e.klemModus; tekenTekening(); });
-  B(".mbib-standaard").addEventListener("click", ()=>{
-    leesForm();
-    if(e.klemmen.length && !confirm("De huidige klemmen vervangen door standaardklemmen?")) return;
-    const fake = {categorie: r.categorie, polen: normPolen(r.polen) || "1P", breedte: Number(r.breedte)||1, uitgangen: []};
-    e.klemmen = standaardKlemmen(fake).map(k=>({...k}));
-    e.selKlem = null;
-    tekenTekening(); tekenKlemlijst();
-  });
-  B(".mbib-geenklem").addEventListener("click", ()=>{
-    if(!e.klemmen.length) return;
-    if(!confirm("Alle klemmen wissen?")) return;
-    e.klemmen = []; e.selKlem = null; tekenTekening(); tekenKlemlijst();
-  });
-  function tekenKlemlijst(){
-    const z = B(".mbib-klemlijst");
-    z.innerHTML = "";
-    if(!e.klemmen.length){
-      z.innerHTML = `<div class="mbib-hint">Nog geen klemmen. Laat de AI ze aanduiden, tik "＋ Klem toevoegen" en dan op de tekening, of gebruik "Standaardklemmen".</div>`;
-      return;
-    }
-    const tbl = document.createElement("table");
-    tbl.className = "mbib-klemtabel";
-    tbl.innerHTML = `<thead><tr><th>Label</th><th>Functie</th><th>Zijde</th><th></th></tr></thead><tbody></tbody>`;
-    const tb = tbl.querySelector("tbody");
-    e.klemmen.slice().sort((a,b)=> (zijdeVanKlem(a)===zijdeVanKlem(b) ? a.x-b.x : (zijdeVanKlem(a)==="boven" ? -1 : 1))).forEach(k=>{
-      const tr = document.createElement("tr");
-      if(e.selKlem===k.id) tr.className = "sel";
-      const functies = KLEM_FUNCTIES.includes(k.functie) || !k.functie ? KLEM_FUNCTIES : [k.functie, ...KLEM_FUNCTIES];
-      tr.innerHTML = `<td><input class="kl-label" value="${escapeHtml(k.label||"")}" maxlength="8"></td>
-        <td><select class="kl-functie">${functies.map(f=>`<option ${f===k.functie?"selected":""}>${escapeHtml(f)}</option>`).join("")}</select></td>
-        <td><select class="kl-zijde"><option value="boven" ${zijdeVanKlem(k)==="boven"?"selected":""}>boven</option><option value="onder" ${zijdeVanKlem(k)==="onder"?"selected":""}>onder</option></select></td>
-        <td><button type="button" class="mbib-btn ghost kl-del" title="klem verwijderen">✕</button></td>`;
-      tr.addEventListener("focusin", ()=>{ if(e.selKlem!==k.id){ e.selKlem = k.id; tekenTekening(); tb.querySelectorAll("tr").forEach(x=> x.classList.toggle("sel", x===tr)); } });
-      tr.querySelector(".kl-label").addEventListener("input", ev=>{ k.label = ev.target.value; const d = tek.querySelector(`.mbib-dot[data-id="${CSS.escape(k.id)}"] span`); if(d) d.textContent = k.label; });
-      tr.querySelector(".kl-functie").addEventListener("change", ev=>{ k.functie = ev.target.value; });
-      tr.querySelector(".kl-zijde").addEventListener("change", ev=>{ k.zijde = ev.target.value; tekenTekening(); });
-      tr.querySelector(".kl-del").addEventListener("click", ()=>{ e.klemmen = e.klemmen.filter(x=> x!==k); if(e.selKlem===k.id) e.selKlem = null; tekenTekening(); tekenKlemlijst(); });
-      tb.appendChild(tr);
-    });
-    z.appendChild(tbl);
-  }
+  function tekenTekening(){ ke.teken(); }
+  function tekenKlemlijst(){ /* zit in de klem-editor */ }
 
   /* ---- stap 3: gegevens + vragen ---- */
   const form = B(".mbib-form");
@@ -17334,9 +17354,8 @@ function toonBibEditor(ctx, bestaand){
         id: r.id || undefined, naam, merk: (r.merk||"").trim(), artikelnr: (r.artikelnr||"").trim(), categorie: r.categorie,
         polen: r.polen||"", stroom: r.stroom||"", curve: r.curve||"", kortsluit: r.kortsluit||"", gevoeligheid: r.gevoeligheid||"",
         diff_type: r.diff_type||"", breedte: Number(r.breedte) || bibBreedteVoorPolen(r.polen) || 1, info: r.info||"",
-        klemmen: e.klemmen.map(k=>({ id: String(k.id), label: String(k.label||""), functie: String(k.functie||""), zijde: zijdeVanKlem(k),
-          x: Math.round((Number(k.x)||0)*10000)/10000, y: Math.round((Number(k.y)||0)*10000)/10000 })),
-        tekening_url: url, specs: Object.assign({}, r.specs||{}, e.aiVelden.size ? {ai_velden: [...e.aiVelden]} : {})
+        klemmen: klemmenOpslaanVorm(e.klemmen),
+        tekening_url: url, specs: Object.assign({}, r.specs||{}, {weergave: weergaveOpslaanVorm(e.weergave)}, e.aiVelden.size ? {ai_velden: [...e.aiVelden]} : {})
       };
       const opgeslagen = await window.dbSaveModule(row);
       await laadModuleBib(true);
@@ -17353,10 +17372,621 @@ function toonBibEditor(ctx, bestaand){
 
   tekenForm(); tekenTekening(); tekenKlemlijst();
   if(!bestaand && !e.klemmen.length){
-    // Nieuwe module zonder tekening: alvast standaardklemmen volgens het voorstel.
-    const fake = {categorie: r.categorie, polen: normPolen(r.polen) || "1P", breedte: Number(r.breedte)||1, uitgangen: []};
-    if(["Automaat","Differentieel","Overig"].includes(r.categorie) && r.polen){ e.klemmen = standaardKlemmen(fake).map(k=>({...k})); tekenTekening(); tekenKlemlijst(); tekenVragen(); }
+    // Nieuwe module: alvast de (aangepaste) standaardklemmen van die soort als vertrekpunt.
+    const vm = bibModule();
+    const sj = sjabloonVoor(vm);
+    e.klemmen = ((sj && sj.klemmen && sj.klemmen.length) ? sj.klemmen : standaardKlemmen(vm)).map(k=>({...k}));
+    if(sj && sj.weergave) Object.assign(e.weergave, sj.weergave);
+    tekenTekening(); tekenVragen();
   }
+}
+
+/* ---------- rijgklemmen in het ontwerp ---------- */
+function rijgklemmenZonderModule(){
+  const items = (state.interlex && state.interlex.items) || [];
+  const geplaatst = new Set();
+  state.zekeringen.kasten.forEach(k=> k.rijen.forEach(r=> r.items.forEach(m=>{
+    if(m.categorie==="Rijgklemmenmodule") (m.rijgklemKlemIds||[]).forEach(id=> geplaatst.add(id));
+  })));
+  return items.filter(k=> !geplaatst.has(k.id));
+}
+// Zet de gegeven rijgklemmen op rijgklemmenmodule(s) in de kast (laatste rij als er plaats is,
+// anders een nieuwe rij) -- zo staan ze ook in de layout, met de gewone breedteregel (7 per 2 modules).
+function plaatsRijgklemmenInKast(kast, ids){
+  const perModule = Math.max(1, Math.floor(kast.maat*7/2));
+  let n = 0;
+  for(let i=0; i<ids.length; i+=perModule){
+    const deel = ids.slice(i, i+perModule);
+    const breedte = berekenRijgklemBreedte(deel.length);
+    const mod = {id: cryptoId(), categorie: "Rijgklemmenmodule", type: "", polen: "", mA: "", A: "", breedte, naam: "Rijgklemmen",
+      capaciteit: "", rijgklemKlemIds: deel, isRem: false, kabelOpKlemmen: false, kabelType: "", kabelAantal: 1};
+    let rij = kast.rijen[kast.rijen.length-1];
+    const gebruikt = rij ? rij.items.reduce((s2, it)=> s2 + moduleBreedte(it), 0) : kast.maat;
+    if(!rij || gebruikt + breedte > kast.maat){ rij = newRij(); kast.rijen.push(rij); }
+    rij.items.push(mod);
+    n++;
+  }
+  return n;
+}
+
+/* =========================================================================
+   MODULE-ONTWERPER (2026-10-28, op vraag van Peter: "ipv met tekeningen
+   inladen beter de module van zelf tekenen uitbreiden, zodat alle modules
+   die er nu inzitten kunnen uitgebreid en aangepast worden" -- klemmen
+   verplaatsen, bijzetten, KNX-bus (bus+ / bus-) toevoegen, en de
+   selecteerbare opties zelf uitbreidbaar).
+   - Elke module wordt zelf getekend (vector): titel, ondertitel, kleur,
+     hendel, LED -- instelbaar.
+   - Klemmen: slepen (met raster), bijplaatsen, gelijk verdelen, KNX-bus /
+     DALI-bus met één knop, label/functie/zijde per klem.
+   - Bewaren: enkel deze module (dit project), als standaard voor alle
+     modules van dat type (alle projecten), of in de bibliotheek.
+   - Klemfuncties (L, N, PE, bus+, bus-, DA+, ...) zijn een uitbreidbare
+     lijst met eigen draadkleur, gedeeld over alle projecten.
+   Gedeelde instellingen: tabel elektro_cados_instellingen (sleutel ->
+   waarde): 'klemfuncties' en 'sjabloon:<soort>[|polen]'.
+   ========================================================================= */
+let cadosInst = {};
+let cadosInstGeladen = false;
+let cadosInstPromise = null;
+function laadCadosInst(force){
+  if(force) cadosInstPromise = null;
+  if(!cadosInstPromise){
+    cadosInstPromise = (async()=>{
+      try{
+        if(window.dbListCadosInstellingen){
+          const rows = await window.dbListCadosInstellingen();
+          const m = {};
+          (rows||[]).forEach(r=>{ m[r.sleutel] = r.waarde; });
+          cadosInst = m;
+          cadosInstGeladen = true;
+        }
+      }catch(e){
+        console.error("CaDos-instellingen laden mislukt", e);
+        cadosInstPromise = null;
+        throw e;
+      }
+      return cadosInst;
+    })();
+  }
+  return cadosInstPromise;
+}
+function laadAllesVoorUitvoering(){ return Promise.allSettled([laadModuleBib(), laadCadosInst()]); }
+async function bewaarCadosInst(sleutel, waarde){
+  await window.dbSaveCadosInstelling(sleutel, waarde);
+  cadosInst[sleutel] = waarde;
+}
+async function wisCadosInst(sleutel){
+  await window.dbDeleteCadosInstelling(sleutel);
+  delete cadosInst[sleutel];
+}
+
+const KLEMFUNCTIES_STANDAARD = [
+  {naam:"L", kleur:"Bruin"}, {naam:"L1", kleur:"Bruin"}, {naam:"L2", kleur:"Zwart"}, {naam:"L3", kleur:"Grijs"},
+  {naam:"N", kleur:"Blauw"}, {naam:"PE", kleur:"Geel/groen"},
+  {naam:"bus+", kleur:"Rood"}, {naam:"bus-", kleur:"Zwart"}, {naam:"DA+", kleur:"Oranje"}, {naam:"DA-", kleur:"Violet"},
+  {naam:"24V+", kleur:"Rood"}, {naam:"0V", kleur:"Blauw"}, {naam:"+", kleur:"Rood"}, {naam:"-", kleur:"Blauw"},
+  {naam:"in", kleur:"Bruin"}, {naam:"uit", kleur:"Bruin"}, {naam:"COM", kleur:"Grijs"}, {naam:"NO", kleur:"Grijs"}, {naam:"NC", kleur:"Grijs"},
+  {naam:"contact", kleur:"Grijs"}, {naam:"andere", kleur:"Zwart"}
+];
+function klemFuncties(){
+  const l = cadosInst.klemfuncties && Array.isArray(cadosInst.klemfuncties.lijst) ? cadosInst.klemfuncties.lijst : null;
+  return (l && l.length) ? l : KLEMFUNCTIES_STANDAARD;
+}
+function klemFunctieKleur(f){
+  const s = String(f||"").trim().toUpperCase();
+  if(!s) return null;
+  const x = klemFuncties().find(k=> String(k.naam).trim().toUpperCase()===s);
+  return x ? x.kleur : null;
+}
+async function voegKlemFunctieToe(naam, kleur){
+  naam = String(naam||"").trim();
+  if(!naam) return null;
+  const lijst = klemFuncties().slice();
+  if(lijst.some(k=> k.naam.toUpperCase()===naam.toUpperCase())) return naam;
+  lijst.push({naam, kleur: kleur || "Zwart"});
+  try{ await bewaarCadosInst("klemfuncties", {lijst}); toast(`Klemfunctie "${naam}" toegevoegd`); }
+  catch(e){ alert("Klemfunctie bewaren mislukt: "+(e.message||e)); }
+  return naam;
+}
+
+/* ---------- standaardmodules (sjablonen) ---------- */
+const SJABLOON_SOORTEN = ["Automaat|1P","Automaat|2P","Automaat|3P","Automaat|4P","Differentieel|2P","Differentieel|4P",
+  "Centrale","Voeding","DALI","HVAC","Relais","Overig|1P"];
+function sjabloonSleutel(m){
+  const cat = m.categorie || "Overig";
+  if(["Automaat","Differentieel","Overig"].includes(cat)) return cat + "|" + (m.polen || (cat==="Differentieel" ? "2P" : "1P"));
+  return cat;
+}
+function sjabloonVoor(m){
+  if(!m || m.categorie==="Leeg") return null;
+  return cadosInst["sjabloon:" + sjabloonSleutel(m)] || null;
+}
+function sjabloonLabel(sl){
+  const [cat, p] = sl.split("|");
+  return (MODULE_CATEGORIEEN[cat] ? MODULE_CATEGORIEEN[cat].label : cat) + (p ? " " + p : "");
+}
+function sjabloonVoorbeeldModule(sl){
+  const [cat, p] = sl.split("|");
+  const preset = MODULE_CATEGORIEEN[cat] || {};
+  const polen = p || "";
+  const breedte = AUTO_BREEDTE_CATS.includes(cat) && cat!=="Rijgklemmenmodule" ? polenToBreedte(polen) : (preset.breedte || 1);
+  return {id: "voorbeeld", categorie: cat, polen, A: "", mA: "", naam: "", type: "", breedte, uitgangen: cat==="Relais"||cat==="HVAC" ? [{},{}] : [], rijgklemKlemIds: []};
+}
+
+/* ---------- weergave (zelf getekend) ---------- */
+const MODULE_KLEUREN = { wit:"#ffffff", beige:"#FBEEE0", blauw:"#EAF3F7", grijs:"#EEF0F2", groen:"#E9F4EC", geel:"#FFF7DC", antraciet:"#4a5058" };
+const DOMOTICA_CATS_UV = ["Centrale","Voeding","DALI","HVAC","Relais"];
+function standaardWeergave(m){
+  const cat = m.categorie || "Overig";
+  const elek = ["Automaat","Differentieel","Overig"].includes(cat);
+  return { titel: "", ondertitel: "", kleur: cat==="Differentieel" ? "beige" : (DOMOTICA_CATS_UV.includes(cat) ? "blauw" : "wit"),
+    hendel: elek, led: DOMOTICA_CATS_UV.includes(cat), foto: true };
+}
+function weergaveVoorModule(m){
+  return Object.assign(standaardWeergave(m), (sjabloonVoor(m)||{}).weergave || {}, (m.bib && m.bib.weergave) || {}, m.weergave || {});
+}
+function autoTitel(m){
+  const cat = m.categorie || "Overig";
+  if(["Automaat","Differentieel","Overig"].includes(cat)){
+    const lines = chipCompactLines(m);
+    return [ (m.curve||"") + (lines.a||"").replace(/^[RH]·/, "").replace(/^—$/, ""), cat==="Differentieel" ? (m.mA||"") : "" ].filter(Boolean).join(" ");
+  }
+  return CAT_ABBR[cat] || "";
+}
+function autoOndertitel(m){
+  const cat = m.categorie || "Overig";
+  if(["Automaat","Differentieel","Overig"].includes(cat)) return m.polen || "";
+  return m.naam || m.type || (MODULE_CATEGORIEEN[cat] ? MODULE_CATEGORIEEN[cat].label : cat);
+}
+// Tekent de module zelf (vector), met de linkerbovenhoek op 0,0.
+function moduleVectorSvg(m, w, h, wg){
+  wg = wg || weergaveVoorModule(m);
+  const cat = m.categorie || "Overig";
+  const elek = ["Automaat","Differentieel","Overig"].includes(cat);
+  const fill = MODULE_KLEUREN[wg.kleur] || wg.kleur || "#fff";
+  const donker = wg.kleur==="antraciet";
+  const tekst = donker ? "#fff" : "#1d1f22", dim = donker ? "#d6d9dd" : "#6a7079";
+  const maxT = Math.max(3, Math.floor(w/5.6));
+  let s = `<rect x="1" y="0" width="${w-2}" height="${h}" rx="4" fill="${fill}" class="uv-mod-rand"/>`;
+  s += `<rect x="3" y="2" width="${w-6}" height="20" rx="2" class="uv-klemstrook"/>`;
+  s += `<rect x="3" y="${h-22}" width="${w-6}" height="20" rx="2" class="uv-klemstrook"/>`;
+  if(wg.hendel) s += `<rect x="${w/2-6}" y="${h/2+12}" width="12" height="26" rx="2" class="uv-hendel"/>`;
+  if(wg.led) s += `<circle cx="${w-9}" cy="31" r="3" fill="#3cb45a" stroke="#1f6e34" stroke-width="0.8"/>`;
+  const titel = (wg.titel || autoTitel(m) || "").slice(0, maxT);
+  const onder = (wg.ondertitel || autoOndertitel(m) || "").slice(0, maxT);
+  if(titel) s += `<text x="${w/2}" y="${elek ? 40 : 64}" class="uv-spec" style="fill:${tekst}">${escapeHtml(titel)}</text>`;
+  if(onder) s += `<text x="${w/2}" y="${elek ? 52 : h-34}" class="uv-spec dim" style="fill:${dim}">${escapeHtml(onder)}</text>`;
+  return s;
+}
+function kleurHexVoorFunctie(f){
+  const k = klemFunctieKleur(f);
+  if(!k || k==="Wit") return null;
+  return DRAAD_KLEUREN[k] || null;
+}
+// Kleine voorbeeldtekening (bibliotheekkaart / standaardmodules)
+function miniModuleSvg(m, klemmen, wg){
+  const b = Math.max(1, Math.min(8, moduleBreedte(m)||1));
+  const w = b*38, h = 150;
+  let s = `<svg viewBox="-2 -2 ${w+4} ${h+4}" class="mbib-thumb-svg uv-svg" style="width:${Math.min(160, w*0.62)}px">${moduleVectorSvg(m, w, h, wg)}`;
+  (klemmen||[]).forEach(k=>{
+    const c = kleurHexVoorFunctie(k.functie||k.label) || "#14181d";
+    s += `<circle cx="${(parseFloat(k.x)||0)*w}" cy="${(parseFloat(k.y)||0)*h}" r="4.5" fill="#fff" stroke="${c}" stroke-width="2"/>`;
+  });
+  return s + `</svg>`;
+}
+
+/* ---------- herbruikbare klem-editor ----------
+   o = { getKlemmen(), setKlemmen(v), module() -> module (voor tekening + breedte),
+         weergave() -> weergave-object (wordt ter plaatse aangepast),
+         tekening() -> foto-url of null, standaard() -> standaardklemmen, onChange() } */
+function klemEditor(container, o){
+  let sel = null, plaatsModus = false, raster = true, sleep = null;
+  container.innerHTML = `
+    <div class="mbib-rij ke-toolbar">
+      <button type="button" class="mbib-btn ghost ke-plaats">＋ Klem plaatsen</button>
+      <button type="button" class="mbib-btn ghost ke-knx" title="KNX-busaansluiting: bus+ en bus-">＋ KNX-bus</button>
+      <button type="button" class="mbib-btn ghost ke-dali" title="DALI-bus: DA+ en DA-">＋ DALI-bus</button>
+      <button type="button" class="mbib-btn ghost ke-vb" title="klemmen bovenaan gelijk verdelen over de breedte">⇔ Verdeel boven</button>
+      <button type="button" class="mbib-btn ghost ke-vo" title="klemmen onderaan gelijk verdelen over de breedte">⇔ Verdeel onder</button>
+      <button type="button" class="mbib-btn ghost ke-std">Standaardklemmen</button>
+      <button type="button" class="mbib-btn ghost ke-wis">Alles wissen</button>
+      <label class="ke-raster"><input type="checkbox" checked> raster</label>
+    </div>
+    <div class="mbib-tek-wrap"><div class="mbib-tek ke-stage"></div></div>
+    <div class="ke-hint">Sleep een klem om hem te verplaatsen · tik op een klem om hem te kiezen · bovenste en onderste rij klikken vast.</div>
+    <div class="ke-weergave"></div>
+    <div class="ke-lijst"></div>`;
+  const Q = (s)=> container.querySelector(s);
+  const stage = Q(".ke-stage");
+  const klemmen = ()=> o.getKlemmen();
+  const breedte = ()=> Math.max(1, moduleBreedte(o.module()) || 1);
+  const changed = ()=>{ if(o.onChange) o.onChange(); };
+  function nieuwId(){ let n = klemmen().length + 1; while(klemmen().some(k=> k.id==="k"+n)) n++; return "k"+n; }
+  function snap(k){
+    k.x = Math.min(1, Math.max(0, k.x)); k.y = Math.min(1, Math.max(0, k.y));
+    if(!raster) return;
+    const stap = 1/(breedte()*4);
+    k.x = Math.min(1 - stap/2, Math.max(stap/2, Math.round((k.x - stap/2)/stap)*stap + stap/2));
+    if(k.y < 0.16) k.y = 0.06; else if(k.y > 0.84) k.y = 0.94; else k.y = Math.round(k.y/0.02)*0.02;
+  }
+  function vrijePlek(y, aantal){
+    const stap = 1/(breedte()*4);
+    const bezet = klemmen().filter(k=> Math.abs((parseFloat(k.y)||0) - y) < 0.1).map(k=> parseFloat(k.x)||0);
+    const vrij = [];
+    for(let x = 1 - stap/2; x > 0; x -= stap){ if(bezet.every(b=> Math.abs(b - x) > stap*0.9)) vrij.unshift(x); }
+    return vrij.slice(-aantal);
+  }
+  function voegPaarToe(a, b, y){
+    if(klemmen().some(k=> String(k.functie).toUpperCase()===a.toUpperCase())){ toast(`Er is al een ${a}-klem.`); return; }
+    let plek = y > 0.16 && y < 0.84 ? (breedte() >= 2 ? [0.375, 0.625] : [0.3, 0.7]) : vrijePlek(y, 2);
+    if(plek.length < 2) plek = [0.35, 0.65];
+    const zijde = y < 0.5 ? "boven" : "onder";
+    const ka = {id: nieuwId(), label: a, functie: a, zijde, x: plek[0], y};
+    klemmen().push(ka);
+    klemmen().push({id: nieuwId(), label: b, functie: b, zijde, x: plek[1], y});
+    sel = ka.id; teken(); tekenLijst(); changed();
+  }
+  function verdeel(zijde){
+    const rij = klemmen().filter(k=> zijdeVanKlem(k)===zijde).sort((a,b)=> a.x - b.x);
+    rij.forEach((k, i)=>{ k.x = (i + 0.5)/rij.length; k.y = zijde==="boven" ? 0.06 : 0.94; });
+    teken(); changed();
+  }
+  function teken(){
+    const m = o.module();
+    const w = breedte()*38, h = 150;
+    const foto = o.tekening && o.tekening();
+    stage.style.aspectRatio = foto ? "" : `${w}/${h}`;
+    stage.innerHTML = foto
+      ? `<img class="mbib-tek-img" src="${escapeHtml(foto)}" alt="" draggable="false">`
+      : `<svg class="ke-svg uv-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">${moduleVectorSvg(m, w, h, Object.assign(standaardWeergave(m), o.weergave()))}</svg>`;
+    stage.classList.toggle("klemmodus", plaatsModus);
+    const pb = Q(".ke-plaats");
+    pb.classList.toggle("actief", plaatsModus);
+    pb.textContent = plaatsModus ? "✓ Tik op de module om klemmen te plaatsen" : "＋ Klem plaatsen";
+    klemmen().forEach(k=>{
+      const d = document.createElement("div");
+      d.className = "mbib-dot" + (sel===k.id ? " sel" : "") + (zijdeVanKlem(k)==="onder" ? " onder" : "");
+      d.style.left = (k.x*100)+"%"; d.style.top = (k.y*100)+"%";
+      const c = kleurHexVoorFunctie(k.functie || k.label);
+      if(c) d.style.borderColor = c;
+      d.dataset.id = k.id;
+      d.innerHTML = `<span>${escapeHtml(String(k.label||"").slice(0,6))}</span>`;
+      stage.appendChild(d);
+    });
+  }
+  function tekenWeergave(){
+    const z = Q(".ke-weergave");
+    const wg = o.weergave();
+    const m = o.module();
+    const sw = standaardWeergave(m);
+    const v = (k)=> wg[k]!==undefined ? wg[k] : sw[k];
+    const heeftFoto = !!(o.fotoBeschikbaar && o.fotoBeschikbaar());
+    z.innerHTML = `<div class="ke-weergave-grid">
+      <div class="mbib-veld"><label>Titel op de module</label><input class="kw-titel" value="${escapeHtml(wg.titel||"")}" placeholder="${escapeHtml(autoTitel(m)||"automatisch")}"></div>
+      <div class="mbib-veld"><label>Ondertitel</label><input class="kw-onder" value="${escapeHtml(wg.ondertitel||"")}" placeholder="${escapeHtml(autoOndertitel(m)||"automatisch")}"></div>
+      <div class="mbib-veld"><label>Kleur</label><select class="kw-kleur">${Object.keys(MODULE_KLEUREN).map(k=>`<option value="${k}" ${v("kleur")===k?"selected":""}>${k}</option>`).join("")}</select></div>
+      <div class="mbib-veld ke-vinkjes">
+        <label><input type="checkbox" class="kw-hendel" ${v("hendel")?"checked":""}> hendel</label>
+        <label><input type="checkbox" class="kw-led" ${v("led")?"checked":""}> LED</label>
+        ${heeftFoto ? `<label><input type="checkbox" class="kw-foto" ${v("foto")!==false?"checked":""}> foto tonen</label>` : ""}
+      </div></div>`;
+    const upd = ()=>{ teken(); changed(); };
+    z.querySelector(".kw-titel").addEventListener("input", e=>{ wg.titel = e.target.value; upd(); });
+    z.querySelector(".kw-onder").addEventListener("input", e=>{ wg.ondertitel = e.target.value; upd(); });
+    z.querySelector(".kw-kleur").addEventListener("change", e=>{ wg.kleur = e.target.value; upd(); });
+    z.querySelector(".kw-hendel").addEventListener("change", e=>{ wg.hendel = e.target.checked; upd(); });
+    z.querySelector(".kw-led").addEventListener("change", e=>{ wg.led = e.target.checked; upd(); });
+    const f = z.querySelector(".kw-foto"); if(f) f.addEventListener("change", e=>{ wg.foto = e.target.checked; upd(); });
+  }
+  function tekenLijst(){
+    const z = Q(".ke-lijst");
+    z.innerHTML = "";
+    if(!klemmen().length){ z.innerHTML = `<div class="mbib-hint">Nog geen klemmen. Tik "＋ Klem plaatsen" en daarna op de module, of gebruik "Standaardklemmen".</div>`; return; }
+    const namen = klemFuncties().map(k=> k.naam);
+    const tbl = document.createElement("table");
+    tbl.className = "mbib-klemtabel";
+    tbl.innerHTML = `<thead><tr><th>Label</th><th>Functie</th><th>Zijde</th><th></th></tr></thead><tbody></tbody>`;
+    const tb = tbl.querySelector("tbody");
+    klemmen().slice().sort((a,b)=> (zijdeVanKlem(a)===zijdeVanKlem(b) ? a.x-b.x : (zijdeVanKlem(a)==="boven" ? -1 : 1))).forEach(k=>{
+      const tr = document.createElement("tr");
+      if(sel===k.id) tr.className = "sel";
+      const lijst = (!k.functie || namen.includes(k.functie)) ? namen : [k.functie, ...namen];
+      tr.innerHTML = `<td><input class="kl-label" value="${escapeHtml(k.label||"")}" maxlength="8"></td>
+        <td><select class="kl-functie">${lijst.map(f=>`<option ${f===k.functie?"selected":""}>${escapeHtml(f)}</option>`).join("")}<option value="__nieuw">＋ nieuwe functie…</option></select></td>
+        <td><select class="kl-zijde"><option value="boven" ${zijdeVanKlem(k)==="boven"?"selected":""}>boven</option><option value="onder" ${zijdeVanKlem(k)==="onder"?"selected":""}>onder</option></select></td>
+        <td><button type="button" class="mbib-btn ghost kl-del" title="klem verwijderen">✕</button></td>`;
+      tr.addEventListener("focusin", ()=>{ if(sel!==k.id){ sel = k.id; teken(); tb.querySelectorAll("tr").forEach(x=> x.classList.toggle("sel", x===tr)); } });
+      tr.querySelector(".kl-label").addEventListener("input", ev=>{ k.label = ev.target.value; const d = stage.querySelector(`.mbib-dot[data-id="${CSS.escape(k.id)}"] span`); if(d) d.textContent = k.label; changed(); });
+      tr.querySelector(".kl-functie").addEventListener("change", async ev=>{
+        if(ev.target.value==="__nieuw"){
+          const naam = prompt("Naam van de nieuwe klemfunctie (bv. KNX+, 12V, S1):");
+          if(naam){ k.functie = await voegKlemFunctieToe(naam, "Zwart") || k.functie; }
+          tekenLijst(); teken(); changed(); return;
+        }
+        k.functie = ev.target.value; teken(); changed();
+      });
+      tr.querySelector(".kl-zijde").addEventListener("change", ev=>{ k.zijde = ev.target.value; k.y = ev.target.value==="boven" ? Math.min(k.y, 0.49) : Math.max(k.y, 0.51); if(raster){ k.y = ev.target.value==="boven" ? 0.06 : 0.94; } teken(); changed(); });
+      tr.querySelector(".kl-del").addEventListener("click", ()=>{ o.setKlemmen(klemmen().filter(x=> x!==k)); if(sel===k.id) sel = null; teken(); tekenLijst(); changed(); });
+      tb.appendChild(tr);
+    });
+    z.appendChild(tbl);
+  }
+  stage.addEventListener("pointerdown", ev=>{
+    const dot = ev.target.closest(".mbib-dot");
+    const rc = stage.getBoundingClientRect();
+    const px = Math.min(1, Math.max(0, (ev.clientX-rc.left)/rc.width)), py = Math.min(1, Math.max(0, (ev.clientY-rc.top)/rc.height));
+    if(dot){
+      ev.preventDefault();
+      sel = dot.dataset.id;
+      sleep = {id: dot.dataset.id, moved: false};
+      try{ stage.setPointerCapture(ev.pointerId); }catch(_e){}
+      teken(); tekenLijst();
+      return;
+    }
+    if(plaatsModus){
+      ev.preventDefault();
+      const zijde = py >= 0.5 ? "onder" : "boven";
+      const k = {id: nieuwId(), label: String(klemmen().length+1), functie: "L", zijde, x: px, y: py};
+      snap(k);
+      klemmen().push(k);
+      sel = k.id;
+      teken(); tekenLijst(); changed();
+    }
+  });
+  stage.addEventListener("pointermove", ev=>{
+    if(!sleep) return;
+    const k = klemmen().find(x=> x.id===sleep.id);
+    if(!k) return;
+    const rc = stage.getBoundingClientRect();
+    k.x = (ev.clientX-rc.left)/rc.width; k.y = (ev.clientY-rc.top)/rc.height;
+    snap(k);
+    sleep.moved = true;
+    const d = stage.querySelector(`.mbib-dot[data-id="${CSS.escape(k.id)}"]`);
+    if(d){ d.style.left = (k.x*100)+"%"; d.style.top = (k.y*100)+"%"; }
+  });
+  const einde = ()=>{
+    if(!sleep) return;
+    const k = klemmen().find(x=> x.id===sleep.id);
+    if(k && sleep.moved){ k.zijde = k.y >= 0.5 ? "onder" : "boven"; teken(); tekenLijst(); changed(); }
+    sleep = null;
+  };
+  stage.addEventListener("pointerup", einde);
+  stage.addEventListener("pointercancel", einde);
+  Q(".ke-plaats").addEventListener("click", ()=>{ plaatsModus = !plaatsModus; teken(); });
+  Q(".ke-knx").addEventListener("click", ()=> voegPaarToe("bus+", "bus-", 0.22));
+  Q(".ke-dali").addEventListener("click", ()=> voegPaarToe("DA+", "DA-", 0.94));
+  Q(".ke-vb").addEventListener("click", ()=> verdeel("boven"));
+  Q(".ke-vo").addEventListener("click", ()=> verdeel("onder"));
+  Q(".ke-std").addEventListener("click", ()=>{
+    if(klemmen().length && !confirm("De huidige klemmen vervangen door de standaardklemmen?")) return;
+    o.setKlemmen(o.standaard().map(k=>({...k})));
+    sel = null; teken(); tekenLijst(); changed();
+  });
+  Q(".ke-wis").addEventListener("click", ()=>{
+    if(!klemmen().length || !confirm("Alle klemmen wissen?")) return;
+    o.setKlemmen([]); sel = null; teken(); tekenLijst(); changed();
+  });
+  Q(".ke-raster input").addEventListener("change", e=>{ raster = e.target.checked; });
+  const api = { teken: ()=>{ teken(); tekenWeergave(); tekenLijst(); } };
+  api.teken();
+  return api;
+}
+function klemmenOpslaanVorm(klemmen){
+  return klemmen.map(k=>({ id: String(k.id), label: String(k.label||""), functie: String(k.functie||""), zijde: zijdeVanKlem(k),
+    x: Math.round((Number(k.x)||0)*10000)/10000, y: Math.round((Number(k.y)||0)*10000)/10000 }));
+}
+function weergaveOpslaanVorm(wg){
+  const out = {};
+  ["titel","ondertitel"].forEach(k=>{ if(wg[k]) out[k] = String(wg[k]); });
+  ["kleur","hendel","led","foto"].forEach(k=>{ if(wg[k]!==undefined) out[k] = wg[k]; });
+  return out;
+}
+
+/* ---------- ontwerper-venster ---------- */
+function openModuleOntwerper(opts){
+  const oud = document.getElementById("mod-ontwerper");
+  if(oud) oud.remove();
+  const ov = document.createElement("div");
+  ov.id = "mod-ontwerper";
+  ov.className = "mbib-overlay mod-ontwerper";
+  let klemmen = (opts.klemmen||[]).map(k=>({...k}));
+  const weergave = Object.assign({}, opts.weergave||{});
+  let doel = opts.doel || (opts.doelen && opts.doelen[0] && opts.doelen[0].key);
+  ov.innerHTML = `<div class="mbib-box" role="dialog" aria-modal="true" aria-label="Module tekenen">
+    <div class="mbib-head"><h2>✏️ ${escapeHtml(opts.titel || "Module tekenen")}</h2><button type="button" class="mbib-btn ghost mo-sluit">Sluiten</button></div>
+    <div class="mbib-body"><div class="mbib-edit">
+      <div class="mbib-col mo-editor"></div>
+      <div class="mbib-col">
+        ${opts.uitleg ? `<p class="mbib-hint">${opts.uitleg}</p>` : ""}
+        <div class="mbib-stap"><strong>Waar bewaren?</strong></div>
+        <div class="mo-doelen">${(opts.doelen||[]).map(d=>`<label class="mo-doel"><input type="radio" name="mo-doel" value="${d.key}" ${d.key===doel?"checked":""}> <span>${escapeHtml(d.label)}${d.uitleg?`<small>${escapeHtml(d.uitleg)}</small>`:""}</span></label>${d.naam?`<input class="mo-naam" data-voor="${d.key}" placeholder="Naam bibliotheekmodule, bv. MDT AKS-0816.03" style="${d.key===doel?"":"display:none;"}">`:""}`).join("")}</div>
+        <div class="mbib-acties">
+          ${opts.herstel ? `<button type="button" class="mbib-btn ghost mo-herstel">${escapeHtml(opts.herstel.label)}</button>` : ""}
+          <button type="button" class="mbib-btn ghost mo-annuleer">Annuleren</button>
+          <button type="button" class="mbib-btn primary mo-bewaar">Bewaren</button>
+        </div>
+      </div>
+    </div></div></div>`;
+  document.body.appendChild(ov);
+  const sluit = ()=>{ ov.remove(); document.removeEventListener("keydown", onKey); };
+  const onKey = (e)=>{ if(e.key==="Escape") sluit(); };
+  document.addEventListener("keydown", onKey);
+  ov.querySelector(".mo-sluit").addEventListener("click", sluit);
+  ov.querySelector(".mo-annuleer").addEventListener("click", sluit);
+  ov.querySelectorAll('input[name="mo-doel"]').forEach(r=> r.addEventListener("change", ()=>{
+    doel = r.value;
+    ov.querySelectorAll(".mo-naam").forEach(n=> n.style.display = n.dataset.voor===doel ? "" : "none");
+  }));
+  klemEditor(ov.querySelector(".mo-editor"), {
+    getKlemmen: ()=> klemmen, setKlemmen: (v)=>{ klemmen = v; },
+    module: opts.module, weergave: ()=> weergave,
+    tekening: ()=> (opts.tekening && weergave.foto !== false) ? opts.tekening : null,
+    fotoBeschikbaar: ()=> !!opts.tekening,
+    standaard: opts.standaard || (()=> standaardKlemmen(opts.module()))
+  });
+  if(opts.herstel) ov.querySelector(".mo-herstel").addEventListener("click", async ()=>{
+    if(!confirm(opts.herstel.vraag || "Terug naar de standaard?")) return;
+    try{ await opts.herstel.fn(); sluit(); }catch(e){ alert("Mislukt: "+(e.message||e)); }
+  });
+  ov.querySelector(".mo-bewaar").addEventListener("click", async ()=>{
+    const knop = ov.querySelector(".mo-bewaar");
+    const naamInp = ov.querySelector(`.mo-naam[data-voor="${doel}"]`);
+    const extra = { naam: naamInp ? naamInp.value.trim() : "" };
+    if(naamInp && !extra.naam){ alert("Geef de bibliotheekmodule een naam."); naamInp.focus(); return; }
+    knop.disabled = true; knop.textContent = "Bewaren…";
+    try{
+      await opts.onOpslaan(klemmenOpslaanVorm(klemmen), weergaveOpslaanVorm(weergave), doel, extra);
+      sluit();
+      toast("Module bewaard");
+    }catch(e){
+      const msg = String(e && e.message || e);
+      alert(/duplicate|unique/i.test(msg) ? `Er bestaat al een bibliotheekmodule met de naam "${extra.naam}".` : "Bewaren mislukt: "+msg);
+      knop.disabled = false; knop.textContent = "Bewaren";
+    }
+  });
+}
+
+// Ontwerper voor één module uit een kast (Uitvoeringsplan of Layout).
+async function openModuleOntwerperVoorModule(m, naOpslaan){
+  await laadAllesVoorUitvoering();
+  const codes = computeZekeringCodes();
+  const sl = sjabloonSleutel(m);
+  const label = MODULE_CATEGORIEEN[m.categorie] ? MODULE_CATEGORIEEN[m.categorie].label : m.categorie;
+  const doelen = [
+    {key: "eigen", label: "Enkel deze module (dit project)"},
+    {key: "sjabloon", label: `Standaard voor alle "${sjabloonLabel(sl)}"-modules`, uitleg: "geldt voor alle projecten, voor modules zonder eigen aanpassing of bibliotheekmodule"},
+  ];
+  if(m.bibId && m.bib) doelen.push({key: "bib", label: `Bibliotheekmodule "${m.bib.naam}" bijwerken`, uitleg: "geldt voor elke module die eraan gekoppeld is"});
+  doelen.push({key: "nieuwbib", label: "Als nieuwe bibliotheekmodule bewaren", naam: true, uitleg: "en deze module eraan koppelen"});
+  const eigen = Array.isArray(m.klemmenEigen) || !!m.weergave;
+  openModuleOntwerper({
+    titel: `${codes[m.id] ? codes[m.id]+" · " : ""}${label} — tekening & klemmen`,
+    uitleg: "Pas de tekening en de aansluitklemmen aan. De breedte volgt uit de layout. Draden naar klemmen die je verwijdert, verdwijnen mee.",
+    module: ()=> m,
+    klemmen: klemmenVoorModule(m),
+    weergave: Object.assign({}, (sjabloonVoor(m)||{}).weergave || {}, (m.bib && m.bib.weergave) || {}, m.weergave || {}),
+    tekening: (m.bib && m.bib.tekening_url) || null,
+    standaard: ()=> standaardKlemmen(m),
+    doelen, doel: "eigen",
+    herstel: eigen ? {label: "Eigen aanpassing wissen", vraag: "De eigen aanpassing van deze module wissen? Ze volgt dan weer de bibliotheek / standaard.", fn: async ()=>{ delete m.klemmenEigen; delete m.weergave; save(); if(naOpslaan) naOpslaan(); }} : null,
+    onOpslaan: async (klemmen, weergave, doel, extra)=>{
+      if(doel==="eigen"){ m.klemmenEigen = klemmen; m.weergave = weergave; }
+      else if(doel==="sjabloon"){ await bewaarCadosInst("sjabloon:"+sl, {klemmen, weergave}); delete m.klemmenEigen; delete m.weergave; }
+      else if(doel==="bib"){
+        await laadModuleBib(true);
+        const row = moduleBib.find(r=> String(r.id)===String(m.bibId));
+        if(!row) throw new Error("Bibliotheekmodule niet meer gevonden");
+        const upd = await window.dbSaveModule(Object.assign({}, row, {klemmen, specs: Object.assign({}, row.specs||{}, {weergave})}));
+        await laadModuleBib(true);
+        m.bib = bibSnapshot(upd || Object.assign({}, row, {klemmen, specs: Object.assign({}, row.specs||{}, {weergave})}));
+        delete m.klemmenEigen; delete m.weergave;
+      } else if(doel==="nieuwbib"){
+        const row = await window.dbSaveModule({
+          naam: extra.naam, merk: "", artikelnr: "", categorie: m.categorie, polen: m.polen||"",
+          stroom: m.A ? String(parseFloat(m.A)||"") : "", curve: m.curve||"", kortsluit: m.kA||"",
+          gevoeligheid: m.mA ? String(parseFloat(m.mA)||"") : "", diff_type: m.diffType||"",
+          breedte: moduleBreedte(m)||1, info: "", klemmen, tekening_url: null, specs: {weergave}
+        });
+        await laadModuleBib(true);
+        applyBibOpModule(m, row, {behoudLayout: true});
+        delete m.klemmenEigen; delete m.weergave;
+      }
+      save();
+      if(naOpslaan) naOpslaan();
+    }
+  });
+}
+
+/* ---------- tabbladen in de modulebibliotheek ---------- */
+function bibTabsHtml(ctx){
+  const t = ctx.tab || "modules";
+  return `<div class="mbib-tabs">
+    <button type="button" class="mbib-tab ${t==="modules"?"actief":""}" data-tab="modules">Bibliotheek</button>
+    <button type="button" class="mbib-tab ${t==="sjablonen"?"actief":""}" data-tab="sjablonen">Standaardmodules</button>
+    <button type="button" class="mbib-tab ${t==="functies"?"actief":""}" data-tab="functies">Klemfuncties</button>
+  </div>`;
+}
+function wireBibTabs(ctx){
+  ctx.body.querySelectorAll(".mbib-tab").forEach(b=> b.addEventListener("click", ()=>{
+    ctx.tab = b.dataset.tab;
+    if(ctx.tab==="sjablonen") toonSjablonen(ctx);
+    else if(ctx.tab==="functies") toonKlemfuncties(ctx);
+    else toonBibLijst(ctx);
+  }));
+}
+async function toonSjablonen(ctx){
+  ctx.tab = "sjablonen";
+  ctx.body.innerHTML = bibTabsHtml(ctx) + `<p class="mbib-hint">Zo worden de modules getekend die (nog) niet aan een bibliotheekmodule gekoppeld zijn — in alle projecten. Pas klemmen en tekening aan per soort; een module kan daarnaast nog zijn eigen aanpassing krijgen in het Uitvoeringsplan.</p><div class="mbib-grid"><div class="mbib-leeg">Laden…</div></div>`;
+  wireBibTabs(ctx);
+  try{ await laadCadosInst(true); }catch(e){ ctx.body.querySelector(".mbib-grid").innerHTML = `<div class="mbib-leeg mbib-fout">Kon de instellingen niet laden: ${escapeHtml(e.message||String(e))}</div>`; return; }
+  const grid = ctx.body.querySelector(".mbib-grid");
+  grid.innerHTML = "";
+  SJABLOON_SOORTEN.forEach(sl=>{
+    const m = sjabloonVoorbeeldModule(sl);
+    const sj = cadosInst["sjabloon:"+sl];
+    const klemmen = sj && Array.isArray(sj.klemmen) && sj.klemmen.length ? sj.klemmen : standaardKlemmen(m);
+    const wg = Object.assign(standaardWeergave(m), (sj && sj.weergave) || {});
+    const card = document.createElement("div");
+    card.className = "mbib-card";
+    card.innerHTML = `<div class="mbib-thumb">${miniModuleSvg(m, klemmen, wg)}</div>
+      <div class="mbib-card-body"><div class="mbib-card-naam">${escapeHtml(sjabloonLabel(sl))}</div>
+      <div class="mbib-card-spec">${klemmen.length} klemmen${sj ? ' · <strong class="mbib-aangepast">aangepast</strong>' : " · standaard"}</div>
+      <div class="mbib-card-acties"><button type="button" class="mbib-btn primary sj-edit">Aanpassen</button>
+      ${sj ? `<button type="button" class="mbib-btn ghost sj-reset">Standaard herstellen</button>` : ""}</div></div>`;
+    card.querySelector(".sj-edit").addEventListener("click", ()=> openModuleOntwerper({
+      titel: `Standaardmodule — ${sjabloonLabel(sl)}`,
+      uitleg: "Dit wordt de tekening en klemindeling voor elke module van deze soort zonder bibliotheekmodule of eigen aanpassing, in alle projecten.",
+      module: ()=> m, klemmen, weergave: Object.assign({}, (sj && sj.weergave) || {}),
+      standaard: ()=> standaardKlemmen(m),
+      doelen: [{key: "sjabloon", label: `Standaard voor alle "${sjabloonLabel(sl)}"-modules (alle projecten)`}], doel: "sjabloon",
+      onOpslaan: async (kl, wg2)=>{ await bewaarCadosInst("sjabloon:"+sl, {klemmen: kl, weergave: wg2}); toonSjablonen(ctx); }
+    }));
+    const rs = card.querySelector(".sj-reset");
+    if(rs) rs.addEventListener("click", async ()=>{
+      if(!confirm(`De aanpassing van "${sjabloonLabel(sl)}" wissen en terug naar de ingebouwde standaard?`)) return;
+      try{ await wisCadosInst("sjabloon:"+sl); toonSjablonen(ctx); }catch(e){ alert("Mislukt: "+(e.message||e)); }
+    });
+    grid.appendChild(card);
+  });
+}
+async function toonKlemfuncties(ctx){
+  ctx.tab = "functies";
+  ctx.body.innerHTML = bibTabsHtml(ctx) + `<p class="mbib-hint">De functies die je aan een aansluitklem kan geven (gedeeld over alle projecten). De kleur is de standaard draadkleur als je een draad vanaf zo'n klem trekt.</p><div class="kf-zone">Laden…</div>`;
+  wireBibTabs(ctx);
+  try{ await laadCadosInst(true); }catch(e){ ctx.body.querySelector(".kf-zone").innerHTML = `<div class="mbib-leeg mbib-fout">Kon de instellingen niet laden: ${escapeHtml(e.message||String(e))}</div>`; return; }
+  let lijst = klemFuncties().map(k=>({...k}));
+  const zone = ctx.body.querySelector(".kf-zone");
+  function teken(){
+    zone.innerHTML = `<table class="mbib-klemtabel kf-tabel"><thead><tr><th>Functie</th><th>Draadkleur</th><th></th></tr></thead><tbody></tbody></table>
+      <div class="mbib-acties" style="justify-content:space-between;">
+        <span><button type="button" class="mbib-btn ghost kf-add">＋ Functie toevoegen</button>
+        <button type="button" class="mbib-btn ghost kf-std">Standaardlijst herstellen</button></span>
+        <button type="button" class="mbib-btn primary kf-bewaar">Bewaren</button>
+      </div>`;
+    const tb = zone.querySelector("tbody");
+    lijst.forEach((k, i)=>{
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td><input class="kf-naam" value="${escapeHtml(k.naam)}" maxlength="12"></td>
+        <td><span class="kf-staal" style="background:${DRAAD_KLEUREN[k.kleur]||"#999"}"></span><select class="kf-kleur">${Object.keys(DRAAD_KLEUREN).map(c=>`<option ${c===k.kleur?"selected":""}>${c}</option>`).join("")}</select></td>
+        <td style="white-space:nowrap;"><button type="button" class="mbib-btn ghost kf-op" title="omhoog" ${i===0?"disabled":""}>▲</button><button type="button" class="mbib-btn ghost kf-neer" title="omlaag" ${i===lijst.length-1?"disabled":""}>▼</button><button type="button" class="mbib-btn ghost kf-del" title="verwijderen">✕</button></td>`;
+      tr.querySelector(".kf-naam").addEventListener("input", e=>{ k.naam = e.target.value; });
+      tr.querySelector(".kf-kleur").addEventListener("change", e=>{ k.kleur = e.target.value; tr.querySelector(".kf-staal").style.background = DRAAD_KLEUREN[k.kleur]; });
+      tr.querySelector(".kf-op").addEventListener("click", ()=>{ lijst.splice(i-1, 0, lijst.splice(i, 1)[0]); teken(); });
+      tr.querySelector(".kf-neer").addEventListener("click", ()=>{ lijst.splice(i+1, 0, lijst.splice(i, 1)[0]); teken(); });
+      tr.querySelector(".kf-del").addEventListener("click", ()=>{ lijst.splice(i, 1); teken(); });
+      tb.appendChild(tr);
+    });
+    zone.querySelector(".kf-add").addEventListener("click", ()=>{ lijst.push({naam: "", kleur: "Zwart"}); teken(); const ins = zone.querySelectorAll(".kf-naam"); ins[ins.length-1].focus(); });
+    zone.querySelector(".kf-std").addEventListener("click", ()=>{ if(confirm("De lijst terugzetten naar de standaardlijst? (pas na Bewaren definitief)")){ lijst = KLEMFUNCTIES_STANDAARD.map(k=>({...k})); teken(); } });
+    zone.querySelector(".kf-bewaar").addEventListener("click", async ()=>{
+      const schoon = [];
+      lijst.forEach(k=>{ const n = String(k.naam||"").trim(); if(n && !schoon.some(x=> x.naam.toUpperCase()===n.toUpperCase())) schoon.push({naam: n, kleur: k.kleur||"Zwart"}); });
+      try{ await bewaarCadosInst("klemfuncties", {lijst: schoon}); lijst = schoon.map(k=>({...k})); teken(); toast("Klemfuncties bewaard"); }
+      catch(e){ alert("Bewaren mislukt: "+(e.message||e)); }
+    });
+  }
+  teken();
 }
 
 const RENDERERS = {
@@ -26014,6 +26644,20 @@ window.CaCalcApp = {
     if(error) throw error;
   };
   window.dbUploadModuleTekening = (file) => dbUploadFile('module-tekeningen', file);
+  // Gedeelde CaDos-instellingen (klemfuncties + aangepaste standaardmodules), tabel elektro_cados_instellingen.
+  window.dbListCadosInstellingen = async function(){
+    const { data, error } = await sb.from('elektro_cados_instellingen').select('*');
+    if(error) throw error;
+    return data || [];
+  };
+  window.dbSaveCadosInstelling = async function(sleutel, waarde){
+    const { error } = await sb.from('elektro_cados_instellingen').upsert({ sleutel, waarde, updated_at: new Date().toISOString() }, { onConflict: 'sleutel' });
+    if(error) throw error;
+  };
+  window.dbDeleteCadosInstelling = async function(sleutel){
+    const { error } = await sb.from('elektro_cados_instellingen').delete().eq('sleutel', sleutel);
+    if(error) throw error;
+  };
   // AI: herkent specs + aansluitklemmen op een foto/tekening (Edge Function "module-analyse",
   // apart van ai-assist). Stuurt hetzelfde "AI-model (handschrift)" mee als de kladversie.
   window.aiModuleAnalyse = async function(image, hint){
