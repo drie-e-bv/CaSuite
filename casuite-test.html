@@ -3582,6 +3582,9 @@
 
 .ke-vinkjes input, .ke-raster input, .mo-doel input{width:auto !important;min-height:0 !important;}
 
+.uv-svg .uv-rk-zijde{font-size:8px;font-weight:700;fill:#6a7079;text-anchor:middle;pointer-events:none;}
+.uv-svg .uv-rk-zijde.preflex{fill:#bb5e26;}
+
 </style>
 </head>
 <body>
@@ -15652,8 +15655,17 @@ const KA_OPTIES = ["","3","4.5","6","10","15","25","36","50"];
 const DIFF_TYPE_OPTIES = ["","AC","A","A-SI","F","B"];
 const DRAAD_KLEUREN = {
   "Bruin":"#8a4b1f", "Blauw":"#1f63c6", "Zwart":"#1d1d1f", "Grijs":"#8b8f96", "Geel/groen":"#2e9d3a",
-  "Rood":"#d0302b", "Oranje":"#ee7d11", "Wit":"#f4f4f4", "Violet":"#7b3fb8"
+  "Rood":"#d0302b", "Oranje":"#ee7d11", "Wit":"#f4f4f4", "Violet":"#7b3fb8", "Roze":"#e58fb4", "Geel":"#f2d600"
 };
+// Aderkleur zoals in het tabblad Rijgklemmen ingevuld (bv. "Bruin", "Rood/Zwart", "Geel/groen")
+// -> draadkleur uit DRAAD_KLEUREN (bij tweekleurige aders de eerste kleur, behalve geel/groen).
+function aderKleurNaarDraad(naam){
+  const t = String(naam||"").trim().toLowerCase();
+  if(!t) return null;
+  if(t.includes("geel") && t.includes("groen")) return "Geel/groen";
+  const eerste = t.split(/[\/\s-]+/)[0];
+  return Object.keys(DRAAD_KLEUREN).find(k=> k.toLowerCase()===eerste) || null;
+}
 const DRAAD_SECTIES = ["0.8","1.5","2.5","4","6","10","16","25"];
 function draadBreedte(sectie){ const s = parseFloat(sectie)||1.5; return Math.max(1.6, Math.min(5, 1.1+Math.sqrt(s)*0.9)); }
 function normFunctie(f){
@@ -15696,18 +15708,33 @@ function standaardKlemmen(m){
     return out;
   }
   if(cat==="Rijgklemmenmodule" && (m.rijgklemKlemIds||[]).length){
-    // De echte rijgklemmen (tabblad Rijgklemmen): per klem een aansluiting boven en onder,
-    // label = klemnummer, functie afgeleid uit de aderkleur (blauw = N, geel/groen = PE, ...).
+    // De echte rijgklemmen (tabblad Rijgklemmen). Per geleider een KASTZIJDE (bedrading in de kast)
+    // en een PREFLEX-ZIJDE (de kabel die toekomt). Rijgklemmen bovenaan in de kast: kastzijde onder,
+    // Preflex boven; onderaan in de kast omgekeerd (instelbaar per module). De aderkleur uit de
+    // ontwerpfase bepaalt kleur van het snappunt en van de draad die je eraan trekt.
+    // Enkel = 1 geleider per klem (gegevens "onder"); Dubbel = 2 niveaus (onder + boven).
     const items = (state.interlex && state.interlex.items) || [];
+    const dubbel = state.interlex && state.interlex.type==="dubbel";
+    const positie = rijgklemPositie(m);
+    const kastZ = positie==="boven" ? "onder" : "boven", prefZ = positie==="boven" ? "boven" : "onder";
+    const yVan = (zijde, niveau)=> zijde==="boven" ? (niveau ? 0.18 : 0.06) : (niveau ? 0.82 : 0.94);
     const ids = m.rijgklemKlemIds;
     ids.forEach((kid, i)=>{
       const idx = items.findIndex(k=> k.id===kid);
       const klem = items[idx] || {};
       const nr = idx >= 0 ? String(idx+1) : "?";
-      const x = (i+0.5)/ids.length;
-      const tip = (zijde)=> ["Rijgklem "+nr, (klem[zijde]||{}).watwaar, (klem[zijde]||{}).kleur, klem.kamer, klem.info].filter(Boolean).join(" · ");
-      out.push({id: "rb_"+kid, label: nr, functie: functieVoorAderkleur((klem.boven||{}).kleur) || functieVoorAderkleur((klem.onder||{}).kleur) || "contact", zijde: "boven", x, y: 0.06, tip: tip("boven")});
-      out.push({id: "ro_"+kid, label: nr, functie: functieVoorAderkleur((klem.onder||{}).kleur) || "contact", zijde: "onder", x, y: 0.94, tip: tip("onder")});
+      const niveaus = dubbel ? [klem.onder||{}, klem.boven||{}] : [klem.onder||{}];
+      niveaus.forEach((ader, nv)=>{
+        const x = (i+0.5)/ids.length + (dubbel ? (nv ? 0.17 : -0.17)/ids.length : 0);
+        const label = dubbel ? nr+"."+(nv+1) : nr;
+        const functie = functieVoorAderkleur(ader.kleur) || "contact";
+        const basis = "Rijgklem "+label + (ader.kleur ? " · "+ader.kleur : "");
+        const suffix = nv ? "2_" : "_";
+        out.push({id: "rk"+suffix+kid, label, functie, zijde: kastZ, x, y: yVan(kastZ, nv), kleur: ader.kleur||"", rijgSoort: "kast",
+          tip: [basis, "kastzijde", ader.watwaar].filter(Boolean).join(" · ")});
+        out.push({id: "rp"+suffix+kid, label, functie, zijde: prefZ, x, y: yVan(prefZ, nv), kleur: ader.kleur||"", rijgSoort: "preflex",
+          tip: [basis, "Preflex", ader.watwaar, ader.aansluiting, klem.kamer, klem.info].filter(Boolean).join(" · ")});
+      });
     });
     return out;
   }
@@ -15729,6 +15756,15 @@ function standaardKlemmen(m){
     add("bA", "bus+", "bus+", "onder", 0.3); add("bB", "bus-", "bus-", "onder", 0.7);
   }
   return out;
+}
+// Waar zit de rijgklemmenmodule in de kast? Manueel (m.rijgklemPositie) of automatisch uit de rij:
+// bovenste helft van de kast = "boven", onderste helft = "onder".
+function rijgklemPositie(m){
+  if(m.rijgklemPositie==="boven" || m.rijgklemPositie==="onder") return m.rijgklemPositie;
+  const kast = state.zekeringen.kasten.find(k=> k.rijen.some(r=> r.items.some(it=> it.id===m.id)));
+  if(!kast) return "boven";
+  const ri = kast.rijen.findIndex(r=> r.items.some(it=> it.id===m.id));
+  return ri <= (kast.rijen.length-1)/2 ? "boven" : "onder";
 }
 function functieVoorAderkleur(kleur){
   const k = String(kleur||"").toLowerCase();
@@ -16048,6 +16084,12 @@ function uvModuleSvg(md){
   } else {
     s += `<g transform="translate(${x} ${y})">${moduleVectorSvg(m, w, h, wg)}</g>`;
   }
+  if(cat==="Rijgklemmenmodule" && (m.rijgklemKlemIds||[]).length){
+    const pos = rijgklemPositie(m);
+    const yP = pos==="boven" ? y+34 : y+h-28, yK = pos==="boven" ? y+h-28 : y+34;
+    s += `<text x="${x+w/2}" y="${yP}" class="uv-rk-zijde preflex">Preflex ${pos==="boven" ? "↑" : "↓"}</text>`;
+    s += `<text x="${x+w/2}" y="${yK}" class="uv-rk-zijde">kast ${pos==="boven" ? "↓" : "↑"}</text>`;
+  }
   s += `<rect x="${x+w/2-16}" y="${y+h/2-10}" width="32" height="18" rx="4" class="uv-code-bg"/>`;
   s += `<text x="${x+w/2}" y="${y+h/2+3.5}" class="uv-code">${escapeHtml(code || CAT_ABBR[cat] || "")}</text>`;
   s += `</g>`;
@@ -16098,7 +16140,7 @@ function bouwBedradingSvg(kast, interactief){
     const cls = ["uv-klem", verbonden.has(key)?"bezet":"", pend?"pending":""].filter(Boolean).join(" ");
     const ly = p.zijde==="boven" ? p.y-9 : p.y+15;
     const ktip = [`${p.code || p.m.naam || p.m.categorie} · klem ${p.k.label||p.k.id} (${p.k.functie||"—"}, ${p.zijde})`, p.k.tip || "", p.m.naam || ""].filter(Boolean).join("\n");
-    const kc = kleurHexVoorFunctie(p.k.functie || p.k.label);
+    const kc = (aderKleurNaarDraad(p.k.kleur) && DRAAD_KLEUREN[aderKleurNaarDraad(p.k.kleur)]) || kleurHexVoorFunctie(p.k.functie || p.k.label);
     s += `<g class="${cls}" data-m="${p.m.id}" data-k="${escapeHtml(p.k.id)}" data-tip="${escapeHtml(ktip)}">`;
     if(interactief) s += `<circle cx="${p.x}" cy="${p.y}" r="11" class="uv-klem-hit"/>`;
     s += `<circle cx="${p.x}" cy="${p.y}" r="5" class="uv-klem-dot"${kc ? ` style="stroke:${kc}"` : ""}/>`;
@@ -16114,7 +16156,8 @@ function uvKlemOmschrijving(kast, eind){
   const geo = uvGeometrie(kast);
   const p = geo.klemPos[uvKlemKey(eind.m, eind.k)];
   if(!p) return "?";
-  return `${p.code || (p.m.naam || p.m.categorie)} · ${p.k.label||p.k.id} (${p.zijde})`;
+  const zijde = p.k.rijgSoort ? (p.k.rijgSoort==="kast" ? "kastzijde" : "Preflex") : p.zijde;
+  return `${p.code || (p.m.naam || p.m.categorie)} · ${p.k.label||p.k.id} (${zijde})`;
 }
 
 /* ---------- Kamgeleiders ----------
@@ -16595,6 +16638,10 @@ function renderUitvoeringsplan(){
       const box = el(`<div class="card"><div class="card-body uv-sidebody">
         <strong>${escapeHtml(codes[md.id]||"")} ${escapeHtml(MODULE_CATEGORIEEN[md.categorie] ? MODULE_CATEGORIEEN[md.categorie].label : md.categorie)}</strong>
         <div class="hint">${escapeHtml([chipSpecText(md), md.curve?("curve "+md.curve):"", md.kA?(md.kA+" kA"):"", md.type, md.naam].filter(Boolean).join(" · ")||"—")}</div>
+        ${md.categorie==="Rijgklemmenmodule" ? `<div class="field"><label>Plaats in de kast</label><select class="sm-rkpos">
+          <option value="" ${!md.rijgklemPositie?"selected":""}>Automatisch (nu: ${rijgklemPositie(Object.assign({}, md, {rijgklemPositie: ""}))==="boven" ? "bovenaan" : "onderaan"})</option>
+          <option value="boven" ${md.rijgklemPositie==="boven"?"selected":""}>Bovenaan — Preflex boven, kast onder</option>
+          <option value="onder" ${md.rijgklemPositie==="onder"?"selected":""}>Onderaan — kast boven, Preflex onder</option></select></div>` : ""}
         <div class="field"><label>Bibliotheekmodule</label><select class="sm-bib"></select></div>
         <div class="hint">${klemmen.length} klemmen — ${Array.isArray(md.klemmenEigen) && md.klemmenEigen.length ? "eigen aanpassing" : (md.categorie==="Rijgklemmenmodule" ? "uit het tabblad Rijgklemmen" : (md.bib && md.bib.klemmen && md.bib.klemmen.length ? "uit de bibliotheek" : (sjabloonVoor(md) ? "aangepaste standaard" : "standaard")))}</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
@@ -16604,6 +16651,8 @@ function renderUitvoeringsplan(){
           <button class="btn small ghost sm-sluit">Sluiten</button>
         </div>
       </div></div>`);
+      const rkp = box.querySelector(".sm-rkpos");
+      if(rkp) rkp.addEventListener("change", e=>{ if(e.target.value) md.rijgklemPositie = e.target.value; else delete md.rijgklemPositie; save(); teken(); });
       const sel = box.querySelector(".sm-bib");
       fillBibSelect(sel, md);
       sel.addEventListener("change", e=>{
@@ -16800,7 +16849,9 @@ function renderUitvoeringsplan(){
       if(dubbel){ toast("Die twee klemmen zijn al verbonden."); uvPending = null; teken(); return; }
       const geo = uvGeometrie(kast);
       const pa = geo.klemPos[uvKlemKey(a.m, a.k)];
-      const kleur = uvKleurAuto && pa ? standaardKleurVoorFunctie(pa.k.functie || pa.k.label) : uvKleur;
+      const pb = geo.klemPos[uvKlemKey(eind.m, eind.k)];
+      const ader = (pa && aderKleurNaarDraad(pa.k.kleur)) || (pb && aderKleurNaarDraad(pb.k.kleur));
+      const kleur = uvKleurAuto ? (ader || (pa ? standaardKleurVoorFunctie(pa.k.functie || pa.k.label) : uvKleur)) : uvKleur;
       const nw = {id: cryptoId(), a, b: eind, kleur, sectie: uvSectie, label: ""};
       kast.bedrading.push(nw);
       uvPending = null;

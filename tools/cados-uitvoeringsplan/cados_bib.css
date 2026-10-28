@@ -194,3 +194,6 @@
 .kf-tabel .mbib-btn{min-height:30px;padding:0 8px;}
 
 .ke-vinkjes input, .ke-raster input, .mo-doel input{width:auto !important;min-height:0 !important;}
+
+.uv-svg .uv-rk-zijde{font-size:8px;font-weight:700;fill:#6a7079;text-anchor:middle;pointer-events:none;}
+.uv-svg .uv-rk-zijde.preflex{fill:#bb5e26;}
