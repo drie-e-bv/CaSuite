@@ -1,0 +1,117 @@
+#!/usr/bin/env python3
+"""Past de CaDos-uitbreiding (Modulebibliotheek + Uitvoeringsplan) toe op een CaSuite-HTML-bestand.
+
+Gebruik: patch.py <bron.html> <doel.html> [--test]
+Elk ankerpunt moet precies 1x voorkomen, anders stopt het script zonder iets te schrijven.
+"""
+import sys, re, pathlib
+
+HIER = pathlib.Path(__file__).resolve().parent
+bron, doel = sys.argv[1], sys.argv[2]
+test = "--test" in sys.argv
+html = pathlib.Path(bron).read_text(encoding="utf-8")
+if "MODULEBIBLIOTHEEK + UITVOERINGSPLAN" in html:
+    sys.exit(f"{bron}: is al gepatcht")
+
+JS = (HIER / "cados_bib.js").read_text(encoding="utf-8")
+CSS = (HIER / "cados_bib.css").read_text(encoding="utf-8")
+
+OUTER = r"""
+  // ===== Modulebibliotheek zekeringkast (2026-10-28) =====
+  // Gedeelde bibliotheek van DIN-railmodules (tabel elektro_catalogus_modules, bucket
+  // module-tekeningen) met technische tekening + aansluitklemmen, gebruikt door het nieuwe
+  // Uitvoeringsplan in CaDos. Op window gezet om dezelfde reden als dbListCatalogArmaturen.
+  window.dbListModules = async function(){
+    const { data, error } = await sb.from('elektro_catalogus_modules').select('*').order('categorie', { ascending: true }).order('naam', { ascending: true });
+    if(error) throw error;
+    return data || [];
+  };
+  window.dbSaveModule = async function(row){
+    const r = Object.assign({}, row);
+    const id = r.id;
+    delete r.id; delete r.created_at; delete r.updated_at;
+    if(id){
+      const { data, error } = await sb.from('elektro_catalogus_modules').update(r).eq('id', id).select().single();
+      if(error) throw error;
+      return data;
+    }
+    const { data, error } = await sb.from('elektro_catalogus_modules').insert(r).select().single();
+    if(error) throw error;
+    return data;
+  };
+  window.dbDeleteModule = async function(id){
+    const { error } = await sb.from('elektro_catalogus_modules').delete().eq('id', id);
+    if(error) throw error;
+  };
+  window.dbUploadModuleTekening = (file) => dbUploadFile('module-tekeningen', file);
+  // AI: herkent specs + aansluitklemmen op een foto/tekening (Edge Function "module-analyse",
+  // apart van ai-assist). Stuurt hetzelfde "AI-model (handschrift)" mee als de kladversie.
+  window.aiModuleAnalyse = async function(image, hint){
+    const model = (state.company && state.company.gemini_model_klad && String(state.company.gemini_model_klad).trim()) || DEFAULT_GEMINI_MODEL_KLAD;
+    const { data, error } = await sb.functions.invoke('module-analyse', { body: { image, hint: hint || {}, model } });
+    if(error){
+      let msg = error.message || String(error);
+      try{ const j = error.context && await error.context.json(); if(j && j.error) msg = j.error; }catch(_e){}
+      throw new Error(msg);
+    }
+    if(!data || data.error) throw new Error((data && data.error) || 'Geen antwoord van de AI ontvangen.');
+    return data;
+  };
+"""
+
+def vervang(oud, nieuw, label):
+    global html
+    n = html.count(oud)
+    if n != 1:
+        sys.exit(f"{bron}: anker '{label}' komt {n}x voor (verwacht 1) -- niets geschreven")
+    html = html.replace(oud, nieuw, 1)
+
+# 1. CSS
+vervang("\n</head>\n", "\n<style id=\"cados-uitvoering-css\">\n" + CSS + "\n</style>\n</head>\n", "</head>")
+# 2. extra stroomwaarden (layout-dropdowns tonen zo ook bv. 13A/50A uit de bibliotheek)
+vervang('const A_OPTIES = ["","6A","10A","16A","20A","25A","32A","40A","63A"];',
+        'const A_OPTIES = ["","2A","4A","6A","10A","13A","16A","20A","25A","32A","40A","50A","63A","80A","100A","125A"];', "A_OPTIES")
+# 3. nieuw tabblad direct na Zekeringen (= de layout)
+vervang('  {grp:"Elektro", id:"zekeringen", label:"Zekeringen"},',
+        '  {grp:"Elektro", id:"zekeringen", label:"Zekeringen"},\n'
+        '  // 2026-10-28: Uitvoeringsplan (bedrading + eendraadschema) -- de "Zekeringen"-tab blijft de layout.\n'
+        '  {grp:"Elektro", id:"uitvoering", label:"Uitvoeringsplan"},', "TABS")
+vervang("  zekeringen: renderZekeringen,", "  zekeringen: renderZekeringen,\n  uitvoering: renderUitvoeringsplan,", "RENDERERS-entry")
+# 4. alle nieuwe code vóór de RENDERERS-tabel (binnen het CaDos-IIFE)
+vervang("const RENDERERS = {", JS + "\nconst RENDERERS = {", "RENDERERS")
+# 5. module-editor (layout): curve, kA, type diff + bibliotheekmodule
+anker_type = '      ${cat!=="Leeg" ? `<div class="field wide"><label>Merk / type</label><input class="me-type" list="typeSuggesties"'
+vervang(anker_type, "      ${bibEditorVeldenHtml(m, cat)}\n" + anker_type, "module-editor velden")
+vervang('  const breedteInp = box.querySelector(".me-breedte");',
+        '  wireBibEditorVelden(box, m, rebuildAll);\n  const breedteInp = box.querySelector(".me-breedte");', "module-editor listeners")
+# 6. nieuwe module (staging): "Uit bibliotheek…"
+anker_rem = '      <input type="checkbox" class="sq-rem" ${item.isRem?"checked":""}> Remautomaat</label></span>'
+vervang(anker_rem, anker_rem + "\n    ${bibStagingHtml()}", "staging html")
+vervang('  const remChk = box.querySelector(".sq-rem");',
+        '  wireBibStaging(box, item, rebuildAll);\n  const remChk = box.querySelector(".sq-rem");', "staging listeners")
+# 7. export-checklist / volledig dossier
+anker_exp = '  {key:"interlex", label:"Rijgklemmen", fn:()=>exportRijgklemmenVoorWerf'
+vervang(anker_exp,
+        '  {key:"uitvoering", label:"Uitvoeringsplan & eendraadschema", fn:()=>exportUitvoeringVoorWerf, schema:true, lijst:true, heeftData:()=> state.zekeringen.kasten.some(k=>k.rijen.some(r=>r.items.some(m=>m.categorie!=="Leeg")))},\n' + anker_exp,
+        "EXPORT_SECTIES")
+# 8. DB/AI-wrappers in het buitenste script
+vervang("  window.dbListCatalogDrivers = dbListCatalogDrivers;", "  window.dbListCatalogDrivers = dbListCatalogDrivers;" + OUTER, "db-wrappers")
+# 9. knop in de Catalogus van de suite
+anker_resync = '      <button class="btn btn-ghost btn-sm" id="catalogus-resync" type="button">'
+vervang(anker_resync,
+        '      <button class="btn btn-ghost btn-sm" id="catalogus-modules" type="button" title="Gedeelde bibliotheek van zekeringkastmodules met tekening en aansluitklemmen">🔌 Zekeringkastmodules</button>\n' + anker_resync,
+        "catalogus-knop")
+anker_close = "    el('catalogus-close').addEventListener('click', () => { el('catalogus-modal').style.display = 'none'; });"
+vervang(anker_close, anker_close +
+        "\n    el('catalogus-modules').addEventListener('click', () => { el('catalogus-modal').style.display = 'none'; if(window.openModuleBibliotheek) window.openModuleBibliotheek({}); });",
+        "catalogus-knop listener")
+
+if test:
+    html = re.sub(r"<title>([^<]*)</title>", lambda m: f"<title>TEST · {m.group(1)}</title>", html, count=1)
+    m = re.search(r"<body[^>]*>", html)
+    if not m:
+        sys.exit("geen <body>")
+    html = html[:m.end()] + '\n<div class="casuite-testlint">TESTVERSIE — Uitvoeringsplan &amp; Modulebibliotheek · werkt op de echte gegevens</div>' + html[m.end():]
+
+pathlib.Path(doel).write_text(html, encoding="utf-8")
+print(f"{doel}: OK ({'test' if test else 'definitief'})")

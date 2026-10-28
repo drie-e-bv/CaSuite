@@ -1,0 +1,17 @@
+CaDos — Uitvoeringsplan + Modulebibliotheek (2026-10-28)
+
+TESTVERSIE (staat naast de gewone apps, verandert niets aan de live versie):
+  cados-test.html     = CaDos-app met de nieuwe functies
+  casuite-test.html   = volledige CaSuite met de nieuwe functies
+Beide werken op de ECHTE gegevens (zelfde Supabase).
+
+Nodig in Supabase (eenmalig):
+  - tabel elektro_catalogus_modules + bucket module-tekeningen (migratie)
+  - Edge Function module-analyse (bron: supabase/functions/module-analyse/index.ts)
+
+DEFINITIEF MAKEN (na goedkeuring):
+  python3 tools/cados-uitvoeringsplan/patch.py index.html index.html
+  (idem voor cados.html, werf.html, planning.html, cacalc.html, cabon.html)
+  -> of beter: patch toepassen op src2.html en build-apps.js draaien.
+  Daarna CACHE_VERSION in sw.js verhogen en de testbestanden verwijderen.
+  Het script weigert als een bestand al gepatcht is of een ankerpunt niet (precies 1x) vindt.

@@ -1,0 +1,142 @@
+/* ===== CaDos: Uitvoeringsplan + Modulebibliotheek (2026-10-28) ===== */
+#cados-app .uv-toolbar{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;}
+#cados-app .uv-seg{display:flex;gap:4px;}
+#cados-app .uv-tools{display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
+#cados-app .uv-tools select{width:auto;min-width:0;padding:5px 8px;}
+#cados-app .uv-chk{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:var(--ink-dim);white-space:nowrap;}
+#cados-app .uv-chk input{width:auto;}
+#cados-app .uv-zoomval{font-family:var(--mono);font-size:12px;min-width:40px;text-align:center;color:var(--ink-dim);}
+#cados-app .uv-layout{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:16px;align-items:start;}
+@media (max-width:960px){ #cados-app .uv-layout{grid-template-columns:minmax(0,1fr);} }
+#cados-app .uv-canvas-wrap{overflow:auto;-webkit-overflow-scrolling:touch;max-height:78vh;border:1px solid var(--line);
+  border-radius:var(--radius-lg);background:var(--surface);box-shadow:var(--shadow-sm);}
+#cados-app .uv-canvas-wrap svg{display:block;}
+#cados-app .uv-side .card{position:sticky;top:calc(var(--hdr-bottom, 0px) + 12px);}
+#cados-app .uv-sidebody{display:flex;flex-direction:column;gap:8px;}
+#cados-app .uv-sidebody .field{margin:0;}
+#cados-app .uv-uitleg{margin:4px 0 4px 18px;padding:0;font-size:12.5px;line-height:1.5;color:var(--ink);}
+#cados-app .uv-legende-dot{display:inline-block;width:10px;height:10px;border-radius:50%;border:2px solid #14181d;background:#fff;vertical-align:-1px;}
+#cados-app .uv-leeg-melding{padding:40px 20px;text-align:center;color:var(--ink-dim);}
+#cados-app .uv-kleurstaal{display:inline-block;width:14px;height:10px;border-radius:2px;border:1px solid rgba(0,0,0,.35);vertical-align:-1px;}
+#cados-app tr.uv-rij-sel td{background:var(--copper-tint, #fbf3ec);}
+.uv-svg, .ed-svg{font-family:"Inter","Segoe UI",Arial,sans-serif;}
+.uv-svg .uv-achtergrond, .ed-svg .uv-achtergrond{fill:#fff;}
+.uv-svg .uv-goot{fill:#f6f7f8;stroke:#e3e6ea;stroke-dasharray:4 4;}
+.uv-svg .uv-rail{fill:#c9ced4;stroke:#a9b0b8;}
+.uv-svg .uv-rijnr{font-size:13px;font-weight:800;fill:#8a9099;text-anchor:middle;}
+.uv-svg .uv-leeg{fill:none;stroke:#c3c8ce;stroke-dasharray:3 3;}
+.uv-svg .uv-mod{cursor:pointer;}
+.uv-svg .uv-mod-rand{fill:none;stroke:#5b6168;stroke-width:1.2;}
+.uv-svg .uv-mod.sel .uv-mod-rand{stroke:#bb5e26;stroke-width:3;}
+.uv-svg .uv-klemstrook{fill:#e6e8eb;}
+.uv-svg .uv-hendel{fill:#3a3f45;}
+.uv-svg .uv-spec{font-size:9.5px;font-weight:700;fill:#1d1f22;text-anchor:middle;}
+.uv-svg .uv-spec.dim{font-weight:500;fill:#6a7079;font-size:8.5px;}
+.uv-svg .uv-code-bg{fill:rgba(255,255,255,.92);stroke:#14181d;stroke-width:1;}
+.uv-svg .uv-code{font-size:10.5px;font-weight:800;fill:#14181d;text-anchor:middle;font-family:ui-monospace,Menlo,Consolas,monospace;}
+.uv-svg .uv-draad{cursor:pointer;}
+.uv-svg .uv-draad path{fill:none;stroke-linejoin:round;stroke-linecap:round;}
+.uv-svg .uv-draad-hit{stroke:transparent;stroke-width:14;}
+.uv-svg .uv-draad-rand{stroke:rgba(0,0,0,.45);}
+.uv-svg .uv-draad.sel .uv-draad-rand{stroke:#bb5e26;stroke-width:8 !important;opacity:.55;}
+.uv-svg .uv-draad:hover .uv-draad-rand{stroke:rgba(187,94,38,.7);}
+.uv-svg .uv-klem{cursor:crosshair;}
+.uv-svg .uv-klem-hit{fill:transparent;}
+.uv-svg .uv-klem-dot{fill:#fff;stroke:#14181d;stroke-width:1.6;}
+.uv-svg .uv-klem.bezet .uv-klem-dot{fill:#14181d;}
+.uv-svg .uv-klem:hover .uv-klem-dot{fill:#f2a65a;stroke:#bb5e26;}
+.uv-svg .uv-klem.pending .uv-klem-dot{fill:#bb5e26;stroke:#bb5e26;r:7;}
+.uv-svg .uv-klem-label{font-size:8px;font-weight:700;fill:#4a5058;text-anchor:middle;pointer-events:none;}
+.ed-svg .ed-lijn{stroke:#14181d;stroke-width:1.5;fill:none;}
+.ed-svg .ed-lijn.dik{stroke-width:3;}
+.ed-svg .ed-diffbox{fill:#fff;stroke:#14181d;stroke-width:1.3;}
+.ed-svg .ed-delta{font-size:8.5px;font-weight:700;text-anchor:middle;fill:#14181d;}
+.ed-svg .ed-tekst{font-size:9.5px;fill:#14181d;}
+.ed-svg .ed-tekst.b{font-weight:800;font-family:ui-monospace,Menlo,Consolas,monospace;}
+.ed-svg .ed-tekst.dim{fill:#6a7079;font-size:9px;}
+.ed-svg .ed-eind{fill:#14181d;}
+.uv-print .uv-print-svg{margin-top:8px;}
+@media print{ .uv-print{page-break-inside:avoid;} }
+
+/* ---- Modulebibliotheek (venster, buiten #cados-app zodat het in de hele suite werkt) ---- */
+.mbib-overlay [hidden]{display:none !important;}
+.mbib-overlay{position:fixed;inset:0;z-index:4000;background:rgba(20,24,29,.48);display:flex;align-items:flex-start;justify-content:center;
+  padding:24px 12px;overflow-y:auto;font-family:"Inter","Segoe UI",Arial,sans-serif;color:#14181d;font-size:14px;}
+.mbib-box{background:#fff;border-radius:14px;width:100%;max-width:1180px;box-shadow:0 18px 50px rgba(0,0,0,.25);display:flex;flex-direction:column;}
+.mbib-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;border-bottom:1px solid #e3e6ea;}
+.mbib-head h2{margin:0;font-size:17px;font-weight:800;}
+.mbib-body{padding:16px 18px 20px;}
+.mbib-hint{font-size:12.5px;color:#5c636b;margin:0 0 10px;line-height:1.45;}
+.mbib-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:36px;padding:0 13px;border-radius:9px;
+  border:1px solid #cfd4d9;background:#fff;color:#14181d;font:inherit;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;}
+.mbib-btn:hover{background:#f3f5f6;}
+.mbib-btn.primary{background:#2F7A4D;border-color:#2F7A4D;color:#fff;}
+.mbib-btn.primary:hover{background:#276741;}
+.mbib-btn.ghost{background:transparent;}
+.mbib-btn.actief{background:#e8f2ec;border-color:#2F7A4D;color:#1f5a37;}
+.mbib-btn:disabled{opacity:.55;cursor:wait;}
+.mbib-overlay input, .mbib-overlay select{font:inherit;font-size:13.5px;padding:7px 9px;border:1px solid #cfd4d9;border-radius:8px;background:#fff;color:#14181d;min-height:36px;box-sizing:border-box;}
+.mbib-filter{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;}
+.mbib-filter .mbib-q{flex:1 1 240px;}
+.mbib-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;}
+.mbib-leeg{grid-column:1/-1;padding:28px 14px;text-align:center;color:#5c636b;background:#f6f7f8;border-radius:10px;line-height:1.5;}
+.mbib-fout{color:#a3261c;background:#fdeeee;}
+.mbib-card{display:flex;gap:12px;padding:10px;border:1px solid #e3e6ea;border-radius:11px;background:#fff;}
+.mbib-thumb{flex:0 0 64px;height:110px;display:flex;align-items:center;justify-content:center;background:#f6f7f8;border-radius:7px;overflow:hidden;}
+.mbib-thumb img{max-width:100%;max-height:100%;object-fit:contain;}
+.mbib-thumb-svg{max-height:100px;max-width:60px;}
+.mbib-card-body{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:3px;}
+.mbib-card-naam{font-weight:800;font-size:14px;word-break:break-word;}
+.mbib-card-spec{font-size:12px;color:#3b4047;}
+.mbib-card-spec.dim{color:#7a8089;}
+.mbib-card-acties{display:flex;gap:6px;flex-wrap:wrap;margin-top:auto;padding-top:6px;}
+.mbib-card-acties .mbib-btn{min-height:32px;padding:0 10px;}
+.mbib-terug{margin-bottom:10px;}
+.mbib-edit{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:22px;align-items:start;}
+@media (max-width:860px){ .mbib-edit{grid-template-columns:minmax(0,1fr);} }
+.mbib-col{display:flex;flex-direction:column;gap:10px;min-width:0;}
+.mbib-stap{display:flex;align-items:center;gap:8px;font-size:14px;margin-top:4px;}
+.mbib-sub{font-size:12px;color:#7a8089;font-weight:400;}
+.mbib-nr{display:inline-flex;width:22px;height:22px;border-radius:50%;background:#2F7A4D;color:#fff;font-size:12px;font-weight:800;align-items:center;justify-content:center;}
+.mbib-rij{display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
+.mbib-pdfnav{font-size:12.5px;color:#5c636b;display:inline-flex;gap:6px;align-items:center;}
+.mbib-bron{position:relative;display:block;max-width:100%;border:1px solid #e3e6ea;border-radius:8px;overflow:hidden;background:#f6f7f8;user-select:none;touch-action:pan-y;}
+.mbib-bron.cropmodus{cursor:crosshair;touch-action:none;}
+.mbib-bron-img{display:block;width:100%;height:auto;max-height:340px;object-fit:contain;pointer-events:none;}
+.mbib-crop{position:absolute;border:2px dashed #bb5e26;background:rgba(187,94,38,.08);box-shadow:0 0 0 9999px rgba(20,24,29,.28);pointer-events:none;}
+.mbib-ai-status{font-size:12.5px;line-height:1.45;min-height:0;}
+.mbib-ai-status.bezig{color:#1f5a37;}
+.mbib-ai-status.ok{color:#1f5a37;font-weight:600;}
+.mbib-ai-status.fout{color:#a3261c;font-weight:600;}
+.mbib-tek-wrap{display:flex;justify-content:center;padding:18px 10px;background:repeating-linear-gradient(45deg,#f6f7f8,#f6f7f8 8px,#fff 8px,#fff 16px);border:1px solid #e3e6ea;border-radius:10px;}
+.mbib-tek{position:relative;display:inline-block;height:340px;max-width:100%;user-select:none;touch-action:none;}
+.mbib-tek.klemmodus{cursor:copy;outline:2px dashed #2F7A4D;outline-offset:4px;}
+.mbib-tek-img{display:block;height:100%;width:auto;max-width:100%;object-fit:contain;pointer-events:none;background:#fff;}
+.mbib-tek-leeg{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;font-size:11px;color:#7a8089;}
+.mbib-tek-leeg svg{height:90%;width:auto;max-width:none;}
+.mbib-dot{position:absolute;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;background:#fff;border:2.5px solid #14181d;cursor:grab;box-shadow:0 1px 3px rgba(0,0,0,.3);}
+.mbib-dot span{position:absolute;bottom:17px;left:50%;transform:translateX(-50%);font-size:10px;font-weight:800;background:#14181d;color:#fff;padding:0 4px;border-radius:4px;white-space:nowrap;pointer-events:none;}
+.mbib-dot.onder span{bottom:auto;top:17px;}
+.mbib-dot.sel{border-color:#bb5e26;background:#f2a65a;transform:scale(1.15);}
+.mbib-klemtabel{width:100%;border-collapse:collapse;font-size:13px;}
+.mbib-klemtabel th{text-align:left;font-size:11.5px;color:#7a8089;font-weight:700;padding:4px 6px;border-bottom:1px solid #e3e6ea;}
+.mbib-klemtabel td{padding:3px 4px;border-bottom:1px solid #f0f2f4;}
+.mbib-klemtabel tr.sel td{background:#fbf3ec;}
+.mbib-klemtabel input, .mbib-klemtabel select{width:100%;min-height:32px;padding:4px 6px;}
+.mbib-klemtabel td:last-child{width:40px;}
+.mbib-klemtabel .mbib-btn{min-height:30px;padding:0 8px;}
+.mbib-form{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px;}
+@media (max-width:520px){ .mbib-form{grid-template-columns:1fr;} }
+.mbib-veld{display:flex;flex-direction:column;gap:4px;}
+.mbib-veld label{font-size:12px;font-weight:700;color:#3b4047;}
+.mbib-veld select, .mbib-veld input{width:100%;}
+.mbib-veld.vraag select, .mbib-veld.vraag input{border-color:#e0a100;background:#fffaeb;}
+.mbib-veld.ai select, .mbib-veld.ai input{border-color:#2F7A4D;background:#f1f8f3;}
+.mbib-aitag{display:inline-block;font-size:9.5px;font-weight:800;color:#fff;background:#2F7A4D;border-radius:4px;padding:0 4px;vertical-align:1px;}
+.mbib-vragen{display:flex;flex-direction:column;gap:6px;}
+.mbib-vraagkop{font-size:12.5px;font-weight:700;color:#7a5600;background:#fff6db;border:1px solid #f1d58a;border-radius:8px;padding:8px 10px;}
+.mbib-vraag-ai{font-size:12.5px;color:#3b4047;background:#f6f7f8;border-radius:8px;padding:7px 10px;}
+.mbib-vraag-ok{font-size:12.5px;color:#1f5a37;font-weight:600;}
+.mbib-acties{display:flex;justify-content:flex-end;gap:8px;margin-top:14px;flex-wrap:wrap;}
+.casuite-testlint{position:fixed;left:0;right:0;bottom:0;z-index:5000;background:#c0392b;color:#fff;text-align:center;font:700 12px/1.6 "Inter",Arial,sans-serif;
+  letter-spacing:.04em;pointer-events:none;padding:2px 0;}
