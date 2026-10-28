@@ -1495,6 +1495,24 @@ function bestandNaarDataUrl(file){
   return new Promise((res, rej)=>{ const r = new FileReader(); r.onload = ()=> res(r.result); r.onerror = ()=> rej(r.error); r.readAsDataURL(file); });
 }
 
+/* ---------- niet-bewaarde concepten ----------
+   Werk in de bibliotheek-editor of de module-ontwerper gaat nooit meer verloren: klikken naast het
+   venster sluit niets, sluiten met wijzigingen vraagt bevestiging, en zolang er niet bewaard is houdt
+   CaDos een concept bij (ook na herladen, op dit toestel) om later verder te werken. */
+const CONCEPT_KEY = "cados_concepten_v1";
+let conceptenGeheugen = (()=>{ try{ return JSON.parse(localStorage.getItem(CONCEPT_KEY)||"{}") || {}; }catch(e){ return {}; } })();
+function schrijfConcepten(){
+  try{ localStorage.setItem(CONCEPT_KEY, JSON.stringify(conceptenGeheugen)); }
+  catch(e){
+    // te groot (bv. foto) -> zonder foto bewaren; in het geheugen blijft de foto wel bij
+    try{ const kopie = JSON.parse(JSON.stringify(conceptenGeheugen)); Object.values(kopie).forEach(c=>{ if(c && typeof c.t==="string" && /^data:/.test(c.t)) delete c.t; }); localStorage.setItem(CONCEPT_KEY, JSON.stringify(kopie)); }catch(_e){}
+  }
+}
+function bewaarConcept(sleutel, data){ conceptenGeheugen[sleutel] = Object.assign({}, data, {tijd: Date.now()}); schrijfConcepten(); }
+function wisConcept(sleutel){ if(conceptenGeheugen[sleutel]){ delete conceptenGeheugen[sleutel]; schrijfConcepten(); } }
+function conceptTijd(c){ try{ return new Date(c.tijd).toLocaleString("nl-BE", {day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit"}); }catch(e){ return ""; } }
+const NIET_BEWAARD_VRAAG = "Je wijzigingen zijn nog niet bewaard.\n\nOK = sluiten (je werk blijft als concept bewaard, je kan later verder)\nAnnuleren = verder werken";
+
 function openModuleBibliotheek(opts){
   opts = opts || {};
   const oud = document.getElementById("mbib-overlay");
@@ -1507,20 +1525,29 @@ function openModuleBibliotheek(opts){
     <div class="mbib-body"></div></div>`;
   document.body.appendChild(overlay);
   const ctx = { opts, body: overlay.querySelector(".mbib-body"), filter: { q: "", cat: (opts.preset && opts.preset.categorie) || "" } };
-  const onKey = (e)=>{ if(e.key==="Escape" && !ctx.bezig) ctx.sluit(); };
+  // Mag de editor verlaten worden? Bij niet-bewaarde wijzigingen: concept bewaren + bevestiging vragen.
+  ctx.magWeg = ()=>{
+    if(ctx.bezig) return false;
+    if(ctx.wijzigingen && ctx.wijzigingen()){ ctx.concept(); return confirm(NIET_BEWAARD_VRAAG); }
+    return true;
+  };
+  const onKey = (e)=>{ if(e.key==="Escape" && !document.getElementById("mod-ontwerper") && ctx.magWeg()) ctx.sluit(); };
   ctx.sluit = ()=>{
+    if(ctx.conceptTimer) clearInterval(ctx.conceptTimer);
     overlay.remove();
     document.removeEventListener("keydown", onKey);
     if(typeof opts.naSluiten === "function") opts.naSluiten();
   };
   document.addEventListener("keydown", onKey);
-  overlay.querySelector(".mbib-close").addEventListener("click", ()=> ctx.sluit());
-  overlay.addEventListener("click", e=>{ if(e.target===overlay && !ctx.bezig) ctx.sluit(); });
+  overlay.querySelector(".mbib-close").addEventListener("click", ()=>{ if(ctx.magWeg()) ctx.sluit(); });
+  // bewust GEEN sluiten bij klikken naast het venster: dan ging onbewaard werk verloren
   if(opts.nieuw) toonBibEditor(ctx, null); else toonBibLijst(ctx);
 }
 window.openModuleBibliotheek = openModuleBibliotheek;
 
+function verlaatEditor(ctx){ ctx.wijzigingen = null; if(ctx.conceptTimer){ clearInterval(ctx.conceptTimer); ctx.conceptTimer = null; } }
 async function toonBibLijst(ctx){
+  verlaatEditor(ctx);
   laadCadosInst().catch(()=>{});
   const cats = Object.keys(MODULE_CATEGORIEEN).filter(k=> k!=="Leeg");
   ctx.tab = "modules";
@@ -1531,8 +1558,24 @@ async function toonBibLijst(ctx){
       <select class="mbib-cat"><option value="">Alle soorten</option>${cats.map(c=>`<option value="${c}" ${ctx.filter.cat===c?"selected":""}>${escapeHtml(MODULE_CATEGORIEEN[c].label)}</option>`).join("")}</select>
       <button type="button" class="mbib-btn primary mbib-nieuw">+ Nieuwe module</button>
     </div>
+    <div class="mbib-concepten"></div>
     <div class="mbib-grid"><div class="mbib-leeg">Bibliotheek laden…</div></div>`;
   wireBibTabs(ctx);
+  const cz = ctx.body.querySelector(".mbib-concepten");
+  Object.entries(conceptenGeheugen).filter(([k])=> k.startsWith("bib:")).forEach(([k, c])=>{
+    const naam = (c.r && ((c.r.naam||"").trim() || bibAutoNaam(c.r))) || "nieuwe module";
+    const rij = el(`<div class="mbib-concept">📝 Niet-bewaard concept: <strong>${escapeHtml(naam)}</strong> <span class="mbib-sub">(${escapeHtml(conceptTijd(c))})</span>
+      <button type="button" class="mbib-btn primary">Verder bewerken</button><button type="button" class="mbib-btn ghost">Weggooien</button></div>`);
+    const [verder, weg] = rij.querySelectorAll("button");
+    verder.addEventListener("click", async ()=>{
+      const id = c.r && c.r.id;
+      let bestaand = null;
+      if(id){ try{ await laadModuleBib(); }catch(_e){} bestaand = moduleBib.find(x=> String(x.id)===String(id)) || null; }
+      toonBibEditor(ctx, bestaand, c);
+    });
+    weg.addEventListener("click", ()=>{ if(confirm(`Het concept "${naam}" weggooien?`)){ wisConcept(k); rij.remove(); } });
+    cz.appendChild(rij);
+  });
   const grid = ctx.body.querySelector(".mbib-grid");
   ctx.body.querySelector(".mbib-q").addEventListener("input", e=>{ ctx.filter.q = e.target.value; renderGrid(); });
   ctx.body.querySelector(".mbib-cat").addEventListener("change", e=>{ ctx.filter.cat = e.target.value; renderGrid(); });
@@ -1579,7 +1622,7 @@ async function toonBibLijst(ctx){
   }
 }
 
-function toonBibEditor(ctx, bestaand){
+function toonBibEditor(ctx, bestaand, concept){
   const preset = ctx.opts.preset || {};
   const r = bestaand ? JSON.parse(JSON.stringify(bestaand)) : {
     id: null, naam: "", merk: "", artikelnr: "", categorie: preset.categorie || "Automaat",
@@ -1629,9 +1672,9 @@ function toonBibEditor(ctx, bestaand){
       </div>
     </div>`;
   const B = (s)=> ctx.body.querySelector(s);
-  const terug = ()=>{ if(ctx.bezig) return; toonBibLijst(ctx); };
+  const terug = ()=>{ if(!ctx.magWeg()) return; toonBibLijst(ctx); };
   B(".mbib-terugbtn").addEventListener("click", terug);
-  B(".mbib-annuleer").addEventListener("click", ()=>{ if(ctx.opts.nieuw && !bestaand) ctx.sluit(); else terug(); });
+  B(".mbib-annuleer").addEventListener("click", ()=>{ if(ctx.opts.nieuw && !bestaand){ if(ctx.magWeg()) ctx.sluit(); } else terug(); });
 
   /* ---- stap 1: bron + uitsnede ---- */
   const bronWrap = B(".mbib-bron-wrap"), bronImg = B(".mbib-bron-img"), cropEl = B(".mbib-crop"), bronBox = B(".mbib-bron");
@@ -1865,6 +1908,8 @@ function toonBibEditor(ctx, bestaand){
       const opgeslagen = await window.dbSaveModule(row);
       await laadModuleBib(true);
       ctx.bezig = false;
+      wisConcept(conceptSleutel);
+      verlaatEditor(ctx);
       toast("Module bewaard in de bibliotheek");
       if(ctx.opts.kies){ ctx.opts.kies(opgeslagen); ctx.sluit(); }
       else toonBibLijst(ctx);
@@ -1875,8 +1920,15 @@ function toonBibEditor(ctx, bestaand){
     }finally{ ctx.bezig = false; }
   });
 
+  const conceptSleutel = "bib:" + (r.id || "nieuw");
+  if(concept){
+    Object.assign(r, concept.r || {});
+    if(Array.isArray(concept.k)) e.klemmen = concept.k.map(k=>({...k}));
+    if(concept.w) e.weergave = Object.assign({}, concept.w);
+    if(concept.t !== undefined) e.tekening = concept.t;
+  }
   tekenForm(); tekenTekening(); tekenKlemlijst();
-  if(!bestaand && !e.klemmen.length){
+  if(!concept && !bestaand && !e.klemmen.length){
     // Nieuwe module: alvast de (aangepaste) standaardklemmen van die soort als vertrekpunt.
     const vm = bibModule();
     const sj = sjabloonVoor(vm);
@@ -1884,6 +1936,13 @@ function toonBibEditor(ctx, bestaand){
     if(sj && sj.weergave) Object.assign(e.weergave, sj.weergave);
     tekenTekening(); tekenVragen();
   }
+  const snap = ()=> JSON.stringify({r, k: e.klemmen, w: e.weergave, t: e.tekening});
+  const begin = concept ? "" : snap();     // een concept geldt meteen als niet-bewaard
+  ctx.wijzigingen = ()=>{ leesForm(); return snap() !== begin; };
+  ctx.concept = ()=>{ leesForm(); bewaarConcept(conceptSleutel, JSON.parse(snap())); };
+  if(ctx.conceptTimer) clearInterval(ctx.conceptTimer);
+  ctx.conceptTimer = setInterval(()=>{ if(!document.body.contains(ctx.body)){ clearInterval(ctx.conceptTimer); return; } if(ctx.wijzigingen && ctx.wijzigingen()) ctx.concept(); }, 4000);
+  if(concept) toast("Verder met het niet-bewaarde concept");
 }
 
 /* ---------- rijgklemmen in het ontwerp ---------- */
@@ -2406,11 +2465,33 @@ function openModuleOntwerper(opts){
       </div>
     </div></div></div>`;
   document.body.appendChild(ov);
-  const sluit = ()=>{ ov.remove(); document.removeEventListener("keydown", onKey); };
-  const onKey = (e)=>{ if(e.key==="Escape") sluit(); };
+  const cSleutel = opts.conceptSleutel ? "ontwerp:" + opts.conceptSleutel : null;
+  const snap = ()=> JSON.stringify({klemmen, weergave, breedte});
+  let begin = snap();
+  const bestaandConcept = cSleutel && conceptenGeheugen[cSleutel];
+  if(bestaandConcept){
+    if(confirm(`Er is een niet-bewaard concept van deze tekening (${conceptTijd(bestaandConcept)}). Verder met dat concept?\n\nOK = verder met het concept · Annuleren = weggooien`)){
+      if(Array.isArray(bestaandConcept.klemmen)) klemmen = bestaandConcept.klemmen.map(k=>({...k}));
+      if(bestaandConcept.weergave){ Object.keys(weergave).forEach(k=> delete weergave[k]); Object.assign(weergave, bestaandConcept.weergave); }
+      if(bestaandConcept.breedte) breedte = bestaandConcept.breedte;
+      begin = "";
+    } else wisConcept(cSleutel);
+  }
+  const gewijzigd = ()=> snap() !== begin;
+  const timer = setInterval(()=>{ if(!document.body.contains(ov)){ clearInterval(timer); return; } if(cSleutel && gewijzigd()) bewaarConcept(cSleutel, JSON.parse(snap())); }, 4000);
+  const sluit = ()=>{ clearInterval(timer); ov.remove(); document.removeEventListener("keydown", onKey); };
+  const probeerSluit = ()=>{
+    if(gewijzigd()){
+      if(cSleutel) bewaarConcept(cSleutel, JSON.parse(snap()));
+      if(!confirm(cSleutel ? NIET_BEWAARD_VRAAG : "Je wijzigingen zijn nog niet bewaard. Toch sluiten?")) return;
+    }
+    sluit();
+  };
+  const onKey = (e)=>{ if(e.key==="Escape") probeerSluit(); };
   document.addEventListener("keydown", onKey);
-  ov.querySelector(".mo-sluit").addEventListener("click", sluit);
-  ov.querySelector(".mo-annuleer").addEventListener("click", sluit);
+  ov.querySelector(".mo-sluit").addEventListener("click", probeerSluit);
+  ov.querySelector(".mo-annuleer").addEventListener("click", probeerSluit);
+  // bewust GEEN sluiten bij klikken naast het venster
   ov.querySelectorAll('input[name="mo-doel"]').forEach(r=> r.addEventListener("change", ()=>{
     doel = r.value;
     ov.querySelectorAll(".mo-naam").forEach(n=> n.style.display = n.dataset.voor===doel ? "" : "none");
@@ -2429,7 +2510,7 @@ function openModuleOntwerper(opts){
   ov.querySelector(".mo-bplus").addEventListener("click", ()=> zetBreedte(breedte+1));
   if(opts.herstel) ov.querySelector(".mo-herstel").addEventListener("click", async ()=>{
     if(!confirm(opts.herstel.vraag || "Terug naar de standaard?")) return;
-    try{ await opts.herstel.fn(); sluit(); }catch(e){ alert("Mislukt: "+(e.message||e)); }
+    try{ await opts.herstel.fn(); if(cSleutel) wisConcept(cSleutel); sluit(); }catch(e){ alert("Mislukt: "+(e.message||e)); }
   });
   ov.querySelector(".mo-bewaar").addEventListener("click", async ()=>{
     const knop = ov.querySelector(".mo-bewaar");
@@ -2440,6 +2521,7 @@ function openModuleOntwerper(opts){
     knop.disabled = true; knop.textContent = "Bewaren…";
     try{
       await opts.onOpslaan(klemmenOpslaanVorm(klemmen), weergaveOpslaanVorm(weergave), doel, extra);
+      if(cSleutel) wisConcept(cSleutel);
       sluit();
       toast("Module bewaard");
     }catch(e){
@@ -2465,6 +2547,7 @@ async function openModuleOntwerperVoorModule(m, naOpslaan){
   const eigen = Array.isArray(m.klemmenEigen) || !!m.weergave;
   openModuleOntwerper({
     titel: `${codes[m.id] ? codes[m.id]+" · " : ""}${label} — tekening & klemmen`,
+    conceptSleutel: "module:" + m.id,
     uitleg: "Pas de tekening en de aansluitklemmen aan. De breedte volgt uit de layout. Draden naar klemmen die je verwijdert, verdwijnen mee.",
     module: ()=> m,
     breedte: moduleBreedte(m),
@@ -2532,6 +2615,7 @@ function wireBibTabs(ctx){
   }));
 }
 async function toonSjablonen(ctx){
+  verlaatEditor(ctx);
   ctx.tab = "sjablonen";
   ctx.body.innerHTML = bibTabsHtml(ctx) + `<p class="mbib-hint">Zo worden de modules getekend die (nog) niet aan een bibliotheekmodule gekoppeld zijn — in alle projecten. Pas klemmen en tekening aan per soort; een module kan daarnaast nog zijn eigen aanpassing krijgen in het Uitvoeringsplan.</p><div class="mbib-grid"><div class="mbib-leeg">Laden…</div></div>`;
   wireBibTabs(ctx);
@@ -2553,6 +2637,7 @@ async function toonSjablonen(ctx){
       ${sj ? `<button type="button" class="mbib-btn ghost sj-reset">Standaard herstellen</button>` : ""}</div></div>`;
     card.querySelector(".sj-edit").addEventListener("click", ()=> openModuleOntwerper({
       titel: `Standaardmodule — ${sjabloonLabel(sl)}`,
+      conceptSleutel: "sjabloon:" + sl,
       uitleg: "Dit wordt de tekening en klemindeling voor elke module van deze soort zonder bibliotheekmodule of eigen aanpassing, in alle projecten.",
       module: ()=> m, klemmen, weergave: Object.assign({}, (sj && sj.weergave) || {}),
       breedte: m.breedte, breedteHint: "Standaardbreedte voor nieuwe modules van deze soort in de layout. Bestaande modules behouden hun breedte.",
@@ -2569,6 +2654,7 @@ async function toonSjablonen(ctx){
   });
 }
 async function toonKlemfuncties(ctx){
+  verlaatEditor(ctx);
   ctx.tab = "functies";
   ctx.body.innerHTML = bibTabsHtml(ctx) + `<p class="mbib-hint">De functies die je aan een aansluitklem kan geven (gedeeld over alle projecten). De kleur is de standaard draadkleur als je een draad vanaf zo'n klem trekt.</p><div class="kf-zone">Laden…</div>`;
   wireBibTabs(ctx);
