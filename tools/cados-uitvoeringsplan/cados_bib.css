@@ -197,3 +197,9 @@
 
 .uv-svg .uv-rk-zijde{font-size:8px;font-weight:700;fill:#6a7079;text-anchor:middle;pointer-events:none;}
 .uv-svg .uv-rk-zijde.preflex{fill:#bb5e26;}
+
+.mo-breedte-veld{margin-bottom:6px;}
+.mo-breedte-rij{display:flex;gap:6px;align-items:center;}
+.mo-breedte-rij input{width:80px !important;text-align:center;}
+.mo-breedte-rij .mbib-btn{min-width:36px;}
+.mo-breedte-veld small{display:block;color:#6a7079;font-size:12px;margin-top:3px;}

@@ -107,6 +107,19 @@ vervang('  const remChk = box.querySelector(".sq-rem");',
 vervang("title=\"${isDivider?'Scheidingsteken (0 modules) — onderbreekt de automaat-nummering zonder plaats in te nemen':''}\">",
         "title=\"${isDivider?'Scheidingsteken (0 modules) — onderbreekt de automaat-nummering zonder plaats in te nemen':escapeHtml(chipTitel(m, code))}\">",
         "chip-tooltip")
+# 6c. layout: breedte van automaat/differentieel aanpasbaar (standaard 1 per pool); aangepaste
+#     standaardmodule bepaalt de standaardbreedte bij het kiezen van een soort
+vervang("""        ? `<div class="field"><label>Breedte</label><div class="breedte-auto">${m.breedte} module${m.breedte>1?'s':''} <span class="hint">${cat==="Rijgklemmenmodule"?"(automatisch — 7 klemmen per 2 modules)":"(1 per pool)"}</span></div></div>`""",
+        """        ? (cat==="Rijgklemmenmodule"
+            ? `<div class="field"><label>Breedte</label><div class="breedte-auto">${m.breedte} module${m.breedte>1?'s':''} <span class="hint">(automatisch — 7 klemmen per 2 modules)</span></div></div>`
+            : `<div class="field"><label>Breedte (modules)</label><input type="number" min="1" max="${kastVoorEditor.maat}" class="me-breedte" value="${m.breedte}"><div class="hint" style="margin-top:3px;">standaard 1 per pool — aanpasbaar</div></div>`)""",
+        "breedte aanpasbaar")
+vervang("""    item.breedte = nieuweCat==="Rijgklemmenmodule" ? berekenRijgklemBreedte((item.rijgklemKlemIds||[]).length) : (AUTO_BREEDTE_CATS.includes(nieuweCat) ? polenToBreedte(preset.polen) : preset.breedte);""",
+        """    item.breedte = nieuweCat==="Rijgklemmenmodule" ? berekenRijgklemBreedte((item.rijgklemKlemIds||[]).length) : (sjabloonBreedte(nieuweCat, preset.polen) || (AUTO_BREEDTE_CATS.includes(nieuweCat) ? polenToBreedte(preset.polen) : preset.breedte));""",
+        "staging standaardbreedte")
+vervang("""    m.breedte = newCat==="Rijgklemmenmodule" ? berekenRijgklemBreedte((m.rijgklemKlemIds||[]).length) : (AUTO_BREEDTE_CATS.includes(newCat) ? polenToBreedte(p.polen) : p.breedte);""",
+        """    m.breedte = newCat==="Rijgklemmenmodule" ? berekenRijgklemBreedte((m.rijgklemKlemIds||[]).length) : (sjabloonBreedte(newCat, p.polen) || (AUTO_BREEDTE_CATS.includes(newCat) ? polenToBreedte(p.polen) : p.breedte));""",
+        "editor standaardbreedte")
 # 7. export-checklist / volledig dossier
 anker_exp = '  {key:"interlex", label:"Rijgklemmen", fn:()=>exportRijgklemmenVoorWerf'
 vervang(anker_exp,

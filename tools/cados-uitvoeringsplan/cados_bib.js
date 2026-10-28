@@ -289,6 +289,7 @@ function bibEditorVeldenHtml(m, cat){
   return h;
 }
 function wireBibEditorVelden(box, m, rebuildAll){
+  if(!cadosInstGeladen) laadCadosInst().catch(()=>{});
   const c = box.querySelector(".me-curve"); if(c) c.addEventListener("change", e=>{ m.curve = e.target.value; save(); });
   const k = box.querySelector(".me-ka"); if(k) k.addEventListener("change", e=>{ m.kA = e.target.value; save(); });
   const d = box.querySelector(".me-difftype"); if(d) d.addEventListener("change", e=>{ m.diffType = e.target.value; save(); });
@@ -315,6 +316,7 @@ function bibStagingHtml(){
   return `<span class="sq-bib-wrap"><select class="sq-bib" title="Kies een module uit de bibliotheek — vult soort, polen, A, curve en kA in"><option value="">🔌 Uit bibliotheek…</option></select></span>`;
 }
 function wireBibStaging(box, item, rebuildAll){
+  if(!cadosInstGeladen) laadCadosInst().catch(()=>{});
   const sel = box.querySelector(".sq-bib");
   if(!sel) return;
   const vul = ()=>{
@@ -2229,6 +2231,9 @@ function openModuleOntwerper(opts){
   ov.className = "mbib-overlay mod-ontwerper";
   let klemmen = (opts.klemmen||[]).map(k=>({...k}));
   const weergave = Object.assign({}, opts.weergave||{});
+  let breedte = Math.max(1, parseInt(opts.breedte || moduleBreedte(opts.module()) || 1));
+  const breedteStart = breedte;
+  const modMetBreedte = ()=> Object.assign({}, opts.module(), {breedte});
   let doel = opts.doel || (opts.doelen && opts.doelen[0] && opts.doelen[0].key);
   ov.innerHTML = `<div class="mbib-box" role="dialog" aria-modal="true" aria-label="Module tekenen">
     <div class="mbib-head"><h2>✏️ ${escapeHtml(opts.titel || "Module tekenen")}</h2><button type="button" class="mbib-btn ghost mo-sluit">Sluiten</button></div>
@@ -2236,6 +2241,11 @@ function openModuleOntwerper(opts){
       <div class="mbib-col mo-editor"></div>
       <div class="mbib-col">
         ${opts.uitleg ? `<p class="mbib-hint">${opts.uitleg}</p>` : ""}
+        <div class="mbib-veld mo-breedte-veld"><label>Breedte (modules van 17,5 mm)</label>
+          <div class="mo-breedte-rij"><button type="button" class="mbib-btn ghost mo-bmin" ${opts.breedteVast?"disabled":""}>−</button>
+          <input type="number" class="mo-breedte" min="1" max="${opts.maxBreedte||24}" step="1" value="${breedte}" ${opts.breedteVast?"disabled":""}>
+          <button type="button" class="mbib-btn ghost mo-bplus" ${opts.breedteVast?"disabled":""}>+</button></div>
+          ${opts.breedteVast ? `<small>${escapeHtml(opts.breedteVast)}</small>` : (opts.breedteHint ? `<small>${escapeHtml(opts.breedteHint)}</small>` : "")}</div>
         <div class="mbib-stap"><strong>Waar bewaren?</strong></div>
         <div class="mo-doelen">${(opts.doelen||[]).map(d=>`<label class="mo-doel"><input type="radio" name="mo-doel" value="${d.key}" ${d.key===doel?"checked":""}> <span>${escapeHtml(d.label)}${d.uitleg?`<small>${escapeHtml(d.uitleg)}</small>`:""}</span></label>${d.naam?`<input class="mo-naam" data-voor="${d.key}" placeholder="Naam bibliotheekmodule, bv. MDT AKS-0816.03" style="${d.key===doel?"":"display:none;"}">`:""}`).join("")}</div>
         <div class="mbib-acties">
@@ -2255,13 +2265,18 @@ function openModuleOntwerper(opts){
     doel = r.value;
     ov.querySelectorAll(".mo-naam").forEach(n=> n.style.display = n.dataset.voor===doel ? "" : "none");
   }));
-  klemEditor(ov.querySelector(".mo-editor"), {
+  const ke = klemEditor(ov.querySelector(".mo-editor"), {
     getKlemmen: ()=> klemmen, setKlemmen: (v)=>{ klemmen = v; },
-    module: opts.module, weergave: ()=> weergave,
+    module: modMetBreedte, weergave: ()=> weergave,
     tekening: ()=> (opts.tekening && weergave.foto !== false) ? opts.tekening : null,
     fotoBeschikbaar: ()=> !!opts.tekening,
-    standaard: opts.standaard || (()=> standaardKlemmen(opts.module()))
+    standaard: opts.standaard ? ()=> opts.standaard(breedte) : (()=> standaardKlemmen(modMetBreedte()))
   });
+  const bInp = ov.querySelector(".mo-breedte");
+  const zetBreedte = (b)=>{ breedte = Math.max(1, Math.min(opts.maxBreedte||24, parseInt(b)||1)); bInp.value = breedte; ke.teken(); };
+  bInp.addEventListener("change", e=> zetBreedte(e.target.value));
+  ov.querySelector(".mo-bmin").addEventListener("click", ()=> zetBreedte(breedte-1));
+  ov.querySelector(".mo-bplus").addEventListener("click", ()=> zetBreedte(breedte+1));
   if(opts.herstel) ov.querySelector(".mo-herstel").addEventListener("click", async ()=>{
     if(!confirm(opts.herstel.vraag || "Terug naar de standaard?")) return;
     try{ await opts.herstel.fn(); sluit(); }catch(e){ alert("Mislukt: "+(e.message||e)); }
@@ -2269,7 +2284,8 @@ function openModuleOntwerper(opts){
   ov.querySelector(".mo-bewaar").addEventListener("click", async ()=>{
     const knop = ov.querySelector(".mo-bewaar");
     const naamInp = ov.querySelector(`.mo-naam[data-voor="${doel}"]`);
-    const extra = { naam: naamInp ? naamInp.value.trim() : "" };
+    const extra = { naam: naamInp ? naamInp.value.trim() : "", breedte, breedteGewijzigd: breedte!==breedteStart };
+    if(extra.breedteGewijzigd && opts.controleerBreedte){ const msg = opts.controleerBreedte(breedte); if(msg && !confirm(msg)) return; }
     if(naamInp && !extra.naam){ alert("Geef de bibliotheekmodule een naam."); naamInp.focus(); return; }
     knop.disabled = true; knop.textContent = "Bewaren…";
     try{
@@ -2301,20 +2317,33 @@ async function openModuleOntwerperVoorModule(m, naOpslaan){
     titel: `${codes[m.id] ? codes[m.id]+" · " : ""}${label} — tekening & klemmen`,
     uitleg: "Pas de tekening en de aansluitklemmen aan. De breedte volgt uit de layout. Draden naar klemmen die je verwijdert, verdwijnen mee.",
     module: ()=> m,
+    breedte: moduleBreedte(m),
+    maxBreedte: (kastVanModule(m.id)||{}).maat || 24,
+    breedteVast: m.categorie==="Rijgklemmenmodule" ? "Automatisch: 7 rijgklemmen per 2 modules." : "",
+    breedteHint: AUTO_BREEDTE_CATS.includes(m.categorie) ? "Standaard 1 module per pool — pas aan voor compacte of brede toestellen. Ook zichtbaar in de layout." : "Ook zichtbaar in de layout.",
+    controleerBreedte: (b)=>{
+      const kast = kastVanModule(m.id);
+      const rij = kast && kast.rijen.find(r=> r.items.includes(m));
+      if(!rij) return "";
+      const gebruikt = rij.items.reduce((t, it)=> t + (it===m ? b : moduleBreedte(it)), 0);
+      return gebruikt > kast.maat ? `Met ${b} modules is deze rij ${gebruikt}/${kast.maat} — ${gebruikt-kast.maat} te veel. Toch bewaren? (verplaats nadien een module in de layout)` : "";
+    },
     klemmen: klemmenVoorModule(m),
     weergave: Object.assign({}, (sjabloonVoor(m)||{}).weergave || {}, (m.bib && m.bib.weergave) || {}, m.weergave || {}),
     tekening: (m.bib && m.bib.tekening_url) || null,
-    standaard: ()=> standaardKlemmen(m),
+    standaard: (b)=> standaardKlemmen(Object.assign({}, m, {breedte: b})),
     doelen, doel: "eigen",
     herstel: eigen ? {label: "Eigen aanpassing wissen", vraag: "De eigen aanpassing van deze module wissen? Ze volgt dan weer de bibliotheek / standaard.", fn: async ()=>{ delete m.klemmenEigen; delete m.weergave; save(); if(naOpslaan) naOpslaan(); }} : null,
     onOpslaan: async (klemmen, weergave, doel, extra)=>{
+      // De breedte is fysiek: ze geldt altijd voor deze module in de layout, welk doel je ook kiest.
+      if(extra.breedteGewijzigd && m.categorie!=="Rijgklemmenmodule") m.breedte = extra.breedte;
       if(doel==="eigen"){ m.klemmenEigen = klemmen; m.weergave = weergave; }
-      else if(doel==="sjabloon"){ await bewaarCadosInst("sjabloon:"+sl, {klemmen, weergave}); delete m.klemmenEigen; delete m.weergave; }
+      else if(doel==="sjabloon"){ await bewaarCadosInst("sjabloon:"+sl, {klemmen, weergave, breedte: extra.breedte}); delete m.klemmenEigen; delete m.weergave; }
       else if(doel==="bib"){
         await laadModuleBib(true);
         const row = moduleBib.find(r=> String(r.id)===String(m.bibId));
         if(!row) throw new Error("Bibliotheekmodule niet meer gevonden");
-        const upd = await window.dbSaveModule(Object.assign({}, row, {klemmen, specs: Object.assign({}, row.specs||{}, {weergave})}));
+        const upd = await window.dbSaveModule(Object.assign({}, row, {klemmen, breedte: extra.breedte, specs: Object.assign({}, row.specs||{}, {weergave})}));
         await laadModuleBib(true);
         m.bib = bibSnapshot(upd || Object.assign({}, row, {klemmen, specs: Object.assign({}, row.specs||{}, {weergave})}));
         delete m.klemmenEigen; delete m.weergave;
@@ -2323,7 +2352,7 @@ async function openModuleOntwerperVoorModule(m, naOpslaan){
           naam: extra.naam, merk: "", artikelnr: "", categorie: m.categorie, polen: m.polen||"",
           stroom: m.A ? String(parseFloat(m.A)||"") : "", curve: m.curve||"", kortsluit: m.kA||"",
           gevoeligheid: m.mA ? String(parseFloat(m.mA)||"") : "", diff_type: m.diffType||"",
-          breedte: moduleBreedte(m)||1, info: "", klemmen, tekening_url: null, specs: {weergave}
+          breedte: extra.breedte || moduleBreedte(m) || 1, info: "", klemmen, tekening_url: null, specs: {weergave}
         });
         await laadModuleBib(true);
         applyBibOpModule(m, row, {behoudLayout: true});
@@ -2362,22 +2391,24 @@ async function toonSjablonen(ctx){
   SJABLOON_SOORTEN.forEach(sl=>{
     const m = sjabloonVoorbeeldModule(sl);
     const sj = cadosInst["sjabloon:"+sl];
+    if(sj && Number(sj.breedte) > 0) m.breedte = Number(sj.breedte);
     const klemmen = sj && Array.isArray(sj.klemmen) && sj.klemmen.length ? sj.klemmen : standaardKlemmen(m);
     const wg = Object.assign(standaardWeergave(m), (sj && sj.weergave) || {});
     const card = document.createElement("div");
     card.className = "mbib-card";
     card.innerHTML = `<div class="mbib-thumb">${miniModuleSvg(m, klemmen, wg)}</div>
       <div class="mbib-card-body"><div class="mbib-card-naam">${escapeHtml(sjabloonLabel(sl))}</div>
-      <div class="mbib-card-spec">${klemmen.length} klemmen${sj ? ' · <strong class="mbib-aangepast">aangepast</strong>' : " · standaard"}</div>
+      <div class="mbib-card-spec">${m.breedte} mod. · ${klemmen.length} klemmen${sj ? ' · <strong class="mbib-aangepast">aangepast</strong>' : " · standaard"}</div>
       <div class="mbib-card-acties"><button type="button" class="mbib-btn primary sj-edit">Aanpassen</button>
       ${sj ? `<button type="button" class="mbib-btn ghost sj-reset">Standaard herstellen</button>` : ""}</div></div>`;
     card.querySelector(".sj-edit").addEventListener("click", ()=> openModuleOntwerper({
       titel: `Standaardmodule — ${sjabloonLabel(sl)}`,
       uitleg: "Dit wordt de tekening en klemindeling voor elke module van deze soort zonder bibliotheekmodule of eigen aanpassing, in alle projecten.",
       module: ()=> m, klemmen, weergave: Object.assign({}, (sj && sj.weergave) || {}),
-      standaard: ()=> standaardKlemmen(m),
+      breedte: m.breedte, breedteHint: "Standaardbreedte voor nieuwe modules van deze soort in de layout. Bestaande modules behouden hun breedte.",
+      standaard: (b)=> standaardKlemmen(Object.assign({}, m, {breedte: b})),
       doelen: [{key: "sjabloon", label: `Standaard voor alle "${sjabloonLabel(sl)}"-modules (alle projecten)`}], doel: "sjabloon",
-      onOpslaan: async (kl, wg2)=>{ await bewaarCadosInst("sjabloon:"+sl, {klemmen: kl, weergave: wg2}); toonSjablonen(ctx); }
+      onOpslaan: async (kl, wg2, _d, extra)=>{ await bewaarCadosInst("sjabloon:"+sl, {klemmen: kl, weergave: wg2, breedte: extra.breedte}); toonSjablonen(ctx); }
     }));
     const rs = card.querySelector(".sj-reset");
     if(rs) rs.addEventListener("click", async ()=>{
@@ -2424,4 +2455,13 @@ async function toonKlemfuncties(ctx){
     });
   }
   teken();
+}
+
+// Standaardbreedte van een soort (aangepaste standaardmodule), gebruikt bij het kiezen van de
+// soort in de layout. Geeft null als er geen aangepaste breedte is (dan geldt de gewone regel).
+function sjabloonBreedte(cat, polen){
+  if(!cat || cat==="Leeg" || cat==="Rijgklemmenmodule") return null;
+  const sj = cadosInst["sjabloon:" + sjabloonSleutel({categorie: cat, polen})];
+  const b = sj ? parseInt(sj.breedte) : 0;
+  return b > 0 ? b : null;
 }
