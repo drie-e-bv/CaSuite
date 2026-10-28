@@ -6,7 +6,7 @@
 #cados-app .uv-chk{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:var(--ink-dim);white-space:nowrap;}
 #cados-app .uv-chk input{width:auto;}
 #cados-app .uv-zoomval{font-family:var(--mono);font-size:12px;min-width:40px;text-align:center;color:var(--ink-dim);}
-#cados-app .uv-layout{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:16px;align-items:start;}
+#cados-app .uv-layout{display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:12px;align-items:start;}
 @media (max-width:960px){ #cados-app .uv-layout{grid-template-columns:minmax(0,1fr);} }
 #cados-app .uv-canvas-wrap{overflow:auto;-webkit-overflow-scrolling:touch;max-height:78vh;border:1px solid var(--line);
   border-radius:var(--radius-lg);background:var(--surface);box-shadow:var(--shadow-sm);}
@@ -203,3 +203,9 @@
 .mo-breedte-rij input{width:80px !important;text-align:center;}
 .mo-breedte-rij .mbib-btn{min-width:36px;}
 .mo-breedte-veld small{display:block;color:#6a7079;font-size:12px;margin-top:3px;}
+
+#cados-app .uv-zoomval{cursor:pointer;min-width:56px;}
+#cados-app .uv-uitleg-details summary{cursor:pointer;list-style:none;}
+#cados-app .uv-uitleg-details summary::after{content:" ▾";color:var(--ink-dim);}
+#cados-app .uv-uitleg-details[open] summary::after{content:" ▴";}
+#cados-app .uv-canvas-wrap{max-height:82vh;}

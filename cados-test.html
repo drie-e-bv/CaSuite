@@ -3394,7 +3394,7 @@
 #cados-app .uv-chk{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:var(--ink-dim);white-space:nowrap;}
 #cados-app .uv-chk input{width:auto;}
 #cados-app .uv-zoomval{font-family:var(--mono);font-size:12px;min-width:40px;text-align:center;color:var(--ink-dim);}
-#cados-app .uv-layout{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:16px;align-items:start;}
+#cados-app .uv-layout{display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:12px;align-items:start;}
 @media (max-width:960px){ #cados-app .uv-layout{grid-template-columns:minmax(0,1fr);} }
 #cados-app .uv-canvas-wrap{overflow:auto;-webkit-overflow-scrolling:touch;max-height:78vh;border:1px solid var(--line);
   border-radius:var(--radius-lg);background:var(--surface);box-shadow:var(--shadow-sm);}
@@ -3591,6 +3591,12 @@
 .mo-breedte-rij input{width:80px !important;text-align:center;}
 .mo-breedte-rij .mbib-btn{min-width:36px;}
 .mo-breedte-veld small{display:block;color:#6a7079;font-size:12px;margin-top:3px;}
+
+#cados-app .uv-zoomval{cursor:pointer;min-width:56px;}
+#cados-app .uv-uitleg-details summary{cursor:pointer;list-style:none;}
+#cados-app .uv-uitleg-details summary::after{content:" ▾";color:var(--ink-dim);}
+#cados-app .uv-uitleg-details[open] summary::after{content:" ▴";}
+#cados-app .uv-canvas-wrap{max-height:82vh;}
 
 </style>
 </head>
@@ -15975,7 +15981,6 @@ let uvSelWire = null, uvSelMod = null, uvSelKam = null;
 let uvKamType = "1P+N", uvKamModus = false;
 let uvLaatsteOmzet = null;        // rapport van de laatste automatische omzetting (per kast-id)
 
-function uvChannelY(c){ return c*(UV.MH+UV.G) + UV.G/2; }
 function uvKlemKey(mid, kid){ return mid+"|"+kid; }
 function uvAlleModules(kast){ const f = []; kast.rijen.forEach(r=> r.items.forEach(m=> f.push(m))); return f; }
 
@@ -16019,12 +16024,36 @@ function uvSyncEnOpruimen(kast){
   if(gewijzigd) save();
 }
 
+// Geometrie met goten OP MAAT: elke goot (boven/tussen/onder de rijen) is zo hoog als nodig voor
+// de kamgeleider en het aantal draden dat erin loopt; een lege goot blijft smal.
+const UV_BAAN = 7, UV_MAX_BANEN = 12;
 function uvGeometrie(kast){
   const codes = computeZekeringCodes();
+  const nC = kast.rijen.length + 1;
+  // pass 1: in welke goot komt elke draad toe (zijde van de klem + rij van de module)
+  const zijdeVan = {}, rijVanMod = {};
+  kast.rijen.forEach((rij, ri)=> rij.items.forEach(m=>{
+    rijVanMod[m.id] = ri;
+    if(m.categorie!=="Leeg" && moduleBreedte(m) > 0) klemmenVoorModule(m).forEach(k=>{ zijdeVan[uvKlemKey(m.id, k.id)] = zijdeVanKlem(k); });
+  }));
+  const gootVan = (e)=>{ const z = zijdeVan[uvKlemKey(e.m, e.k)], ri = rijVanMod[e.m]; return (z===undefined || ri===undefined) ? null : (z==="boven" ? ri : ri+1); };
+  const banen = new Array(nC).fill(0);
+  (kast.bedrading||[]).forEach(w=>{ const ca = gootVan(w.a), cb = gootVan(w.b); if(ca===null || cb===null) return; banen[ca]++; if(cb!==ca) banen[cb]++; });
+  const kamBand = new Array(nC).fill(0);
+  (kast.kamgeleiders||[]).forEach(k=>{
+    const ri = kast.rijen.findIndex(r=> r.id===k.rijId);
+    if(ri < 0) return;
+    const g = (KAM_TYPES[k.type] || KAM_TYPES["1P+N"]).g.length;
+    kamBand[ri+1] = Math.max(kamBand[ri+1], 22 + g*6);
+  });
+  const hoogte = banen.map((n, c)=> Math.max(c===0 || c===nC-1 ? 20 : 26, kamBand[c] + (n ? 12 + Math.min(n, UV_MAX_BANEN)*UV_BAAN + 4 : 14)));
+  const gootTop = [], rijY = [];
+  let yy = 0;
+  for(let c=0; c<nC; c++){ gootTop[c] = yy; yy += hoogte[c]; if(c < kast.rijen.length){ rijY[c] = yy; yy += UV.MH; } }
   const mods = [];
   const klemPos = {};
   kast.rijen.forEach((rij, ri)=>{
-    const y = UV.G + ri*(UV.MH+UV.G);
+    const y = rijY[ri];
     let slot = 0;
     rij.items.forEach(m=>{
       const b = moduleBreedte(m);
@@ -16042,29 +16071,26 @@ function uvGeometrie(kast){
     });
   });
   const width = UV.PADX*2 + kast.maat*UV.MW;
-  const height = UV.G + kast.rijen.length*(UV.MH+UV.G);
-  return {mods, klemPos, width, height, codes};
+  return {mods, klemPos, width, height: yy, codes, gootTop, hoogte, kamBand, rijY};
 }
 
-// Orthogonale routering: uit de klem naar de bedradingsgoot boven/onder de
-// rij, horizontaal, en zo naar de andere klem. Liggen de twee klemmen aan
-// een verschillende goot, dan via de zijgoot links of rechts van de kast.
-// Elke draad krijgt een eigen "baan" in de goot zodat ze niet samenvallen.
+// Orthogonale routering: uit de klem naar de bedradingsgoot boven/onder de rij, horizontaal, en zo
+// naar de andere klem. Liggen de twee klemmen aan een verschillende goot, dan via de zijgoot links of
+// rechts van de kast. Elke draad krijgt een eigen baan in de goot (onder de kamgeleider).
 function uvRoutes(kast, geo){
   const baan = {};
   const zij = {L:0, R:0};
-  // Banen iets onder het midden van de goot, zodat ze vrij blijven van de kamgeleiders vlak onder de modules.
-  const neemBaan = (c)=>{ baan[c] = (baan[c]||0) + 1; const n = baan[c]-1; return ((n % 6) - 2) * 7 + 6; };
+  const neemBaan = (c)=>{ baan[c] = (baan[c]||0) + 1; const n = (baan[c]-1) % UV_MAX_BANEN; return geo.gootTop[c] + geo.kamBand[c] + 12 + n*UV_BAAN; };
   return kast.bedrading.map(w=>{
     const A = geo.klemPos[uvKlemKey(w.a.m, w.a.k)], B = geo.klemPos[uvKlemKey(w.b.m, w.b.k)];
     if(!A || !B) return null;
     const ca = A.zijde==="boven" ? A.ri : A.ri+1;
     const cb = B.zijde==="boven" ? B.ri : B.ri+1;
     if(ca===cb){
-      const yc = uvChannelY(ca) + neemBaan(ca);
+      const yc = neemBaan(ca);
       return {w, A, B, d:`M${A.x} ${A.y} V${yc} H${B.x} V${B.y}`};
     }
-    const ya = uvChannelY(ca) + neemBaan(ca), yb = uvChannelY(cb) + neemBaan(cb);
+    const ya = neemBaan(ca), yb = neemBaan(cb);
     const links = (A.x + B.x)/2 < geo.width/2;
     const n = links ? zij.L++ : zij.R++;
     const xs = links ? (UV.PADX - 16 - (n % 5)*8) : (geo.width - UV.PADX + 16 + (n % 5)*8);
@@ -16134,11 +16160,11 @@ function bouwBedradingSvg(kast, interactief){
   s += `<rect x="0" y="0" width="${geo.width}" height="${geo.height}" class="uv-achtergrond"/>`;
   // bedradingsgoten
   for(let c=0; c<=kast.rijen.length; c++){
-    s += `<rect x="${UV.PADX-6}" y="${uvChannelY(c)-UV.G/2+14}" width="${geo.width-2*UV.PADX+12}" height="${UV.G-28}" rx="6" class="uv-goot"/>`;
+    if(geo.hoogte[c] > 30) s += `<rect x="${UV.PADX-6}" y="${geo.gootTop[c]+geo.kamBand[c]+4}" width="${geo.width-2*UV.PADX+12}" height="${Math.max(6, geo.hoogte[c]-geo.kamBand[c]-10)}" rx="6" class="uv-goot"/>`;
   }
   // DIN-rails + rijnummer
   kast.rijen.forEach((rij, ri)=>{
-    const y = UV.G + ri*(UV.MH+UV.G);
+    const y = geo.rijY[ri];
     s += `<rect x="${UV.PADX-10}" y="${y+UV.MH/2-12}" width="${kast.maat*UV.MW+20}" height="24" class="uv-rail"/>`;
     s += `<text x="${UV.PADX-24}" y="${y+UV.MH/2+4}" class="uv-rijnr">${ri+1}</text>`;
   });
@@ -16193,7 +16219,7 @@ function uvKamLayout(kast, geo){
     if(!mds.length) return null;
     const ri = mds[0].ri;
     const x0 = Math.min(...mds.map(d=> d.x)) + 3, x1 = Math.max(...mds.map(d=> d.x + d.w)) - 3;
-    const yRij = UV.G + ri*(UV.MH+UV.G);
+    const yRij = geo.rijY[ri];
     const geleiders = (KAM_TYPES[kam.type] || KAM_TYPES["1P+N"]).g;
     const gy = {};
     geleiders.forEach((f, i)=>{ gy[f] = yRij + UV.MH + 11 + i*6; });
@@ -16519,7 +16545,7 @@ function renderUitvoeringsplan(){
       </div>
       <div class="uv-tools">
         <button class="btn small ghost uv-zoom-uit" title="uitzoomen">−</button>
-        <span class="uv-zoomval">${Math.round(uvZoom*100)}%</span>
+        <span class="uv-zoomval" title="klik: passend op het scherm"></span>
         <button class="btn small ghost uv-zoom-in" title="inzoomen">+</button>
         <button class="btn small ghost uv-bib">🔌 Modulebibliotheek</button>
         <button class="btn small uv-export">Exporteer (PDF)</button>
@@ -16558,8 +16584,7 @@ function renderUitvoeringsplan(){
     const scrollL = canvas.scrollLeft, scrollT = canvas.scrollTop;
     if(uvView==="eendraad"){
       canvas.innerHTML = bouwEendraadSvg(kast);
-      const svg = canvas.querySelector("svg");
-      if(svg){ svg.setAttribute("width", Math.round(svg.viewBox.baseVal.width*uvZoom)); svg.setAttribute("height", Math.round(svg.viewBox.baseVal.height*uvZoom)); }
+      pasSchaalAan();
       side.innerHTML = `<div class="card"><div class="card-body uv-sidebody"><strong>Eendraadschema</strong>
         <p class="hint">Automatisch afgeleid uit de layout van deze kast: net → remautomaat → hoofddifferentieel → differentielen met hun groep automaten.
         Per kring: code, curve/A/polen/kA, kabeltype (indien ingevuld bij "Voedingskabel komt op klemmen") en benoeming.</p>
@@ -16570,8 +16595,32 @@ function renderUitvoeringsplan(){
     }
     const res = bouwBedradingSvg(kast, true);
     canvas.innerHTML = res.svg;
+    pasSchaalAan();
     canvas.scrollLeft = scrollL; canvas.scrollTop = scrollT;
     tekenBanner(); tekenSide(); tekenLijst();
+  }
+  // Standaard "passend": de tekening vult de beschikbare breedte; zoom is een factor daarop.
+  function pasSchaalAan(){
+    const svg = canvas.querySelector("svg");
+    if(!svg || !svg.viewBox || !svg.viewBox.baseVal) return;
+    const vb = svg.viewBox.baseVal;
+    // vaste buitenbreedte van het vak (inclusief eventuele schuifbalk), zodat een verschijnende
+    // schuifbalk de schaal niet opnieuw doet verspringen
+    const beschikbaar = Math.max(200, canvas.getBoundingClientRect().width - 22);
+    const passend = Math.max(0.5, Math.min(1.6, beschikbaar / vb.width));
+    const sc = passend * uvZoom;
+    svg.setAttribute("width", Math.round(vb.width*sc));
+    svg.setAttribute("height", Math.round(vb.height*sc));
+  }
+  if(window.ResizeObserver){
+    let laatsteBreedte = 0;
+    const ro = new ResizeObserver(()=>{
+      const b = Math.round(canvas.getBoundingClientRect().width);
+      if(Math.abs(b - laatsteBreedte) < 6) return;
+      laatsteBreedte = b;
+      pasSchaalAan();
+    });
+    ro.observe(canvas);
   }
   function tekenBanner(){
     banner.innerHTML = "";
@@ -16726,13 +16775,13 @@ function renderUitvoeringsplan(){
     }
     const zonderBib = uvAlleModules(kast).filter(m=> m.categorie!=="Leeg" && !m.bibId).length;
     side.appendChild(el(`<div class="card"><div class="card-body uv-sidebody">
-      <strong>Zo werkt het</strong>
+      <details class="uv-uitleg-details" ${kast.bedrading.length || (kast.kamgeleiders||[]).length ? "" : "open"}><summary><strong>Zo werkt het</strong></summary>
       <ol class="uv-uitleg">
         <li><strong>⚡ Automatisch omzetten</strong> maakt een voorstel vanuit de layout.</li>
         <li>Draad: tik een <span class="uv-legende-dot"></span> aansluitklem aan, daarna de klem waar hij naartoe moet.</li>
         <li>Kamgeleider: kies het type, tik "Kamgeleider trekken" en sleep onderaan over de modules.</li>
         <li>Tik een draad, kam of module aan om hem aan te passen of te verwijderen.</li>
-      </ol>
+      </ol></details>
       <div class="hint">${kast.bedrading.length} draad/draden en ${(kast.kamgeleiders||[]).length} kamgeleider(s) in deze kast.${zonderBib ? ` ${zonderBib} module(s) gebruiken nog de standaardtekening.` : ""}</div>
     </div></div>`));
   }
@@ -16797,8 +16846,10 @@ function renderUitvoeringsplan(){
     const svg = canvas.querySelector("svg.uv-svg");
     if(!svg) return;
     const p = svgPunt(svg, ev);
-    const ri = Math.floor((p.y - UV.G/2) / (UV.MH + UV.G));
-    if(ri < 0 || ri >= kast.rijen.length) return;
+    const geoK = uvGeometrie(kast);
+    let ri = -1, best = Infinity;
+    geoK.rijY.forEach((y, i)=>{ const d = Math.abs(p.y - (y + UV.MH*0.75)); if(d < best){ best = d; ri = i; } });
+    if(ri < 0 || best > UV.MH) return;
     ev.preventDefault();
     kamSleep = { svg, ri, x0: p.x, x1: p.x };
     try{ canvas.setPointerCapture(ev.pointerId); }catch(_e){}
@@ -16820,7 +16871,7 @@ function renderUitvoeringsplan(){
     const r = kamSleep.svg.querySelector(".uv-kam-preview");
     if(!r) return;
     const mds = kamModulesOnder();
-    const yRij = UV.G + kamSleep.ri*(UV.MH+UV.G);
+    const yRij = uvGeometrie(kast).rijY[kamSleep.ri];
     const lo = mds.length ? Math.min(...mds.map(d=> d.x)) : Math.min(kamSleep.x0, kamSleep.x1);
     const hi = mds.length ? Math.max(...mds.map(d=> d.x+d.w)) : Math.max(kamSleep.x0, kamSleep.x1);
     r.setAttribute("x", lo); r.setAttribute("width", Math.max(2, hi-lo));
@@ -16891,7 +16942,10 @@ function renderUitvoeringsplan(){
     if(!confirm(`Alle ${kast.bedrading.length} draden en ${nk} kamgeleider(s) van ${kast.naam} wissen?`)) return;
     kast.bedrading = []; kast.kamgeleiders = []; uvSelWire = null; uvSelKam = null; uvPending = null; uvLaatsteOmzet = null; save(); teken();
   });
-  const zoom = (f)=>{ uvZoom = Math.max(0.4, Math.min(2.5, Math.round(uvZoom*f*10)/10)); wrap.querySelector(".uv-zoomval").textContent = Math.round(uvZoom*100)+"%"; teken(); };
+  const zoomLabel = ()=> uvZoom===1 ? "passend" : Math.round(uvZoom*100)+"%";
+  wrap.querySelector(".uv-zoomval").textContent = zoomLabel();
+  const zoom = (f)=>{ uvZoom = f===0 ? 1 : Math.max(0.4, Math.min(3, Math.round(uvZoom*f*10)/10)); wrap.querySelector(".uv-zoomval").textContent = zoomLabel(); pasSchaalAan(); };
+  wrap.querySelector(".uv-zoomval").addEventListener("click", ()=> zoom(0));
   wrap.querySelector(".uv-zoom-in").addEventListener("click", ()=> zoom(1.2));
   wrap.querySelector(".uv-zoom-uit").addEventListener("click", ()=> zoom(1/1.2));
   wrap.querySelector(".uv-bib").addEventListener("click", ()=> openModuleBibliotheek({ naSluiten: ()=>{ uvSyncEnOpruimen(kast); teken(); } }));
@@ -17609,7 +17663,7 @@ function moduleVectorSvg(m, w, h, wg){
   const donker = wg.kleur==="antraciet";
   const tekst = donker ? "#fff" : "#1d1f22", dim = donker ? "#d6d9dd" : "#6a7079";
   const maxT = Math.max(3, Math.floor(w/5.6));
-  let s = `<rect x="1" y="0" width="${w-2}" height="${h}" rx="4" fill="${fill}" class="uv-mod-rand"/>`;
+  let s = `<rect x="1" y="0" width="${w-2}" height="${h}" rx="4" style="fill:${fill}" class="uv-mod-rand"/>`;
   s += `<rect x="3" y="2" width="${w-6}" height="20" rx="2" class="uv-klemstrook"/>`;
   s += `<rect x="3" y="${h-22}" width="${w-6}" height="20" rx="2" class="uv-klemstrook"/>`;
   if(wg.hendel) s += `<rect x="${w/2-6}" y="${h/2+12}" width="12" height="26" rx="2" class="uv-hendel"/>`;
