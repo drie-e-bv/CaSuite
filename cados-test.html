@@ -3598,6 +3598,18 @@
 #cados-app .uv-uitleg-details[open] summary::after{content:" ▴";}
 #cados-app .uv-canvas-wrap{max-height:82vh;}
 
+/* uitgangen (2026-10-28) */
+.uv-svg .uv-uitgang{font-size:7.5px;font-weight:800;fill:#1f4f8a;text-anchor:middle;pointer-events:none;font-family:ui-monospace,Menlo,Consolas,monospace;}
+.uv-svg .uv-uitgang.enkel{text-anchor:start;}
+.ke-uitgang{position:absolute;transform:translate(-50%,-50%);font:800 11px ui-monospace,Menlo,Consolas,monospace;color:#1f4f8a;background:rgba(255,255,255,.85);padding:0 2px;border-radius:3px;pointer-events:none;}
+.ke-uit-paneel{border:1px solid #2F7A4D;background:#f1f8f3;border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;}
+.ke-uit-paneel[hidden]{display:none !important;}
+.ke-uit-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px 10px;}
+@media (max-width:620px){ .ke-uit-grid{grid-template-columns:1fr 1fr;} }
+.ke-uit-grid label{display:flex;flex-direction:column;gap:3px;font-size:11.5px;font-weight:700;color:#3b4047;}
+.ke-uit-grid input, .ke-uit-grid select{width:100%;min-height:32px !important;padding:4px 6px !important;}
+.mbib-klemtabel .kl-uitgang{max-width:70px;}
+
 </style>
 </head>
 <body>
@@ -16184,7 +16196,7 @@ function bouwBedradingSvg(kast, interactief){
     const pend = uvPending && uvKlemKey(uvPending.m, uvPending.k)===key;
     const cls = ["uv-klem", verbonden.has(key)?"bezet":"", pend?"pending":""].filter(Boolean).join(" ");
     const ly = p.zijde==="boven" ? p.y-9 : p.y+15;
-    const ktip = [`${p.code || p.m.naam || p.m.categorie} · klem ${p.k.label||p.k.id} (${p.k.functie||"—"}, ${p.zijde})`, p.k.tip || "", p.m.naam || ""].filter(Boolean).join("\n");
+    const ktip = [`${p.code || p.m.naam || p.m.categorie} · ${p.k.uitgang ? "uitgang "+p.k.uitgang+" · " : ""}klem ${p.k.label||p.k.id} (${p.k.functie||"—"}, ${p.zijde})`, p.k.tip || "", p.m.naam || ""].filter(Boolean).join("\n");
     const kk = klemKleur(p.k);
     const kc = kk && kk!=="Wit" ? DRAAD_KLEUREN[kk] : null;
     s += `<g class="${cls}" data-m="${p.m.id}" data-k="${escapeHtml(p.k.id)}" data-tip="${escapeHtml(ktip)}">`;
@@ -16192,6 +16204,14 @@ function bouwBedradingSvg(kast, interactief){
     s += `<circle cx="${p.x}" cy="${p.y}" r="5" class="uv-klem-dot"${kc ? ` style="stroke:${kc}"` : ""}/>`;
     if(!opKam.has(key)) s += `<text x="${p.x}" y="${ly}" class="uv-klem-label">${escapeHtml(String(p.k.label||"").slice(0,6))}</text>`;
     s += `</g>`;
+  });
+  // uitgangsnummers (bv. C1) één keer tussen de klemmen die erbij horen
+  geo.mods.forEach(md=>{
+    if(md.m.categorie==="Leeg") return;
+    uitgangGroepen(klemmenVoorModule(md.m)).forEach(g=>{
+      const gx = md.x + (g.enkel ? g.xMax*md.w + 9 : g.x*md.w), gy = md.y + g.y*md.h + 3;
+      s += `<text x="${gx}" y="${gy}" class="uv-uitgang${g.enkel?" enkel":""}">${escapeHtml(g.uitgang)}</text>`;
+    });
   });
   if(interactief) s += `<rect class="uv-kam-preview" x="0" y="0" width="0" height="0" style="display:none"/>`;
   s += `</svg>`;
@@ -16203,7 +16223,7 @@ function uvKlemOmschrijving(kast, eind){
   const p = geo.klemPos[uvKlemKey(eind.m, eind.k)];
   if(!p) return "?";
   const zijde = p.k.rijgSoort ? (p.k.rijgSoort==="kast" ? "kastzijde" : "Preflex") : p.zijde;
-  return `${p.code || (p.m.naam || p.m.categorie)} · ${p.k.label||p.k.id} (${zijde})`;
+  return `${p.code || (p.m.naam || p.m.categorie)} · ${p.k.uitgang ? p.k.uitgang+" · " : ""}${p.k.label||p.k.id} (${zijde})`;
 }
 
 /* ---------- Kamgeleiders ----------
@@ -17706,6 +17726,22 @@ function miniModuleSvg(m, klemmen, wg){
    o = { getKlemmen(), setKlemmen(v), module() -> module (voor tekening + breedte),
          weergave() -> weergave-object (wordt ter plaatse aangepast),
          tekening() -> foto-url of null, standaard() -> standaardklemmen, onChange() } */
+const KLEM_RIJ = { boven: [0.06, 0.17], onder: [0.94, 0.83] };
+const KLEM_RIJ_Y = [...KLEM_RIJ.boven, ...KLEM_RIJ.onder];
+// Groepeert klemmen met hetzelfde uitgangsnummer op dezelfde rij -> één label tussen de klemmen.
+function uitgangGroepen(klemmen){
+  const g = {};
+  klemmen.forEach(k=>{
+    const u = String(k.uitgang||"").trim();
+    if(!u) return;
+    const key = u + "|" + zijdeVanKlem(k) + "|" + Math.round((parseFloat(k.y)||0)*50);
+    (g[key] = g[key] || {uitgang: u, klemmen: []}).klemmen.push(k);
+  });
+  return Object.values(g).map(gr=>{
+    const xs = gr.klemmen.map(k=> parseFloat(k.x)||0);
+    return {uitgang: gr.uitgang, x: xs.reduce((a,b)=> a+b, 0)/xs.length, y: parseFloat(gr.klemmen[0].y)||0, enkel: gr.klemmen.length===1, xMax: Math.max(...xs)};
+  });
+}
 function klemEditor(container, o){
   let sel = null, plaatsModus = false, raster = true, sleep = null;
   container.innerHTML = `
@@ -17713,14 +17749,30 @@ function klemEditor(container, o){
       <button type="button" class="mbib-btn ghost ke-plaats">＋ Klem plaatsen</button>
       <button type="button" class="mbib-btn ghost ke-knx" title="KNX-busaansluiting: bus+ en bus-">＋ KNX-bus</button>
       <button type="button" class="mbib-btn ghost ke-dali" title="DALI-bus: DA+ en DA-">＋ DALI-bus</button>
+      <button type="button" class="mbib-btn ghost ke-uit" title="meerdere uitgangen met hun klemmen in één keer toevoegen">＋ Uitgangen…</button>
       <button type="button" class="mbib-btn ghost ke-vb" title="klemmen bovenaan gelijk verdelen over de breedte">⇔ Verdeel boven</button>
       <button type="button" class="mbib-btn ghost ke-vo" title="klemmen onderaan gelijk verdelen over de breedte">⇔ Verdeel onder</button>
       <button type="button" class="mbib-btn ghost ke-std">Standaardklemmen</button>
       <button type="button" class="mbib-btn ghost ke-wis">Alles wissen</button>
       <label class="ke-raster"><input type="checkbox" checked> raster</label>
     </div>
+    <div class="ke-uit-paneel" hidden>
+      <div class="ke-uit-grid">
+        <label>Aantal uitgangen<input type="number" class="ku-n" min="1" max="32" value="4"></label>
+        <label>Klemmen per uitgang<input type="number" class="ku-kpu" min="1" max="4" value="2"></label>
+        <label>Voorvoegsel<input class="ku-pre" value="C" maxlength="4"></label>
+        <label>Eerste uitgang<input type="number" class="ku-start" min="0" value="1"></label>
+        <label>Eerste klemnummer<input type="number" class="ku-klem" min="0" placeholder="leeg = geen"></label>
+        <label>Zijde<select class="ku-zijde"><option value="boven">boven</option><option value="onder">onder</option></select></label>
+        <label>Rij<select class="ku-rij"><option value="0">rij 1 (buiten)</option><option value="1">rij 2 (binnen)</option></select></label>
+        <label>Functie<select class="ku-functie"></select></label>
+      </div>
+      <label class="ke-raster"><input type="checkbox" class="ku-vervang" checked> bestaande klemmen op die rij vervangen</label>
+      <div class="mbib-rij"><button type="button" class="mbib-btn primary ku-ok">Toevoegen</button><button type="button" class="mbib-btn ghost ku-annuleer">Annuleren</button>
+      <span class="ke-hint">De uitgangen worden gelijk over de breedte verdeeld — versleep of hernummer nadien gerust.</span></div>
+    </div>
     <div class="mbib-tek-wrap"><div class="mbib-tek ke-stage"></div></div>
-    <div class="ke-hint">Sleep een klem om hem te verplaatsen · tik op een klem om hem te kiezen · bovenste en onderste rij klikken vast.</div>
+    <div class="ke-hint">Sleep een klem om hem te verplaatsen · tik op een klem om hem te kiezen · per zijde klikken 2 rijen vast (buiten en binnen).</div>
     <div class="ke-weergave"></div>
     <div class="ke-lijst"></div>`;
   const Q = (s)=> container.querySelector(s);
@@ -17734,7 +17786,9 @@ function klemEditor(container, o){
     if(!raster) return;
     const stap = 1/(breedte()*4);
     k.x = Math.min(1 - stap/2, Math.max(stap/2, Math.round((k.x - stap/2)/stap)*stap + stap/2));
-    if(k.y < 0.16) k.y = 0.06; else if(k.y > 0.84) k.y = 0.94; else k.y = Math.round(k.y/0.02)*0.02;
+    // twee klemrijen per zijde (rij 1 buiten, rij 2 binnen), daartussen een fijn raster
+    const niveau = KLEM_RIJ_Y.find(v=> Math.abs(k.y - v) < 0.055);
+    k.y = niveau !== undefined ? niveau : Math.round(k.y/0.02)*0.02;
   }
   function vrijePlek(y, aantal){
     const stap = 1/(breedte()*4);
@@ -17779,7 +17833,16 @@ function klemEditor(container, o){
       if(c) d.style.borderColor = c;
       d.dataset.id = k.id;
       d.innerHTML = `<span>${escapeHtml(String(k.label||"").slice(0,6))}</span>`;
+      if(k.uitgang) d.title = "uitgang " + k.uitgang;
       stage.appendChild(d);
+    });
+    uitgangGroepen(klemmen()).forEach(g=>{
+      const t = document.createElement("div");
+      t.className = "ke-uitgang";
+      t.style.left = ((g.enkel ? g.xMax + 0.06/breedte() : g.x)*100) + "%";
+      t.style.top = (g.y*100) + "%";
+      t.textContent = g.uitgang;
+      stage.appendChild(t);
     });
   }
   function tekenWeergave(){
@@ -17813,13 +17876,14 @@ function klemEditor(container, o){
     const namen = klemFuncties().map(k=> k.naam);
     const tbl = document.createElement("table");
     tbl.className = "mbib-klemtabel";
-    tbl.innerHTML = `<thead><tr><th>Label</th><th>Functie</th><th>Kleur</th><th>Zijde</th><th></th></tr></thead><tbody></tbody>`;
+    tbl.innerHTML = `<thead><tr><th>Label</th><th>Uitgang</th><th>Functie</th><th>Kleur</th><th>Zijde</th><th></th></tr></thead><tbody></tbody>`;
     const tb = tbl.querySelector("tbody");
     klemmen().slice().sort((a,b)=> (zijdeVanKlem(a)===zijdeVanKlem(b) ? a.x-b.x : (zijdeVanKlem(a)==="boven" ? -1 : 1))).forEach(k=>{
       const tr = document.createElement("tr");
       if(sel===k.id) tr.className = "sel";
       const lijst = (!k.functie || namen.includes(k.functie)) ? namen : [k.functie, ...namen];
       tr.innerHTML = `<td><input class="kl-label" value="${escapeHtml(k.label||"")}" maxlength="8"></td>
+        <td><input class="kl-uitgang" value="${escapeHtml(k.uitgang||"")}" maxlength="8" placeholder="bv. C1"></td>
         <td><select class="kl-functie">${lijst.map(f=>`<option ${f===k.functie?"selected":""}>${escapeHtml(f)}</option>`).join("")}<option value="__nieuw">＋ nieuwe functie…</option></select></td>
         <td><select class="kl-kleur" title="kleur van de klem — een draad neemt die automatisch over"><option value="">volgens functie${klemKleurFunctie(k) ? " ("+klemKleurFunctie(k)+")" : ""}</option>${Object.keys(DRAAD_KLEUREN).map(c=>`<option ${klemKleurExpliciet(k)===c?"selected":""}>${c}</option>`).join("")}</select></td>
         <td><select class="kl-zijde"><option value="boven" ${zijdeVanKlem(k)==="boven"?"selected":""}>boven</option><option value="onder" ${zijdeVanKlem(k)==="onder"?"selected":""}>onder</option></select></td>
@@ -17834,8 +17898,9 @@ function klemEditor(container, o){
         }
         k.functie = ev.target.value; teken(); tekenLijst(); changed();
       });
+      tr.querySelector(".kl-uitgang").addEventListener("input", ev=>{ const v = ev.target.value.trim(); if(v) k.uitgang = v; else delete k.uitgang; teken(); changed(); });
       tr.querySelector(".kl-kleur").addEventListener("change", ev=>{ if(ev.target.value) k.kleur = ev.target.value; else delete k.kleur; teken(); changed(); });
-      tr.querySelector(".kl-zijde").addEventListener("change", ev=>{ k.zijde = ev.target.value; k.y = ev.target.value==="boven" ? Math.min(k.y, 0.49) : Math.max(k.y, 0.51); if(raster){ k.y = ev.target.value==="boven" ? 0.06 : 0.94; } teken(); changed(); });
+      tr.querySelector(".kl-zijde").addEventListener("change", ev=>{ k.zijde = ev.target.value; k.y = ev.target.value==="boven" ? Math.min(k.y, 0.49) : Math.max(k.y, 0.51); if(raster){ k.y = KLEM_RIJ[ev.target.value][0]; } teken(); changed(); });
       tr.querySelector(".kl-del").addEventListener("click", ()=>{ o.setKlemmen(klemmen().filter(x=> x!==k)); if(sel===k.id) sel = null; teken(); tekenLijst(); changed(); });
       tb.appendChild(tr);
     });
@@ -17885,6 +17950,41 @@ function klemEditor(container, o){
   Q(".ke-plaats").addEventListener("click", ()=>{ plaatsModus = !plaatsModus; teken(); });
   Q(".ke-knx").addEventListener("click", ()=> voegPaarToe("bus+", "bus-", 0.22));
   Q(".ke-dali").addEventListener("click", ()=> voegPaarToe("DA+", "DA-", 0.94));
+  const uitP = Q(".ke-uit-paneel");
+  Q(".ke-uit").addEventListener("click", ()=>{
+    uitP.hidden = !uitP.hidden;
+    const fs = Q(".ku-functie");
+    if(!fs.options.length) fs.innerHTML = klemFuncties().map(f=>`<option ${f.naam==="contact"?"selected":""}>${escapeHtml(f.naam)}</option>`).join("");
+    // volgende uitgang voorstellen na de hoogste die al bestaat
+    const pre = Q(".ku-pre").value || "C";
+    const hoogste = klemmen().map(k=> String(k.uitgang||"")).filter(u=> u.startsWith(pre)).map(u=> parseInt(u.slice(pre.length))||0).reduce((a,b)=> Math.max(a,b), 0);
+    if(hoogste) Q(".ku-start").value = hoogste + 1;
+  });
+  Q(".ku-annuleer").addEventListener("click", ()=>{ uitP.hidden = true; });
+  Q(".ku-ok").addEventListener("click", ()=>{
+    const n = Math.max(1, Math.min(32, parseInt(Q(".ku-n").value)||1));
+    const kpu = Math.max(1, Math.min(4, parseInt(Q(".ku-kpu").value)||1));
+    const pre = Q(".ku-pre").value.trim();
+    const start = parseInt(Q(".ku-start").value); const st = Number.isNaN(start) ? 1 : start;
+    const klemStart = parseInt(Q(".ku-klem").value);
+    const zijde = Q(".ku-zijde").value, rij = parseInt(Q(".ku-rij").value)||0;
+    const functie = Q(".ku-functie").value || "contact";
+    const y = KLEM_RIJ[zijde][rij];
+    if(Q(".ku-vervang").checked) o.setKlemmen(klemmen().filter(k=> !(zijdeVanKlem(k)===zijde && Math.abs((parseFloat(k.y)||0) - y) < 0.03)));
+    const totaal = n*kpu;
+    const sp = 1/(totaal + n);          // klemafstand, met een halve plaats tussen de uitgangen
+    let nr = klemStart, x = sp;
+    for(let u=0; u<n; u++){
+      for(let j=0; j<kpu; j++){
+        klemmen().push({id: nieuwId(), label: Number.isNaN(nr) ? (pre + (st+u) + (kpu>1 ? "."+(j+1) : "")) : String(nr++),
+          uitgang: pre + (st+u), functie, zijde, x: Math.min(0.98, x), y});
+        x += sp;
+      }
+      x += sp;
+    }
+    uitP.hidden = true;
+    teken(); tekenLijst(); changed();
+  });
   Q(".ke-vb").addEventListener("click", ()=> verdeel("boven"));
   Q(".ke-vo").addEventListener("click", ()=> verdeel("onder"));
   Q(".ke-std").addEventListener("click", ()=>{
@@ -17903,7 +18003,7 @@ function klemEditor(container, o){
 }
 function klemmenOpslaanVorm(klemmen){
   return klemmen.map(k=> Object.assign({ id: String(k.id), label: String(k.label||""), functie: String(k.functie||""), zijde: zijdeVanKlem(k),
-    x: Math.round((Number(k.x)||0)*10000)/10000, y: Math.round((Number(k.y)||0)*10000)/10000 }, k.kleur ? {kleur: String(k.kleur)} : {}));
+    x: Math.round((Number(k.x)||0)*10000)/10000, y: Math.round((Number(k.y)||0)*10000)/10000 }, k.kleur ? {kleur: String(k.kleur)} : {}, k.uitgang ? {uitgang: String(k.uitgang)} : {}));
 }
 function weergaveOpslaanVorm(wg){
   const out = {};
