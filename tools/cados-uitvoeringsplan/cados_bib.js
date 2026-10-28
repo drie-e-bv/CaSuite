@@ -106,13 +106,14 @@ function standaardKlemmen(m){
     const kastZ = positie==="boven" ? "onder" : "boven", prefZ = positie==="boven" ? "boven" : "onder";
     const yVan = (zijde, niveau)=> zijde==="boven" ? (niveau ? 0.18 : 0.06) : (niveau ? 0.82 : 0.94);
     const ids = m.rijgklemKlemIds;
+    const indeling = rijgklemIndeling(m);
     ids.forEach((kid, i)=>{
       const idx = items.findIndex(k=> k.id===kid);
       const klem = items[idx] || {};
       const nr = idx >= 0 ? String(idx+1) : "?";
       const niveaus = dubbel ? [klem.onder||{}, klem.boven||{}] : [klem.onder||{}];
       niveaus.forEach((ader, nv)=>{
-        const x = (i+0.5)/ids.length + (dubbel ? (nv ? 0.17 : -0.17)/ids.length : 0);
+        const x = indeling.xs[i] + (dubbel ? (nv ? 0.17 : -0.17)/indeling.eenheden : 0);
         const label = dubbel ? nr+"."+(nv+1) : nr;
         const functie = functieVoorAderkleur(ader.kleur) || "contact";
         const basis = "Rijgklem "+label + (ader.kleur ? " · "+ader.kleur : "");
@@ -457,6 +458,55 @@ function uvGeometrie(kast){
 // Orthogonale routering: uit de klem naar de bedradingsgoot boven/onder de rij, horizontaal, en zo
 // naar de andere klem. Liggen de twee klemmen aan een verschillende goot, dan via de zijgoot links of
 // rechts van de kast. Elke draad krijgt een eigen baan in de goot (onder de kamgeleider).
+// Knikpunten van een draad worden bewaard t.o.v. de goot of rij waarin ze liggen (goot + fractie,
+// of rij + afstand), zodat ze mee verschuiven als de goten groter/kleiner worden.
+function uvEncodeerPunt(p, geo){
+  const x = Math.round(p.x*10)/10;
+  for(let c=0; c<geo.hoogte.length; c++){
+    const t = geo.gootTop[c], h = geo.hoogte[c];
+    if(p.y >= t - 0.01 && p.y <= t + h + 0.01) return {x, g: c, f: Math.round((p.y - t)/h*1000)/1000};
+  }
+  for(let r=0; r<geo.rijY.length; r++){
+    const t = geo.rijY[r];
+    if(p.y >= t && p.y <= t + UV.MH) return {x, r, dy: Math.round((p.y - t)*10)/10};
+  }
+  return {x, g: geo.hoogte.length-1, f: 1};
+}
+function uvDecodeerPunt(q, geo){
+  if(q.g !== undefined && geo.gootTop[q.g] !== undefined) return {x: q.x, y: geo.gootTop[q.g] + q.f*geo.hoogte[q.g]};
+  if(q.r !== undefined && geo.rijY[q.r] !== undefined) return {x: q.x, y: geo.rijY[q.r] + q.dy};
+  return {x: q.x, y: q.y || 0};
+}
+function uvVereenvoudig(v){
+  const out = [];
+  v.forEach(p=>{
+    const l = out[out.length-1];
+    if(l && Math.abs(l.x - p.x) < 0.01 && Math.abs(l.y - p.y) < 0.01) return;
+    out.push({x: p.x, y: p.y});
+  });
+  for(let i=out.length-2; i>=1; i--){
+    const a = out[i-1], b = out[i], c = out[i+1];
+    if((Math.abs(a.x-b.x) < 0.01 && Math.abs(b.x-c.x) < 0.01) || (Math.abs(a.y-b.y) < 0.01 && Math.abs(b.y-c.y) < 0.01)) out.splice(i, 1);
+  }
+  return out;
+}
+// Haakse lijn door de knikpunten: uit de beginklem eerst verticaal, in de eindklem verticaal binnen.
+function uvVertsVoor(A, B, punten){
+  const pts = [{x: A.x, y: A.y}, ...punten, {x: B.x, y: B.y}];
+  const v = [pts[0]];
+  for(let i=1; i<pts.length; i++){
+    const P = v[v.length-1], Q = pts[i];
+    if(Math.abs(P.x - Q.x) < 0.01 || Math.abs(P.y - Q.y) < 0.01){ v.push(Q); continue; }
+    if(i===1 && pts.length > 2) v.push({x: P.x, y: Q.y});
+    else v.push({x: Q.x, y: P.y});
+    v.push(Q);
+  }
+  return uvVereenvoudig(v);
+}
+function uvPad(v){ return "M" + v.map(p=> `${Math.round(p.x*10)/10} ${Math.round(p.y*10)/10}`).join(" L"); }
+// Orthogonale routering: zonder knikpunten automatisch (uit de klem naar de goot boven/onder de rij,
+// horizontaal, en zo naar de andere klem; via de zijgoot als het een andere goot is), met knikpunten
+// haaks door die punten. Elke automatische draad krijgt een eigen baan in de goot.
 function uvRoutes(kast, geo){
   const baan = {};
   const zij = {L:0, R:0};
@@ -466,15 +516,21 @@ function uvRoutes(kast, geo){
     if(!A || !B) return null;
     const ca = A.zijde==="boven" ? A.ri : A.ri+1;
     const cb = B.zijde==="boven" ? B.ri : B.ri+1;
-    if(ca===cb){
+    let verts;
+    if(Array.isArray(w.punten) && w.punten.length){
+      if(ca===cb) neemBaan(ca); else { neemBaan(ca); neemBaan(cb); }
+      verts = uvVertsVoor(A, B, w.punten.map(q=> uvDecodeerPunt(q, geo)));
+    } else if(ca===cb){
       const yc = neemBaan(ca);
-      return {w, A, B, d:`M${A.x} ${A.y} V${yc} H${B.x} V${B.y}`};
+      verts = uvVereenvoudig([{x:A.x,y:A.y},{x:A.x,y:yc},{x:B.x,y:yc},{x:B.x,y:B.y}]);
+    } else {
+      const ya = neemBaan(ca), yb = neemBaan(cb);
+      const links = (A.x + B.x)/2 < geo.width/2;
+      const n = links ? zij.L++ : zij.R++;
+      const xs = links ? (UV.PADX - 16 - (n % 5)*8) : (geo.width - UV.PADX + 16 + (n % 5)*8);
+      verts = uvVereenvoudig([{x:A.x,y:A.y},{x:A.x,y:ya},{x:xs,y:ya},{x:xs,y:yb},{x:B.x,y:yb},{x:B.x,y:B.y}]);
     }
-    const ya = neemBaan(ca), yb = neemBaan(cb);
-    const links = (A.x + B.x)/2 < geo.width/2;
-    const n = links ? zij.L++ : zij.R++;
-    const xs = links ? (UV.PADX - 16 - (n % 5)*8) : (geo.width - UV.PADX + 16 + (n % 5)*8);
-    return {w, A, B, d:`M${A.x} ${A.y} V${ya} H${xs} V${yb} H${B.x} V${B.y}`};
+    return {w, A, B, verts, d: uvPad(verts), handmatig: !!(w.punten && w.punten.length)};
   }).filter(Boolean);
 }
 
@@ -499,36 +555,62 @@ function uvModuleSvg(md){
     s += `<image href="${escapeHtml(url)}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="none"/>`;
     s += `<rect x="${x}" y="${y}" width="${w}" height="${h}" class="uv-mod-rand"/>`;
   } else {
-    s += `<g transform="translate(${x} ${y})">${moduleVectorSvg(m, w, h, wg)}</g>`;
+    const wgT = (cat==="Rijgklemmenmodule" && (m.rijgklemKlemIds||[]).length) ? Object.assign({}, wg, {titel: wg.titel || " ", ondertitel: wg.ondertitel || " "}) : wg;
+    s += `<g transform="translate(${x} ${y})">${moduleVectorSvg(m, w, h, wgT)}</g>`;
   }
   if(cat==="Rijgklemmenmodule" && (m.rijgklemKlemIds||[]).length){
+    s += rijgklemGroepenSvg(m, x, y, w, h);
     const pos = rijgklemPositie(m);
     const yP = pos==="boven" ? y+34 : y+h-28, yK = pos==="boven" ? y+h-28 : y+34;
     s += `<text x="${x+w/2}" y="${yP}" class="uv-rk-zijde preflex">Preflex ${pos==="boven" ? "↑" : "↓"}</text>`;
     s += `<text x="${x+w/2}" y="${yK}" class="uv-rk-zijde">kast ${pos==="boven" ? "↓" : "↑"}</text>`;
   }
-  s += `<rect x="${x+w/2-16}" y="${y+h/2-10}" width="32" height="18" rx="4" class="uv-code-bg"/>`;
-  s += `<text x="${x+w/2}" y="${y+h/2+3.5}" class="uv-code">${escapeHtml(code || CAT_ABBR[cat] || "")}</text>`;
+  const codeTekst = code || CAT_ABBR[cat] || "";
+  if(codeTekst){
+    s += `<rect x="${x+w/2-16}" y="${y+h/2-10}" width="32" height="18" rx="4" class="uv-code-bg"/>`;
+    s += `<text x="${x+w/2}" y="${y+h/2+3.5}" class="uv-code">${escapeHtml(codeTekst)}</text>`;
+  }
   s += `</g>`;
   return s;
 }
 
-function uvWireSvg(r, interactief){
+function uvWireSvg(r, interactief, nummer, toonNummer){
   const w = r.w;
   const kleur = DRAAD_KLEUREN[w.kleur] || DRAAD_KLEUREN.Bruin;
   const bw = draadBreedte(w.sectie);
   const sel = interactief && uvSelWire===w.id;
-  const tip = r.A && r.B ? `${r.A.code||""} · ${r.A.k.label||""} → ${r.B.code||""} · ${r.B.k.label||""}\n${w.kleur||""} ${w.sectie||""} mm²${w.label?" · "+w.label:""}` : "";
+  const tip = r.A && r.B ? `#${nummer} · ${r.A.code||""} · ${r.A.k.label||""} → ${r.B.code||""} · ${r.B.k.label||""}\n${w.kleur||""} ${w.sectie||""} mm²${w.label?" · "+w.label:""}${r.handmatig?" · eigen route":""}` : "";
   let s = `<g class="uv-draad${sel?" sel":""}" data-w="${w.id}" data-tip="${escapeHtml(tip)}">`;
   if(interactief) s += `<path d="${r.d}" class="uv-draad-hit"/>`;
   s += `<path d="${r.d}" class="uv-draad-rand" style="stroke-width:${bw+1.6}"/>`;
   s += `<path d="${r.d}" style="stroke:${kleur};stroke-width:${bw}" class="uv-draad-kern"/>`;
   if(w.kleur==="Geel/groen") s += `<path d="${r.d}" style="stroke:#f2d600;stroke-width:${bw};stroke-dasharray:7 7" class="uv-draad-kern"/>`;
+  if(toonNummer){
+    // nummer op het midden van het langste stuk
+    let best = null, lang = -1;
+    for(let i=0; i<r.verts.length-1; i++){ const a = r.verts[i], b = r.verts[i+1]; const l = Math.abs(a.x-b.x) + Math.abs(a.y-b.y); if(l > lang){ lang = l; best = {x: (a.x+b.x)/2, y: (a.y+b.y)/2}; } }
+    if(best){ const t = String(nummer); s += `<rect x="${best.x - 3 - t.length*2.6}" y="${best.y-5.5}" width="${6 + t.length*5.2}" height="11" rx="3" class="uv-draadnr-bg" style="stroke:${kleur}"/><text x="${best.x}" y="${best.y+3}" class="uv-draadnr">${t}</text>`; }
+  }
   s += `</g>`;
+  if(sel){
+    // handgrepen: draadstukken verslepen, knikpunten verslepen (dubbelklik = weg), begin/einde naar een andere klem slepen
+    let h = `<g class="uv-greep">`;
+    for(let i=0; i<r.verts.length-1; i++){
+      const a = r.verts[i], b = r.verts[i+1];
+      const binnen = i >= 1 && i+1 <= r.verts.length-2;
+      h += `<path d="M${a.x} ${a.y} L${b.x} ${b.y}" class="uv-dseg${binnen?" sleepbaar":""}" data-i="${i}" data-as="${Math.abs(a.y-b.y) < 0.01 ? "h" : "v"}"/>`;
+    }
+    r.verts.slice(1, -1).forEach((p, i)=>{ h += `<circle cx="${p.x}" cy="${p.y}" r="4" class="uv-vtx" data-i="${i}"/>`; });
+    h += `<rect x="${r.A.x-6}" y="${r.A.y-6}" width="12" height="12" rx="2" class="uv-eind" data-e="a"><title>begin naar een andere klem slepen</title></rect>`;
+    h += `<rect x="${r.B.x-6}" y="${r.B.y-6}" width="12" height="12" rx="2" class="uv-eind" data-e="b"><title>einde naar een andere klem slepen</title></rect>`;
+    s += h + `</g>`;
+  }
   return s;
 }
 
-function bouwBedradingSvg(kast, interactief){
+let uvLagen = { draden: true, kammen: true, labels: true, nummers: false };
+function bouwBedradingSvg(kast, interactief, opts){
+  const lagen = Object.assign({}, interactief ? uvLagen : { draden: true, kammen: true, labels: true, nummers: true }, (opts && opts.lagen) || {});
   const geo = uvGeometrie(kast);
   const routes = uvRoutes(kast, geo);
   const kammen = uvKamLayout(kast, geo);
@@ -549,8 +631,12 @@ function bouwBedradingSvg(kast, interactief){
     s += `<text x="${UV.PADX-24}" y="${y+UV.MH/2+4}" class="uv-rijnr">${ri+1}</text>`;
   });
   geo.mods.forEach(md=>{ s += uvModuleSvg(md); });
-  kammen.forEach(kl=>{ s += uvKamSvg(kl, interactief); });
-  routes.forEach(r=>{ s += uvWireSvg(r, interactief); });
+  if(lagen.kammen) kammen.forEach(kl=>{ s += uvKamSvg(kl, interactief); });
+  const nrVan = {};
+  kast.bedrading.forEach((w, i)=>{ nrVan[w.id] = i+1; });
+  if(lagen.draden){
+    routes.filter(r=> !(interactief && uvSelWire===r.w.id)).forEach(r=>{ s += uvWireSvg(r, interactief, nrVan[r.w.id], lagen.nummers); });
+  }
   // klemmen bovenop
   Object.entries(geo.klemPos).forEach(([key, p])=>{
     const pend = uvPending && uvKlemKey(uvPending.m, uvPending.k)===key;
@@ -562,18 +648,20 @@ function bouwBedradingSvg(kast, interactief){
     s += `<g class="${cls}" data-m="${p.m.id}" data-k="${escapeHtml(p.k.id)}" data-tip="${escapeHtml(ktip)}">`;
     if(interactief) s += `<circle cx="${p.x}" cy="${p.y}" r="11" class="uv-klem-hit"/>`;
     s += `<circle cx="${p.x}" cy="${p.y}" r="5" class="uv-klem-dot"${kc ? ` style="stroke:${kc}"` : ""}/>`;
-    if(!opKam.has(key)) s += `<text x="${p.x}" y="${ly}" class="uv-klem-label">${escapeHtml(String(p.k.label||"").slice(0,6))}</text>`;
+    if(lagen.labels && !opKam.has(key)) s += `<text x="${p.x}" y="${ly}" class="uv-klem-label">${escapeHtml(String(p.k.label||"").slice(0,6))}</text>`;
     s += `</g>`;
   });
   // uitgangsnummers (bv. C1) één keer tussen de klemmen die erbij horen
   geo.mods.forEach(md=>{
-    if(md.m.categorie==="Leeg") return;
+    if(md.m.categorie==="Leeg" || !lagen.labels) return;
     uitgangGroepen(klemmenVoorModule(md.m)).forEach(g=>{
       const gx = md.x + (g.enkel ? g.xMax*md.w + 9 : g.x*md.w), gy = md.y + g.y*md.h + 3;
       s += `<text x="${gx}" y="${gy}" class="uv-uitgang${g.enkel?" enkel":""}">${escapeHtml(g.uitgang)}</text>`;
     });
   });
-  if(interactief) s += `<rect class="uv-kam-preview" x="0" y="0" width="0" height="0" style="display:none"/>`;
+  // de geselecteerde draad bovenaan, met zijn handgrepen
+  if(interactief && uvSelWire && lagen.draden){ const r = routes.find(x=> x.w.id===uvSelWire); if(r) s += uvWireSvg(r, true, nrVan[r.w.id], lagen.nummers); }
+  if(interactief) s += `<rect class="uv-kam-preview" x="0" y="0" width="0" height="0" style="display:none"/><rect class="uv-zoom-preview" x="0" y="0" width="0" height="0" style="display:none"/><path class="uv-draad-preview" d="" style="display:none"/>`;
   s += `</svg>`;
   return {svg: s, geo, routes};
 }
@@ -899,156 +987,333 @@ function bouwEendraadSvg(kast){
   return s;
 }
 
+/* Schermindeling (2026-10-28, op vraag van Peter: "het scherm waarin we effectief werken neemt maar
+   een te klein deel in ... alle modules mogen kleiner, zoom + en - (ook volledige kast cfr pdf
+   reader), het bovenste deel moet weg, de knoppen naar de zijkant") + AutoCAD-achtige functies:
+   draden met knikpunten (haaks), draadstukken/knikpunten/eindpunten verslepen, ongedaan maken /
+   opnieuw, zoomvenster, pannen, sneltoetsen en lagen. */
+let uvOrtho = true;
+let uvZoomModus = "kast";     // "kast" (volledige kast) | "breedte" | "vrij"
+let uvSchaal = 1;
+let uvZoomVenster = false;
+let uvVerplaats = null;       // {w: draad-id, e: "a"|"b"}: volgende tik op een klem = nieuw begin/einde
+let uvHulpOpen = false;
+const uvHistorie = {};        // kast-id -> {undo: [], redo: [], laatste: ""}
+function uvKastJson(kast){ return JSON.stringify(kast); }
+function uvHist(kast){ return uvHistorie[kast.id] || (uvHistorie[kast.id] = {undo: [], redo: [], laatste: uvKastJson(kast)}); }
+
+let uvLijstOpen = false;
+let uvToetsHandler = null, uvResizeHandler = null;
+/* Controle bij het aansluiten (op vraag van Peter: "blauwe kabel (neuter) op een andere kleur aansluiten
+   moet een foutmelding geven, maar je moet wel kunnen kiezen om toch verder te gaan").
+   Soort geleider van een klem: L (L, L1-L3), N of PE, uit de klemfunctie of de aderkleur. */
+function uvGeleider(k){
+  if(!k) return null;
+  const f = normFunctie(k.functie || k.label);
+  if(f==="N") return "N";
+  if(f==="PE") return "PE";
+  if(/^L[123]?$/.test(f)) return "L";
+  const kl = klemKleurExpliciet(k);
+  if(kl==="Blauw") return "N";
+  if(kl==="Geel/groen") return "PE";
+  if(kl==="Bruin" || kl==="Zwart" || kl==="Grijs") return f ? null : "L";
+  return null;
+}
+const UV_GELEIDER_NAAM = {L: "fase (L)", N: "neuter (N)", PE: "aarding (PE)"};
+function uvAansluitFouten(kleur, ka, kb){
+  const ga = uvGeleider(ka), gb = uvGeleider(kb);
+  const uit = [];
+  if(ga && gb && ga!==gb && (ga!=="L" || gb!=="L")) uit.push(`${UV_GELEIDER_NAAM[ga]} verbonden met ${UV_GELEIDER_NAAM[gb]}`);
+  [ga, gb].forEach(g=>{
+    if(!g) return;
+    let m = null;
+    if(kleur==="Blauw" && g!=="N") m = `blauwe draad (neuter) op een ${UV_GELEIDER_NAAM[g]}-klem`;
+    else if(kleur==="Geel/groen" && g!=="PE") m = `geel/groene draad (aarding) op een ${UV_GELEIDER_NAAM[g]}-klem`;
+    else if(g==="N" && kleur && kleur!=="Blauw") m = `${kleur.toLowerCase()} draad op een neuter (N)-klem`;
+    else if(g==="PE" && kleur && kleur!=="Geel/groen") m = `${kleur.toLowerCase()} draad op een aarding (PE)-klem`;
+    if(m && !uit.includes(m)) uit.push(m);
+  });
+  return uit;
+}
+function bevestigAansluiting(fouten){
+  if(!fouten || !fouten.length) return true;
+  return confirm("⚠ Let op — mogelijk verkeerde aansluiting:\n\n• " + fouten.join("\n• ") + "\n\nToch zo aansluiten?");
+}
+
 function renderUitvoeringsplan(){
   const kast = huidigeZekeringKast();
   uvSyncEnOpruimen(kast);
-  const wrap = el(`<div class="panel" id="panel-uitvoering">
-    ${panelHeadHtml(
-      "Zekeringkast — uitvoeringsplan",
-      "De bedrading van de kast: echte tekening per module, klemmen als snappunten en draden ertussen — plus het eendraadschema.",
-      `De opbouw (welke module waar) komt uit de Layout op het tabblad "Zekeringen" — die pas je daar aan; hier teken je de uitvoering.
-      Draad trekken: tik een aansluitklem aan, daarna een tweede klem. Kleur en doorsnede kies je in de balk (of laat de kleur automatisch volgen uit de klem: L bruin, N blauw, PE geel/groen…).
-      Tik een draad aan om hem aan te passen of te verwijderen; tik een module aan om er een bibliotheekmodule (echte tekening + klemmen) aan te koppelen.
-      Kamgeleider: kies het type (2-polig, 4-polig…), tik "Kamgeleider trekken" en sleep onderaan over de modules die verbonden moeten worden — welke modules erop zitten wordt automatisch herkend.
-      "Automatisch omzetten" maakt in één keer een voorstel vanuit de layout: bibliotheekmodules koppelen, een kamgeleider per differentieel met zijn automaten en de voedingsdraden. Alles blijft aanpasbaar; opnieuw omzetten vervangt enkel de automatische voorstellen, niet wat je zelf tekende.
-      Het eendraadschema wordt volledig afgeleid uit de layout (groepen, hoofddifferentieel, remautomaat, specs, kabeltype en benoeming).`
-    )}
-    <div class="toolbar-card" style="margin-bottom:12px;"><div class="toolbar-row" id="uvKastbar" style="flex-wrap:wrap;"></div></div>
-    <div class="toolbar-card uv-toolbar" style="margin-bottom:12px;">
+  const hist = uvHist(kast);
+  const bed = uvView==="bedrading";
+  const wrap = el(`<div class="panel uv-panel" id="panel-uitvoering">
+    <div class="uv-kop">
+      <strong class="uv-titel">Uitvoeringsplan</strong>
+      <div class="uv-kasten" id="uvKastbar"></div>
       <div class="uv-seg">
-        <button class="btn small ${uvView==="bedrading"?"primary":"ghost"}" data-view="bedrading">Bedrading</button>
-        <button class="btn small ${uvView==="eendraad"?"primary":"ghost"}" data-view="eendraad">Eendraadschema</button>
+        <button class="btn small ${bed?"primary":"ghost"}" data-view="bedrading">Bedrading</button>
+        <button class="btn small ${!bed?"primary":"ghost"}" data-view="eendraad">Eendraadschema</button>
       </div>
-      <div class="uv-tools" style="${uvView==="bedrading"?"":"display:none;"}">
-        <button class="btn small primary uv-omzet" title="voorstel maken vanuit de layout: bibliotheek, kamgeleiders en voedingsdraden">⚡ Automatisch omzetten</button>
+      <span class="uv-spacer"></span>
+      <div class="uv-zoom">
+        ${bed ? `<button class="btn small ghost uv-undo" title="ongedaan maken (Ctrl+Z)" ${hist.undo.length?"":"disabled"}>↶</button>
+        <button class="btn small ghost uv-redo" title="opnieuw (Ctrl+Y)" ${hist.redo.length?"":"disabled"}>↷</button><span class="uv-sep"></span>` : ""}
+        <button class="btn small ghost uv-zoom-uit" title="uitzoomen (−)">−</button>
+        <span class="uv-zoomval" title="zoom"></span>
+        <button class="btn small ghost uv-zoom-in" title="inzoomen (+)">+</button>
+        <button class="btn small ghost uv-zoom-kast ${uvZoomModus==="kast"?"actief":""}" title="volledige kast in beeld (F)">⤢ Kast</button>
+        <button class="btn small ghost uv-zoom-breedte ${uvZoomModus==="breedte"?"actief":""}" title="passend op de breedte (W)">↔ Breedte</button>
+        <button class="btn small ghost uv-zoom-venster ${uvZoomVenster?"actief":""}" title="zoomvenster: sleep een rechthoek (Z)">⬚</button>
       </div>
-      <div class="uv-tools" style="${uvView==="bedrading"?"":"display:none;"}">
-        <select class="uv-kamtype" title="type kamgeleider">${Object.entries(KAM_TYPES).map(([k,v])=>`<option value="${k}" ${k===uvKamType?"selected":""}>Kam ${v.label}</option>`).join("")}</select>
-        <button class="btn small ${uvKamModus?"primary":"ghost"} uv-kammodus" title="sleep daarna onderaan over de modules die verbonden moeten worden">${uvKamModus ? "✓ Sleep over de modules…" : "▭ Kamgeleider trekken"}</button>
-      </div>
-      <div class="uv-tools" style="${uvView==="bedrading"?"":"display:none;"}">
-        <label class="uv-chk"><input type="checkbox" class="uv-kleurauto" ${uvKleurAuto?"checked":""}> kleur volgens klem</label>
-        <select class="uv-kleur" ${uvKleurAuto?"disabled":""} title="draadkleur">${Object.keys(DRAAD_KLEUREN).map(k=>`<option ${k===uvKleur?"selected":""}>${k}</option>`).join("")}</select>
-        <select class="uv-sectie" title="doorsnede">${DRAAD_SECTIES.map(v=>`<option value="${v}" ${v===uvSectie?"selected":""}>${v} mm²</option>`).join("")}</select>
-        <button class="btn small ghost uv-wis" title="alle draden en kamgeleiders van deze kast wissen">Alles wissen</button>
-      </div>
-      <div class="uv-tools">
-        <button class="btn small ghost uv-zoom-uit" title="uitzoomen">−</button>
-        <span class="uv-zoomval" title="klik: passend op het scherm"></span>
-        <button class="btn small ghost uv-zoom-in" title="inzoomen">+</button>
-        <button class="btn small ghost uv-bib">🔌 Modulebibliotheek</button>
-        <button class="btn small uv-export">Exporteer (PDF)</button>
-      </div>
+      <button class="btn small ghost uv-help ${uvHulpOpen?"actief":""}" title="uitleg en sneltoetsen">ⓘ</button>
     </div>
-    <div id="uvBanner"></div>
-    <div class="uv-layout">
-      <div class="uv-canvas-wrap" id="uvCanvas"></div>
-      <div class="uv-side" id="uvSide"></div>
+    <div class="uv-werk">
+      <div class="uv-canvas-box">
+        <div class="uv-canvas-wrap" id="uvCanvas"></div>
+        <div id="uvBanner" class="uv-banner"></div>
+        <div class="uv-status" id="uvStatus"></div>
+      </div>
+      <aside class="uv-side" id="uvSide">
+        <div id="uvHulp" ${uvHulpOpen?"":"hidden"}></div>
+        <div id="uvDetail"></div>
+        <div id="uvGereedschap"></div>
+      </aside>
     </div>
     <div id="uvLijst"></div>
   </div>`);
-  wireHintToggle(wrap);
 
   const kastbar = wrap.querySelector("#uvKastbar");
   state.zekeringen.kasten.forEach(k=>{
     const btn = el(`<button class="btn small ${k.id===kast.id?'primary':'ghost'}">${escapeHtml(k.naam)}</button>`);
-    btn.addEventListener("click", ()=>{ zekeringHuidigeKastId = k.id; uvPending = null; uvSelWire = null; uvSelMod = null; selectTab("uitvoering"); });
+    btn.addEventListener("click", ()=>{ zekeringHuidigeKastId = k.id; uvPending = null; uvSelWire = null; uvSelMod = null; uvSelKam = null; uvVerplaats = null; selectTab("uitvoering"); });
     kastbar.appendChild(btn);
   });
-  kastbar.appendChild(el(`<span class="hint" style="margin-left:6px;">Layout aanpassen? → tabblad <a href="#" class="uv-naar-layout">Zekeringen</a></span>`));
-  kastbar.querySelector(".uv-naar-layout").addEventListener("click", e=>{ e.preventDefault(); selectTab("zekeringen"); });
+  const naarLayout = el(`<a href="#" class="uv-naar-layout" title="layout aanpassen op het tabblad Zekeringen">layout ✎</a>`);
+  naarLayout.addEventListener("click", e=>{ e.preventDefault(); selectTab("zekeringen"); });
+  kastbar.appendChild(naarLayout);
 
   const canvas = wrap.querySelector("#uvCanvas");
+  const canvasBox = wrap.querySelector(".uv-canvas-box");
   const side = wrap.querySelector("#uvSide");
+  const detail = wrap.querySelector("#uvDetail");
+  const gereedschap = wrap.querySelector("#uvGereedschap");
   const banner = wrap.querySelector("#uvBanner");
+  const status = wrap.querySelector("#uvStatus");
   const lijst = wrap.querySelector("#uvLijst");
+  const hulp = wrap.querySelector("#uvHulp");
   const heeftModules = uvAlleModules(kast).some(m=> m.categorie!=="Leeg");
+  let geoNu = null, routesNu = [];
+  let huidigeSchaal = 1;
+
+  hulp.innerHTML = `<div class="card"><div class="card-body uv-sidebody">
+    <strong>Zo werkt het</strong>
+    <ol class="uv-uitleg">
+      <li><strong>⚡ Automatisch omzetten</strong> maakt een voorstel vanuit de layout (bibliotheek, kamgeleiders, voedingsdraden).</li>
+      <li><strong>Draad</strong>: tik een klem, klik eventueel tussenpunten (haaks), tik de eindklem.</li>
+      <li><strong>Draad aanpassen</strong>: tik hem aan, sleep een draadstuk of knikpunt; sleep het ▪ begin/einde naar een andere klem. Dubbelklik op een knikpunt = weg.</li>
+      <li><strong>Kamgeleider</strong>: kies het type, druk K en sleep onderaan over de modules.</li>
+      <li><strong>Verschuiven</strong>: sleep op een lege plek (of middelste muisknop). <strong>Zoomen</strong>: Ctrl + muiswiel, −/+, ⤢ Kast, ⬚ zoomvenster.</li>
+    </ol>
+    <div class="uv-sneltoetsen">
+      <span><kbd>D</kbd> draad</span><span><kbd>K</kbd> kamgeleider</span><span><kbd>Esc</kbd> stoppen</span><span><kbd>Del</kbd> verwijderen</span>
+      <span><kbd>⌫</kbd> laatste knikpunt</span><span><kbd>O</kbd> haaks aan/uit</span><span><kbd>F</kbd> volledige kast</span><span><kbd>W</kbd> breedte</span>
+      <span><kbd>Z</kbd> zoomvenster</span><span><kbd>+</kbd>/<kbd>−</kbd> zoom</span><span><kbd>Ctrl</kbd>+<kbd>Z</kbd> ongedaan</span><span><kbd>Ctrl</kbd>+<kbd>Y</kbd> opnieuw</span>
+    </div>
+    <div class="hint">De layout (welke module waar) pas je aan op het tabblad Zekeringen. Het eendraadschema volgt volledig uit de layout.</div>
+  </div></div>`;
+
+  gereedschap.innerHTML = bed ? `
+    <div class="card"><div class="card-body uv-sidebody uv-tools-kaart">
+      <div class="uv-sec">
+        <div class="uv-sec-titel">Gereedschap</div>
+        <div class="uv-toolknoppen">
+          <button class="uv-tool ${!uvKamModus?"actief":""}" data-tool="draad" title="draad trekken (D)">╱ Draad <kbd>D</kbd></button>
+          <button class="uv-tool ${uvKamModus?"actief":""}" data-tool="kam" title="kamgeleider trekken (K)">▭ Kam <kbd>K</kbd></button>
+        </div>
+        <label class="uv-veld">Type kamgeleider<select class="uv-kamtype">${Object.entries(KAM_TYPES).map(([k,v])=>`<option value="${k}" ${k===uvKamType?"selected":""}>${v.label}</option>`).join("")}</select></label>
+      </div>
+      <div class="uv-sec">
+        <div class="uv-sec-titel">Nieuwe draad</div>
+        <label class="uv-chk"><input type="checkbox" class="uv-kleurauto" ${uvKleurAuto?"checked":""}> kleur volgens klem</label>
+        <div class="uv-rij2">
+          <select class="uv-kleur" ${uvKleurAuto?"disabled":""} title="draadkleur">${Object.keys(DRAAD_KLEUREN).map(k=>`<option ${k===uvKleur?"selected":""}>${k}</option>`).join("")}</select>
+          <select class="uv-sectie" title="doorsnede">${DRAAD_SECTIES.map(v=>`<option value="${v}" ${v===uvSectie?"selected":""}>${v} mm²</option>`).join("")}</select>
+        </div>
+        <label class="uv-chk"><input type="checkbox" class="uv-ortho" ${uvOrtho?"checked":""}> haaks tekenen <kbd>O</kbd></label>
+      </div>
+      <div class="uv-sec">
+        <button class="btn small primary uv-omzet" title="voorstel maken vanuit de layout: bibliotheek, kamgeleiders en voedingsdraden">⚡ Automatisch omzetten</button>
+      </div>
+      <div class="uv-sec">
+        <div class="uv-sec-titel">Lagen</div>
+        <div class="uv-lagen">
+          <label class="uv-chk"><input type="checkbox" data-laag="draden" ${uvLagen.draden?"checked":""}> draden</label>
+          <label class="uv-chk"><input type="checkbox" data-laag="kammen" ${uvLagen.kammen?"checked":""}> kamgeleiders</label>
+          <label class="uv-chk"><input type="checkbox" data-laag="labels" ${uvLagen.labels?"checked":""}> klemlabels</label>
+          <label class="uv-chk"><input type="checkbox" data-laag="nummers" ${uvLagen.nummers?"checked":""}> draadnummers</label>
+        </div>
+      </div>
+      <div class="uv-sec uv-sec-meer">
+        <button class="btn small ghost uv-bib">🔌 Modulebibliotheek</button>
+        <button class="btn small ghost uv-export">⎙ Exporteer (PDF)</button>
+        <button class="btn small ghost uv-wis" title="alle draden en kamgeleiders van deze kast wissen">🗑 Alles wissen</button>
+      </div>
+    </div></div>` : `
+    <div class="card"><div class="card-body uv-sidebody">
+      <strong>Eendraadschema</strong>
+      <p class="hint">Automatisch afgeleid uit de layout van deze kast: net → remautomaat → hoofddifferentieel → differentielen met hun groep automaten.
+      Per kring: code, curve/A/polen/kA, kabeltype en benoeming.</p>
+      <p class="hint">Iets niet juist? Pas het aan in de <a href="#" class="uv-naar-layout2">layout</a> — het schema volgt vanzelf.</p>
+      <button class="btn small ghost uv-export">⎙ Exporteer (PDF)</button>
+    </div></div>`;
+
+  // werkvlak zo hoog als het scherm toelaat
+  function pasHoogteAan(){
+    if(!document.body.contains(wrap)) return;
+    const top = canvasBox.getBoundingClientRect().top;
+    const lint = document.querySelector(".casuite-testlint");
+    const h = Math.max(420, Math.round(window.innerHeight - Math.max(0, top) - 14 - (lint ? lint.offsetHeight : 0)));
+    canvasBox.style.height = h + "px";
+    side.style.maxHeight = h + "px";
+  }
+  function effSchaal(vb){
+    const bw = Math.max(200, canvas.clientWidth - 12), bh = Math.max(200, canvas.clientHeight - 12);
+    let sc = uvZoomModus==="kast" ? Math.min(bw/vb.width, bh/vb.height) : (uvZoomModus==="breedte" ? bw/vb.width : uvSchaal);
+    return Math.max(0.12, Math.min(5, sc));
+  }
+  function pasSchaalAan(){
+    const svg = canvas.querySelector("svg");
+    if(!svg || !svg.viewBox || !svg.viewBox.baseVal) return;
+    const vb = svg.viewBox.baseVal;
+    huidigeSchaal = effSchaal(vb);
+    svg.setAttribute("width", Math.round(vb.width*huidigeSchaal));
+    svg.setAttribute("height", Math.round(vb.height*huidigeSchaal));
+    const lbl = wrap.querySelector(".uv-zoomval");
+    if(lbl) lbl.textContent = Math.round(huidigeSchaal*100) + "%";
+    wrap.querySelector(".uv-zoom-kast").classList.toggle("actief", uvZoomModus==="kast");
+    wrap.querySelector(".uv-zoom-breedte").classList.toggle("actief", uvZoomModus==="breedte");
+  }
+  // zoom rond een punt op het scherm (cursor of midden van het werkvlak)
+  function zoomRond(factor, cx, cy){
+    const svg = canvas.querySelector("svg");
+    if(!svg) return;
+    const r1 = svg.getBoundingClientRect();
+    const cr = canvas.getBoundingClientRect();
+    if(cx===undefined){ cx = cr.left + cr.width/2; cy = cr.top + cr.height/2; }
+    const fx = (cx - r1.left)/r1.width, fy = (cy - r1.top)/r1.height;
+    uvSchaal = Math.max(0.12, Math.min(5, huidigeSchaal*factor));
+    uvZoomModus = "vrij";
+    pasSchaalAan();
+    const r2 = svg.getBoundingClientRect();
+    canvas.scrollLeft += (r2.left + fx*r2.width) - cx;
+    canvas.scrollTop += (r2.top + fy*r2.height) - cy;
+  }
+  function zetZoomModus(mod){ uvZoomModus = mod; pasSchaalAan(); canvas.scrollLeft = 0; canvas.scrollTop = 0; }
+  const svgPuntVan = (ev)=>{ const svg = canvas.querySelector("svg.uv-svg"); if(!svg) return null; const pt = svg.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY; return pt.matrixTransform(svg.getScreenCTM().inverse()); };
+
+  // ongedaan maken: elke wijziging aan deze kast wordt automatisch vastgelegd bij het hertekenen
+  function legHistorieVast(){
+    if(sleep) return;
+    const nu = uvKastJson(kast);
+    if(nu !== hist.laatste){
+      hist.undo.push(hist.laatste);
+      if(hist.undo.length > 60) hist.undo.shift();
+      hist.redo = [];
+      hist.laatste = nu;
+    }
+    const u = wrap.querySelector(".uv-undo"), r = wrap.querySelector(".uv-redo");
+    if(u) u.disabled = !hist.undo.length;
+    if(r) r.disabled = !hist.redo.length;
+  }
+  function herstelKast(json){
+    const data = JSON.parse(json);
+    Object.keys(kast).forEach(k=>{ delete kast[k]; });
+    Object.assign(kast, data);
+    hist.laatste = json;
+    uvPending = null; uvVerplaats = null;
+    if(uvSelWire && !kast.bedrading.some(w=> w.id===uvSelWire)) uvSelWire = null;
+    if(uvSelKam && !(kast.kamgeleiders||[]).some(k=> k.id===uvSelKam)) uvSelKam = null;
+    save(); teken();
+  }
+  function ongedaan(){ if(!hist.undo.length) return; hist.redo.push(uvKastJson(kast)); herstelKast(hist.undo.pop()); toast("Ongedaan gemaakt"); }
+  function opnieuw(){ if(!hist.redo.length) return; hist.undo.push(uvKastJson(kast)); herstelKast(hist.redo.pop()); toast("Opnieuw"); }
 
   function teken(){
     if(!heeftModules){
       canvas.innerHTML = `<div class="uv-leeg-melding">Deze kast heeft nog geen modules. Bouw eerst de layout op het tabblad <strong>Zekeringen</strong>.</div>`;
-      side.innerHTML = ""; lijst.innerHTML = ""; banner.innerHTML = "";
+      detail.innerHTML = ""; lijst.innerHTML = ""; banner.innerHTML = ""; status.textContent = "";
       return;
     }
     const scrollL = canvas.scrollLeft, scrollT = canvas.scrollTop;
     if(uvView==="eendraad"){
       canvas.innerHTML = bouwEendraadSvg(kast);
       pasSchaalAan();
-      side.innerHTML = `<div class="card"><div class="card-body uv-sidebody"><strong>Eendraadschema</strong>
-        <p class="hint">Automatisch afgeleid uit de layout van deze kast: net → remautomaat → hoofddifferentieel → differentielen met hun groep automaten.
-        Per kring: code, curve/A/polen/kA, kabeltype (indien ingevuld bij "Voedingskabel komt op klemmen") en benoeming.</p>
-        <p class="hint">Iets niet juist? Pas het aan in de <a href="#" class="uv-naar-layout2">Layout</a> (benoeming, specs, groep) — het schema volgt vanzelf.</p></div></div>`;
-      side.querySelector(".uv-naar-layout2").addEventListener("click", e=>{ e.preventDefault(); selectTab("zekeringen"); });
-      banner.innerHTML = ""; lijst.innerHTML = "";
+      canvas.scrollLeft = scrollL; canvas.scrollTop = scrollT;
+      detail.innerHTML = ""; banner.innerHTML = ""; lijst.innerHTML = "";
+      status.textContent = "Eendraadschema — sleep om te verschuiven · Ctrl + muiswiel om te zoomen";
       return;
     }
     const res = bouwBedradingSvg(kast, true);
+    geoNu = res.geo; routesNu = res.routes;
     canvas.innerHTML = res.svg;
     pasSchaalAan();
     canvas.scrollLeft = scrollL; canvas.scrollTop = scrollT;
-    tekenBanner(); tekenSide(); tekenLijst();
+    legHistorieVast();
+    if(uvPending){ const pts = uvPending.punten||[]; if(pts.length) toonDraadPreview(pts[pts.length-1]); }
+    tekenBanner(); tekenSide(); tekenLijst(); tekenStatus();
   }
-  // Standaard "passend": de tekening vult de beschikbare breedte; zoom is een factor daarop.
-  function pasSchaalAan(){
-    const svg = canvas.querySelector("svg");
-    if(!svg || !svg.viewBox || !svg.viewBox.baseVal) return;
-    const vb = svg.viewBox.baseVal;
-    // vaste buitenbreedte van het vak (inclusief eventuele schuifbalk), zodat een verschijnende
-    // schuifbalk de schaal niet opnieuw doet verspringen
-    const beschikbaar = Math.max(200, canvas.getBoundingClientRect().width - 22);
-    const passend = Math.max(0.5, Math.min(1.6, beschikbaar / vb.width));
-    const sc = passend * uvZoom;
-    svg.setAttribute("width", Math.round(vb.width*sc));
-    svg.setAttribute("height", Math.round(vb.height*sc));
-  }
-  if(window.ResizeObserver){
-    let laatsteBreedte = 0;
-    const ro = new ResizeObserver(()=>{
-      const b = Math.round(canvas.getBoundingClientRect().width);
-      if(Math.abs(b - laatsteBreedte) < 6) return;
-      laatsteBreedte = b;
-      pasSchaalAan();
-    });
-    ro.observe(canvas);
+  function tekenStatus(){
+    let t;
+    if(uvVerplaats) t = `Tik de nieuwe klem voor het ${uvVerplaats.e==="a" ? "begin" : "einde"} van de draad · Esc = stoppen`;
+    else if(uvPending) t = `Klik tussenpunten (haaks: ${uvOrtho ? "aan" : "uit"} — O) · tik de eindklem · ⌫ = laatste punt weg · Esc = stoppen`;
+    else if(uvKamModus) t = `Kamgeleider ${(KAM_TYPES[uvKamType]||{}).label||uvKamType}: sleep onderaan over de modules · Esc = stoppen`;
+    else if(uvZoomVenster) t = "Zoomvenster: sleep een rechthoek rond wat je wil zien · Esc = stoppen";
+    else if(uvSelWire) t = "Draad gekozen: sleep een draadstuk of knikpunt · sleep ▪ begin/einde naar een andere klem · Del = verwijderen";
+    else t = "Tik een klem om een draad te starten · sleep op een lege plek om te verschuiven · Ctrl + muiswiel = zoomen";
+    status.textContent = t;
   }
   function tekenBanner(){
     banner.innerHTML = "";
     if(uvKamModus){
-      const b = el(`<div class="move-banner">▭ Kamgeleider <strong>${escapeHtml((KAM_TYPES[uvKamType]||{}).label||uvKamType)}</strong>: sleep onderaan over de modules die verbonden moeten worden. <button class="btn small ghost">Annuleren</button></div>`);
+      const b = el(`<div class="move-banner">▭ Kamgeleider <strong>${escapeHtml((KAM_TYPES[uvKamType]||{}).label||uvKamType)}</strong>: sleep onderaan over de modules. <button class="btn small ghost">Annuleren</button></div>`);
       b.querySelector("button").addEventListener("click", ()=>{ uvKamModus = false; selectTab("uitvoering"); });
       banner.appendChild(b);
       return;
     }
+    if(uvVerplaats){
+      const b = el(`<div class="move-banner">⇄ Tik de nieuwe klem voor het <strong>${uvVerplaats.e==="a"?"begin":"einde"}</strong> van de draad. <button class="btn small ghost">Annuleren</button></div>`);
+      b.querySelector("button").addEventListener("click", ()=>{ uvVerplaats = null; teken(); });
+      banner.appendChild(b);
+      return;
+    }
     if(!uvPending && !kast.bedrading.length && !(kast.kamgeleiders||[]).length){
-      const b = el(`<div class="move-banner uv-omzet-banner">Nog geen uitvoering voor deze kast. Maak in één keer een voorstel vanuit de layout — daarna pas je alles vrij aan.
-        <button class="btn small primary">⚡ Automatisch omzetten</button></div>`);
+      const b = el(`<div class="move-banner uv-omzet-banner">Nog geen uitvoering voor deze kast — maak een voorstel vanuit de layout. <button class="btn small primary">⚡ Automatisch omzetten</button></div>`);
       b.querySelector("button").addEventListener("click", doeOmzet);
       banner.appendChild(b);
       return;
     }
     if(uvPending){
-      const b = el(`<div class="move-banner">🔌 Startklem: <strong>${escapeHtml(uvKlemOmschrijving(kast, uvPending))}</strong> — tik nu de eindklem aan. <button class="btn small ghost">Annuleren</button></div>`);
+      const n = (uvPending.punten||[]).length;
+      const b = el(`<div class="move-banner">🔌 Van <strong>${escapeHtml(uvKlemOmschrijving(kast, uvPending))}</strong>${n ? ` · ${n} knikpunt(en)` : ""} — tik de eindklem. <button class="btn small ghost">Annuleren</button></div>`);
       b.querySelector("button").addEventListener("click", ()=>{ uvPending = null; teken(); });
       banner.appendChild(b);
     }
   }
   function tekenSide(){
-    side.innerHTML = "";
+    detail.innerHTML = "";
     const w = uvSelWire && kast.bedrading.find(x=> x.id===uvSelWire);
     const md = uvSelMod && uvAlleModules(kast).find(x=> x.id===uvSelMod);
     const kam = uvSelKam && (kast.kamgeleiders||[]).find(x=> x.id===uvSelKam);
     if(kam){
       const om = uvKamOmschrijving(kast, kam);
       const codes = computeZekeringCodes();
-      const box = el(`<div class="card"><div class="card-body uv-sidebody">
-        <strong>Kamgeleider</strong>
+      const box = el(`<div class="card uv-detail"><div class="card-body uv-sidebody">
+        <div class="uv-detail-kop"><strong>Kamgeleider</strong><button class="uv-x sk-sluit" title="sluiten (Esc)">✕</button></div>
         <div class="hint">Rij ${om.rij}${kam.auto ? " · <em>automatisch voorstel</em>" : ""}</div>
-        <div class="field"><label>Type</label><select class="sk-type">${Object.entries(KAM_TYPES).map(([k,v])=>`<option value="${k}" ${k===kam.type?"selected":""}>${v.label}</option>`).join("")}</select></div>
-        <div class="field"><label>Verbonden modules</label><div class="uv-kam-chips"></div></div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <label class="uv-veld">Type<select class="sk-type">${Object.entries(KAM_TYPES).map(([k,v])=>`<option value="${k}" ${k===kam.type?"selected":""}>${v.label}</option>`).join("")}</select></label>
+        <div class="uv-veld">Verbonden modules<div class="uv-kam-chips"></div></div>
+        <div class="uv-knoprij">
           <button class="btn small ghost sk-opnieuw">Opnieuw trekken</button>
-          <button class="btn small ghost sk-del">Kam verwijderen</button>
-          <button class="btn small ghost sk-sluit">Sluiten</button>
+          <button class="btn small ghost sk-del">🗑 Verwijderen</button>
         </div>
       </div></div>`);
       const chips = box.querySelector(".uv-kam-chips");
@@ -1058,48 +1323,71 @@ function renderUitvoeringsplan(){
         chips.appendChild(c);
       });
       box.querySelector(".sk-type").addEventListener("change", e=>{ kam.type = e.target.value; kam.auto = false; save(); teken(); });
-      box.querySelector(".sk-opnieuw").addEventListener("click", ()=>{ uvKamType = kam.type; kast.kamgeleiders = kast.kamgeleiders.filter(x=> x!==kam); uvSelKam = null; uvKamModus = true; save(); selectTab("uitvoering"); });
+      box.querySelector(".sk-opnieuw").addEventListener("click", ()=>{ uvKamType = kam.type; kast.kamgeleiders = kast.kamgeleiders.filter(x=> x!==kam); uvSelKam = null; save(); zetTool("kam"); });
       box.querySelector(".sk-del").addEventListener("click", ()=>{ kast.kamgeleiders = kast.kamgeleiders.filter(x=> x!==kam); uvSelKam = null; save(); teken(); });
       box.querySelector(".sk-sluit").addEventListener("click", ()=>{ uvSelKam = null; teken(); });
-      side.appendChild(box);
+      detail.appendChild(box);
       return;
     }
     if(w){
-      const box = el(`<div class="card"><div class="card-body uv-sidebody">
-        <strong>Draad</strong>
-        <div class="hint">${escapeHtml(uvKlemOmschrijving(kast, w.a))}<br>→ ${escapeHtml(uvKlemOmschrijving(kast, w.b))}${w.auto?"<br><em>(automatisch voorstel)</em>":""}</div>
-        <div class="field"><label>Kleur</label><select class="sw-kleur">${Object.keys(DRAAD_KLEUREN).map(k=>`<option ${k===w.kleur?"selected":""}>${k}</option>`).join("")}</select>
-          <label class="uv-chk" style="margin-top:5px;"><input type="checkbox" class="sw-kleurauto" ${w.kleurAuto?"checked":""}> kleur volgt klem</label></div>
-        <div class="field"><label>Doorsnede</label><select class="sw-sectie">${DRAAD_SECTIES.map(v=>`<option value="${v}" ${v===String(w.sectie)?"selected":""}>${v} mm²</option>`).join("")}</select></div>
-        <div class="field"><label>Label (optioneel)</label><input class="sw-label" value="${escapeHtml(w.label||"")}" placeholder="bv. kambalk, naar klem 12"></div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;"><button class="btn small ghost sw-del">Draad verwijderen</button><button class="btn small ghost sw-sluit">Sluiten</button></div>
+      const r = routesNu.find(x=> x.w.id===w.id);
+      const fout = r ? uvAansluitFouten(w.kleur, r.A.k, r.B.k) : [];
+      const nr = kast.bedrading.indexOf(w) + 1;
+      const box = el(`<div class="card uv-detail"><div class="card-body uv-sidebody">
+        <div class="uv-detail-kop"><strong>Draad #${nr}</strong><button class="uv-x sw-sluit" title="sluiten (Esc)">✕</button></div>
+        <div class="uv-van-naar">
+          <div><span class="uv-vn">van</span> ${escapeHtml(uvKlemOmschrijving(kast, w.a))} <button class="btn small ghost sw-va" title="begin naar een andere klem verplaatsen (of sleep het ▪ in de tekening)">⇄</button></div>
+          <div><span class="uv-vn">naar</span> ${escapeHtml(uvKlemOmschrijving(kast, w.b))} <button class="btn small ghost sw-vb" title="einde naar een andere klem verplaatsen (of sleep het ▪ in de tekening)">⇄</button></div>
+        </div>
+        ${fout.length ? `<div class="uv-fout">⚠ ${fout.map(escapeHtml).join("<br>⚠ ")}${w.bewustAfwijkend ? `<div class="hint">bewust zo aangesloten</div>` : ""}</div>` : ""}
+        ${w.auto ? `<div class="hint"><em>automatisch voorstel</em></div>` : ""}
+        <div class="uv-rij2">
+          <label class="uv-veld">Kleur<select class="sw-kleur">${Object.keys(DRAAD_KLEUREN).map(k=>`<option ${k===w.kleur?"selected":""}>${k}</option>`).join("")}</select></label>
+          <label class="uv-veld">Doorsnede<select class="sw-sectie">${DRAAD_SECTIES.map(v=>`<option value="${v}" ${v===String(w.sectie)?"selected":""}>${v} mm²</option>`).join("")}</select></label>
+        </div>
+        <label class="uv-chk"><input type="checkbox" class="sw-kleurauto" ${w.kleurAuto?"checked":""}> kleur volgt klem</label>
+        <label class="uv-veld">Label<input class="sw-label" value="${escapeHtml(w.label||"")}" placeholder="bv. naar klem 12"></label>
+        <div class="hint">Route: ${w.punten && w.punten.length ? `eigen route (${w.punten.length} knikpunt${w.punten.length>1?"en":""})` : "automatisch"} — sleep een draadstuk of knikpunt in de tekening.</div>
+        <div class="uv-knoprij">
+          ${w.punten && w.punten.length ? `<button class="btn small ghost sw-auto">↺ Route automatisch</button>` : ""}
+          <button class="btn small ghost sw-del">🗑 Verwijderen <kbd>Del</kbd></button>
+        </div>
       </div></div>`);
-      box.querySelector(".sw-kleur").addEventListener("change", e=>{ w.kleur = e.target.value; w.kleurAuto = false; w.auto = false; save(); teken(); });
+      box.querySelector(".sw-kleur").addEventListener("change", e=>{
+        const nieuw = e.target.value;
+        if(r && !bevestigAansluiting(uvAansluitFouten(nieuw, r.A.k, r.B.k))){ e.target.value = w.kleur; return; }
+        w.kleur = nieuw; w.kleurAuto = false; w.auto = false;
+        w.bewustAfwijkend = r ? uvAansluitFouten(nieuw, r.A.k, r.B.k).length > 0 : false;
+        save(); teken();
+      });
       box.querySelector(".sw-kleurauto").addEventListener("change", e=>{ w.kleurAuto = e.target.checked; if(w.kleurAuto) uvSyncEnOpruimen(kast); save(); teken(); });
       box.querySelector(".sw-sectie").addEventListener("change", e=>{ w.sectie = e.target.value; w.auto = false; save(); teken(); });
-      box.querySelector(".sw-label").addEventListener("input", e=>{ w.label = e.target.value; save(); });
-      box.querySelector(".sw-del").addEventListener("click", ()=>{ kast.bedrading = kast.bedrading.filter(x=> x.id!==w.id); uvSelWire = null; save(); teken(); });
-      box.querySelector(".sw-sluit").addEventListener("click", ()=>{ uvSelWire = null; teken(); });
-      side.appendChild(box);
+      box.querySelector(".sw-label").addEventListener("change", e=>{ w.label = e.target.value; save(); teken(); });
+      box.querySelector(".sw-va").addEventListener("click", ()=>{ uvVerplaats = {w: w.id, e: "a"}; uvPending = null; teken(); });
+      box.querySelector(".sw-vb").addEventListener("click", ()=>{ uvVerplaats = {w: w.id, e: "b"}; uvPending = null; teken(); });
+      const ra = box.querySelector(".sw-auto");
+      if(ra) ra.addEventListener("click", ()=>{ delete w.punten; save(); teken(); });
+      box.querySelector(".sw-del").addEventListener("click", ()=> verwijderSelectie());
+      box.querySelector(".sw-sluit").addEventListener("click", ()=>{ uvSelWire = null; uvVerplaats = null; teken(); });
+      detail.appendChild(box);
       return;
     }
     if(md){
       const codes = computeZekeringCodes();
       const klemmen = klemmenVoorModule(md);
-      const box = el(`<div class="card"><div class="card-body uv-sidebody">
-        <strong>${escapeHtml(codes[md.id]||"")} ${escapeHtml(MODULE_CATEGORIEEN[md.categorie] ? MODULE_CATEGORIEEN[md.categorie].label : md.categorie)}</strong>
+      const box = el(`<div class="card uv-detail"><div class="card-body uv-sidebody">
+        <div class="uv-detail-kop"><strong>${escapeHtml(codes[md.id]||"")} ${escapeHtml(MODULE_CATEGORIEEN[md.categorie] ? MODULE_CATEGORIEEN[md.categorie].label : md.categorie)}</strong><button class="uv-x sm-sluit" title="sluiten (Esc)">✕</button></div>
         <div class="hint">${escapeHtml([chipSpecText(md), md.curve?("curve "+md.curve):"", md.kA?(md.kA+" kA"):"", md.type, md.naam].filter(Boolean).join(" · ")||"—")}</div>
-        ${md.categorie==="Rijgklemmenmodule" ? `<div class="field"><label>Plaats in de kast</label><select class="sm-rkpos">
+        ${md.categorie==="Rijgklemmenmodule" ? `<label class="uv-veld">Plaats in de kast<select class="sm-rkpos">
           <option value="" ${!md.rijgklemPositie?"selected":""}>Automatisch (nu: ${rijgklemPositie(Object.assign({}, md, {rijgklemPositie: ""}))==="boven" ? "bovenaan" : "onderaan"})</option>
           <option value="boven" ${md.rijgklemPositie==="boven"?"selected":""}>Bovenaan — Preflex boven, kast onder</option>
-          <option value="onder" ${md.rijgklemPositie==="onder"?"selected":""}>Onderaan — kast boven, Preflex onder</option></select></div>` : ""}
-        <div class="field"><label>Bibliotheekmodule</label><select class="sm-bib"></select></div>
+          <option value="onder" ${md.rijgklemPositie==="onder"?"selected":""}>Onderaan — kast boven, Preflex onder</option></select></label>` : ""}
+        <label class="uv-veld">Bibliotheekmodule<select class="sm-bib"></select></label>
         <div class="hint">${klemmen.length} klemmen — ${Array.isArray(md.klemmenEigen) && md.klemmenEigen.length ? "eigen aanpassing" : (md.categorie==="Rijgklemmenmodule" ? "uit het tabblad Rijgklemmen" : (md.bib && md.bib.klemmen && md.bib.klemmen.length ? "uit de bibliotheek" : (sjabloonVoor(md) ? "aangepaste standaard" : "standaard")))}</div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
+        <div class="uv-knoprij">
           <button class="btn small primary sm-ontwerp">✏️ Tekening &amp; klemmen</button>
           <button class="btn small ghost sm-open">🔌 Bibliotheek…</button>
           <button class="btn small ghost sm-layout">In layout openen</button>
-          <button class="btn small ghost sm-sluit">Sluiten</button>
         </div>
       </div></div>`);
       const rkp = box.querySelector(".sm-rkpos");
@@ -1120,13 +1408,13 @@ function renderUitvoeringsplan(){
       box.querySelector(".sm-ontwerp").addEventListener("click", ()=> openModuleOntwerperVoorModule(md, ()=>{ uvSyncEnOpruimen(kast); teken(); }));
       box.querySelector(".sm-layout").addEventListener("click", ()=> selectTab("zekeringen"));
       box.querySelector(".sm-sluit").addEventListener("click", ()=>{ uvSelMod = null; teken(); });
-      side.appendChild(box);
+      detail.appendChild(box);
       return;
     }
     const rap = uvLaatsteOmzet && uvLaatsteOmzet.kastId===kast.id ? uvLaatsteOmzet : null;
     if(rap){
-      const box = el(`<div class="card" style="margin-bottom:12px;"><div class="card-body uv-sidebody">
-        <strong>⚡ Automatisch omgezet</strong>
+      const box = el(`<div class="card uv-detail"><div class="card-body uv-sidebody">
+        <div class="uv-detail-kop"><strong>⚡ Automatisch omgezet</strong><button class="uv-x uv-rap-sluit" title="sluiten">✕</button></div>
         <ul class="uv-uitleg" style="list-style:disc;">
           <li>${rap.gekoppeld.length} module(s) gekoppeld aan de bibliotheek${rap.alGekoppeld ? ` (${rap.alGekoppeld} waren al gekoppeld)` : ""}</li>
           <li>${rap.kammen} kamgeleider(s), ${rap.draden} voedingsdraad/draden</li>
@@ -1134,7 +1422,6 @@ function renderUitvoeringsplan(){
         </ul>
         <div class="uv-kam-chips uv-ontbrekend"></div>
         <div class="hint">Alles blijft aanpasbaar. Opnieuw omzetten vervangt enkel de automatische voorstellen.</div>
-        <button class="btn small ghost uv-rap-sluit">Sluiten</button>
       </div></div>`);
       const zone = box.querySelector(".uv-ontbrekend");
       rap.zonderMatch.forEach(z=>{
@@ -1148,11 +1435,11 @@ function renderUitvoeringsplan(){
         zone.appendChild(c);
       });
       box.querySelector(".uv-rap-sluit").addEventListener("click", ()=>{ uvLaatsteOmzet = null; teken(); });
-      side.appendChild(box);
+      detail.appendChild(box);
     }
     const losseKlemmen = rijgklemmenZonderModule();
     if(losseKlemmen.length){
-      const box = el(`<div class="card" style="margin-bottom:12px;"><div class="card-body uv-sidebody">
+      const box = el(`<div class="card uv-detail"><div class="card-body uv-sidebody">
         <strong>Rijgklemmen</strong>
         <div class="hint">${losseKlemmen.length} rijgklem(men) van het tabblad Rijgklemmen staan nog op geen enkele rijgklemmenmodule in een kast.</div>
         <button class="btn small primary uv-rk-plaats">＋ In deze kast plaatsen</button>
@@ -1162,24 +1449,19 @@ function renderUitvoeringsplan(){
         save(); toast(`${losseKlemmen.length} rijgklem(men) geplaatst op ${n} rijgklemmenmodule(s) — ook zichtbaar in de layout.`);
         selectTab("uitvoering");
       });
-      side.appendChild(box);
+      detail.appendChild(box);
     }
     const zonderBib = uvAlleModules(kast).filter(m=> m.categorie!=="Leeg" && !m.bibId).length;
-    side.appendChild(el(`<div class="card"><div class="card-body uv-sidebody">
-      <details class="uv-uitleg-details" ${kast.bedrading.length || (kast.kamgeleiders||[]).length ? "" : "open"}><summary><strong>Zo werkt het</strong></summary>
-      <ol class="uv-uitleg">
-        <li><strong>⚡ Automatisch omzetten</strong> maakt een voorstel vanuit de layout.</li>
-        <li>Draad: tik een <span class="uv-legende-dot"></span> aansluitklem aan, daarna de klem waar hij naartoe moet.</li>
-        <li>Kamgeleider: kies het type, tik "Kamgeleider trekken" en sleep onderaan over de modules.</li>
-        <li>Tik een draad, kam of module aan om hem aan te passen of te verwijderen.</li>
-      </ol></details>
-      <div class="hint">${kast.bedrading.length} draad/draden en ${(kast.kamgeleiders||[]).length} kamgeleider(s) in deze kast.${zonderBib ? ` ${zonderBib} module(s) gebruiken nog de standaardtekening.` : ""}</div>
-    </div></div>`));
+    const nFout = routesNu.filter(r=> uvAansluitFouten(r.w.kleur, r.A.k, r.B.k).length).length;
+    detail.appendChild(el(`<div class="uv-telling">${kast.bedrading.length} draden · ${(kast.kamgeleiders||[]).length} kamgeleiders${zonderBib ? ` · ${zonderBib} module(s) met standaardtekening` : ""}${nFout ? ` · <span class="uv-fout-tel">⚠ ${nFout} afwijkende aansluiting(en)</span>` : ""}</div>`));
   }
   function tekenLijst(){
     lijst.innerHTML = "";
-    const codes = computeZekeringCodes();
-    const card = el(`<div class="card" style="margin-top:16px;">
+    const kammen = kast.kamgeleiders || [];
+    const det = el(`<details class="uv-lijsten" ${uvLijstOpen?"open":""}><summary>Draadlijst (${kast.bedrading.length}) &amp; kamgeleiders (${kammen.length})</summary><div class="uv-lijsten-in"></div></details>`);
+    det.addEventListener("toggle", ()=>{ uvLijstOpen = det.open; });
+    const binnen = det.querySelector(".uv-lijsten-in");
+    const card = el(`<div class="card">
       <div class="card-head"><h3>Draadlijst</h3><span class="hint">${kast.bedrading.length} draad/draden</span></div>
       <div class="card-body" style="padding:0;overflow-x:auto;"><table class="grid">
         <thead><tr><th>#</th><th>Van</th><th>Naar</th><th>Kleur</th><th>Doorsnede</th><th>Label</th><th></th></tr></thead><tbody></tbody>
@@ -1187,19 +1469,19 @@ function renderUitvoeringsplan(){
     const tbody = card.querySelector("tbody");
     if(!kast.bedrading.length) tbody.appendChild(el(`<tr class="emptyrow"><td colspan="7">Nog geen draden getrokken.</td></tr>`));
     kast.bedrading.forEach((w, i)=>{
+      const r = routesNu.find(x=> x.w.id===w.id);
+      const fout = r && uvAansluitFouten(w.kleur, r.A.k, r.B.k).length;
       const tr = el(`<tr class="${uvSelWire===w.id?"uv-rij-sel":""}">
-        <td class="codecell">${i+1}</td><td>${escapeHtml(uvKlemOmschrijving(kast, w.a))}</td><td>${escapeHtml(uvKlemOmschrijving(kast, w.b))}</td>
+        <td class="codecell">${i+1}${fout?' <span class="uv-fout-tel" title="afwijkende aansluiting">⚠</span>':""}</td><td>${escapeHtml(uvKlemOmschrijving(kast, w.a))}</td><td>${escapeHtml(uvKlemOmschrijving(kast, w.b))}</td>
         <td><span class="uv-kleurstaal" style="background:${DRAAD_KLEUREN[w.kleur]||"#999"}"></span> ${escapeHtml(w.kleur||"")}</td>
         <td>${escapeHtml(String(w.sectie||""))} mm²</td><td>${escapeHtml(w.label||"")}</td>
         <td><button class="btn small ghost dl-del" title="verwijderen">✕</button></td></tr>`);
-      tr.addEventListener("click", e=>{ if(e.target.closest(".dl-del")) return; uvSelWire = w.id; uvSelMod = null; uvPending = null; teken(); });
+      tr.addEventListener("click", e=>{ if(e.target.closest(".dl-del")) return; uvSelWire = w.id; uvSelMod = null; uvSelKam = null; uvPending = null; teken(); });
       tr.querySelector(".dl-del").addEventListener("click", ()=>{ kast.bedrading = kast.bedrading.filter(x=> x.id!==w.id); if(uvSelWire===w.id) uvSelWire = null; save(); teken(); });
       tbody.appendChild(tr);
     });
-    lijst.appendChild(card);
-    void codes;
-    const kammen = kast.kamgeleiders || [];
-    const kcard = el(`<div class="card" style="margin-top:16px;">
+    binnen.appendChild(card);
+    const kcard = el(`<div class="card" style="margin-top:12px;">
       <div class="card-head"><h3>Kamgeleiders</h3><span class="hint">${kammen.length} stuk(s)</span></div>
       <div class="card-body" style="padding:0;overflow-x:auto;"><table class="grid">
         <thead><tr><th>#</th><th>Type</th><th>Rij</th><th>Modules</th><th></th></tr></thead><tbody></tbody>
@@ -1214,7 +1496,8 @@ function renderUitvoeringsplan(){
       tr.querySelector(".kl-del").addEventListener("click", ()=>{ kast.kamgeleiders = kast.kamgeleiders.filter(x=> x!==k); if(uvSelKam===k.id) uvSelKam = null; save(); teken(); });
       ktb.appendChild(tr);
     });
-    lijst.appendChild(kcard);
+    binnen.appendChild(kcard);
+    lijst.appendChild(det);
   }
 
   async function doeOmzet(){
@@ -1225,143 +1508,430 @@ function renderUitvoeringsplan(){
     const r = uvAutoOmzet(kast);
     uvPending = null; uvSelWire = null; uvSelMod = null; uvSelKam = null; uvKamModus = false;
     uvSyncEnOpruimen(kast);
-    save(); teken();
+    save(); teken(); tekenTools();
     toast(`Omgezet: ${r.gekoppeld.length} bibliotheekkoppeling(en), ${r.kammen} kamgeleider(s), ${r.draden} draad/draden.`);
   }
+  function verwijderSelectie(){
+    if(uvSelWire){ kast.bedrading = kast.bedrading.filter(x=> x.id!==uvSelWire); uvSelWire = null; uvVerplaats = null; save(); teken(); return true; }
+    if(uvSelKam){ kast.kamgeleiders = (kast.kamgeleiders||[]).filter(x=> x.id!==uvSelKam); uvSelKam = null; save(); teken(); return true; }
+    return false;
+  }
+  function tekenTools(){
+    gereedschap.querySelectorAll(".uv-tool").forEach(b=> b.classList.toggle("actief", (b.dataset.tool==="kam")===!!uvKamModus));
+    const zv = wrap.querySelector(".uv-zoom-venster");
+    if(zv) zv.classList.toggle("actief", uvZoomVenster);
+    const o = gereedschap.querySelector(".uv-ortho");
+    if(o) o.checked = uvOrtho;
+  }
+  function zetTool(t){
+    uvKamModus = t==="kam"; uvPending = null; uvVerplaats = null; uvZoomVenster = false;
+    if(uvKamModus){ uvSelWire = null; uvSelKam = null; }
+    tekenTools(); teken();
+  }
 
-  // Kamgeleider trekken: slepen over een rij (muis of vinger)
-  let kamSleep = null;
-  const svgPunt = (svg, ev)=>{ const pt = svg.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY; return pt.matrixTransform(svg.getScreenCTM().inverse()); };
-  canvas.addEventListener("pointerdown", ev=>{
-    if(!uvKamModus || uvView!=="bedrading") return;
+  /* ---------- tekenhulp: raster + objectsnap + haaks ---------- */
+  function snapPunt(p, vorige){
+    let x = Math.round(p.x/2)*2, y = Math.round(p.y/2)*2;
+    if(geoNu){
+      let bx = 6, by = 6;
+      Object.values(geoNu.klemPos).forEach(k=>{
+        if(Math.abs(k.x - p.x) < bx){ bx = Math.abs(k.x - p.x); x = k.x; }
+        if(Math.abs(k.y - p.y) < by){ by = Math.abs(k.y - p.y); y = k.y; }
+      });
+    }
+    if(uvOrtho && vorige){
+      if(Math.abs(x - vorige.x) >= Math.abs(y - vorige.y)) y = vorige.y; else x = vorige.x;
+    }
+    return {x, y};
+  }
+  function startPuntPending(){ return uvPending && geoNu ? geoNu.klemPos[uvKlemKey(uvPending.m, uvPending.k)] : null; }
+  function pendingVorige(){ const pts = uvPending.punten || []; return pts.length ? pts[pts.length-1] : startPuntPending(); }
+  function toonDraadPreview(cur){
     const svg = canvas.querySelector("svg.uv-svg");
-    if(!svg) return;
-    const p = svgPunt(svg, ev);
-    const geoK = uvGeometrie(kast);
-    let ri = -1, best = Infinity;
-    geoK.rijY.forEach((y, i)=>{ const d = Math.abs(p.y - (y + UV.MH*0.75)); if(d < best){ best = d; ri = i; } });
-    if(ri < 0 || best > UV.MH) return;
-    ev.preventDefault();
-    kamSleep = { svg, ri, x0: p.x, x1: p.x };
-    try{ canvas.setPointerCapture(ev.pointerId); }catch(_e){}
-    toonKamPreview();
-  });
-  canvas.addEventListener("pointermove", ev=>{
-    if(!kamSleep) return;
-    kamSleep.x1 = svgPunt(kamSleep.svg, ev).x;
-    toonKamPreview();
-  });
-  function kamModulesOnder(){
-    const geo = uvGeometrie(kast);
-    const lo = Math.min(kamSleep.x0, kamSleep.x1), hi = Math.max(kamSleep.x0, kamSleep.x1);
-    const inRij = geo.mods.filter(md=> md.ri===kamSleep.ri && md.m.categorie!=="Leeg");
+    const pv = svg && svg.querySelector(".uv-draad-preview");
+    if(!pv) return;
+    if(!cur){ pv.style.display = "none"; return; }
+    const A = startPuntPending();
+    if(!A){ pv.style.display = "none"; return; }
+    pv.setAttribute("d", uvPad(uvVertsVoor(A, cur, uvPending.punten || [])));
+    pv.style.display = "";
+  }
+
+  /* ---------- draden aansluiten (met controle N / PE) ---------- */
+  function sluitAan(a, b){
+    const dubbel = kast.bedrading.some(w=> (w.a.m===a.m && w.a.k===a.k && w.b.m===b.m && w.b.k===b.k) || (w.a.m===b.m && w.a.k===b.k && w.b.m===a.m && w.b.k===a.k));
+    if(dubbel){ toast("Die twee klemmen zijn al verbonden."); uvPending = null; teken(); return; }
+    const pa = geoNu.klemPos[uvKlemKey(a.m, a.k)];
+    const pb = geoNu.klemPos[uvKlemKey(b.m, b.k)];
+    const kleur = uvKleurAuto ? (draadKleurVoorKlemmen(pa && pa.k, pb && pb.k) || uvKleur) : uvKleur;
+    const fouten = uvAansluitFouten(kleur, pa && pa.k, pb && pb.k);
+    if(!bevestigAansluiting(fouten)){ teken(); return; }
+    const nw = {id: cryptoId(), a: {m: a.m, k: a.k}, b, kleur, kleurAuto: uvKleurAuto, sectie: uvSectie, label: ""};
+    if(fouten.length) nw.bewustAfwijkend = true;
+    const pts = (uvPending && uvPending.punten) || [];
+    if(pts.length) nw.punten = pts.map(p=> uvEncodeerPunt(p, geoNu));
+    kast.bedrading.push(nw);
+    uvPending = null;
+    save(); teken();
+  }
+  function verplaatsEinde(wid, e, naar){
+    const w = kast.bedrading.find(x=> x.id===wid);
+    if(!w) return false;
+    const ander = e==="a" ? w.b : w.a;
+    if(ander.m===naar.m && ander.k===naar.k){ toast("Begin en einde kunnen niet op dezelfde klem."); return false; }
+    if(w[e].m===naar.m && w[e].k===naar.k) return false;
+    const pa = geoNu.klemPos[uvKlemKey(naar.m, naar.k)], po = geoNu.klemPos[uvKlemKey(ander.m, ander.k)];
+    const kleurNa = w.kleurAuto ? (draadKleurVoorKlemmen(e==="a" ? pa.k : po.k, e==="a" ? po.k : pa.k) || w.kleur) : w.kleur;
+    const fouten = uvAansluitFouten(kleurNa, pa && pa.k, po && po.k);
+    if(!bevestigAansluiting(fouten)) return false;
+    w[e] = {m: naar.m, k: naar.k};
+    w.kleur = kleurNa;
+    w.bewustAfwijkend = fouten.length > 0;
+    w.auto = false;
+    delete w.punten;
+    uvSyncEnOpruimen(kast);
+    save();
+    toast(`${e==="a" ? "Begin" : "Einde"} van draad #${kast.bedrading.indexOf(w)+1} verplaatst naar ${uvKlemOmschrijving(kast, w[e])}`);
+    return true;
+  }
+
+  /* ---------- slepen: pannen, zoomvenster, kamgeleider, draadstukken, knikpunten, eindpunten ---------- */
+  let sleep = null;          // {soort, ...}
+  let negeerKlik = false;
+  let rafBezig = false;
+  const negeerVolgendeKlik = ()=>{ negeerKlik = true; setTimeout(()=>{ negeerKlik = false; }, 60); };
+  function kamModulesOnder(ks){
+    const lo = Math.min(ks.x0, ks.x1), hi = Math.max(ks.x0, ks.x1);
+    const inRij = geoNu.mods.filter(md=> md.ri===ks.ri && md.m.categorie!=="Leeg");
     if(hi - lo < 4) return inRij.filter(md=> lo >= md.x && lo <= md.x + md.w);
     return inRij.filter(md=> md.x + md.w > lo + 4 && md.x < hi - 4);
   }
-  function toonKamPreview(){
-    const r = kamSleep.svg.querySelector(".uv-kam-preview");
+  function toonKamPreview(ks){
+    const r = canvas.querySelector(".uv-kam-preview");
     if(!r) return;
-    const mds = kamModulesOnder();
-    const yRij = uvGeometrie(kast).rijY[kamSleep.ri];
-    const lo = mds.length ? Math.min(...mds.map(d=> d.x)) : Math.min(kamSleep.x0, kamSleep.x1);
-    const hi = mds.length ? Math.max(...mds.map(d=> d.x+d.w)) : Math.max(kamSleep.x0, kamSleep.x1);
+    const mds = kamModulesOnder(ks);
+    const yRij = geoNu.rijY[ks.ri];
+    const lo = mds.length ? Math.min(...mds.map(d=> d.x)) : Math.min(ks.x0, ks.x1);
+    const hi = mds.length ? Math.max(...mds.map(d=> d.x+d.w)) : Math.max(ks.x0, ks.x1);
     r.setAttribute("x", lo); r.setAttribute("width", Math.max(2, hi-lo));
     r.setAttribute("y", yRij + UV.MH - 22); r.setAttribute("height", 52);
     r.style.display = "";
   }
-  let negeerKlik = false;
-  const kamEinde = ()=>{
-    if(!kamSleep) return;
-    const mds = kamModulesOnder();
-    const rij = kast.rijen[kamSleep.ri];
-    kamSleep = null;
-    negeerKlik = true; setTimeout(()=>{ negeerKlik = false; }, 50);
-    if(mds.length < 2){ toast("Sleep over minstens 2 modules."); teken(); return; }
-    const ids = mds.map(d=> d.m.id);
-    // modules die al op een andere kam zaten, gaan naar deze nieuwe kam
-    kast.kamgeleiders = (kast.kamgeleiders||[]).map(k=> Object.assign(k, {moduleIds: k.moduleIds.filter(id=> !ids.includes(id))})).filter(k=> k.moduleIds.length);
-    const kam = {id: cryptoId(), rijId: rij.id, type: uvKamType, moduleIds: ids, auto: false};
-    kast.kamgeleiders.push(kam);
-    uvKamModus = false; uvSelKam = kam.id; uvSelWire = null; uvSelMod = null;
-    save();
-    selectTab("uitvoering");
-  };
-  canvas.addEventListener("pointerup", kamEinde);
-  canvas.addEventListener("pointercancel", ()=>{ kamSleep = null; teken(); });
+  // draad tijdelijk hertekenen met andere knikpunten (zonder historie/bewaren)
+  function tekenDraadLive(w, verts){
+    const d = uvPad(verts);
+    canvas.querySelectorAll(`.uv-draad[data-w="${w.id}"] path`).forEach(p=> p.setAttribute("d", d));
+    const g = canvas.querySelector(".uv-greep");
+    if(g) g.style.display = "none";
+  }
+
+  canvas.addEventListener("pointerdown", ev=>{
+    if(ev.button===2) return;
+    const svg = canvas.querySelector("svg");
+    if(!svg) return;
+    const p = svgPuntVan(ev);
+    const midden = ev.button===1;
+    if(midden || uvView!=="bedrading"){
+      if(ev.pointerType==="touch") return;
+      ev.preventDefault();
+      sleep = {soort: "pan", cx: ev.clientX, cy: ev.clientY, sl: canvas.scrollLeft, st: canvas.scrollTop, bewogen: false};
+      try{ canvas.setPointerCapture(ev.pointerId); }catch(_e){}
+      return;
+    }
+    if(uvZoomVenster && p){
+      ev.preventDefault();
+      sleep = {soort: "zoomvenster", x0: p.x, y0: p.y, x1: p.x, y1: p.y};
+      try{ canvas.setPointerCapture(ev.pointerId); }catch(_e){}
+      return;
+    }
+    if(uvKamModus && p){
+      let ri = -1, best = Infinity;
+      geoNu.rijY.forEach((y, i)=>{ const d = Math.abs(p.y - (y + UV.MH*0.75)); if(d < best){ best = d; ri = i; } });
+      if(ri < 0 || best > UV.MH) return;
+      ev.preventDefault();
+      sleep = {soort: "kam", ri, x0: p.x, x1: p.x};
+      try{ canvas.setPointerCapture(ev.pointerId); }catch(_e){}
+      toonKamPreview(sleep);
+      return;
+    }
+    const eind = ev.target.closest && ev.target.closest(".uv-eind");
+    const vtx = ev.target.closest && ev.target.closest(".uv-vtx");
+    const seg = ev.target.closest && ev.target.closest(".uv-dseg.sleepbaar");
+    const r = uvSelWire && routesNu.find(x=> x.w.id===uvSelWire);
+    if(r && (eind || vtx || seg)){
+      ev.preventDefault(); ev.stopPropagation();
+      const basis = r.verts.map(v=> ({x: v.x, y: v.y}));
+      if(eind) sleep = {soort: "eind", e: eind.getAttribute("data-e"), r, bewogen: false};
+      else if(vtx) sleep = {soort: "vtx", i: +vtx.getAttribute("data-i") + 1, r, basis, p0: p, bewogen: false};
+      else sleep = {soort: "seg", i: +seg.getAttribute("data-i"), as: seg.getAttribute("data-as"), r, basis, p0: p, bewogen: false};
+      svg.classList.add("sleept");
+      try{ canvas.setPointerCapture(ev.pointerId); }catch(_e){}
+      return;
+    }
+    if(ev.target.closest && ev.target.closest(".uv-klem")) return;
+    if(ev.pointerType==="touch") return;    // vinger: gewoon scrollen
+    sleep = {soort: "pan", cx: ev.clientX, cy: ev.clientY, sl: canvas.scrollLeft, st: canvas.scrollTop, bewogen: false};
+  });
+  canvas.addEventListener("pointermove", ev=>{
+    if(!sleep){
+      if(uvPending && uvView==="bedrading" && !uvKamModus){
+        const p = svgPuntVan(ev);
+        if(p && !(ev.target.closest && ev.target.closest(".uv-klem"))) toonDraadPreview(snapPunt(p, pendingVorige()));
+        else if(p){ const kg = ev.target.closest(".uv-klem"); const kp = geoNu && geoNu.klemPos[uvKlemKey(kg.getAttribute("data-m"), kg.getAttribute("data-k"))]; toonDraadPreview(kp ? {x: kp.x, y: kp.y} : null); }
+      }
+      return;
+    }
+    if(sleep.soort==="pan"){
+      const dx = ev.clientX - sleep.cx, dy = ev.clientY - sleep.cy;
+      if(!sleep.bewogen && Math.abs(dx) + Math.abs(dy) < 5) return;
+      if(!sleep.bewogen){ sleep.bewogen = true; canvas.classList.add("pannen"); try{ canvas.setPointerCapture(ev.pointerId); }catch(_e){} }
+      canvas.scrollLeft = sleep.sl - dx; canvas.scrollTop = sleep.st - dy;
+      return;
+    }
+    const p = svgPuntVan(ev);
+    if(!p) return;
+    if(sleep.soort==="zoomvenster"){
+      sleep.x1 = p.x; sleep.y1 = p.y;
+      const r = canvas.querySelector(".uv-zoom-preview");
+      if(r){ r.setAttribute("x", Math.min(sleep.x0, p.x)); r.setAttribute("y", Math.min(sleep.y0, p.y)); r.setAttribute("width", Math.abs(p.x - sleep.x0)); r.setAttribute("height", Math.abs(p.y - sleep.y0)); r.style.display = ""; }
+      return;
+    }
+    if(sleep.soort==="kam"){ sleep.x1 = p.x; toonKamPreview(sleep); return; }
+    sleep.bewogen = true;
+    if(sleep.soort==="eind"){
+      const ander = sleep.e==="a" ? sleep.r.B : sleep.r.A;
+      const kg = document.elementFromPoint(ev.clientX, ev.clientY);
+      const klem = kg && kg.closest && kg.closest(".uv-klem");
+      canvas.querySelectorAll(".uv-klem.doel").forEach(x=> x.classList.remove("doel"));
+      if(klem) klem.classList.add("doel");
+      const verts = sleep.e==="a" ? uvVertsVoor(p, ander, []) : uvVertsVoor(ander, p, []);
+      tekenDraadLive(sleep.r.w, verts);
+      return;
+    }
+    if(rafBezig) return;
+    rafBezig = true;
+    requestAnimationFrame(()=>{
+      rafBezig = false;
+      if(!sleep || (sleep.soort!=="vtx" && sleep.soort!=="seg")) return;
+      const v = sleep.basis.map(q=> ({x: q.x, y: q.y}));
+      if(sleep.soort==="vtx"){
+        const n = snapPunt(p, null);
+        v[sleep.i] = n;
+      } else {
+        const n = snapPunt(p, null);
+        if(sleep.as==="h"){ v[sleep.i].y = n.y; v[sleep.i+1].y = n.y; }
+        else { v[sleep.i].x = n.x; v[sleep.i+1].x = n.x; }
+      }
+      sleep.verts = uvVertsVoor(v[0], v[v.length-1], v.slice(1, -1));
+      tekenDraadLive(sleep.r.w, sleep.verts);
+    });
+  });
+  function sleepEinde(ev){
+    if(!sleep) return;
+    const s = sleep; sleep = null;
+    // klem onder de cursor bepalen zolang de gesleepte draad nog "doorzichtig" is voor de muis
+    const onder = s.soort==="eind" && ev && ev.clientX!==undefined ? document.elementFromPoint(ev.clientX, ev.clientY) : null;
+    canvas.classList.remove("pannen");
+    const svg = canvas.querySelector("svg");
+    if(svg) svg.classList.remove("sleept");
+    if(s.soort==="pan"){ if(s.bewogen) negeerVolgendeKlik(); return; }
+    negeerVolgendeKlik();
+    if(s.soort==="zoomvenster"){
+      const rx = Math.min(s.x0, s.x1), ry = Math.min(s.y0, s.y1), rw = Math.abs(s.x1 - s.x0), rh = Math.abs(s.y1 - s.y0);
+      uvZoomVenster = false; tekenTools();
+      const pr = canvas.querySelector(".uv-zoom-preview"); if(pr) pr.style.display = "none";
+      if(rw < 12 || rh < 12){ teken(); return; }
+      zoomOpRechthoek(rx, ry, rw, rh);
+      tekenStatus();
+      return;
+    }
+    if(s.soort==="kam"){
+      const mds = kamModulesOnder(s);
+      const rij = kast.rijen[s.ri];
+      if(mds.length < 2){ toast("Sleep over minstens 2 modules."); teken(); return; }
+      const ids = mds.map(d=> d.m.id);
+      kast.kamgeleiders = (kast.kamgeleiders||[]).map(k=> Object.assign(k, {moduleIds: k.moduleIds.filter(id=> !ids.includes(id))})).filter(k=> k.moduleIds.length);
+      const kam = {id: cryptoId(), rijId: rij.id, type: uvKamType, moduleIds: ids, auto: false};
+      kast.kamgeleiders.push(kam);
+      uvKamModus = false; uvSelKam = kam.id; uvSelWire = null; uvSelMod = null;
+      save(); tekenTools(); teken();
+      return;
+    }
+    if(s.soort==="eind"){
+      canvas.querySelectorAll(".uv-klem.doel").forEach(x=> x.classList.remove("doel"));
+      const klem = onder && onder.closest && onder.closest(".uv-klem");
+      if(klem && s.bewogen) verplaatsEinde(s.r.w.id, s.e, {m: klem.getAttribute("data-m"), k: klem.getAttribute("data-k")});
+      else if(s.bewogen) toast("Laat het eindpunt los op een klem om de draad te verplaatsen.");
+      teken();
+      return;
+    }
+    if((s.soort==="vtx" || s.soort==="seg") && s.bewogen && s.verts){
+      const w = s.r.w;
+      const binnen = s.verts.slice(1, -1);
+      w.punten = binnen.map(q=> uvEncodeerPunt(q, geoNu));
+      w.auto = false;
+      save();
+    }
+    teken();
+  }
+  canvas.addEventListener("pointerup", sleepEinde);
+  canvas.addEventListener("pointercancel", ()=>{ sleep = null; canvas.classList.remove("pannen"); teken(); });
+  canvas.addEventListener("auxclick", e=>{ if(e.button===1) e.preventDefault(); });
+  canvas.addEventListener("dblclick", e=>{
+    const vtx = e.target.closest && e.target.closest(".uv-vtx");
+    const r = uvSelWire && routesNu.find(x=> x.w.id===uvSelWire);
+    if(!vtx || !r) return;
+    const i = +vtx.getAttribute("data-i") + 1;
+    const v = r.verts.slice(); v.splice(i, 1);
+    const binnen = uvVereenvoudig(uvVertsVoor(v[0], v[v.length-1], v.slice(1, -1))).slice(1, -1);
+    if(binnen.length) r.w.punten = binnen.map(q=> uvEncodeerPunt(q, geoNu)); else delete r.w.punten;
+    save(); teken();
+  });
+  function zoomOpRechthoek(rx, ry, rw, rh){
+    const bw = Math.max(200, canvas.clientWidth - 12), bh = Math.max(200, canvas.clientHeight - 12);
+    uvSchaal = Math.max(0.12, Math.min(5, Math.min(bw/rw, bh/rh)));
+    uvZoomModus = "vrij";
+    pasSchaalAan();
+    const svg = canvas.querySelector("svg");
+    const sr = svg.getBoundingClientRect(), cr = canvas.getBoundingClientRect();
+    const doelX = cr.left + (canvas.clientWidth - rw*huidigeSchaal)/2, doelY = cr.top + (canvas.clientHeight - rh*huidigeSchaal)/2;
+    canvas.scrollLeft += (sr.left + rx*huidigeSchaal) - doelX;
+    canvas.scrollTop += (sr.top + ry*huidigeSchaal) - doelY;
+  }
 
   canvas.addEventListener("click", e=>{
-    if(uvView!=="bedrading" || uvKamModus || negeerKlik) return;
+    if(uvView!=="bedrading" || uvKamModus || uvZoomVenster || negeerKlik) return;
+    if(e.target.closest(".uv-greep")) return;
     const klem = e.target.closest(".uv-klem");
     if(klem){
       const eind = {m: klem.getAttribute("data-m"), k: klem.getAttribute("data-k")};
+      if(uvVerplaats){ const v = uvVerplaats; uvVerplaats = null; verplaatsEinde(v.w, v.e, eind); teken(); return; }
       uvSelWire = null; uvSelMod = null; uvSelKam = null;
-      if(!uvPending){ uvPending = eind; teken(); return; }
+      if(!uvPending){ uvPending = Object.assign({}, eind, {punten: []}); teken(); return; }
       if(uvPending.m===eind.m && uvPending.k===eind.k){ uvPending = null; teken(); return; }
-      const a = uvPending;
-      const dubbel = kast.bedrading.some(w=> (w.a.m===a.m && w.a.k===a.k && w.b.m===eind.m && w.b.k===eind.k) || (w.a.m===eind.m && w.a.k===eind.k && w.b.m===a.m && w.b.k===a.k));
-      if(dubbel){ toast("Die twee klemmen zijn al verbonden."); uvPending = null; teken(); return; }
-      const geo = uvGeometrie(kast);
-      const pa = geo.klemPos[uvKlemKey(a.m, a.k)];
-      const pb = geo.klemPos[uvKlemKey(eind.m, eind.k)];
-      const kleur = uvKleurAuto ? (draadKleurVoorKlemmen(pa && pa.k, pb && pb.k) || uvKleur) : uvKleur;
-      const nw = {id: cryptoId(), a, b: eind, kleur, kleurAuto: uvKleurAuto, sectie: uvSectie, label: ""};
-      kast.bedrading.push(nw);
-      uvPending = null;
-      save(); teken();
+      sluitAan(uvPending, eind);
       return;
     }
+    if(uvPending){
+      // tussenpunt (knikpunt) toevoegen
+      const p = svgPuntVan(e);
+      if(!p) return;
+      uvPending.punten = uvPending.punten || [];
+      uvPending.punten.push(snapPunt(p, pendingVorige()));
+      teken();
+      return;
+    }
+    if(uvVerplaats) return;
     const draad = e.target.closest(".uv-draad");
-    if(draad){ uvSelWire = draad.getAttribute("data-w"); uvSelMod = null; uvSelKam = null; uvPending = null; teken(); return; }
+    if(draad){ uvSelWire = draad.getAttribute("data-w"); uvSelMod = null; uvSelKam = null; teken(); return; }
     const kamEl = e.target.closest(".uv-kam");
-    if(kamEl){ uvSelKam = kamEl.getAttribute("data-kam"); uvSelWire = null; uvSelMod = null; uvPending = null; teken(); return; }
+    if(kamEl){ uvSelKam = kamEl.getAttribute("data-kam"); uvSelWire = null; uvSelMod = null; teken(); return; }
     const mod = e.target.closest(".uv-mod");
     if(mod){ uvSelMod = mod.getAttribute("data-mod"); uvSelWire = null; uvSelKam = null; teken(); return; }
     if(uvSelWire || uvSelMod || uvSelKam){ uvSelWire = null; uvSelMod = null; uvSelKam = null; teken(); }
   });
+  canvas.addEventListener("wheel", e=>{
+    if(!(e.ctrlKey || e.metaKey)) return;
+    e.preventDefault();
+    zoomRond(e.deltaY < 0 ? 1.15 : 1/1.15, e.clientX, e.clientY);
+  }, {passive: false});
 
-  wrap.querySelectorAll(".uv-seg button").forEach(b=> b.addEventListener("click", ()=>{ uvView = b.dataset.view; uvPending = null; selectTab("uitvoering"); }));
-  wrap.querySelector(".uv-kleurauto").addEventListener("change", e=>{ uvKleurAuto = e.target.checked; wrap.querySelector(".uv-kleur").disabled = uvKleurAuto; });
-  wrap.querySelector(".uv-kleur").addEventListener("change", e=>{ uvKleur = e.target.value; });
-  wrap.querySelector(".uv-sectie").addEventListener("change", e=>{ uvSectie = e.target.value; });
-  wrap.querySelector(".uv-omzet").addEventListener("click", doeOmzet);
-  wrap.querySelector(".uv-kamtype").addEventListener("change", e=>{ uvKamType = e.target.value; });
-  wrap.querySelector(".uv-kammodus").addEventListener("click", ()=>{ uvKamModus = !uvKamModus; uvPending = null; uvSelKam = null; selectTab("uitvoering"); });
-  wrap.querySelector(".uv-wis").addEventListener("click", ()=>{
+  /* ---------- knoppen ---------- */
+  wrap.querySelectorAll(".uv-seg button").forEach(b=> b.addEventListener("click", ()=>{ uvView = b.dataset.view; uvPending = null; uvKamModus = false; uvZoomVenster = false; selectTab("uitvoering"); }));
+  const q = (s)=> wrap.querySelector(s);
+  const aan = (s, ev, fn)=>{ const x = q(s); if(x) x.addEventListener(ev, fn); };
+  aan(".uv-undo", "click", ongedaan);
+  aan(".uv-redo", "click", opnieuw);
+  aan(".uv-zoom-in", "click", ()=> zoomRond(1.25));
+  aan(".uv-zoom-uit", "click", ()=> zoomRond(1/1.25));
+  aan(".uv-zoomval", "click", ()=> zetZoomModus("kast"));
+  aan(".uv-zoom-kast", "click", ()=> zetZoomModus("kast"));
+  aan(".uv-zoom-breedte", "click", ()=> zetZoomModus("breedte"));
+  aan(".uv-zoom-venster", "click", ()=>{ uvZoomVenster = !uvZoomVenster; uvPending = null; tekenTools(); tekenStatus(); });
+  aan(".uv-help", "click", ()=>{ uvHulpOpen = !uvHulpOpen; hulp.hidden = !uvHulpOpen; q(".uv-help").classList.toggle("actief", uvHulpOpen); });
+  wrap.querySelectorAll(".uv-naar-layout2").forEach(a=> a.addEventListener("click", e=>{ e.preventDefault(); selectTab("zekeringen"); }));
+  wrap.querySelectorAll(".uv-tool").forEach(b=> b.addEventListener("click", ()=> zetTool(b.dataset.tool)));
+  aan(".uv-kleurauto", "change", e=>{ uvKleurAuto = e.target.checked; q(".uv-kleur").disabled = uvKleurAuto; });
+  aan(".uv-kleur", "change", e=>{ uvKleur = e.target.value; });
+  aan(".uv-sectie", "change", e=>{ uvSectie = e.target.value; });
+  aan(".uv-ortho", "change", e=>{ uvOrtho = e.target.checked; tekenStatus(); });
+  aan(".uv-omzet", "click", doeOmzet);
+  aan(".uv-kamtype", "change", e=>{ uvKamType = e.target.value; if(uvKamModus) teken(); });
+  wrap.querySelectorAll("[data-laag]").forEach(c=> c.addEventListener("change", ()=>{ uvLagen[c.dataset.laag] = c.checked; teken(); }));
+  aan(".uv-wis", "click", ()=>{
     const nk = (kast.kamgeleiders||[]).length;
     if(!kast.bedrading.length && !nk) return;
-    if(!confirm(`Alle ${kast.bedrading.length} draden en ${nk} kamgeleider(s) van ${kast.naam} wissen?`)) return;
+    if(!confirm(`Alle ${kast.bedrading.length} draden en ${nk} kamgeleider(s) van ${kast.naam} wissen? (Ctrl+Z maakt dit ongedaan)`)) return;
     kast.bedrading = []; kast.kamgeleiders = []; uvSelWire = null; uvSelKam = null; uvPending = null; uvLaatsteOmzet = null; save(); teken();
   });
-  const zoomLabel = ()=> uvZoom===1 ? "passend" : Math.round(uvZoom*100)+"%";
-  wrap.querySelector(".uv-zoomval").textContent = zoomLabel();
-  const zoom = (f)=>{ uvZoom = f===0 ? 1 : Math.max(0.4, Math.min(3, Math.round(uvZoom*f*10)/10)); wrap.querySelector(".uv-zoomval").textContent = zoomLabel(); pasSchaalAan(); };
-  wrap.querySelector(".uv-zoomval").addEventListener("click", ()=> zoom(0));
-  wrap.querySelector(".uv-zoom-in").addEventListener("click", ()=> zoom(1.2));
-  wrap.querySelector(".uv-zoom-uit").addEventListener("click", ()=> zoom(1/1.2));
-  wrap.querySelector(".uv-bib").addEventListener("click", ()=> openModuleBibliotheek({ naSluiten: ()=>{ uvSyncEnOpruimen(kast); teken(); } }));
-  wrap.querySelector(".uv-export").addEventListener("click", ()=> exportUitvoeringVoorWerf(true));
+  aan(".uv-bib", "click", ()=> openModuleBibliotheek({ naSluiten: ()=>{ uvSyncEnOpruimen(kast); teken(); } }));
+  wrap.querySelectorAll(".uv-export").forEach(b=> b.addEventListener("click", ()=> exportUitvoeringVoorWerf(true)));
+
+  /* ---------- sneltoetsen ---------- */
+  if(uvToetsHandler) document.removeEventListener("keydown", uvToetsHandler);
+  uvToetsHandler = (e)=>{
+    if(!document.body.contains(wrap)){ document.removeEventListener("keydown", uvToetsHandler); uvToetsHandler = null; return; }
+    const t = e.target;
+    if(t && (t.isContentEditable || /^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName))) return;
+    if(document.getElementById("mbib-overlay") || document.getElementById("mod-ontwerper")) return;
+    const ctrl = e.ctrlKey || e.metaKey;
+    const k = e.key;
+    if(ctrl && (k==="z" || k==="Z") && !e.shiftKey){ if(uvView==="bedrading"){ e.preventDefault(); ongedaan(); } return; }
+    if(ctrl && (k==="y" || k==="Y" || ((k==="z" || k==="Z") && e.shiftKey))){ if(uvView==="bedrading"){ e.preventDefault(); opnieuw(); } return; }
+    if(ctrl || e.altKey) return;
+    if(k==="Escape"){
+      if(uvPending || uvKamModus || uvZoomVenster || uvVerplaats){ uvPending = null; uvKamModus = false; uvZoomVenster = false; uvVerplaats = null; tekenTools(); teken(); }
+      else if(uvSelWire || uvSelKam || uvSelMod){ uvSelWire = null; uvSelKam = null; uvSelMod = null; teken(); }
+      return;
+    }
+    if(k==="f" || k==="F"){ e.preventDefault(); zetZoomModus("kast"); return; }
+    if(k==="w" || k==="W"){ e.preventDefault(); zetZoomModus("breedte"); return; }
+    if(k==="+" || k==="="){ e.preventDefault(); zoomRond(1.25); return; }
+    if(k==="-" || k==="_"){ e.preventDefault(); zoomRond(1/1.25); return; }
+    if(uvView!=="bedrading") return;
+    if(k==="z" || k==="Z"){ e.preventDefault(); uvZoomVenster = !uvZoomVenster; uvPending = null; tekenTools(); tekenStatus(); return; }
+    if(k==="d" || k==="D"){ e.preventDefault(); zetTool("draad"); return; }
+    if(k==="k" || k==="K"){ e.preventDefault(); zetTool("kam"); return; }
+    if(k==="o" || k==="O"){ e.preventDefault(); uvOrtho = !uvOrtho; tekenTools(); tekenStatus(); toast(`Haaks tekenen ${uvOrtho ? "aan" : "uit"}`); return; }
+    if(k==="Backspace" && uvPending){ e.preventDefault(); if((uvPending.punten||[]).length){ uvPending.punten.pop(); teken(); } else { uvPending = null; teken(); } return; }
+    if(k==="Delete" || k==="Backspace"){ if(verwijderSelectie()) e.preventDefault(); return; }
+  };
+  document.addEventListener("keydown", uvToetsHandler);
+
+  /* ---------- schermgrootte ---------- */
+  if(uvResizeHandler) window.removeEventListener("resize", uvResizeHandler);
+  uvResizeHandler = ()=>{ if(!document.body.contains(wrap)){ window.removeEventListener("resize", uvResizeHandler); uvResizeHandler = null; return; } pasHoogteAan(); if(uvZoomModus!=="vrij") pasSchaalAan(); };
+  window.addEventListener("resize", uvResizeHandler);
+  if(window.ResizeObserver){
+    let laatst = "";
+    new ResizeObserver(()=>{
+      const m = Math.round(canvas.clientWidth/6) + "x" + Math.round(canvas.clientHeight/6);
+      if(m===laatst) return;
+      laatst = m;
+      if(uvZoomModus!=="vrij") pasSchaalAan();
+    }).observe(canvas);
+  }
+  requestAnimationFrame(()=>{ pasHoogteAan(); pasSchaalAan(); });
 
   teken();
-  // Bibliotheek op de achtergrond laden zodat gekoppelde modules hun meest
-  // recente tekening/klemmen tonen.
-  if(!moduleBibGeladen || !cadosInstGeladen) laadAllesVoorUitvoering().then(()=>{ uvSyncEnOpruimen(kast); if(document.body.contains(wrap)) teken(); });
+  if(!moduleBibGeladen || !cadosInstGeladen) laadAllesVoorUitvoering().then(()=>{ uvSyncEnOpruimen(kast); if(document.body.contains(wrap)){ hist.laatste = uvKastJson(kast); teken(); } });
   // Zwevende uitleg bij hoveren: benaming + specs van de module, klem, draad.
   const tipEl = el(`<div class="uv-tip" style="display:none;"></div>`);
-  canvas.parentElement.style.position = "relative";
-  canvas.parentElement.appendChild(tipEl);
+  canvasBox.appendChild(tipEl);
   canvas.addEventListener("pointermove", ev=>{
-    if(ev.pointerType==="touch" || kamSleep){ tipEl.style.display = "none"; return; }
+    if(ev.pointerType==="touch" || sleep){ tipEl.style.display = "none"; return; }
     const t = ev.target.closest && ev.target.closest("[data-tip]");
     const tekst = t && t.getAttribute("data-tip");
     if(!tekst){ tipEl.style.display = "none"; return; }
     tipEl.textContent = tekst;
-    const rc = canvas.parentElement.getBoundingClientRect();
+    const rc = canvasBox.getBoundingClientRect();
     tipEl.style.display = "block";
     let lx = ev.clientX - rc.left + 14, ly = ev.clientY - rc.top + 16;
     if(lx + tipEl.offsetWidth > rc.width - 4) lx = Math.max(4, ev.clientX - rc.left - tipEl.offsetWidth - 10);
+    if(ly + tipEl.offsetHeight > rc.height - 30) ly = Math.max(4, ev.clientY - rc.top - tipEl.offsetHeight - 10);
     tipEl.style.left = lx + "px"; tipEl.style.top = ly + "px";
   });
-  canvas.addEventListener("pointerleave", ()=>{ tipEl.style.display = "none"; });
+  canvas.addEventListener("pointerleave", ()=>{ tipEl.style.display = "none"; toonDraadPreview(null); });
   return wrap;
 }
 
@@ -2715,4 +3285,68 @@ function klemKleurFunctie(k){
 function klemKleur(k){ return klemKleurExpliciet(k) || klemKleurFunctie(k); }
 function draadKleurVoorKlemmen(ka, kb){
   return klemKleurExpliciet(ka) || klemKleurExpliciet(kb) || klemKleurFunctie(ka) || klemKleurFunctie(kb) || null;
+}
+
+/* ---------- rijgklemmen gegroepeerd per kabel ----------
+   Klemmen die bij dezelfde kabel horen (zelfde bron via Snelmodus, of zelfde info + kamer) vormen een
+   groep: tussen twee kabels komt een tussenruimte met scheidingslijn, en gecentreerd boven de groep
+   staan de naam van de kabel, het kabeltype en de locatie. */
+const RK_TUSSENRUIMTE = 0.8;   // in klembreedtes
+function rijgklemIndeling(m){
+  const items = (state.interlex && state.interlex.items) || [];
+  const ids = m.rijgklemKlemIds || [];
+  const groepen = [];
+  ids.forEach((kid, i)=>{
+    const k = items.find(x=> x.id===kid) || {};
+    const sleutel = k.bronId ? "b:"+k.bronType+"|"+k.bronId : ((k.info || k.kamer) ? "i:"+(k.info||"")+"|"+(k.kamer||"") : "x:"+kid);
+    const vorige = groepen[groepen.length-1];
+    if(vorige && vorige.sleutel===sleutel && !sleutel.startsWith("x:")) vorige.leden.push(i);
+    else groepen.push({sleutel, leden: [i], klem: k});
+  });
+  groepen.forEach(g=>{
+    const k = g.klem;
+    let naam = "", kabel = "";
+    if(k.bronId && typeof snelmodusBronnen === "function"){
+      try{ const b = snelmodusBronnen(k.bronType).find(x=> x.id===k.bronId); if(b){ naam = b.label || ""; kabel = b.kabeltype || ""; } }catch(_e){}
+    }
+    if(!naam){ const ww = (k.onder && k.onder.watwaar) || ""; naam = ww.replace(/\s*[-–]\s*ader\s*\d+\s*$/i, "") || k.info || ""; }
+    g.naam = naam; g.kabel = kabel; g.locatie = k.kamer || "";
+    g.toon = !g.sleutel.startsWith("x:") && !!(g.naam || g.locatie);
+  });
+  // posities: een tussenruimte tussen twee groepen als minstens één van beide een kabelgroep is
+  let pos = 0;
+  const posVan = [];
+  groepen.forEach((g, gi)=>{
+    if(gi > 0 && (g.toon || groepen[gi-1].toon)) pos += RK_TUSSENRUIMTE;
+    g.start = pos;
+    g.leden.forEach(i=>{ posVan[i] = pos; pos += 1; });
+    g.eind = pos;
+  });
+  const eenheden = Math.max(1, pos);
+  return { eenheden, groepen, xs: ids.map((_, i)=> (posVan[i] + 0.5)/eenheden) };
+}
+function rijgklemGroepenSvg(m, x, y, w, h){
+  const ind = rijgklemIndeling(m);
+  let s = "";
+  ind.groepen.forEach((g, gi)=>{
+    const x0 = x + g.start/ind.eenheden*w, x1 = x + g.eind/ind.eenheden*w;
+    if(gi > 0 && (g.toon || ind.groepen[gi-1].toon)){
+      const xs = x + (g.start - RK_TUSSENRUIMTE/2)/ind.eenheden*w;
+      s += `<line x1="${xs}" y1="${y+4}" x2="${xs}" y2="${y+h-4}" class="uv-rk-scheiding"/>`;
+    }
+    if(!g.toon) return;
+    const r1 = g.naam || g.locatie, r2 = [g.kabel, g.naam ? g.locatie : ""].filter(Boolean).join(" · ");
+    const breed = x1 - x0, cx = (x0 + x1)/2, cy = y + h/2;
+    const lang = Math.max(r1.length, r2.length) * 5.4;
+    if(breed >= lang + 6){
+      s += `<text x="${cx}" y="${cy - (r2 ? 2 : -3)}" class="uv-rk-kabel">${escapeHtml(r1)}</text>`;
+      if(r2) s += `<text x="${cx}" y="${cy + 10}" class="uv-rk-kabel sub">${escapeHtml(r2)}</text>`;
+    } else {
+      const max = Math.floor((h - 70)/5.4);
+      s += `<text transform="translate(${cx - (r2 ? 4 : -3)} ${cy}) rotate(-90)" class="uv-rk-kabel">${escapeHtml(r1.slice(0, max))}</text>`;
+      if(r2 && breed >= 18) s += `<text transform="translate(${cx + 7} ${cy}) rotate(-90)" class="uv-rk-kabel sub">${escapeHtml(r2.slice(0, max))}</text>`;
+    }
+    s += `<rect x="${x0+1}" y="${y+24}" width="${Math.max(2, x1-x0-2)}" height="${h-48}" rx="3" class="uv-rk-groep"><title>${escapeHtml([r1, r2].filter(Boolean).join(" — "))}</title></rect>`;
+  });
+  return s;
 }

@@ -5,6 +5,16 @@ TESTVERSIE (staat naast de gewone apps, verandert niets aan de live versie):
   casuite-test.html   = volledige CaSuite met de nieuwe functies
 Beide werken op de ECHTE gegevens (zelfde Supabase).
 
+Bronbestanden: cados_bib.js + cados_bib.css (uitvoeringsplan, bibliotheek, ontwerper),
+cados_motoren.js (nieuw onderdeel Motoren: screens, gordijnen, rolluiken). patch.py voegt alles in.
+
+Uitvoeringsplan (versie 28/10 avond): compacte kopbalk, werkvlak over de volle schermhoogte,
+gereedschap in de zijkolom, zoom (−/+, volledige kast F, breedte W, zoomvenster Z, Ctrl+muiswiel),
+pannen (slepen op een lege plek / middelste muisknop), draden met knikpunten (haaks, O),
+draadstukken/knikpunten/eindpunten verslepen, ongedaan maken / opnieuw (Ctrl+Z / Ctrl+Y),
+lagen, sneltoetsen (D, K, Esc, Del), waarschuwing bij N/PE op een andere klem of kleur (toch
+doorgaan kan), rijgklemmen gegroepeerd per kabel.
+
 Nodig in Supabase (eenmalig):
   - tabel elektro_catalogus_modules + bucket module-tekeningen (migratie)
   - Edge Function module-analyse (bron: supabase/functions/module-analyse/index.ts)

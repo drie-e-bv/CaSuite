@@ -13,7 +13,7 @@ html = pathlib.Path(bron).read_text(encoding="utf-8")
 if "MODULEBIBLIOTHEEK + UITVOERINGSPLAN" in html:
     sys.exit(f"{bron}: is al gepatcht")
 
-JS = (HIER / "cados_bib.js").read_text(encoding="utf-8")
+JS = (HIER / "cados_bib.js").read_text(encoding="utf-8") + "\n" + (HIER / "cados_motoren.js").read_text(encoding="utf-8")
 CSS = (HIER / "cados_bib.css").read_text(encoding="utf-8")
 
 OUTER = r"""
@@ -137,12 +137,40 @@ vervang(anker_close, anker_close +
         "\n    el('catalogus-modules').addEventListener('click', () => { el('catalogus-modal').style.display = 'none'; if(window.openModuleBibliotheek) window.openModuleBibliotheek({}); });",
         "catalogus-knop listener")
 
+# 10. Motoren (screens, gordijnen, rolluiken) als nieuw onderdeel / tabblad
+vervang('  {key:"zonnepanelen", label:"Zonnepanelen"},',
+        '  {key:"zonnepanelen", label:"Zonnepanelen"},\n  {key:"motoren", label:"Motoren (screens, gordijnen, rolluiken)"},', "MODULE_TOGGLES motoren")
+vervang('  {grp:"Data & sturing", id:"verwarming", label:"Verwarmingsturing", toggle:"verwarming"},',
+        '  {grp:"Data & sturing", id:"verwarming", label:"Verwarmingsturing", toggle:"verwarming"},\n'
+        '  // 2026-10-28: motoren (screens, gordijnen, rolluiken) -- zie renderMotoren()\n'
+        '  {grp:"Data & sturing", id:"motoren", label:"Motoren", toggle:"motoren"},', "TABS motoren")
+vervang('    zonnepanelen: { items: [] },', '    zonnepanelen: { items: [] },\n    motoren: { items: [] },', "blankState motoren")
+vervang('  if(!s.zonnepanelen || !Array.isArray(s.zonnepanelen.items)){\n    s.zonnepanelen = { items: [] };\n  }',
+        '  if(!s.zonnepanelen || !Array.isArray(s.zonnepanelen.items)){\n    s.zonnepanelen = { items: [] };\n  }\n'
+        '  if(!s.motoren || !Array.isArray(s.motoren.items)){\n    s.motoren = { items: [] };\n  }', "migrate motoren")
+vervang('  zonnepanelen: renderZonnepanelen,', '  zonnepanelen: renderZonnepanelen,\n  motoren: renderMotoren,', "RENDERERS motoren")
+vervang('const isVerw = u.type==="verwarming";', 'const isVerw = u.type==="verwarming", isMotor = u.type==="motor";', "uitgang isMotor")
+vervang('const opties = isVerw', 'const opties = isMotor ? motorUitgangOpties(u) : isVerw', "uitgang opties motor")
+vervang('<option value="verwarming" ${isVerw?"selected":""}>Verwarmingskring</option>',
+        '<option value="verwarming" ${isVerw?"selected":""}>Verwarmingskring</option>\n                <option value="motor" ${isMotor?"selected":""}>Motor (screen/rolluik)</option>', "uitgang type motor")
+vervang('blok.querySelector(".ug-target").addEventListener("change", e2=>{ u.targetId = e2.target.value;',
+        'blok.querySelector(".ug-target").addEventListener("change", e2=>{ u.targetId = e2.target.value; delete u.rol;', "uitgang target rol")
+vervang('  if(u.type==="verwarming"){\n    const zone = state.verwarming.items.find(z=>z.id===u.targetId);',
+        '  if(u.type==="motor") return motorTargetLabel(u);\n  if(u.type==="verwarming"){\n    const zone = state.verwarming.items.find(z=>z.id===u.targetId);', "uitgangTargetLabel motor")
+vervang('if(u.type==="verwarming") return vCodes[u.targetId];', 'if(u.type==="verwarming") return vCodes[u.targetId];\n        if(u.type==="motor") return motorCodeVoorUitgang(u);', "chip motor")
+vervang('              <option value="laadpalen">Laadpalen</option>', '              <option value="laadpalen">Laadpalen</option>\n              <option value="motoren">Motoren</option>', "snelmodus optie")
+vervang('laadpalen:"Laadpalen", zekeringen:"Zekeringkast"};', 'laadpalen:"Laadpalen", motoren:"Motoren", zekeringen:"Zekeringkast"};', "snelmodus labelMap")
+vervang('  if(bronType==="zekeringen"){',
+        '  if(bronType==="motoren"){ const mc = computeMotorCodes(); return ((state.motoren && state.motoren.items) || []).map(m=>({id:m.id, label:[mc[m.id], m.soort, m.naam||m.kamer||""].filter(Boolean).join(" — "), kabeltype:m.kabel, kamer:m.kamer, info:[m.soort, m.naam].filter(Boolean).join(" ")})); }\n  if(bronType==="zekeringen"){', "snelmodus bron")
+vervang('  {key:"laadpalen", label:"Laadpalen", fn:()=>exportLaadpalenVoorWerf',
+        '  {key:"motoren", label:"Motoren", fn:()=>exportMotorenVoorWerf, schema:false, lijst:true, heeftData:()=> !!(state.motoren && state.motoren.items.length)},\n  {key:"laadpalen", label:"Laadpalen", fn:()=>exportLaadpalenVoorWerf', "EXPORT motoren")
+
 if test:
     html = re.sub(r"<title>([^<]*)</title>", lambda m: f"<title>TEST · {m.group(1)}</title>", html, count=1)
     m = re.search(r"<body[^>]*>", html)
     if not m:
         sys.exit("geen <body>")
-    html = html[:m.end()] + '\n<div class="casuite-testlint">TESTVERSIE — Uitvoeringsplan &amp; Modulebibliotheek · werkt op de echte gegevens</div>' + html[m.end():]
+    html = html[:m.end()] + '\n<div class="casuite-testlint">TESTVERSIE — Uitvoeringsplan &amp; Modulebibliotheek · Motoren · werkt op de echte gegevens</div>' + html[m.end():]
 
 pathlib.Path(doel).write_text(html, encoding="utf-8")
 print(f"{doel}: OK ({'test' if test else 'definitief'})")

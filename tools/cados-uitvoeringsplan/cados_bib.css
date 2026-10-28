@@ -155,7 +155,7 @@
 #cados-app .uv-kam-chips{display:flex;flex-wrap:wrap;gap:5px;}
 #cados-app .uv-chip{display:inline-flex;align-items:center;gap:4px;padding:2px 4px 2px 8px;border:1px solid var(--line);border-radius:999px;font:700 12px var(--mono);background:var(--surface-alt);}
 #cados-app .uv-chip button{border:0;background:transparent;cursor:pointer;font-size:12px;padding:2px 5px;color:var(--ink-dim);min-height:0;}
-#cados-app #uvBanner .move-banner{display:flex;align-items:center;gap:10px;flex-wrap:wrap;color:#fff;margin-bottom:12px;}
+#cados-app #uvBanner .move-banner{display:flex;align-items:center;gap:10px;flex-wrap:wrap;color:#fff;margin:0;padding:7px 12px;font-size:13px;}
 #cados-app #uvBanner .move-banner .btn{background:rgba(255,255,255,.16);color:#fff;border-color:rgba(255,255,255,.45);}
 #cados-app #uvBanner .move-banner.uv-omzet-banner{background:#eef6f1;color:var(--ink);border:1px solid #2F7A4D;box-shadow:none;}
 #cados-app #uvBanner .move-banner.uv-omzet-banner .btn{background:#2F7A4D;color:#fff;border-color:#2F7A4D;}
@@ -208,7 +208,6 @@
 #cados-app .uv-uitleg-details summary{cursor:pointer;list-style:none;}
 #cados-app .uv-uitleg-details summary::after{content:" ▾";color:var(--ink-dim);}
 #cados-app .uv-uitleg-details[open] summary::after{content:" ▴";}
-#cados-app .uv-canvas-wrap{max-height:82vh;}
 
 /* uitgangen (2026-10-28) */
 .uv-svg .uv-uitgang{font-size:7.5px;font-weight:800;fill:#1f4f8a;text-anchor:middle;pointer-events:none;font-family:ui-monospace,Menlo,Consolas,monospace;}
@@ -225,3 +224,89 @@
 .mbib-concepten{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;}
 .mbib-concept{display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:#fff6db;border:1px solid #f1d58a;border-radius:10px;padding:8px 12px;font-size:13px;}
 .mbib-concept .mbib-btn{min-height:30px;padding:0 10px;}
+
+.uv-svg .uv-rk-scheiding{stroke:#9aa1a9;stroke-width:1.2;stroke-dasharray:4 3;pointer-events:none;}
+.uv-svg .uv-rk-groep{fill:rgba(31,79,138,.05);stroke:rgba(31,79,138,.25);stroke-width:.8;}
+.uv-svg .uv-rk-kabel{font-size:8.5px;font-weight:800;fill:#1f4f8a;text-anchor:middle;pointer-events:none;}
+.uv-svg .uv-rk-kabel.sub{font-weight:600;fill:#5c636b;font-size:7.5px;}
+
+/* ===== schermindeling uitvoeringsplan: compacte kopbalk, groot werkvlak, gereedschap aan de zijkant ===== */
+#cados-app .uv-panel{display:flex;flex-direction:column;gap:8px;}
+#cados-app .uv-kop{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;padding:6px 10px;border:1px solid var(--line);
+  border-radius:var(--radius-lg);background:var(--surface);box-shadow:var(--shadow-sm);}
+#cados-app .uv-titel{font-size:14px;white-space:nowrap;}
+#cados-app .uv-kasten{display:flex;flex-wrap:wrap;gap:4px;align-items:center;}
+#cados-app .uv-naar-layout{font-size:12px;margin-left:4px;white-space:nowrap;}
+#cados-app .uv-spacer{flex:1;}
+#cados-app .uv-zoom{display:flex;align-items:center;gap:3px;flex-wrap:wrap;}
+#cados-app .uv-zoom .btn, #cados-app .uv-help{min-width:30px;padding-left:8px;padding-right:8px;}
+#cados-app .uv-kop .btn.actief, #cados-app .uv-help.actief{background:#fbeee3;border-color:#bb5e26;color:#8a3f12;}
+#cados-app .uv-kop .btn:disabled{opacity:.35;cursor:default;}
+#cados-app .uv-sep{width:1px;height:20px;background:var(--line);margin:0 4px;}
+#cados-app .uv-werk{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:8px;align-items:start;}
+@media (max-width:900px){ #cados-app .uv-werk{grid-template-columns:minmax(0,1fr);} #cados-app .uv-side{max-height:none !important;} }
+#cados-app .uv-canvas-box{position:relative;display:flex;flex-direction:column;min-height:420px;border:1px solid var(--line);
+  border-radius:var(--radius-lg);background:#eef0f2;box-shadow:var(--shadow-sm);overflow:hidden;}
+#cados-app .uv-canvas-box .uv-canvas-wrap{flex:1;min-height:0;max-height:none;border:0;border-radius:0;box-shadow:none;background:#eef0f2;
+  padding:6px;box-sizing:border-box;cursor:default;}
+#cados-app .uv-canvas-wrap.pannen{cursor:grabbing;user-select:none;}
+#cados-app .uv-canvas-wrap svg{margin:0 auto;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.12);}
+#cados-app .uv-canvas-box #uvBanner{position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:20;max-width:calc(100% - 24px);}
+#cados-app .uv-canvas-box #uvBanner:empty{display:none;}
+#cados-app .uv-canvas-box #uvBanner .move-banner{box-shadow:0 4px 14px rgba(0,0,0,.22);border-radius:10px;}
+#cados-app .uv-status{flex:none;font-size:12px;color:var(--ink-dim);padding:4px 10px;border-top:1px solid var(--line);background:var(--surface);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+#cados-app .uv-side{display:flex;flex-direction:column;gap:8px;overflow:auto;}
+#cados-app .uv-side .card{position:static;margin:0;}
+#cados-app .uv-side .card-body{padding:10px 12px;}
+#cados-app .uv-detail{border-color:#e7b892;}
+#cados-app .uv-detail-kop{display:flex;align-items:center;justify-content:space-between;gap:6px;}
+#cados-app .uv-x{border:0;background:transparent;cursor:pointer;color:var(--ink-dim);font-size:14px;padding:2px 6px;min-height:0;}
+#cados-app .uv-knoprij{display:flex;flex-wrap:wrap;gap:5px;}
+#cados-app .uv-veld{display:flex;flex-direction:column;gap:3px;font-size:12px;font-weight:600;color:var(--ink-dim);}
+#cados-app .uv-veld select, #cados-app .uv-veld input, #cados-app .uv-rij2 select{width:100%;padding:5px 7px;font-size:13px;}
+#cados-app .uv-rij2{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+#cados-app .uv-tools-kaart{gap:0 !important;padding:0 !important;}
+#cados-app .uv-sec{padding:9px 12px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:6px;}
+#cados-app .uv-sec:first-child{border-top:0;}
+#cados-app .uv-sec-titel{font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-dim);}
+#cados-app .uv-sec-meer{flex-direction:row;flex-wrap:wrap;}
+#cados-app .uv-toolknoppen{display:grid;grid-template-columns:1fr 1fr;gap:5px;}
+#cados-app .uv-tool{display:flex;align-items:center;justify-content:center;gap:6px;padding:7px 6px;border:1px solid var(--line);border-radius:8px;
+  background:var(--surface);cursor:pointer;font:700 13px var(--sans, "Inter", Arial, sans-serif);color:var(--ink);}
+#cados-app .uv-tool.actief{background:#bb5e26;border-color:#bb5e26;color:#fff;}
+#cados-app .uv-tool.actief kbd{background:rgba(255,255,255,.2);color:#fff;border-color:rgba(255,255,255,.4);}
+#cados-app .uv-side kbd, #cados-app .uv-sneltoetsen kbd{display:inline-block;font:700 10px var(--mono);padding:1px 4px;border:1px solid var(--line);
+  border-bottom-width:2px;border-radius:4px;background:var(--surface-alt);color:var(--ink-dim);}
+#cados-app .uv-lagen{display:grid;grid-template-columns:1fr 1fr;gap:4px;}
+#cados-app .uv-sneltoetsen{display:grid;grid-template-columns:1fr 1fr;gap:4px 8px;font-size:12px;color:var(--ink-dim);}
+#cados-app .uv-van-naar{display:flex;flex-direction:column;gap:4px;font-size:12px;}
+#cados-app .uv-van-naar .btn{padding:1px 7px;min-height:0;}
+#cados-app .uv-vn{display:inline-block;min-width:32px;font-weight:800;color:var(--ink-dim);text-transform:uppercase;font-size:10px;}
+#cados-app .uv-fout{background:#fdecea;border:1px solid #e3a59f;color:#8d1f16;border-radius:8px;padding:6px 8px;font-size:12px;font-weight:600;}
+#cados-app .uv-fout-tel{color:#b3261e;font-weight:700;}
+#cados-app .uv-telling{font-size:12px;color:var(--ink-dim);padding:0 4px;}
+#cados-app .uv-lijsten > summary{cursor:pointer;font-weight:700;font-size:13px;padding:8px 10px;border:1px solid var(--line);border-radius:var(--radius-lg);background:var(--surface);}
+#cados-app .uv-lijsten[open] > summary{margin-bottom:8px;}
+/* draad bewerken: draadstukken, knikpunten, eindpunten */
+.uv-svg .uv-greep .uv-dseg{fill:none;stroke:transparent;stroke-width:12;pointer-events:stroke;}
+.uv-svg .uv-greep .uv-dseg.sleepbaar[data-as="h"]{cursor:ns-resize;}
+.uv-svg .uv-greep .uv-dseg.sleepbaar[data-as="v"]{cursor:ew-resize;}
+.uv-svg .uv-greep .uv-dseg.sleepbaar:hover{stroke:rgba(187,94,38,.25);}
+.uv-svg .uv-greep .uv-vtx{fill:#fff;stroke:#bb5e26;stroke-width:2;cursor:move;}
+.uv-svg .uv-greep .uv-eind{fill:#bb5e26;stroke:#fff;stroke-width:1.5;cursor:grab;}
+.uv-svg.sleept .uv-greep, .uv-svg.sleept .uv-draad.sel{pointer-events:none;}
+.uv-svg.sleept .uv-greep{opacity:.4;}
+.uv-svg .uv-klem.doel .uv-klem-dot{fill:#2F7A4D;stroke:#2F7A4D;r:8;}
+.uv-svg .uv-draad-preview{fill:none;stroke:#bb5e26;stroke-width:2;stroke-dasharray:6 4;pointer-events:none;}
+.uv-svg .uv-zoom-preview{fill:rgba(31,99,198,.08);stroke:#1f63c6;stroke-width:1.5;stroke-dasharray:5 4;pointer-events:none;vector-effect:non-scaling-stroke;}
+.uv-svg .uv-draadnr-bg{fill:#fff;stroke-width:1;}
+.uv-svg .uv-draadnr{font-size:7.5px;font-weight:800;fill:#14181d;text-anchor:middle;pointer-events:none;font-family:ui-monospace,Menlo,Consolas,monospace;}
+/* motoren */
+#cados-app .mot-tabel select, #cados-app .mot-tabel input:not([type=checkbox]){padding:5px 7px;font-size:13px;}
+#cados-app .mot-tabel td{vertical-align:middle;}
+#cados-app .mot-tabel .mo-soort{min-width:118px;} #cados-app .mot-tabel .mo-sturing{min-width:170px;}
+#cados-app .mot-tabel .mo-op, #cados-app .mot-tabel .mo-neer{min-width:150px;} #cados-app .mot-tabel .mo-automaat{min-width:120px;}
+#cados-app .mot-inline{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;}
+#cados-app .mot-inline select{width:auto;}
+#cados-app .mot-waarschuwing{margin-top:10px;padding:8px 12px;border:1px solid #e7c27a;background:#fdf6e6;border-radius:8px;color:#7a5410;}
