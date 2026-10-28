@@ -1,6 +1,23 @@
 <!DOCTYPE html>
 <html lang="nl">
 <head>
+<script>/* testversie: toon elke JS-fout zichtbaar op het scherm (zodat een schermafdruk volstaat) */
+(function(){
+  function toon(msg){
+    try{
+      var b = document.getElementById('test-foutmelder');
+      if(!b){ b = document.createElement('div'); b.id = 'test-foutmelder';
+        b.style.cssText = 'position:fixed;left:8px;right:8px;bottom:34px;z-index:99999;background:#fff3f2;border:2px solid #b3261e;color:#5c1410;font:12px/1.4 monospace;padding:8px 10px;border-radius:8px;max-height:40vh;overflow:auto;white-space:pre-wrap;box-shadow:0 6px 20px rgba(0,0,0,.25)';
+        b.innerHTML = '<b>Fout in de testversie — maak hiervan een schermafdruk voor Claude</b> <button onclick="this.parentNode.remove()" style="float:right">sluiten</button>\n';
+        (document.body || document.documentElement).appendChild(b); }
+      b.appendChild(document.createTextNode('\n' + new Date().toLocaleTimeString() + ' ' + msg));
+    }catch(_e){}
+  }
+  window.addEventListener('error', function(e){ toon((e.message||'fout') + (e.filename ? ' @' + String(e.filename).split('/').pop() + ':' + e.lineno + ':' + e.colno : '') + (e.error && e.error.stack ? '\n' + String(e.error.stack).split('\n').slice(0,6).join('\n') : '')); });
+  window.addEventListener('unhandledrejection', function(e){ var r = e.reason; toon('(promise) ' + (r && (r.message || r.error_description || JSON.stringify(r)) || r) + (r && r.stack ? '\n' + String(r.stack).split('\n').slice(0,6).join('\n') : '')); });
+  var ce = console.error; console.error = function(){ try{ var t = [].map.call(arguments, function(a){ return a && a.stack ? a.stack : (typeof a==='object' ? JSON.stringify(a) : String(a)); }).join(' '); if(!/ServiceWorker|sw\.js/.test(t)) toon('console.error: ' + t.slice(0,600)); }catch(_e){} return ce.apply(console, arguments); };
+})();
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TEST · CaSuite – werfverslagen</title>
