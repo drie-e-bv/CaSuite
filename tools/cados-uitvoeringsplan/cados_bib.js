@@ -380,6 +380,14 @@ function uvSyncEnOpruimen(kast){
     const voor = kast.bedrading.length;
     kast.bedrading = kast.bedrading.filter(w=> w && w.a && w.b && bestaand.has(uvKlemKey(w.a.m, w.a.k)) && bestaand.has(uvKlemKey(w.b.m, w.b.k)));
     if(kast.bedrading.length !== voor) gewijzigd = true;
+    // draden met "kleur volgt klem" volgen de (eventueel gewijzigde) klemkleur
+    const klemVan = {};
+    mods.forEach(m=> klemmenVoorModule(m).forEach(k=>{ klemVan[uvKlemKey(m.id, k.id)] = k; }));
+    kast.bedrading.forEach(w=>{
+      if(!w.kleurAuto) return;
+      const nk = draadKleurVoorKlemmen(klemVan[uvKlemKey(w.a.m, w.a.k)], klemVan[uvKlemKey(w.b.m, w.b.k)]);
+      if(nk && nk !== w.kleur){ w.kleur = nk; gewijzigd = true; }
+    });
   }
   // Kamgeleiders: enkel modules die nog in dezelfde rij staan blijven erop; een lege kam verdwijnt.
   if(!Array.isArray(kast.kamgeleiders)) kast.kamgeleiders = [];
@@ -549,7 +557,8 @@ function bouwBedradingSvg(kast, interactief){
     const cls = ["uv-klem", verbonden.has(key)?"bezet":"", pend?"pending":""].filter(Boolean).join(" ");
     const ly = p.zijde==="boven" ? p.y-9 : p.y+15;
     const ktip = [`${p.code || p.m.naam || p.m.categorie} · klem ${p.k.label||p.k.id} (${p.k.functie||"—"}, ${p.zijde})`, p.k.tip || "", p.m.naam || ""].filter(Boolean).join("\n");
-    const kc = (aderKleurNaarDraad(p.k.kleur) && DRAAD_KLEUREN[aderKleurNaarDraad(p.k.kleur)]) || kleurHexVoorFunctie(p.k.functie || p.k.label);
+    const kk = klemKleur(p.k);
+    const kc = kk && kk!=="Wit" ? DRAAD_KLEUREN[kk] : null;
     s += `<g class="${cls}" data-m="${p.m.id}" data-k="${escapeHtml(p.k.id)}" data-tip="${escapeHtml(ktip)}">`;
     if(interactief) s += `<circle cx="${p.x}" cy="${p.y}" r="11" class="uv-klem-hit"/>`;
     s += `<circle cx="${p.x}" cy="${p.y}" r="5" class="uv-klem-dot"${kc ? ` style="stroke:${kc}"` : ""}/>`;
@@ -718,7 +727,7 @@ function uvAutoOmzet(kast){
       if(!d) return;
       const a = {m: bron.id, k: b.id}, z = {m: doel.id, k: d.id};
       if(bestaat(a, z)) return;
-      kast.bedrading.push({id: cryptoId(), a, b: z, kleur: standaardKleurVoorFunctie(f), sectie, label, auto: true});
+      kast.bedrading.push({id: cryptoId(), a, b: z, kleur: draadKleurVoorKlemmen(b, d) || standaardKleurVoorFunctie(f), kleurAuto: true, sectie, label, auto: true});
       rapport.draden++;
     });
   };
@@ -1051,12 +1060,14 @@ function renderUitvoeringsplan(){
       const box = el(`<div class="card"><div class="card-body uv-sidebody">
         <strong>Draad</strong>
         <div class="hint">${escapeHtml(uvKlemOmschrijving(kast, w.a))}<br>→ ${escapeHtml(uvKlemOmschrijving(kast, w.b))}${w.auto?"<br><em>(automatisch voorstel)</em>":""}</div>
-        <div class="field"><label>Kleur</label><select class="sw-kleur">${Object.keys(DRAAD_KLEUREN).map(k=>`<option ${k===w.kleur?"selected":""}>${k}</option>`).join("")}</select></div>
+        <div class="field"><label>Kleur</label><select class="sw-kleur">${Object.keys(DRAAD_KLEUREN).map(k=>`<option ${k===w.kleur?"selected":""}>${k}</option>`).join("")}</select>
+          <label class="uv-chk" style="margin-top:5px;"><input type="checkbox" class="sw-kleurauto" ${w.kleurAuto?"checked":""}> kleur volgt klem</label></div>
         <div class="field"><label>Doorsnede</label><select class="sw-sectie">${DRAAD_SECTIES.map(v=>`<option value="${v}" ${v===String(w.sectie)?"selected":""}>${v} mm²</option>`).join("")}</select></div>
         <div class="field"><label>Label (optioneel)</label><input class="sw-label" value="${escapeHtml(w.label||"")}" placeholder="bv. kambalk, naar klem 12"></div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;"><button class="btn small ghost sw-del">Draad verwijderen</button><button class="btn small ghost sw-sluit">Sluiten</button></div>
       </div></div>`);
-      box.querySelector(".sw-kleur").addEventListener("change", e=>{ w.kleur = e.target.value; w.auto = false; save(); teken(); });
+      box.querySelector(".sw-kleur").addEventListener("change", e=>{ w.kleur = e.target.value; w.kleurAuto = false; w.auto = false; save(); teken(); });
+      box.querySelector(".sw-kleurauto").addEventListener("change", e=>{ w.kleurAuto = e.target.checked; if(w.kleurAuto) uvSyncEnOpruimen(kast); save(); teken(); });
       box.querySelector(".sw-sectie").addEventListener("change", e=>{ w.sectie = e.target.value; w.auto = false; save(); teken(); });
       box.querySelector(".sw-label").addEventListener("input", e=>{ w.label = e.target.value; save(); });
       box.querySelector(".sw-del").addEventListener("click", ()=>{ kast.bedrading = kast.bedrading.filter(x=> x.id!==w.id); uvSelWire = null; save(); teken(); });
@@ -1284,9 +1295,8 @@ function renderUitvoeringsplan(){
       const geo = uvGeometrie(kast);
       const pa = geo.klemPos[uvKlemKey(a.m, a.k)];
       const pb = geo.klemPos[uvKlemKey(eind.m, eind.k)];
-      const ader = (pa && aderKleurNaarDraad(pa.k.kleur)) || (pb && aderKleurNaarDraad(pb.k.kleur));
-      const kleur = uvKleurAuto ? (ader || (pa ? standaardKleurVoorFunctie(pa.k.functie || pa.k.label) : uvKleur)) : uvKleur;
-      const nw = {id: cryptoId(), a, b: eind, kleur, sectie: uvSectie, label: ""};
+      const kleur = uvKleurAuto ? (draadKleurVoorKlemmen(pa && pa.k, pb && pb.k) || uvKleur) : uvKleur;
+      const nw = {id: cryptoId(), a, b: eind, kleur, kleurAuto: uvKleurAuto, sectie: uvSectie, label: ""};
       kast.bedrading.push(nw);
       uvPending = null;
       save(); teken();
@@ -2057,7 +2067,8 @@ function miniModuleSvg(m, klemmen, wg){
   const w = b*38, h = 150;
   let s = `<svg viewBox="-2 -2 ${w+4} ${h+4}" class="mbib-thumb-svg uv-svg" style="width:${Math.min(160, w*0.62)}px">${moduleVectorSvg(m, w, h, wg)}`;
   (klemmen||[]).forEach(k=>{
-    const c = kleurHexVoorFunctie(k.functie||k.label) || "#14181d";
+    const kk = klemKleur(k);
+    const c = (kk && kk!=="Wit" && DRAAD_KLEUREN[kk]) || "#14181d";
     s += `<circle cx="${(parseFloat(k.x)||0)*w}" cy="${(parseFloat(k.y)||0)*h}" r="4.5" fill="#fff" stroke="${c}" stroke-width="2"/>`;
   });
   return s + `</svg>`;
@@ -2135,7 +2146,8 @@ function klemEditor(container, o){
       const d = document.createElement("div");
       d.className = "mbib-dot" + (sel===k.id ? " sel" : "") + (zijdeVanKlem(k)==="onder" ? " onder" : "");
       d.style.left = (k.x*100)+"%"; d.style.top = (k.y*100)+"%";
-      const c = kleurHexVoorFunctie(k.functie || k.label);
+      const kk = klemKleur(k);
+      const c = kk && kk!=="Wit" ? DRAAD_KLEUREN[kk] : null;
       if(c) d.style.borderColor = c;
       d.dataset.id = k.id;
       d.innerHTML = `<span>${escapeHtml(String(k.label||"").slice(0,6))}</span>`;
@@ -2173,7 +2185,7 @@ function klemEditor(container, o){
     const namen = klemFuncties().map(k=> k.naam);
     const tbl = document.createElement("table");
     tbl.className = "mbib-klemtabel";
-    tbl.innerHTML = `<thead><tr><th>Label</th><th>Functie</th><th>Zijde</th><th></th></tr></thead><tbody></tbody>`;
+    tbl.innerHTML = `<thead><tr><th>Label</th><th>Functie</th><th>Kleur</th><th>Zijde</th><th></th></tr></thead><tbody></tbody>`;
     const tb = tbl.querySelector("tbody");
     klemmen().slice().sort((a,b)=> (zijdeVanKlem(a)===zijdeVanKlem(b) ? a.x-b.x : (zijdeVanKlem(a)==="boven" ? -1 : 1))).forEach(k=>{
       const tr = document.createElement("tr");
@@ -2181,6 +2193,7 @@ function klemEditor(container, o){
       const lijst = (!k.functie || namen.includes(k.functie)) ? namen : [k.functie, ...namen];
       tr.innerHTML = `<td><input class="kl-label" value="${escapeHtml(k.label||"")}" maxlength="8"></td>
         <td><select class="kl-functie">${lijst.map(f=>`<option ${f===k.functie?"selected":""}>${escapeHtml(f)}</option>`).join("")}<option value="__nieuw">＋ nieuwe functie…</option></select></td>
+        <td><select class="kl-kleur" title="kleur van de klem — een draad neemt die automatisch over"><option value="">volgens functie${klemKleurFunctie(k) ? " ("+klemKleurFunctie(k)+")" : ""}</option>${Object.keys(DRAAD_KLEUREN).map(c=>`<option ${klemKleurExpliciet(k)===c?"selected":""}>${c}</option>`).join("")}</select></td>
         <td><select class="kl-zijde"><option value="boven" ${zijdeVanKlem(k)==="boven"?"selected":""}>boven</option><option value="onder" ${zijdeVanKlem(k)==="onder"?"selected":""}>onder</option></select></td>
         <td><button type="button" class="mbib-btn ghost kl-del" title="klem verwijderen">✕</button></td>`;
       tr.addEventListener("focusin", ()=>{ if(sel!==k.id){ sel = k.id; teken(); tb.querySelectorAll("tr").forEach(x=> x.classList.toggle("sel", x===tr)); } });
@@ -2191,8 +2204,9 @@ function klemEditor(container, o){
           if(naam){ k.functie = await voegKlemFunctieToe(naam, "Zwart") || k.functie; }
           tekenLijst(); teken(); changed(); return;
         }
-        k.functie = ev.target.value; teken(); changed();
+        k.functie = ev.target.value; teken(); tekenLijst(); changed();
       });
+      tr.querySelector(".kl-kleur").addEventListener("change", ev=>{ if(ev.target.value) k.kleur = ev.target.value; else delete k.kleur; teken(); changed(); });
       tr.querySelector(".kl-zijde").addEventListener("change", ev=>{ k.zijde = ev.target.value; k.y = ev.target.value==="boven" ? Math.min(k.y, 0.49) : Math.max(k.y, 0.51); if(raster){ k.y = ev.target.value==="boven" ? 0.06 : 0.94; } teken(); changed(); });
       tr.querySelector(".kl-del").addEventListener("click", ()=>{ o.setKlemmen(klemmen().filter(x=> x!==k)); if(sel===k.id) sel = null; teken(); tekenLijst(); changed(); });
       tb.appendChild(tr);
@@ -2260,8 +2274,8 @@ function klemEditor(container, o){
   return api;
 }
 function klemmenOpslaanVorm(klemmen){
-  return klemmen.map(k=>({ id: String(k.id), label: String(k.label||""), functie: String(k.functie||""), zijde: zijdeVanKlem(k),
-    x: Math.round((Number(k.x)||0)*10000)/10000, y: Math.round((Number(k.y)||0)*10000)/10000 }));
+  return klemmen.map(k=> Object.assign({ id: String(k.id), label: String(k.label||""), functie: String(k.functie||""), zijde: zijdeVanKlem(k),
+    x: Math.round((Number(k.x)||0)*10000)/10000, y: Math.round((Number(k.y)||0)*10000)/10000 }, k.kleur ? {kleur: String(k.kleur)} : {}));
 }
 function weergaveOpslaanVorm(wg){
   const out = {};
@@ -2512,4 +2526,19 @@ function sjabloonBreedte(cat, polen){
   const sj = cadosInst["sjabloon:" + sjabloonSleutel({categorie: cat, polen})];
   const b = sj ? parseInt(sj.breedte) : 0;
   return b > 0 ? b : null;
+}
+
+/* ---------- kleur per klem -> draad ----------
+   Elke klem heeft een kleur: een expliciet gekozen kleur (of de aderkleur van een rijgklem), anders
+   de kleur van zijn klemfunctie (bus+ rood, bus- zwart, L bruin, N blauw, PE geel/groen, ...).
+   Draden met "kleur volgt klem" (standaard) nemen die kleur automatisch over, ook achteraf. */
+function klemKleurExpliciet(k){ return (k && aderKleurNaarDraad(k.kleur)) || null; }
+function klemKleurFunctie(k){
+  if(!k) return null;
+  const f = klemFunctieKleur(k.functie || k.label);
+  return f && DRAAD_KLEUREN[f] ? f : null;
+}
+function klemKleur(k){ return klemKleurExpliciet(k) || klemKleurFunctie(k); }
+function draadKleurVoorKlemmen(ka, kb){
+  return klemKleurExpliciet(ka) || klemKleurExpliciet(kb) || klemKleurFunctie(ka) || klemKleurFunctie(kb) || null;
 }
