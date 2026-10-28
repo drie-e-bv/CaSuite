@@ -140,3 +140,22 @@
 .mbib-acties{display:flex;justify-content:flex-end;gap:8px;margin-top:14px;flex-wrap:wrap;}
 .casuite-testlint{position:fixed;left:0;right:0;bottom:0;z-index:5000;background:#c0392b;color:#fff;text-align:center;font:700 12px/1.6 "Inter",Arial,sans-serif;
   letter-spacing:.04em;pointer-events:none;padding:2px 0;}
+
+/* kamgeleiders (2026-10-28) */
+.uv-svg.kammodus{cursor:col-resize;touch-action:none;}
+.uv-svg.kammodus .uv-klem, .uv-svg.kammodus .uv-mod, .uv-svg.kammodus .uv-draad{pointer-events:none;}
+.uv-svg .uv-kam{cursor:pointer;}
+.uv-svg .uv-kam-bg{fill:#f6e7d6;stroke:#b06a2a;stroke-width:1;}
+.uv-svg .uv-kam.sel .uv-kam-bg{stroke:#bb5e26;stroke-width:2.5;fill:#f2d3b0;}
+.uv-svg .uv-kam-geleider{stroke-width:3;stroke-linecap:round;}
+.uv-svg .uv-kam-tand{stroke:#b06a2a;stroke-width:2;}
+.uv-svg .uv-kam-knoop{fill:#7a4416;}
+.uv-svg .uv-kam-label{font-size:8.5px;font-weight:800;fill:#7a4416;}
+.uv-svg .uv-kam-preview{fill:rgba(187,94,38,.16);stroke:#bb5e26;stroke-width:2;stroke-dasharray:5 4;pointer-events:none;}
+#cados-app .uv-kam-chips{display:flex;flex-wrap:wrap;gap:5px;}
+#cados-app .uv-chip{display:inline-flex;align-items:center;gap:4px;padding:2px 4px 2px 8px;border:1px solid var(--line);border-radius:999px;font:700 12px var(--mono);background:var(--surface-alt);}
+#cados-app .uv-chip button{border:0;background:transparent;cursor:pointer;font-size:12px;padding:2px 5px;color:var(--ink-dim);min-height:0;}
+#cados-app #uvBanner .move-banner{display:flex;align-items:center;gap:10px;flex-wrap:wrap;color:#fff;margin-bottom:12px;}
+#cados-app #uvBanner .move-banner .btn{background:rgba(255,255,255,.16);color:#fff;border-color:rgba(255,255,255,.45);}
+#cados-app #uvBanner .move-banner.uv-omzet-banner{background:#eef6f1;color:var(--ink);border:1px solid #2F7A4D;box-shadow:none;}
+#cados-app #uvBanner .move-banner.uv-omzet-banner .btn{background:#2F7A4D;color:#fff;border-color:#2F7A4D;}
