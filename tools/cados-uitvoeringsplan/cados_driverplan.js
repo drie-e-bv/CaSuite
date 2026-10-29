@@ -12,9 +12,13 @@
    ========================================================================= */
 const DK_PXMM = UV.MW / 18;
 const DK_KLEM_MM = 5.2, DK_RAIL_H_MM = 48, DK_RAND_MM = 10, DK_TUSSEN_MM = 10, DK_SCHAK_MM = 36;
-// Phoenix PTFIX 6X2,5: 6 aansluitingen per blokje van 16 mm breed (contorion.de); blokjes worden doorverbonden
-const DK_PTFIX_PUNTEN = 6, DK_PTFIX_MM = 16;
-function dkPhoenixBreedte(punten){ return Math.max(1, Math.ceil(punten / DK_PTFIX_PUNTEN)) * DK_PTFIX_MM; }
+// Phoenix 3273112 (opgave Peter, 29/10): verdeelblok met verticale uitlijning en geïntegreerde voeding,
+// push-in, 19 aansluitingen (1 voeding + 18), 0,14-4 mm², 28,6 mm breed, 28,7 mm hoog. Casentis gebruikt
+// bruin (L) en blauw (N) voor 230V en 2x grijs voor DALI. Meer dan 18 drivers = een tweede blok.
+const DK_PTFIX_UIT = 18, DK_PTFIX_MM = 28.6, DK_PTFIX_ART = "3273112";
+function dkPhoenixBlokken(uitgangen){ return Math.max(1, Math.ceil(uitgangen / DK_PTFIX_UIT)); }
+function dkPhoenixBreedte(punten){ const b = dkPhoenixBlokken(Math.max(0, punten - 1)); return b*DK_PTFIX_MM + (b-1)*2; }
+const DK_PTFIX_KLEUR = {L: "bruin", N: "blauw", "DA+": "grijs", "DA-": "grijs", push: "grijs"};
 // rijgklemmen: enkel (1 niveau) of dubbel (2 niveaus: + boven, − eronder op dezelfde klem)
 function dkRijgBreedte(lijst, p){ return (p.rkDubbel ? Math.ceil(lijst.length/2) : lijst.length) * DK_KLEM_MM; }
 const DK_KOKERS = [30, 40, 50, 60];
@@ -70,6 +74,7 @@ function dkPlan(dk){
   if(!DK_KOKERS.includes(p.kokerV)) p.kokerV = 40;
   if(!DK_KOKERS.includes(p.kokerH)) p.kokerH = 40;
   if(p.rkPositie !== "onder") p.rkPositie = "boven";
+  if(p.rkDubbel === undefined) p.rkDubbel = true;   // Casentis gebruikt dubbele rijgklemmen in de driverkast
   delete p.indeling;   // oude rij-indeling (eerste testversie)
   return p;
 }
@@ -239,10 +244,19 @@ function dkPlanKast(dk){
   phx.forEach(([sl, f, lab])=>{
     const klemmen = [];
     const tot = n + 1;
-    for(let i=0; i<tot; i++) klemmen.push({id: i ? "p" + i : "i", label: i ? String(i) : "in", functie: f, zijde: i ? zijKast : zijKabel, x: (i + 0.5)/tot, y: i ? yKast : yKabel, rijgSoort: i ? "kast" : "preflex", tip: `verdeelblok ${lab} · ${i ? "punt " + i : "ingang"}`});
+    // punten in een raster per blok (4 breed): de voeding bovenaan (aan de kabelkant), de 18 uitgangen eronder
+    const nBlok = dkPhoenixBlokken(n), bw = 1/nBlok;
+    for(let i=0; i<tot; i++){
+      if(!i){ klemmen.push({id: "i", label: "in", functie: f, zijde: zijKabel, x: bw/2, y: yKabel, rijgSoort: "preflex", tip: `verdeelblok ${lab} · voeding (ingang)`}); continue; }
+      const blokNr = Math.floor((i-1)/DK_PTFIX_UIT), j = (i-1) % DK_PTFIX_UIT;
+      const kol = j % 4, rij = Math.floor(j / 4);
+      const xr = blokNr*bw + bw*(0.14 + kol*0.24);
+      const yr = boven ? 0.36 + rij*0.14 : 0.64 - rij*0.14;
+      klemmen.push({id: "p" + i, label: String(i), functie: f, zijde: zijKast, x: Math.round(xr*1000)/1000, y: Math.round(yr*1000)/1000, rijgSoort: "kast", geenLabel: true, tip: `verdeelblok ${lab} · punt ${i}`});
+    }
     const id = "dkp_" + sl + "_" + dk.id;
     codes[id] = lab;
-    railModule(id, "Verdeelblok " + lab, dkPhoenixBreedte(tot), "phoenix", klemmen, {lab, f});
+    railModule(id, "Verdeelblok " + lab, dkPhoenixBreedte(tot), "phoenix", klemmen, {lab, f, kleur: DK_PTFIX_KLEUR[f] || "grijs", blokken: dkPhoenixBlokken(n)});
   });
   cols.flat().forEach(d=>{
     const lijst = dkKlemLijst(d, p);
@@ -428,7 +442,7 @@ function dkModuleSvg(md){
   const soort = info.soort;
   const d = info.driver;
   const tip = soort==="schakelaar" ? "Werkschakelaar — voeding van de driverkast uitschakelen" :
-    soort==="phoenix" ? `Phoenix-verdeelblok ${info.lab} — doorverbinden naar alle drivers` :
+    soort==="phoenix" ? `Phoenix ${DK_PTFIX_ART} (${info.kleur}) — verdeelblok ${info.lab}, ${info.blokken} blok(ken) van 1 voeding + 18 aansluitingen` :
     [code + " — " + (d.naam||""), info.perSpot===0 ? "1 kabel per driver" : `${info.spots} spot(s) × ${info.perSpot} klemmen`, [...new Set((d.armaturen||[]).map(a=> a.ruimte).filter(Boolean))].join(", ")].filter(Boolean).join("\n");
   let s = `<g class="uv-mod dk-blok${sel} ${soort}" data-mod="${m.id}" data-tip="${escapeHtml(tip)}">`;
   s += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="3" class="dk-blok-body"/>`;
@@ -442,8 +456,12 @@ function dkModuleSvg(md){
     }
   }
   if(soort==="schakelaar") s += `<rect x="${x + w/2 - 5}" y="${y + h/2 - 12}" width="10" height="18" rx="2" class="dk-hendel"/>`;
+  if(soort==="phoenix"){
+    const bw = (w - (info.blokken-1)*2*DK_PXMM)/info.blokken;
+    for(let b=0; b<info.blokken; b++) s += `<rect x="${x + b*(bw + 2*DK_PXMM)}" y="${y + h*0.22}" width="${bw}" height="${h*0.62}" rx="3" class="dk-ptfix ${info.kleur}"/>`;
+  }
   const lab = soort==="schakelaar" ? "Q" : (soort==="phoenix" ? info.lab : code);
-  if(w > 30) s += `<text x="${x + w/2}" y="${y + h/2 + (soort==="schakelaar" ? 18 : 3)}" class="dk-blok-lab">${escapeHtml(lab)}</text>`;
+  if(w > 30) s += `<text x="${x + w/2}" y="${y + (soort==="phoenix" ? h*0.16 : h/2) + (soort==="schakelaar" ? 18 : 3)}" class="dk-blok-lab">${escapeHtml(lab)}</text>`;
   else s += `<text transform="translate(${x + w/2 + 3} ${y + h/2}) rotate(-90)" class="dk-blok-lab">${escapeHtml(lab)}</text>`;
   s += `</g>`;
   return s;
@@ -634,7 +652,7 @@ const UV_CTX_DK = {
     box.querySelector(".dk-kv").addEventListener("change", e=>{ p.kokerV = parseInt(e.target.value); save(); h.rerender(); });
     box.querySelector(".dk-kh").addEventListener("change", e=>{ p.kokerH = parseInt(e.target.value); save(); h.rerender(); });
     box.querySelector(".dk-rkpos").addEventListener("change", e=>{ p.rkPositie = e.target.value; save(); h.rerender(); });
-    box.querySelector(".dk-dub").addEventListener("change", e=>{ p.rkDubbel = e.target.value==="1"; if(!p.rkDubbel) delete p.rkDubbel; save(); h.rerender(); });
+    box.querySelector(".dk-dub").addEventListener("change", e=>{ p.rkDubbel = e.target.value==="1"; save(); h.rerender(); });
     box.querySelector(".dk-herschik").addEventListener("click", ()=>{ dkVulIndeling(dk, true); save(); h.rerender(); });
     zone.appendChild(box);
   },
@@ -643,7 +661,7 @@ const UV_CTX_DK = {
     const codes = p._codes;
     if(info.soort==="schakelaar" || info.soort==="phoenix"){
       zone.appendChild(el(`<div class="card uv-detail"><div class="card-body uv-sidebody"><strong>${info.soort==="schakelaar" ? "Werkschakelaar" : "Phoenix-verdeelblok " + escapeHtml(info.lab)}</strong>
-        <div class="hint">${info.soort==="schakelaar" ? "De voedingskabel (L/N) komt toe op de werkschakelaar; daarna naar de verdeelblokken L en N." : `1 ingang en ${dkDrivers(dk).length} punten — elke driver op zijn eigen punt.`}</div></div></div>`));
+        <div class="hint">${info.soort==="schakelaar" ? "De voedingskabel (L/N) komt toe op de werkschakelaar; daarna naar de verdeelblokken L en N." : `Phoenix ${DK_PTFIX_ART}, ${info.kleur}: ${info.blokken} blok(ken) met geïntegreerde voeding en 18 push-in-aansluitingen (0,14–4 mm², 28,6 × 28,7 mm) — elke driver op zijn eigen punt (${dkDrivers(dk).length} nodig).`}</div></div></div>`));
       return;
     }
     const d = info.driver;

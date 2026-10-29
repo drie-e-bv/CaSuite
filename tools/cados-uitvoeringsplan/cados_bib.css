@@ -357,3 +357,7 @@
 .uv-svg .dk-hendel{fill:#3a3f45;}
 .uv-svg .dk-blok.schakelaar .dk-blok-body{fill:#f2f2f2;}
 .uv-svg .dk-blok.phoenix .dk-blok-body{fill:#fff6c9;stroke:#b39b26;}
+
+.uv-svg .dk-ptfix{stroke:#444;stroke-width:.8;}
+.uv-svg .dk-ptfix.bruin{fill:#a0663a;} .uv-svg .dk-ptfix.blauw{fill:#3d78c9;} .uv-svg .dk-ptfix.grijs{fill:#a7adb4;}
+.uv-svg .dk-blok.phoenix .dk-blok-body{fill:#f4f5f6;stroke:#9aa1a9;}
