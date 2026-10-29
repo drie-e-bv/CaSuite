@@ -210,6 +210,11 @@ vervang('      <div class="field wide"><label>Merk / type (eigen notitie)</label
 vervang('  box.querySelector(".di-type").addEventListener("input", e=>{ driver.type=e.target.value; save(); });\n\n  return box;\n}\n\nfunction renderArmatuurEditor',
         '  box.querySelector(".di-type").addEventListener("input", e=>{ driver.type=e.target.value; save(); });\n  const dkKastSel = box.querySelector(".di-dkkast");\n  if(dkKastSel) dkKastSel.addEventListener("change", e=>{ dkVerhuisDriver(driver, e.target.value); save(); rebuildAll(); });\n\n  return box;\n}\n\nfunction renderArmatuurEditor', "driver editor kast handler")
 
+# 18. Driverkast-tab: drivers van een kamer die over meer kasten verspreid is, oranje
+vervang("""  const block = el(`<div class="rackitem cat-driver ${selected?'selected':''} ${driver.leeg?'is-leeg':''}" data-id="${driver.id}">""",
+        """  const dkElders = typeof dkKamerElders==="function" && !driver.leeg ? dkKamerElders()[driver.id] : null;
+  const block = el(`<div class="rackitem cat-driver ${selected?'selected':''} ${driver.leeg?'is-leeg':''} ${dkElders?'kamer-elders':''}" data-id="${driver.id}" ${dkElders ? `title="${escapeHtml('Andere kast dan de rest van de kamer — ' + dkEldersTekst(dkElders))}"` : ''}>""", "driver chip kamer elders")
+
 if test:
     html = re.sub(r"<title>([^<]*)</title>", lambda m: f"<title>TEST · {m.group(1)}</title>", html, count=1)
     m = re.search(r"<body[^>]*>", html)

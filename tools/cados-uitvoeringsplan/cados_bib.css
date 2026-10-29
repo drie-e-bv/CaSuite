@@ -382,3 +382,9 @@
 #cados-app .dk-lijst-rij .s{color:var(--ink-dim);}
 .uv-svg .dk-kasttitel{font-size:14px;font-weight:800;fill:#1f4f8a;}
 #cados-app .dk-lijst-rij.modelstart{margin-top:6px;border-top:2px solid #1f4f8a33;}
+
+.uv-svg .dk-driver.kamer-elders .dk-body{fill:#ffe1c2;stroke:#e07a12;stroke-width:2;}
+.uv-svg .dk-driver.kamer-elders.sel .dk-body{stroke:#bb5e26;stroke-width:3;}
+#cados-app .dk-lijst-rij.kamer-elders{background:#ffefdc;border-color:#e07a12;}
+#cados-app .dk-lijst-rij.kamer-elders.sel{background:#fbd9b3;}
+#cados-app .rackitem.kamer-elders{box-shadow:inset 0 0 0 2px #e07a12;background:#ffefdc;}

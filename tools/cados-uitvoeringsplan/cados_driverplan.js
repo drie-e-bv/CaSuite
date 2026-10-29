@@ -60,6 +60,23 @@ function dkSpots(d){
   (d.armaturen||[]).forEach(a=>{ n += Math.max(0, parseInt(a.aantal) || (a.naam ? 1 : 0)); });
   return n;
 }
+/* Kamers verspreid over meer driverkasten (Peter, 29/10): per kamer is de "hoofdkast" de kast met de
+   meeste drivers van die kamer; drivers van die kamer in een andere kast worden oranje gemarkeerd. */
+function dkDriverKamers(d){ return [...new Set((d.armaturen||[]).map(a=> String(a.ruimte||"").trim()).filter(Boolean))]; }
+function dkKamerElders(){
+  const kasten = (state.driverkast && state.driverkast.kasten) || [];
+  const tel = {};   // kamer -> [aantal per kastindex]
+  kasten.forEach((k, ki)=> dkDrivers(k).forEach(d=> dkDriverKamers(d).forEach(r=>{ (tel[r] || (tel[r] = []))[ki] = ((tel[r]||[])[ki]||0) + 1; })));
+  const hoofd = {};
+  Object.entries(tel).forEach(([r, a])=>{ let best = -1; a.forEach((n, i)=>{ if(n && (best < 0 || n > a[best])) best = i; }); hoofd[r] = best; });
+  const uit = {};
+  kasten.forEach((k, ki)=> dkDrivers(k).forEach(d=>{
+    const elders = dkDriverKamers(d).filter(r=> hoofd[r] !== ki);
+    if(elders.length) uit[d.id] = elders.map(r=> ({kamer: r, kast: hoofd[r] + 1}));
+  }));
+  return uit;
+}
+function dkEldersTekst(e){ return e.map(x=> `${x.kamer}: de meeste drivers staan in Driverkast ${x.kast}`).join("; "); }
 function dkDrivers(dk){ return (dk.items||[]).filter(d=> !d.leeg && (d.categorie||"Driver")==="Driver"); }
 // Volgorde op de rail en de verdeelblokken: op drivernummer (D1, D2, ... D30), niet op plaats in de kast
 function dkOpNummer(drivers){
@@ -461,7 +478,8 @@ function dkModuleSvg(md){
     const ruimte = [...new Set((d.armaturen||[]).map(a=> a.ruimte).filter(Boolean))].join(", ");
     const kantTekst = info.kant==="beide" ? "aansluitingen links (ingang) en rechts (uitgang)" : "aansluitingen " + (info.kant==="L" ? "links" : "rechts");
     const tip = [code + " — " + (d.naam || "driver"), `${maat.l} × ${maat.b} × ${maat.h} mm${maat.onbekend ? " (maat onbekend)" : ""}`, info.spanning ? "spanningsgestuurd (parallel)" : "stroomgestuurd (in serie)", kantTekst, arm, ruimte].filter(Boolean).join("\n");
-    let s = `<g class="uv-mod dk-driver${sel}${maat.onbekend ? " onbekend" : ""}" data-mod="${m.id}" data-tip="${escapeHtml(tip)}">`;
+    const elders = dkKamerElders()[d.id];
+    let s = `<g class="uv-mod dk-driver${sel}${maat.onbekend ? " onbekend" : ""}${elders ? " kamer-elders" : ""}" data-mod="${m.id}" data-tip="${escapeHtml(tip + (elders ? "\n⚠ andere kast dan de rest van de kamer — " + dkEldersTekst(elders) : ""))}">`;
     s += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" class="dk-body"/>`;
     const sw = Math.min(24, w*0.17);
     if(info.kant==="L" || info.kant==="beide") s += `<rect x="${x+2}" y="${y+2}" width="${sw}" height="${h-4}" rx="2" class="dk-klemstrook"/>`;
@@ -819,6 +837,7 @@ function dkLijstPaneel(zone, h){
   const kast = h.kast;
   const delen = kast._alle ? kast._delen.map(q=> ({dk: q.dk, p: q.p, naam: q.naam})) : [{dk: kast._dk, p: kast, naam: kast.naam}];
   const codes = computeDriverCodes();
+  const eldersAlle = dkKamerElders();
   zone.appendChild(el(`<div class="dk-lijst-kop"><span>Drivers</span><span>${delen.reduce((t, q)=> t + dkDrivers(q.dk).length, 0)}</span></div>`));
   delen.forEach(q=>{
     const drivers = q.p.sorteer === "model" ? dkPerModel(dkDrivers(q.dk)) : dkOpNummer(dkDrivers(q.dk));
@@ -833,7 +852,8 @@ function dkLijstPaneel(zone, h){
       const model = dkModelSleutel(d);
       const nieuwModel = q.p.sorteer === "model" && model !== vorigModel;
       vorigModel = model;
-      const rij = el(`<div class="dk-lijst-rij${uvSelMod===d.id ? " sel" : ""}${nieuwModel ? " modelstart" : ""}" data-id="${d.id}" title="klik om te selecteren">
+      const elders = eldersAlle[d.id];
+      const rij = el(`<div class="dk-lijst-rij${uvSelMod===d.id ? " sel" : ""}${nieuwModel ? " modelstart" : ""}${elders ? " kamer-elders" : ""}" data-id="${d.id}" title="${elders ? escapeHtml("Andere kast dan de rest van de kamer — " + dkEldersTekst(elders)) : "klik om te selecteren"}">
         <span class="c">${escapeHtml(codes[d.id] || "")}</span>
         <span class="n">${escapeHtml(d.naam || "driver")}</span>
         <span class="s">${maat.l}×${maat.b} mm · ${dkIsSpanning(d) ? "spanning" : "stroom"} · ${dkSpots(d)} spot(s)${kol >= 0 ? " · kolom " + (kol+1) : ""}</span>
