@@ -429,6 +429,7 @@ function uvModW(m){ return m._wPx !== undefined ? m._wPx : moduleBreedte(m)*UV.M
 function uvModH(m){ return m._hPx !== undefined ? m._hPx : UV.MH; }
 function uvKastBreedtePx(kast){ return kast._breedtePx !== undefined ? kast._breedtePx : kast.maat*UV.MW; }
 function uvGeometrie(kast){
+  if(kast._geometrie) return kast._geometrie(kast);   // bv. de driverkast: eigen indeling met kokers
   const codes = kast._codes || computeZekeringCodes();
   const nC = kast.rijen.length + 1;
   const breedtePx = uvKastBreedtePx(kast);
@@ -504,6 +505,7 @@ function uvGeometrie(kast){
 // Knikpunten van een draad worden bewaard t.o.v. de goot of rij waarin ze liggen (goot + fractie,
 // of rij + afstand), zodat ze mee verschuiven als de goten groter/kleiner worden.
 function uvEncodeerPunt(p, geo){
+  if(geo._absoluut) return {ax: Math.round(p.x*10)/10, ay: Math.round(p.y*10)/10};
   const x = Math.round((p.x - (geo.padL || UV.PADX))*10)/10;
   for(let c=0; c<geo.hoogte.length; c++){
     const t = geo.gootTop[c], h = geo.hoogte[c];
@@ -516,6 +518,7 @@ function uvEncodeerPunt(p, geo){
   return {xr: x, g: geo.hoogte.length-1, f: 1};
 }
 function uvDecodeerPunt(q, geo){
+  if(q.ax !== undefined) return {x: q.ax, y: q.ay};
   const x = q.xr !== undefined ? (geo.padL || UV.PADX) + q.xr : q.x - UV.PADX + (geo.padL || UV.PADX);
   if(q.g !== undefined && geo.gootTop[q.g] !== undefined) return {x, y: geo.gootTop[q.g] + q.f*geo.hoogte[q.g]};
   if(q.r !== undefined && geo.rijY[q.r] !== undefined) return {x, y: geo.rijY[q.r] + q.dy};
@@ -611,6 +614,7 @@ function uvBaanPlan(kast, gootVan, xVan, zijdeVanE, nC, width){
 }
 // Orthogonale routering: zonder knikpunten volgens het banenplan, met knikpunten haaks door die punten.
 function uvRoutes(kast, geo){
+  if(geo._router) return geo._router(kast, geo);
   const plan = geo.plan || {perDraad: {}, zijN: {L: 0, R: 0}};
   const baanY = (c, i)=> geo.gootTop[c] + geo.kamBand[c] + 12 + (i % UV_MAX_BANEN)*UV_BAAN;
   return kast.bedrading.map(w=>{
@@ -752,7 +756,7 @@ function bouwBedradingSvg(kast, interactief, opts){
     });
   }
   // DIN-rails + rijnummer
-  kast.rijen.forEach((rij, ri)=>{
+  if(!geo._eigen) kast.rijen.forEach((rij, ri)=>{
     const y = geo.rijY[ri];
     const rh = geo.rijH ? geo.rijH[ri] : UV.MH;
     if(!kast._dk || rij._rail) s += `<rect x="${geo.padL-10}" y="${y+rh/2-12}" width="${uvKastBreedtePx(kast)+20}" height="24" class="uv-rail"/>`;
@@ -775,7 +779,7 @@ function bouwBedradingSvg(kast, interactief, opts){
     s += `<g class="${cls}" data-m="${p.m.id}" data-k="${escapeHtml(p.k.id)}" data-tip="${escapeHtml(ktip)}">`;
     if(interactief) s += `<circle cx="${p.x}" cy="${p.y}" r="11" class="uv-klem-hit"/>`;
     s += `<circle cx="${p.x}" cy="${p.y}" r="5" class="uv-klem-dot"${kc ? ` style="stroke:${kc}"` : ""}/>`;
-    if(lagen.labels && !opKam.has(key)) s += `<text x="${p.x}" y="${ly}" class="uv-klem-label">${escapeHtml(String(p.k.label||"").slice(0,6))}</text>`;
+    if(lagen.labels && !opKam.has(key) && !p.k.geenLabel) s += `<text x="${p.x}" y="${ly}" class="uv-klem-label">${escapeHtml(String(p.k.label||"").slice(0,6))}</text>`;
     s += `</g>`;
   });
   // uitgangsnummers (bv. C1) één keer tussen de klemmen die erbij horen

@@ -350,3 +350,10 @@
 
 #cados-app .dk-advies{background:#eef6f1;border:1px solid #9cc7ad;border-radius:8px;padding:6px 8px;font-size:12px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
 #cados-app .dk-kast{font-size:12px;}
+
+.uv-svg .dk-koker{fill:#e9ecef;stroke:#9aa1a9;stroke-width:1;stroke-dasharray:6 3;}
+.uv-svg .dk-koker-lab{font-size:8px;font-weight:700;fill:#8a9099;pointer-events:none;}
+.uv-svg .dk-kl{font-size:6.5px;font-weight:800;fill:#3a3f45;text-anchor:middle;pointer-events:none;}
+.uv-svg .dk-hendel{fill:#3a3f45;}
+.uv-svg .dk-blok.schakelaar .dk-blok-body{fill:#f2f2f2;}
+.uv-svg .dk-blok.phoenix .dk-blok-body{fill:#fff6c9;stroke:#b39b26;}

@@ -56,20 +56,21 @@ function bouwDxf(kast, titel){
   const d = dxfMaker();
   const kastB = uvKastBreedtePx(kast);
   // kast / montageplaat
-  if(kast._dk){
-    d.rect(geo.padL - 4, 0, kastB + 8, kast.hoogte*DXF_PXMM, "KAST");
-    d.tekst(geo.padL + kastB/2, -10, `${titel} - kast ${kast.breedte} x ${kast.hoogte} mm - schaal 1:1 (mm)`, 5, "TEKST");
+  if(kast._dxfExtra){
+    kast._dxfExtra(d, geo);
+    const kt = kast.kast ? `Rittal ${kast.kast.naam} ${kast.kast.b}x${kast.kast.h}x${kast.kast.d} - montageplaat ${kast.breedte} x ${kast.hoogte} mm` : `montageplaat ${kast.breedte} x ${kast.hoogte} mm`;
+    d.tekst(geo.padL + kastB/2, 4, `${titel} - ${kt} - schaal 1:1 (mm)`, 5, "TEKST");
   } else {
     d.rect(geo.padL - 14, 0, kastB + 28, geo.height, "KAST");
     d.tekst(geo.padL + kastB/2, -10, `${titel} - ${kast.maat} modules (${kast.maat*18} mm) - schaal 1:1 (mm), modulehoogte schematisch`, 5, "TEKST");
+    for(let c=0; c<=kast.rijen.length; c++){
+      if(geo.hoogte[c] > 30) d.rect(geo.padL - 6, geo.gootTop[c] + geo.kamBand[c] + 4, geo.kastR - geo.padL + 12, Math.max(6, geo.hoogte[c] - geo.kamBand[c] - 10), "GOTEN");
+    }
+    kast.rijen.forEach((rij, ri)=>{
+      const rh = geo.rijH ? geo.rijH[ri] : UV.MH;
+      d.rect(geo.padL - 10, geo.rijY[ri] + rh/2 - 12, kastB + 20, 24, "RAILS");
+    });
   }
-  for(let c=0; c<=kast.rijen.length; c++){
-    if(geo.hoogte[c] > 30) d.rect(geo.padL - 6, geo.gootTop[c] + geo.kamBand[c] + 4, geo.kastR - geo.padL + 12, Math.max(6, geo.hoogte[c] - geo.kamBand[c] - 10), "GOTEN");
-  }
-  kast.rijen.forEach((rij, ri)=>{
-    const rh = geo.rijH ? geo.rijH[ri] : UV.MH;
-    if(!kast._dk || rij._rail) d.rect(geo.padL - 10, geo.rijY[ri] + rh/2 - 12, kastB + 20, 24, "RAILS");   // DIN-rail 35 mm ~ schematisch
-  });
   // modules
   geo.mods.forEach(md=>{
     const m = md.m;
@@ -79,7 +80,7 @@ function bouwDxf(kast, titel){
     if(md.code) d.tekst(cx, md.y + md.h*0.3, md.code, 3.5, "TEKST");
     let regels = [];
     if(m._dk && m._dk.soort==="driver"){ const mt = m._dk.maat; regels = [m.naam, `${mt.l}x${mt.b} mm`]; }
-    else if(m._dk) regels = [m._dk.soort==="voeding" ? "VOEDING" : ""];
+    else if(m._dk) regels = [m._dk.soort==="schakelaar" ? "Q werkschakelaar" : (m._dk.soort==="phoenix" ? m._dk.lab : "")];
     else regels = [typeof chipSpecText === "function" ? chipSpecText(m) : "", m.naam || ""];
     regels.filter(Boolean).forEach((r, i)=>{
       const hMm = Math.min(2.5, (md.w / DXF_PXMM) / Math.max(4, r.length) * 1.6);
@@ -114,7 +115,8 @@ function bouwDxf(kast, titel){
   });
   // klemmen
   Object.values(geo.klemPos).forEach(p=>{
-    d.cirkel(p.x, p.y, 5, "KLEMMEN");
+    d.cirkel(p.x, p.y, p.k.geenLabel ? 3.5 : 5, "KLEMMEN");
+    if(p.k.geenLabel){ d.tekst(p.x + (p.k.x < 0.5 ? 9 : -9), p.y, String(p.k.label||""), 1.4, "KLEMLABELS"); return; }
     const ly = p.zijde==="boven" ? p.y - 9 : p.y + 13;
     d.tekst(p.x, ly, String(p.k.label||"").slice(0, 6), 1.5, "KLEMLABELS");
   });
