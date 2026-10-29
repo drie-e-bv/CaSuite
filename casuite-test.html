@@ -17109,6 +17109,7 @@ function renderUitvoeringsplan(ctxArg){
       <div class="uv-sec uv-sec-meer">
         <button class="btn small ghost uv-bib">🔌 Modulebibliotheek</button>
         <button class="btn small ghost uv-export">⎙ Exporteer (PDF)</button>
+        <button class="btn small ghost uv-dxf" title="tekening als DXF voor AutoCAD — in mm, schaal 1:1, met lagen">⬇ DXF (AutoCAD)</button>
         <button class="btn small ghost uv-wis" title="alle draden en kamgeleiders van deze kast wissen">🗑 Alles wissen</button>
       </div>
     </div></div>` : `
@@ -17424,7 +17425,7 @@ function renderUitvoeringsplan(ctxArg){
     }
     const zonderBib = uvAlleModules(kast).filter(m=> m.categorie!=="Leeg" && !m.bibId).length;
     const nFout = routesNu.filter(r=> uvAansluitFouten(r.w.kleur, r.A.k, r.B.k).length).length;
-    detail.appendChild(el(`<div class="uv-telling">${kast.bedrading.length} draden · ${(kast.kamgeleiders||[]).length} kamgeleiders${zonderBib ? ` · ${zonderBib} module(s) met standaardtekening` : ""}${nFout ? ` · <span class="uv-fout-tel">⚠ ${nFout} afwijkende aansluiting(en)</span>` : ""}</div>`));
+    detail.appendChild(el(`<div class="uv-telling">${kast.bedrading.length} draden${ctx.zekering ? ` · ${(kast.kamgeleiders||[]).length} kamgeleiders` : ""}${zonderBib && ctx.zekering ? ` · ${zonderBib} module(s) met standaardtekening` : ""}${nFout ? ` · <span class="uv-fout-tel">⚠ ${nFout} afwijkende aansluiting(en)</span>` : ""}</div>`));
   }
   function tekenLijst(){
     lijst.innerHTML = "";
@@ -17848,6 +17849,7 @@ function renderUitvoeringsplan(ctxArg){
   });
   aan(".uv-bib", "click", ()=> openModuleBibliotheek({ naSluiten: ()=>{ uvSyncEnOpruimen(kast); teken(); } }));
   wrap.querySelectorAll(".uv-export").forEach(b=> b.addEventListener("click", ()=> ctx.export()));
+  aan(".uv-dxf", "click", ()=> downloadDxf(kast, kast.naam || ctx.titel));
   if(ctx.extraKaart && bed) ctx.extraKaart(wrap.querySelector("#uvExtra"), {teken, kast, rerender: ()=> selectTab(ctx.tab)});
 
   /* ---------- sneltoetsen ---------- */
@@ -19817,7 +19819,9 @@ function dkDriverKlemmen(d, sturing){
     const x = lijst.length===1 ? (x0+x1)/2 : x0 + (x1-x0)*i/(lijst.length-1);
     k.push({id, label: lab, functie: f, zijde, x: Math.round(x*1000)/1000, y, tip: lab==="DA" ? "DALI-bus" : (f==="push" ? "drukknop (push)" : (f==="+"||f==="-" ? "uitgang LED " + f : ""))});
   });
-  if(m.aansl==="twee"){ mk(inn, "boven", 0.04, 0.16, 0.84); mk(uit, "onder", 0.96, 0.3, 0.7); }
+  // Mean Well-drivers hebben aan elk uiteinde kabels: we hangen ze met de ingang (L/N/DALI) onderaan,
+  // zodat voeding en bus in dezelfde goot doorlussen als bij de TCI-drivers; de uitgang zit dan boven.
+  if(m.aansl==="twee"){ mk(inn, "onder", 0.96, 0.16, 0.84); mk(uit, "boven", 0.04, 0.3, 0.7); }
   else mk(inn.concat(uit), "onder", 0.95, 0.1, 0.9);
   return k;
 }
@@ -19885,28 +19889,34 @@ function dkPlanKast(dk){
         _wPx: maat.b*DK_PXMM, _hPx: maat.l*DK_PXMM, _gapPx: i ? DK_TUSSEN_MM*DK_PXMM : 0, klemmenEigen: dkDriverKlemmen(d, dk.sturing)};
     })
   }));
-  // rijgklemmen: voeding + per driver een blok, verdeeld over DIN-rails onderaan
-  const blokken = [];
+  // rijgklemmen: onder elke rij drivers een DIN-rail met de klemmen van die drivers (zo blijven de
+  // uitgangen in dezelfde goot); de voedingsklemmen staan vooraan op de eerste rail
   const v = dkVoedingKlemmen(dk, drivers);
   codes["dkv_" + dk.id] = "V";
-  blokken.push({id: "dkv_" + dk.id, categorie: "Driverklemmen", naam: "Voeding", breedte: 1, _dk: {soort: "voeding"},
-    _wPx: v.n*DK_KLEM_MM*DK_PXMM, _hPx: DK_KLEM_H_MM*DK_PXMM, klemmenEigen: v.klemmen});
-  p.indeling.flat().forEach(id=>{
-    const d = byId[id];
-    const kb = dkKlemmenVoorDriver(d, p, codes);
-    codes["dkk_" + d.id] = codes[d.id];
-    blokken.push({id: "dkk_" + d.id, categorie: "Driverklemmen", naam: d.naam, breedte: 1, _dk: {soort: "klemmen", driver: d, perSpot: kb.perSpot, spots: kb.spots},
-      _wPx: kb.n*DK_KLEM_MM*DK_PXMM, _hPx: DK_KLEM_H_MM*DK_PXMM, klemmenEigen: kb.klemmen});
-  });
+  const voeding = {id: "dkv_" + dk.id, categorie: "Driverklemmen", naam: "Voeding", breedte: 1, _dk: {soort: "voeding"},
+    _wPx: v.n*DK_KLEM_MM*DK_PXMM, _hPx: DK_KLEM_H_MM*DK_PXMM, klemmenEigen: v.klemmen};
   const railMax = p.breedte*DK_PXMM - 20;
-  let rail = null, bx = 0;
-  blokken.forEach(b=>{
-    const gap = 3*DK_PXMM;
-    if(!rail || bx + gap + b._wPx > railMax){ rail = {id: "dkrail" + rijen.length, items: [], _rail: true}; rijen.push(rail); bx = 0; }
-    else { b._gapPx = gap; bx += gap; }
-    rail.items.push(b);
-    bx += b._wPx;
+  const alleRijen = [];
+  rijen.forEach((rij, ri)=>{
+    alleRijen.push(rij);
+    const blokken = ri===0 ? [voeding] : [];
+    p.indeling[ri].forEach(id=>{
+      const d = byId[id];
+      const kb = dkKlemmenVoorDriver(d, p, codes);
+      codes["dkk_" + d.id] = codes[d.id];
+      blokken.push({id: "dkk_" + d.id, categorie: "Driverklemmen", naam: d.naam, breedte: 1, _dk: {soort: "klemmen", driver: d, perSpot: kb.perSpot, spots: kb.spots},
+        _wPx: kb.n*DK_KLEM_MM*DK_PXMM, _hPx: DK_KLEM_H_MM*DK_PXMM, klemmenEigen: kb.klemmen});
+    });
+    let rail = null, bx = 0;
+    blokken.forEach(b=>{
+      const gap = 3*DK_PXMM;
+      if(!rail || bx + gap + b._wPx > railMax){ rail = {id: "dkrail" + ri + "_" + alleRijen.length, items: [], _rail: true}; alleRijen.push(rail); bx = 0; }
+      else { b._gapPx = gap; bx += gap; }
+      rail.items.push(b);
+      bx += b._wPx;
+    });
   });
+  rijen.length = 0; rijen.push(...alleRijen);
   const idx = state.driverkast.kasten.indexOf(dk);
   dkEigen(p, {
     rijen, maat: Math.ceil(p.breedte/18), naam: "Driverkast " + (idx+1), _dk: dk, _codes: codes,
@@ -20083,7 +20093,7 @@ const UV_CTX_DK = {
     zone.appendChild(box);
   },
   moduleDetail: (md, zone, h)=>{
-    const p = h.kast, dk = p._dk, info = md.m._dk;
+    const p = h.kast, dk = p._dk, info = md._dk;   // md = de (pseudo)module zelf
     const d = info.driver;
     const codes = p._codes;
     if(info.soort==="voeding"){
@@ -20133,6 +20143,144 @@ function renderDriverplan(){
   }
   if(!cadosInstGeladen) laadAllesVoorUitvoering().then(()=>{ if(document.getElementById("panel-driverplan")) selectTab("driverplan"); });
   return renderUitvoeringsplan(UV_CTX_DK);
+}
+
+
+/* =========================================================================
+   DXF-EXPORT (2026-10-29, Peter: "van beide kastontwerpen een DXF export voorzien, zodat we dit in
+   AutoCAD op schaal kunnen afdrukken"). Schrijft een ASCII-DXF (R12 / AC1009, door elke AutoCAD-versie
+   te openen) in millimeter, schaal 1:1: 1 DIN-module = 18 mm breed, drivers op hun echte maat.
+   De hoogte van een zekeringmodule is schematisch (zoals op het scherm); breedtes en de driverkast
+   zijn op maat. Lagen: KAST, GOTEN, RAILS, MODULES, KLEMMEN, KLEMLABELS, DRADEN, DRAADNUMMERS,
+   KAMGELEIDERS, TEKST — elk apart aan/uit te zetten in AutoCAD.
+   ========================================================================= */
+const DXF_PXMM = UV.MW / 18;
+const DXF_KLEUR = {"Bruin": 34, "Blauw": 5, "Zwart": 7, "Grijs": 8, "Geel/groen": 3, "Rood": 1, "Oranje": 30, "Wit": 9, "Violet": 200, "Roze": 221, "Geel": 2};
+const DXF_LAGEN = [["KAST", 8], ["GOTEN", 9], ["RAILS", 8], ["MODULES", 7], ["KLEMMEN", 7], ["KLEMLABELS", 8], ["DRADEN", 7], ["DRAADNUMMERS", 7], ["KAMGELEIDERS", 30], ["TEKST", 7]];
+function dxfTekst(t){
+  return String(t == null ? "" : t)
+    .replace(/[—–]/g, "-").replace(/×/g, "x").replace(/²/g, "2").replace(/[↑▲]/g, "^").replace(/[↓▼]/g, "v").replace(/−/g, "-").replace(/·/g, "-")
+    .normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\x20-\x7e]/g, "").trim();
+}
+function dxfMaker(){
+  const e = [];
+  const n = (v)=> (Math.round(v*1000)/1000).toString();
+  const X = (px)=> px / DXF_PXMM, Y = (px)=> -px / DXF_PXMM;   // DXF: y naar boven
+  const api = {
+    lijn(x1, y1, x2, y2, laag, kleur){ e.push("0","LINE","8",laag, ...(kleur ? ["62", String(kleur)] : []), "10",n(X(x1)),"20",n(Y(y1)),"30","0","11",n(X(x2)),"21",n(Y(y2)),"31","0"); },
+    poly(pts, laag, kleur, dicht){
+      if(pts.length < 2) return;
+      e.push("0","POLYLINE","8",laag, ...(kleur ? ["62", String(kleur)] : []), "66","1","10","0","20","0","30","0","70", dicht ? "1" : "0");
+      pts.forEach(p=> e.push("0","VERTEX","8",laag,"10",n(X(p.x)),"20",n(Y(p.y)),"30","0"));
+      e.push("0","SEQEND","8",laag);
+    },
+    rect(x, y, w, h, laag, kleur){ api.poly([{x, y}, {x: x+w, y}, {x: x+w, y: y+h}, {x, y: y+h}], laag, kleur, true); },
+    cirkel(x, y, rPx, laag, kleur){ e.push("0","CIRCLE","8",laag, ...(kleur ? ["62", String(kleur)] : []), "10",n(X(x)),"20",n(Y(y)),"30","0","40",n(rPx / DXF_PXMM)); },
+    // tekst gecentreerd op (x,y); hoogte in mm
+    tekst(x, y, t, hMm, laag, opts){
+      const s = dxfTekst(t);
+      if(!s) return;
+      const o = opts || {};
+      e.push("0","TEXT","8",laag, ...(o.kleur ? ["62", String(o.kleur)] : []), "10",n(X(x)),"20",n(Y(y)),"30","0","40",n(hMm),"1",s,
+        ...(o.rot ? ["50", String(o.rot)] : []), "72", String(o.h === undefined ? 1 : o.h), "11",n(X(x)),"21",n(Y(y)),"31","0","73", String(o.v === undefined ? 2 : o.v));
+    },
+    bestand(){
+      const lagen = ["0","SECTION","2","TABLES","0","TABLE","2","LTYPE","70","1","0","LTYPE","2","CONTINUOUS","70","0","3","Solid line","72","65","73","0","40","0.0","0","ENDTAB",
+        "0","TABLE","2","LAYER","70", String(DXF_LAGEN.length)];
+      DXF_LAGEN.forEach(([naam, kleur])=> lagen.push("0","LAYER","2",naam,"70","0","62",String(kleur),"6","CONTINUOUS"));
+      lagen.push("0","ENDTAB","0","ENDSEC");
+      const kop = ["0","SECTION","2","HEADER","9","$ACADVER","1","AC1009","9","$INSUNITS","70","4","9","$MEASUREMENT","70","1","0","ENDSEC"];
+      return [...kop, ...lagen, "0","SECTION","2","ENTITIES", ...e, "0","ENDSEC","0","EOF"].join("\r\n") + "\r\n";
+    }
+  };
+  return api;
+}
+function bouwDxf(kast, titel){
+  if(kast._dk) dkPlanKast(kast._dk);
+  const geo = uvGeometrie(kast);
+  const routes = uvRoutes(kast, geo);
+  const kammen = uvKamLayout(kast, geo);
+  const d = dxfMaker();
+  const kastB = uvKastBreedtePx(kast);
+  // kast / montageplaat
+  if(kast._dk){
+    d.rect(geo.padL - 4, 0, kastB + 8, kast.hoogte*DXF_PXMM, "KAST");
+    d.tekst(geo.padL + kastB/2, -10, `${titel} - kast ${kast.breedte} x ${kast.hoogte} mm - schaal 1:1 (mm)`, 5, "TEKST");
+  } else {
+    d.rect(geo.padL - 14, 0, kastB + 28, geo.height, "KAST");
+    d.tekst(geo.padL + kastB/2, -10, `${titel} - ${kast.maat} modules (${kast.maat*18} mm) - schaal 1:1 (mm), modulehoogte schematisch`, 5, "TEKST");
+  }
+  for(let c=0; c<=kast.rijen.length; c++){
+    if(geo.hoogte[c] > 30) d.rect(geo.padL - 6, geo.gootTop[c] + geo.kamBand[c] + 4, geo.kastR - geo.padL + 12, Math.max(6, geo.hoogte[c] - geo.kamBand[c] - 10), "GOTEN");
+  }
+  kast.rijen.forEach((rij, ri)=>{
+    const rh = geo.rijH ? geo.rijH[ri] : UV.MH;
+    if(!kast._dk || rij._rail) d.rect(geo.padL - 10, geo.rijY[ri] + rh/2 - 12, kastB + 20, 24, "RAILS");   // DIN-rail 35 mm ~ schematisch
+  });
+  // modules
+  geo.mods.forEach(md=>{
+    const m = md.m;
+    if(m.categorie==="Leeg") return;
+    d.rect(md.x, md.y, md.w, md.h, "MODULES");
+    const cx = md.x + md.w/2;
+    if(md.code) d.tekst(cx, md.y + md.h*0.3, md.code, 3.5, "TEKST");
+    let regels = [];
+    if(m._dk && m._dk.soort==="driver"){ const mt = m._dk.maat; regels = [m.naam, `${mt.l}x${mt.b} mm`]; }
+    else if(m._dk) regels = [m._dk.soort==="voeding" ? "VOEDING" : ""];
+    else regels = [typeof chipSpecText === "function" ? chipSpecText(m) : "", m.naam || ""];
+    regels.filter(Boolean).forEach((r, i)=>{
+      const hMm = Math.min(2.5, (md.w / DXF_PXMM) / Math.max(4, r.length) * 1.6);
+      d.tekst(cx, md.y + md.h*0.45 + i*5*DXF_PXMM, r, hMm, "TEKST");
+    });
+  });
+  // kamgeleiders
+  kammen.forEach(kl=>{
+    kl.geleiders.forEach(f=>{
+      const kk = DXF_KLEUR[standaardKleurVoorFunctie ? standaardKleurVoorFunctie(f) : "Zwart"] || 30;
+      d.lijn(kl.x0, kl.gy[f], kl.x1, kl.gy[f], "KAMGELEIDERS", kk);
+    });
+    kl.tanden.forEach(t=> d.lijn(t.x, t.y, t.x, t.yg, "KAMGELEIDERS"));
+    d.tekst(kl.x0 + 14, kl.yBot + 6, "kam " + (KAM_TYPES[kl.kam.type] || {}).label, 2, "KAMGELEIDERS", {h: 0});
+  });
+  // draden
+  const nr = {};
+  kast.bedrading.forEach((w, i)=>{ nr[w.id] = i+1; });
+  routes.forEach(r=>{
+    const kleur = DXF_KLEUR[r.w.kleur] || 7;
+    d.poly(r.verts, "DRADEN", kleur, false);
+    const v = r.verts;
+    if(v.length > 1){
+      [[v[0], v[1]], [v[v.length-1], v[v.length-2]]].forEach(([p, q])=>{
+        const l = Math.abs(q.x-p.x) + Math.abs(q.y-p.y);
+        if(l < 4) return;
+        const f = Math.min(16, l*0.5)/l;
+        const verticaal = Math.abs(q.x - p.x) < 0.01;
+        d.tekst(p.x + (q.x-p.x)*f + (verticaal ? 4 : 0), p.y + (q.y-p.y)*f - (verticaal ? 0 : 4), String(nr[r.w.id]), 1.8, "DRAADNUMMERS", {kleur, h: verticaal ? 0 : 1});
+      });
+    }
+  });
+  // klemmen
+  Object.values(geo.klemPos).forEach(p=>{
+    d.cirkel(p.x, p.y, 5, "KLEMMEN");
+    const ly = p.zijde==="boven" ? p.y - 9 : p.y + 13;
+    d.tekst(p.x, ly, String(p.k.label||"").slice(0, 6), 1.5, "KLEMLABELS");
+  });
+  return d.bestand();
+}
+function downloadDxf(kast, titel){
+  try{
+    const inhoud = bouwDxf(kast, titel);
+    const naam = dxfTekst((state.instellingen.project || "project") + " - " + titel).replace(/[^A-Za-z0-9 _.-]+/g, "_").replace(/\s+/g, "_") + ".dxf";
+    const blob = new Blob([inhoud], {type: "application/dxf"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = naam;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+    toast(`DXF gedownload: ${naam} (mm, schaal 1:1)`);
+    return inhoud;
+  }catch(e){ alert("DXF maken mislukt: " + (e.message || e)); }
 }
 
 const RENDERERS = {

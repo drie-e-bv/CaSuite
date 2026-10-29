@@ -13,7 +13,7 @@ html = pathlib.Path(bron).read_text(encoding="utf-8")
 if "MODULEBIBLIOTHEEK + UITVOERINGSPLAN" in html:
     sys.exit(f"{bron}: is al gepatcht")
 
-JS = (HIER / "cados_bib.js").read_text(encoding="utf-8") + "\n" + (HIER / "cados_motoren.js").read_text(encoding="utf-8") + "\n" + (HIER / "cados_driverplan.js").read_text(encoding="utf-8")
+JS = (HIER / "cados_bib.js").read_text(encoding="utf-8") + "\n" + (HIER / "cados_motoren.js").read_text(encoding="utf-8") + "\n" + (HIER / "cados_driverplan.js").read_text(encoding="utf-8") + "\n" + (HIER / "cados_dxf.js").read_text(encoding="utf-8")
 CSS = (HIER / "cados_bib.css").read_text(encoding="utf-8")
 
 OUTER = r"""

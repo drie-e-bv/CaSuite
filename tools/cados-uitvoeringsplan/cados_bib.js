@@ -1300,6 +1300,7 @@ function renderUitvoeringsplan(ctxArg){
       <div class="uv-sec uv-sec-meer">
         <button class="btn small ghost uv-bib">🔌 Modulebibliotheek</button>
         <button class="btn small ghost uv-export">⎙ Exporteer (PDF)</button>
+        <button class="btn small ghost uv-dxf" title="tekening als DXF voor AutoCAD — in mm, schaal 1:1, met lagen">⬇ DXF (AutoCAD)</button>
         <button class="btn small ghost uv-wis" title="alle draden en kamgeleiders van deze kast wissen">🗑 Alles wissen</button>
       </div>
     </div></div>` : `
@@ -2039,6 +2040,7 @@ function renderUitvoeringsplan(ctxArg){
   });
   aan(".uv-bib", "click", ()=> openModuleBibliotheek({ naSluiten: ()=>{ uvSyncEnOpruimen(kast); teken(); } }));
   wrap.querySelectorAll(".uv-export").forEach(b=> b.addEventListener("click", ()=> ctx.export()));
+  aan(".uv-dxf", "click", ()=> downloadDxf(kast, kast.naam || ctx.titel));
   if(ctx.extraKaart && bed) ctx.extraKaart(wrap.querySelector("#uvExtra"), {teken, kast, rerender: ()=> selectTab(ctx.tab)});
 
   /* ---------- sneltoetsen ---------- */
