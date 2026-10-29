@@ -81,14 +81,11 @@ function bouwDxf(kast, titel){
     let regels = [];
     if(m._dk && m._dk.soort==="driver"){
       const mt = m._dk.maat; regels = [m.naam, `${mt.l}x${mt.b} mm`];
-      if(mt.gat && mt.gat.hoh > 0){
-        const gy = md.y + md.h/2;
-        [-1, 1].forEach(z=>{ const gx = cx + z*mt.gat.hoh/2*DXF_PXMM; d.cirkel(gx, gy, mt.gat.d/2*DXF_PXMM, "BOORGATEN"); d.lijn(gx - 4*DXF_PXMM, gy, gx + 4*DXF_PXMM, gy, "BOORGATEN"); d.lijn(gx, gy - 4*DXF_PXMM, gx, gy + 4*DXF_PXMM, "BOORGATEN"); });
-      }
+      dkGatenPx(md).forEach(g=>{ d.cirkel(g.x, g.y, g.r, "BOORGATEN"); d.lijn(g.x - 4*DXF_PXMM, g.y, g.x + 4*DXF_PXMM, g.y, "BOORGATEN"); d.lijn(g.x, g.y - 4*DXF_PXMM, g.x, g.y + 4*DXF_PXMM, "BOORGATEN"); });
       const ac = computeDriverCodes();
       (m._dk.driver.armaturen||[]).filter(a=> a.naam).forEach(a=> regels.push(`${ac[a.id]||""} ${parseInt(a.aantal)||1}x ${a.naam}${a.ruimte ? " - " + a.ruimte : ""}`));
     }
-    else if(m._dk) regels = [m._dk.soort==="schakelaar" ? "Q werkschakelaar" : (m._dk.soort==="phoenix" ? m._dk.lab : "")];
+    else if(m._dk) regels = [m._dk.soort==="schakelaar" ? "Q werkschakelaar" : (m._dk.soort==="phoenix" ? m._dk.lab : ""), m._dk.soort==="schakelaar" && m._dk.voeding && m._dk.voeding.codes.length ? "zekering " + m._dk.voeding.codes.join("+") : ""];
     else regels = [typeof chipSpecText === "function" ? chipSpecText(m) : "", m.naam || ""];
     regels.filter(Boolean).forEach((r, i)=>{
       const hMm = Math.min(2.5, (md.w / DXF_PXMM) / Math.max(4, r.length) * 1.6);

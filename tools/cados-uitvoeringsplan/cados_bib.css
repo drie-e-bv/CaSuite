@@ -394,3 +394,6 @@
 .uv-svg .dk-ruimte{font-size:8.2px;fill:#6a3d12;font-style:italic;text-anchor:middle;pointer-events:none;}
 .uv-svg .dk-gat{fill:#fff;stroke:#3a3f45;stroke-width:1;pointer-events:none;}
 .uv-svg .dk-gat-kruis{stroke:#b3261e;stroke-width:.6;fill:none;pointer-events:none;}
+.uv-svg .dk-gat.sleuf{stroke-dasharray:2 1.2;}
+.uv-svg .dk-voeding{font-size:8px;font-weight:800;fill:#b3261e;text-anchor:middle;pointer-events:none;}
+.uv-svg .dk-voeding.leeg{fill:#9aa0a6;font-weight:600;}

@@ -27,26 +27,60 @@ function dkKokerMM(p, id){ const v = p.kokerBreedte && p.kokerBreedte[id]; retur
 const DK_TOP_PX = 18;
 // Maten (L x B x H in mm) van de drivers die Casentis gebruikt, opgezocht op 29/10/2026.
 // Aanpasbaar per type in het zijpaneel (gedeeld via elektro_cados_instellingen).
+/* Boorgaten (Peter, 29/10: "volgens de technische fiche overgezet, zodat het blad op ware grootte kan
+   afgedrukt en op de plaat gelegd worden"). Per model in mm vanaf de linkerbovenhoek van de omtrek, zoals
+   op de maattekening van de fabrikant, met de aansluitingen aan de kant "fiche". Wordt de driver met de
+   aansluitingen aan de andere kant getekend, dan draait het patroon 180°.
+   - TCI MAXI JOLLY US DALI (fiche p.2): 2 schroefsleuven diagonaal, hart-op-hart 111 × 67 (124 × 79).
+     De ronde schroef aan de klemmenkant is de schroef van het klemmendeksel, geen bevestiging.
+   - TCI JOLLY DALI 122424 (fiche): 2 sleuven diagonaal, L1 93,5 × B1 57,5 (103 × 67); de schroef in het
+     midden van de klemmenkant is weer het klemmendeksel.
+   - TCI MINI JOLLY (fiche Mini Jolly, zelfde behuizing): 3 punten — sleuf in het lipje aan de ene kant,
+     108 mm verder 2 gaten 27,5 uit elkaar (gestippeld = onderzijde). Omtrek incl. lipje ±119 × 52.
+   - Mean Well PWM-60 (NPF-60A) en PWM-120: 2 gaten Ø4,5 diagonaal, 5 mm uit de hoeken (150 × 53 en
+     191 × 63). PWM-90: zelfde behuizingsreeks, zelfde 5 mm-patroon (171 × 63). */
 const DK_DRIVER_MATEN = [
-  {re: /maxi\s*jol+[iy]/i, l: 124, b: 79, h: 22, aansl: "eind", gat: {hoh: 111, d: 4.2}, bron: "TCI DC MAXI JOLLY US DALI (122413) — verlichting.be"},
-  {re: /mini\s*jol+[iy]/i, l: 110, b: 52, h: 22, aansl: "eind", gat: {hoh: 98, d: 4.2, schat: true}, bron: "TCI DC MINI JOLLY DALI (122403) — Onninen"},
-  {re: /jol+[iy]/i,        l: 103, b: 67, h: 21, aansl: "eind", gat: {hoh: 91, d: 4.2, schat: true}, bron: "TCI DC JOLLY DALI (122424) — TCI-datasheet via Rexel"},
-  {re: /pwm-?\s*120/i,     l: 191, b: 63, h: 37.5, aansl: "twee", gat: {hoh: 181, d: 4.5, schat: true}, bron: "Mean Well PWM-120 — datasheet"},
-  {re: /pwm-?\s*90/i,      l: 171, b: 63, h: 37.5, aansl: "twee", gat: {hoh: 161, d: 4.5, schat: true}, bron: "Mean Well PWM-90 — datasheet"},
-  {re: /pwm-?\s*60/i,      l: 150, b: 53, h: 35, aansl: "twee", gat: {hoh: 140, d: 4.5}, bron: "Mean Well PWM-60 — datasheet"},
+  {re: /maxi\s*jol+[iy]/i, l: 124, b: 79, h: 22, aansl: "eind", fiche: "R", gaten: [{x: 117.5, y: 6, d: 4.5, sleuf: true}, {x: 6.5, y: 73, d: 4.5, sleuf: true}],
+    gatBron: "TCI-fiche MAXI JOLLY US DALI: sleuven hart-op-hart 111 × 67", bron: "TCI DC MAXI JOLLY US DALI (122413) — TCI-fiche"},
+  {re: /mini\s*jol+[iy]/i, l: 119, b: 52, h: 22, aansl: "eind", fiche: "R", gaten: [{x: 4.1, y: 26, d: 4.5, sleuf: true}, {x: 112.1, y: 12.25, d: 4}, {x: 112.1, y: 39.75, d: 4}],
+    gatBron: "TCI-fiche MINI JOLLY: sleuf + 2 gaten op 108 mm, onderling 27,5", bron: "TCI DC MINI JOLLY DALI (122403) — 110,4 × 52 + lipje (TCI-fiche)"},
+  {re: /jol+[iy]/i,        l: 103, b: 67, h: 21, aansl: "eind", fiche: "L", gaten: [{x: 98.25, y: 4.75, d: 4.5, sleuf: true}, {x: 4.75, y: 62.25, d: 4.5, sleuf: true}],
+    gatBron: "TCI-fiche JOLLY DALI: L1 93,5 × B1 57,5", bron: "TCI DC JOLLY DALI (122424) — TCI-datasheet via Rexel"},
+  {re: /pwm-?\s*120/i,     l: 191, b: 63, h: 37.5, aansl: "twee", fiche: "R", gaten: [{x: 186, y: 5, d: 4.5}, {x: 5, y: 58, d: 4.5}],
+    gatBron: "Mean Well-fiche PWM-120: 2 × Ø4,5, 5 mm uit de hoeken", bron: "Mean Well PWM-120 — datasheet"},
+  {re: /pwm-?\s*90/i,      l: 171, b: 63, h: 37.5, aansl: "twee", fiche: "R", gaten: [{x: 166, y: 5, d: 4.5}, {x: 5, y: 58, d: 4.5}],
+    gatBron: "Mean Well PWM-90: zelfde patroon als PWM-60/120 (5 mm uit de hoeken)", gatTeControleren: true, bron: "Mean Well PWM-90 — datasheet"},
+  {re: /pwm-?\s*60/i,      l: 150, b: 53, h: 35, aansl: "twee", fiche: "R", gaten: [{x: 145, y: 5, d: 4.5}, {x: 5, y: 48, d: 4.5}],
+    gatBron: "Mean Well-fiche PWM-60 (NPF-60A): 2 × Ø4,5, 5 mm uit de hoeken", bron: "Mean Well PWM-60 — datasheet"},
 ];
 // ruimte tussen de DIN-rail (zone van 48 mm) en de horizontale koker, instelbaar (Peter, 29/10)
 function dkRailKoker(p){ const v = parseFloat(p.railKoker); return v >= 0 && v <= 200 ? v : 6; }
+// boorgaten van een getekende driver in px (draait 180° als de aansluitingen aan de andere kant zitten)
+function dkGatenPx(md){
+  const info = md.m._dk || {}, maat = info.maat;
+  if(!maat || !Array.isArray(maat.gaten)) return [];
+  const draai = info.kant && info.kant !== "beide" && maat.fiche && info.kant !== maat.fiche;
+  const sx = md.w / maat.l, sy = md.h / maat.b;
+  return maat.gaten.map(g=> ({x: md.x + (draai ? maat.l - g.x : g.x)*sx, y: md.y + (draai ? maat.b - g.y : g.y)*sy, r: (g.d||4.5)/2*sx, sleuf: !!g.sleuf, g}));
+}
+function dkGatenTekst(gaten){ return (gaten||[]).map(g=> `${g.x},${g.y},${g.d||4.5}${g.sleuf ? "s" : ""}`).join("; "); }
+function dkGatenLees(t){
+  return String(t||"").split(/[;\n]+/).map(x=> x.trim()).filter(Boolean).map(x=>{
+    const m = /^(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*(?:,\s*([\d.]+))?\s*(s)?$/i.exec(x.replace(/\s+/g, " "));
+    return m ? {x: parseFloat(m[1]), y: parseFloat(m[2]), d: m[3] ? parseFloat(m[3]) : 4.5, ...(m[4] ? {sleuf: true} : {})} : null;
+  }).filter(Boolean);
+}
 function dkMaatSleutel(naam){ return "driver_maat:" + String(naam||"").trim().toLowerCase(); }
 function dkDriverMaat(d){
   const naam = d.naam || d.type || "";
   const eigen = cadosInst[dkMaatSleutel(naam)];
   const std = DK_DRIVER_MATEN.find(x=> x.re.test(naam));
-  // boorgaten (Peter, 29/10): 2 gaten op de middellijn, hart-op-hart in de lengte; eigen waarde gaat voor
-  const stdGat = (l)=> (std && std.gat) ? std.gat : {hoh: Math.max(0, l - 12), d: 4.5, schat: true};
-  if(eigen && eigen.l && eigen.b) return Object.assign({aansl: (std && std.aansl) || "eind"}, eigen, {eigen: true, bron: "eigen maat (gedeeld)", gat: eigen.gat && eigen.gat.hoh > 0 ? Object.assign({eigen: true}, eigen.gat) : stdGat(eigen.l)});
-  if(std) return {l: std.l, b: std.b, h: std.h, aansl: std.aansl, bron: std.bron, gat: stdGat(std.l)};
-  return {l: 120, b: 60, h: 30, aansl: "eind", onbekend: true, bron: "maat onbekend — vul ze in", gat: stdGat(120)};
+  // boorgaten: eigen lijst (gedeeld) gaat voor die van de fiche
+  const gatInfo = (eg)=> Array.isArray(eg) && eg.length ? {gaten: eg, fiche: (eigen && eigen.fiche) || (std && std.fiche) || "R", gatBron: "eigen boorgaten (gedeeld)", gatEigen: true}
+    : (std ? {gaten: std.gaten, fiche: std.fiche, gatBron: std.gatBron, gatTeControleren: !!std.gatTeControleren} : {gaten: [], fiche: "R", gatBron: "geen boorgaten gekend — vul ze in", gatTeControleren: true});
+  if(eigen && eigen.l && eigen.b) return Object.assign({aansl: (std && std.aansl) || "eind"}, eigen, {eigen: true, bron: "eigen maat (gedeeld)"}, gatInfo(eigen.gaten));
+  if(std) return Object.assign({l: std.l, b: std.b, h: std.h, aansl: std.aansl, bron: std.bron}, gatInfo(null));
+  return Object.assign({l: 120, b: 60, h: 30, aansl: "eind", onbekend: true, bron: "maat onbekend — vul ze in"}, gatInfo(null));
 }
 // stroomsturing (350/500/700 mA, in serie) of spanning (12/24 V, parallel)?
 function dkIsSpanning(d){
@@ -111,6 +145,17 @@ function dkPlan(dk){
 }
 
 /* ---------- klemlijsten ---------- */
+// Op welke zekering(en) hangt de driverkast? Eigen keuze bij de werkschakelaar, anders de automaten
+// die bij de drivers ingevuld zijn ("Gevoed door automaat").
+function dkVoeding(dk, p){
+  let lijst = [];
+  try{ lijst = alleZekeringAutomaten(); }catch(_e){}
+  const van = (id)=> lijst.find(a=> a.id===id);
+  if(p && p.voedingZek && van(p.voedingZek)) { const a = van(p.voedingZek); return {codes: [a.code], tekst: a.code + (a.naam ? " — " + a.naam : ""), eigen: true}; }
+  const ids = [...new Set(dkDrivers(dk).map(d=> d.zekeringModuleId).filter(Boolean))].filter(id=> van(id));
+  const as = ids.map(van);
+  return {codes: as.map(a=> a.code), tekst: as.map(a=> a.code + (a.naam ? " — " + a.naam : "")).join(", "), eigen: false};
+}
 function dkPushKringen(dk){ return [...new Set(dkDrivers(dk).map(d=> d.kringId).filter(Boolean))]; }
 // Rijgklemmen van één driver (Peter, 29/10): altijd 1 kabel per driver (+ en −) — de serie- of
 // parallelschakeling gebeurt in de strip/spot zelf. Optie: 1 extra klem erbij.
@@ -278,11 +323,12 @@ function dkPlanKast(dk){
     rx += breedteMm + 3;
   };
   codes["dks_" + dk.id] = "Q";
+  const voeding = dkVoeding(dk, p);
   railModule("dks_" + dk.id, "Werkschakelaar", DK_SCHAK_MM, "schakelaar", [
     {id: "iL", label: "L", functie: "L", zijde: zijKabel, x: 0.3, y: yKabel, rijgSoort: "preflex", tip: "voedingskabel L"},
     {id: "iN", label: "N", functie: "N", zijde: zijKabel, x: 0.7, y: yKabel, rijgSoort: "preflex", tip: "voedingskabel N"},
     {id: "oL", label: "L", functie: "L", zijde: zijKast, x: 0.3, y: yKast, rijgSoort: "kast", tip: "uit naar verdeelblok L"},
-    {id: "oN", label: "N", functie: "N", zijde: zijKast, x: 0.7, y: yKast, rijgSoort: "kast", tip: "uit naar verdeelblok N"}]);
+    {id: "oN", label: "N", functie: "N", zijde: zijKast, x: 0.7, y: yKast, rijgSoort: "kast", tip: "uit naar verdeelblok N"}], {voeding});
   // DALI-ingang (Peter, 29/10): 2 rijgklemmen naast de werkschakelaar waar de DALI-kabel toekomt
   // (DA+ zwart, DA− grijs), van daar doorverbonden naar de grijze Phoenix-blokken.
   if(dk.sturing !== "PUSH"){
@@ -494,14 +540,13 @@ function dkModuleSvg(md){
     });
     const cx = x + w/2;
     // boorgaten
-    if(maat.gat && maat.gat.hoh > 0){
-      const gr = Math.max(2, maat.gat.d/2*DK_PXMM), gy = y + h/2;
-      [-1, 1].forEach(z=>{ const gx = cx + z*maat.gat.hoh/2*DK_PXMM; s += `<circle cx="${gx}" cy="${gy}" r="${gr}" class="dk-gat"/><path d="M${gx-gr-2} ${gy}H${gx+gr+2}M${gx} ${gy-gr-2}V${gy+gr+2}" class="dk-gat-kruis"/>`; });
-    }
+    dkGatenPx(md).forEach(g=>{
+      s += `<circle cx="${g.x}" cy="${g.y}" r="${g.r}" class="dk-gat${g.sleuf ? " sleuf" : ""}"/><path d="M${g.x-g.r-3} ${g.y}H${g.x+g.r+3}M${g.x} ${g.y-g.r-3}V${g.y+g.r+3}" class="dk-gat-kruis"/>`;
+    });
     s += `<rect x="${cx-18}" y="${y + 4}" width="36" height="15" rx="4" class="uv-code-bg"/><text x="${cx}" y="${y + 15}" class="uv-code">${escapeHtml(code)}</text>`;
     const naam = String(d.naam || "driver").replace(/^tci\s+/i, "TCI ").replace(/meanwel+\b/i, "Mean Well");
     // omschrijving (Peter, 29/10): per armatuur het draadnummer (armatuurcode), aantal × armatuur en de ruimte
-    const binnen = w - 2*sw - 2*Math.max(6, (maat.gat ? maat.gat.d : 4)*DK_PXMM) - 8;
+    const binnen = w - 2*sw - 2*Math.max(6, 4.5*DK_PXMM) - 8;
     const maxC = Math.max(8, Math.floor(binnen/5));
     const kort = (t)=> t.length > maxC ? t.slice(0, maxC - 1) + "…" : t;
     const ac = computeDriverCodes();
@@ -529,7 +574,7 @@ function dkModuleSvg(md){
   }
   const soort = info.soort;
   const d = info.driver;
-  const tip = soort==="schakelaar" ? "Werkschakelaar — voeding van de driverkast uitschakelen" :
+  const tip = soort==="schakelaar" ? "Werkschakelaar — voeding van de driverkast uitschakelen" + (info.voeding && info.voeding.codes.length ? "\nGevoed door zekering " + info.voeding.tekst : "\nZekering nog niet gekend — klik om ze te kiezen") :
     soort==="dali" ? "DALI-ingang — 2 rijgklemmen: DALI-kabel DA+ (zwart) en DA− (grijs), doorverbonden naar de verdeelblokken" :
     soort==="phoenix" ? `Phoenix ${DK_PTFIX_ART} (${info.kleur}) — verdeelblok ${info.lab}, ${info.blokken} blok(ken) van 1 voeding + 18 aansluitingen` :
     [code + " — " + (d.naam||""), info.extra ? "1 kabel (+ en −) + 1 extra klem" : "1 kabel (+ en −)", `${info.spots} spot(s)/strip(s) — serie of parallel in de armatuur`, [...new Set((d.armaturen||[]).map(a=> a.ruimte).filter(Boolean))].join(", ")].filter(Boolean).join("\n");
@@ -544,7 +589,11 @@ function dkModuleSvg(md){
       s += `<line x1="${xl}" y1="${y+3}" x2="${xl}" y2="${y+h-3}" class="dk-klemlijn${a && b && a._sp !== b._sp ? " spot" : ""}"/>`;
     }
   }
-  if(soort==="schakelaar") s += `<rect x="${x + w/2 - 5}" y="${y + h/2 - 12}" width="10" height="18" rx="2" class="dk-hendel"/>`;
+  if(soort==="schakelaar"){
+    s += `<rect x="${x + w/2 - 5}" y="${y + h/2 - 12}" width="10" height="18" rx="2" class="dk-hendel"/>`;
+    const zk = info.voeding && info.voeding.codes.length ? info.voeding.codes.join("+") : "zek. ?";
+    s += `<text x="${x + w/2}" y="${y + h/2 - 16}" class="dk-voeding${info.voeding && info.voeding.codes.length ? "" : " leeg"}">${escapeHtml(zk)}</text>`;
+  }
   if(soort==="phoenix"){
     const bw = (w - (info.blokken-1)*2*DK_PXMM)/info.blokken;
     for(let b=0; b<info.blokken; b++) s += `<rect x="${x + b*(bw + 2*DK_PXMM)}" y="${y + h*0.22}" width="${bw}" height="${h*0.62}" rx="3" class="dk-ptfix ${info.kleur}"/>`;
@@ -705,7 +754,26 @@ function dkDropVoorbeeld(p, id, pt, svg){
   r.setAttribute("x", kol.x0 - 4); r.setAttribute("y", y - 2); r.setAttribute("width", kol.x1 - kol.x0 + 8); r.setAttribute("height", 4);
 }
 // driver naar een andere driverkast (of een nieuwe) verplaatsen
-function dkNaarKast(dk, d, doelId){
+/* Drivernummers = kabelnummers op de werf (Peter, 29/10: "kloppen de nummers van de klemmen nog volgens
+   de nummers van de kabels?"). De nummering telt door over de kasten heen, dus een driver naar een andere
+   kast verplaatsen zou alle volgende nummers doen verschuiven. Daarom houden we bij een verplaatsing de
+   oude nummers vast (handmatig nummer), enkel het kastvoorvoegsel (1. / 2.) volgt de kast. */
+function dkNummerVan(code){ const m = /D(\d+)/.exec(code || ""); return m ? parseInt(m[1]) : null; }
+function dkHoudNummers(fn){
+  const voor = {}, c0 = computeDriverCodes();
+  state.driverkast.kasten.forEach(k=> k.items.forEach(d=>{ voor[d.id] = dkNummerVan(c0[d.id]); }));
+  const r = fn();
+  for(let ronde=0; ronde<500; ronde++){
+    const c = computeDriverCodes();
+    let fout = null;
+    state.driverkast.kasten.some(k=> k.items.some(d=>{ if(voor[d.id] != null && dkNummerVan(c[d.id]) !== voor[d.id]){ fout = d; return true; } return false; }));
+    if(!fout) break;
+    fout.manueelNummer = String(voor[fout.id]);
+  }
+  return r;
+}
+function dkNaarKast(dk, d, doelId){ return dkHoudNummers(()=> dkNaarKastRuw(dk, d, doelId)); }
+function dkNaarKastRuw(dk, d, doelId){
   let doel = state.driverkast.kasten.find(k=> k.id===doelId);
   if(!doel){
     doel = newDriverKast();
@@ -1077,7 +1145,22 @@ const UV_CTX_DK = {
         <div class="hint">2 rijgklemmen naast de werkschakelaar: de DALI-kabel komt toe op DA+ (zwarte ader) en DA− (grijze ader) en wordt doorverbonden naar de grijze verdeelblokken.</div></div></div>`));
       return;
     }
-    if(info.soort==="schakelaar" || info.soort==="phoenix"){
+    if(info.soort==="schakelaar"){
+      let autos = [];
+      try{ autos = alleZekeringAutomaten(); }catch(_e){}
+      const v = dkVoeding(dk, p);
+      const box = el(`<div class="card uv-detail"><div class="card-body uv-sidebody"><strong>Werkschakelaar</strong>
+        <div class="hint">De voedingskabel (L/N) komt toe op de werkschakelaar; daarna naar de verdeelblokken L en N.</div>
+        <label class="uv-veld">Gevoed door zekering<select class="dk-voed">
+          <option value="">${v.eigen || !v.codes.length ? "— volgens de drivers —" : "volgens de drivers: " + escapeHtml(v.codes.join(", "))}</option>
+          ${autos.map(a=> `<option value="${a.id}" ${p.voedingZek===a.id ? "selected" : ""}>${escapeHtml(a.code)}${a.naam ? " — " + escapeHtml(a.naam) : ""}</option>`).join("")}
+        </select></label>
+        <div class="hint">${v.codes.length ? "Op de tekening: " + escapeHtml(v.tekst) : "Nog geen zekering: kies ze hier, of vul bij de drivers \"Gevoed door automaat\" in."}</div></div></div>`);
+      box.querySelector(".dk-voed").addEventListener("change", e=>{ if(e.target.value) p.voedingZek = e.target.value; else delete p.voedingZek; save(); h.rerender(); });
+      zone.appendChild(box);
+      return;
+    }
+    if(info.soort==="phoenix"){
       zone.appendChild(el(`<div class="card uv-detail"><div class="card-body uv-sidebody"><strong>${info.soort==="schakelaar" ? "Werkschakelaar" : "Phoenix-verdeelblok " + escapeHtml(info.lab)}</strong>
         <div class="hint">${info.soort==="schakelaar" ? "De voedingskabel (L/N) komt toe op de werkschakelaar; daarna naar de verdeelblokken L en N." : `Phoenix ${DK_PTFIX_ART}, ${info.kleur}: ${info.blokken} blok(ken) met geïntegreerde voeding en 18 push-in-aansluitingen (0,14–4 mm², 28,6 × 28,7 mm) — elke driver op zijn eigen punt (${dkDrivers(dk).length} nodig).`}</div></div></div>`));
       return;
@@ -1099,9 +1182,9 @@ const UV_CTX_DK = {
       <div class="uv-veld">Maat (L × B × H mm)${maat.onbekend ? ' <span class="uv-fout-tel">onbekend</span>' : ""}
         <div class="dk-maatrij"><input type="number" class="dk-ml" value="${maat.l}"><input type="number" class="dk-mb" value="${maat.b}"><input type="number" class="dk-mh" value="${maat.h}"></div>
         <div class="hint">${escapeHtml(maat.bron)} — geldt voor alle "${escapeHtml(d.naam||"")}"</div></div>
-      <div class="uv-veld">Boorgaten (hart-op-hart × Ø mm)${maat.gat && maat.gat.schat ? ' <span class="uv-fout-tel" title="nog niet op een datasheet nagekeken — meet na en vul in">te controleren</span>' : ""}
-        <div class="dk-maatrij"><input type="number" step="0.5" class="dk-gh" value="${maat.gat ? maat.gat.hoh : ""}"><input type="number" step="0.1" class="dk-gd" value="${maat.gat ? maat.gat.d : ""}"><span></span></div>
-        <div class="hint">2 gaten op de middellijn, in de lengte van de driver — ook in de DXF (laag BOORGATEN).</div></div>
+      <label class="uv-veld">Boorgaten (x,y,Ø mm; …)${maat.gatTeControleren ? ' <span class="uv-fout-tel" title="niet rechtstreeks op de fiche gemaat — meet na">te controleren</span>' : ""}
+        <input class="dk-gaten" value="${escapeHtml(dkGatenTekst(maat.gaten))}"></label>
+      <div class="hint">${escapeHtml(maat.gatBron || "")} · gemeten vanaf de linkerbovenhoek met de aansluitingen ${maat.fiche==="L" ? "links" : "rechts"} (zoals op de fiche); "s" = sleuf. Staan de aansluitingen aan de andere kant, dan draait het patroon mee. Ook in de DXF (laag BOORGATEN).</div>
       <div class="uv-veld">Plaats (kolom ${info.kolom + 1} van ${p.kolommen.length})<div class="uv-knoprij">
         <button class="btn small ghost dk-mv" data-r="op" title="hoger in de kolom">↑</button><button class="btn small ghost dk-mv" data-r="neer" title="lager in de kolom">↓</button>
         <button class="btn small ghost dk-mv" data-r="links" title="naar de kolom links">← kolom</button><button class="btn small ghost dk-mv" data-r="rechts" title="naar de kolom rechts (of een nieuwe)">kolom →</button></div></div>` : ""}
@@ -1117,15 +1200,16 @@ const UV_CTX_DK = {
     if(ml){
       const zetMaat = async ()=>{
         const l = parseFloat(box.querySelector(".dk-ml").value), b = parseFloat(box.querySelector(".dk-mb").value), hh = parseFloat(box.querySelector(".dk-mh").value);
-        const gh = parseFloat(box.querySelector(".dk-gh").value), gd = parseFloat(box.querySelector(".dk-gd").value);
         if(!(l > 0 && b > 0)) return;
         const waarde = {l, b, h: hh || 0};
-        if(gh > 0) waarde.gat = {hoh: gh, d: gd > 0 ? gd : 4.5};
+        const gt = box.querySelector(".dk-gaten").value;
+        if(gt.trim() && gt.trim() !== dkGatenTekst(maat.gaten).trim()) waarde.gaten = dkGatenLees(gt);
+        else if(maat.gatEigen) waarde.gaten = maat.gaten;
         try{ await bewaarCadosInst(dkMaatSleutel(d.naam||d.type), waarde); toast(`Maat van "${d.naam}" bewaard (${l} × ${b} mm) — geldt voor alle projecten`); }
         catch(err){ alert("Bewaren mislukt: " + (err.message||err)); }
         h.rerender();
       };
-      ["dk-ml","dk-mb","dk-mh","dk-gh","dk-gd"].forEach(c=> box.querySelector("." + c).addEventListener("change", zetMaat));
+      ["dk-ml","dk-mb","dk-mh","dk-gaten"].forEach(c=> box.querySelector("." + c).addEventListener("change", zetMaat));
     }
     box.querySelector(".dk-layout").addEventListener("click", ()=> selectTab("driverkast"));
     const nk = box.querySelector(".dk-naarkast");
