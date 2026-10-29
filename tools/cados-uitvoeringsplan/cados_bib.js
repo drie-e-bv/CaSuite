@@ -3562,3 +3562,61 @@ function rijgklemGroepenSvg(m, x, y, w, h){
   });
   return s;
 }
+
+/* Rijgklemmen opnieuw koppelen aan hun bron (2026-10-29, Peter: "ik heb de armaturen aangepast in
+   Verlichting 230V — hoe komt die info ook in de klemmenlijst?"). Klemmen die via de Snelmodus
+   gemaakt zijn, volgen hun bron automatisch (naam, kamer, info). Klemmen die die koppeling kwijt zijn
+   (bv. oudere klemmen), worden hier opnieuw gekoppeld op basis van de code in "wat/waar"
+   ("101 — TBP - ader 1" -> verlichting 101), daarna volgt alles weer vanzelf. */
+const RK_BRON_TYPES = ["verlichting","verwarming","laadpalen","motoren","zekeringen"];
+function herkoppelKlemBronnen(){
+  const items = (state.interlex && state.interlex.items) || [];
+  const gebruikt = (state.interlex && state.interlex.gebruikteBronnen) || [];
+  const isGebruikt = (t, id)=> gebruikt.some(g=> g.bronType===t && g.bronId===id);
+  const alle = [];
+  RK_BRON_TYPES.forEach(t=>{ try{ (snelmodusBronnen(t) || []).forEach(b=> alle.push(Object.assign({type: t}, b))); }catch(_e){} });
+  const codeVan = (label)=> String(label||"").split(" — ")[0].trim();
+  const restVan = (label)=> String(label||"").split(" — ").slice(2).join(" — ").trim();   // bv. "kabel 2"
+  const kabelNaam = (k)=>{
+    for(const z of [k.onder, k.boven]){
+      const m = z && String(z.watwaar||"").match(/^(.*?)\s*[-–]\s*ader\s*\d+\s*$/i);
+      if(m) return m[1].trim();
+    }
+    return "";
+  };
+  let gekoppeld = 0;
+  const kabels = new Map();   // bron-sleutel -> {bron, n}
+  items.forEach(k=>{
+    if(k.bronType && k.bronId) return;
+    const naam = kabelNaam(k);
+    if(!naam) return;
+    let kand = alle.filter(b=> String(b.label||"").trim()===naam);
+    if(!kand.length){
+      const code = codeVan(naam), rest = restVan(naam);
+      if(!code) return;
+      kand = alle.filter(b=> codeVan(b.label)===code && restVan(b.label)===rest);
+    }
+    if(kand.length > 1){ const g = kand.filter(b=> isGebruikt(b.type, b.id)); if(g.length) kand = g; }
+    if(kand.length > 1 && k.kamer){ const g = kand.filter(b=> (b.kamer||"")===k.kamer); if(g.length) kand = g; }
+    if(kand.length !== 1) return;
+    const b = kand[0];
+    k.bronType = b.type; k.bronId = b.id;
+    if(!isGebruikt(b.type, b.id)) gebruikt.push({bronType: b.type, bronId: b.id});
+    gekoppeld++;
+  });
+  // controle: past het aantal klemmen bij het kabeltype van de bron?
+  items.forEach(k=>{
+    if(!k.bronType || !k.bronId) return;
+    const sl = k.bronType + "|" + k.bronId;
+    if(!kabels.has(sl)){ const b = alle.find(x=> x.type===k.bronType && x.id===k.bronId); kabels.set(sl, {bron: b, n: 0}); }
+    const e = kabels.get(sl);
+    e.n += [k.onder, k.boven].filter(z=> z && z.aderNr).length || 1;
+  });
+  const afwijkend = [];
+  kabels.forEach(({bron, n})=>{
+    if(!bron || !bron.kabeltype) return;
+    const aders = typeof parseAderAantalUitKabel === "function" ? parseAderAantalUitKabel(bron.kabeltype) : 0;
+    if(aders && aders !== n) afwijkend.push(`${bron.label}: ${bron.kabeltype} = ${aders} aders, ${n} op de klemmen`);
+  });
+  return {gekoppeld, afwijkend};
+}

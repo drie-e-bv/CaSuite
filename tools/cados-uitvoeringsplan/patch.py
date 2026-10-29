@@ -169,6 +169,23 @@ vervang('  {key:"laadpalen", label:"Laadpalen", fn:()=>exportLaadpalenVoorWerf',
 vervang('        state.interlex.items.push(klem);\n      }\n      klem[zijde].watwaar',
         '        if(smKabeltype.value.trim()) klem.kabeltype = smKabeltype.value.trim();\n        state.interlex.items.push(klem);\n      }\n      klem[zijde].watwaar', "snelmodus kabeltype")
 
+# 12. Rijgklemmen: knop "Bijwerken vanuit de tabbladen" (klemmen opnieuw aan hun bron koppelen + bijwerken)
+vervang('        <button class="btn" id="smMaak">Klemmen aanmaken</button>',
+        '        <button class="btn" id="smMaak">Klemmen aanmaken</button>\n'
+        '        <button class="btn ghost" id="smHerkoppel" title="naam, kamer, info en kabeltype van de klemmen opnieuw ophalen uit Verlichting, Verwarming, Laadpalen, Motoren en Zekeringen — ook voor klemmen die hun koppeling kwijt waren">↻ Bijwerken vanuit de tabbladen</button>', "herkoppel knop")
+vervang('  wrap.querySelector("#smMaak").addEventListener("click", ()=>{',
+        '  wrap.querySelector("#smHerkoppel").addEventListener("click", ()=>{\n'
+        '    const r = herkoppelKlemBronnen();\n'
+        '    syncKlemBronnen();\n'
+        '    save();\n'
+        '    rebuildSmBronItem();\n'
+        '    rebuildKlemmenRack();\n'
+        '    let msg = r.gekoppeld ? `${r.gekoppeld} klem(men) opnieuw gekoppeld aan hun bron en bijgewerkt.` : "Alle klemmen zijn bijgewerkt vanuit hun bron.";\n'
+        '    if(r.afwijkend.length) msg += "\\n\\nLet op, het aantal aders klopt niet met het kabeltype:\\n• " + r.afwijkend.join("\\n• ");\n'
+        '    alert(msg);\n'
+        '  });\n'
+        '  wrap.querySelector("#smMaak").addEventListener("click", ()=>{', "herkoppel listener")
+
 if test:
     html = re.sub(r"<title>([^<]*)</title>", lambda m: f"<title>TEST · {m.group(1)}</title>", html, count=1)
     m = re.search(r"<body[^>]*>", html)
