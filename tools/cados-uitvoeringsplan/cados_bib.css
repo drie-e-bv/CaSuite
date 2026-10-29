@@ -361,3 +361,7 @@
 .uv-svg .dk-ptfix{stroke:#444;stroke-width:.8;}
 .uv-svg .dk-ptfix.bruin{fill:#a0663a;} .uv-svg .dk-ptfix.blauw{fill:#3d78c9;} .uv-svg .dk-ptfix.grijs{fill:#a7adb4;}
 .uv-svg .dk-blok.phoenix .dk-blok-body{fill:#f4f5f6;stroke:#9aa1a9;}
+
+.uv-svg .dk-koker{cursor:pointer;}
+.uv-svg .dk-koker:hover{fill:#dfe3e8;}
+.uv-svg .dk-koker.sel{fill:#fbeee3;stroke:#bb5e26;stroke-width:2;stroke-dasharray:none;}

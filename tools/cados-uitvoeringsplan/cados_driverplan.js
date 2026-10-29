@@ -22,7 +22,8 @@ const DK_PTFIX_KLEUR = {L: "bruin", N: "blauw", "DA+": "grijs", "DA-": "grijs", 
 // rijgklemmen: enkel (1 niveau) of dubbel (2 niveaus: + boven, − eronder op dezelfde klem)
 function dkRijgBreedte(lijst, p){ return (p.rkDubbel ? Math.ceil(lijst.length/2) : lijst.length) * DK_KLEM_MM; }
 const DK_KOKERS = [30, 40, 50, 60];
-const DK_PLAN_VERSIE = 3;   // ophogen als het automatische draadvoorstel wijzigt
+const DK_PLAN_VERSIE = 4;
+function dkKokerMM(p, id){ const v = p.kokerBreedte && p.kokerBreedte[id]; return DK_KOKERS.includes(v) ? v : (id==="H" ? p.kokerH : p.kokerV); }   // ophogen als het automatische draadvoorstel wijzigt
 const DK_TOP_PX = 18;
 // Maten (L x B x H in mm) van de drivers die Casentis gebruikt, opgezocht op 29/10/2026.
 // Aanpasbaar per type in het zijpaneel (gedeeld via elektro_cados_instellingen).
@@ -60,6 +61,12 @@ function dkSpots(d){
   return n;
 }
 function dkDrivers(dk){ return (dk.items||[]).filter(d=> !d.leeg && (d.categorie||"Driver")==="Driver"); }
+// Volgorde op de rail en de verdeelblokken: op drivernummer (D1, D2, ... D30), niet op plaats in de kast
+function dkOpNummer(drivers){
+  const codes = computeDriverCodes();
+  const nr = (d)=>{ const m = /(\d+)/.exec(codes[d.id] || ""); return m ? parseInt(m[1]) : 1e9; };
+  return drivers.slice().sort((a, b)=> nr(a) - nr(b));
+}
 function dkKringCodes(){ try{ return computeKringCodes(); }catch(_e){ return {}; } }
 function dkPlan(dk){
   if(!dk.plan || typeof dk.plan !== "object") dk.plan = {};
@@ -75,6 +82,7 @@ function dkPlan(dk){
   if(!Array.isArray(p.kamgeleiders)) p.kamgeleiders = [];
   if(!DK_KOKERS.includes(p.kokerV)) p.kokerV = 40;
   if(!DK_KOKERS.includes(p.kokerH)) p.kokerH = 40;
+  if(!p.kokerBreedte || typeof p.kokerBreedte !== "object") p.kokerBreedte = {};   // per koker: {H: 60, V1: 50, ...}
   if(p.rkPositie !== "onder") p.rkPositie = "boven";
   if(p.rkDubbel === undefined) p.rkDubbel = true;   // Casentis gebruikt dubbele rijgklemmen in de driverkast
   delete p.indeling;   // oude rij-indeling (eerste testversie)
@@ -155,12 +163,12 @@ function dkVerdeel(drivers, k){
 }
 // Maten (mm) van een kolomindeling
 function dkMeetIndeling(dk, p, cols){
-  const zone = DK_RAND_MM + DK_RAIL_H_MM + 6 + p.kokerH + 8;
+  const zone = DK_RAND_MM + DK_RAIL_H_MM + 6 + dkKokerMM(p, "H") + 8;
   const kolB = cols.map(c=> Math.max(0, ...c.map(d=> dkDriverMaat(d).l)));
   const kolH = cols.map(c=> c.reduce((t, d, i)=> t + dkDriverMaat(d).b + (i ? DK_TUSSEN_MM : 0), 0));
-  const nKoker = dkKokerPosities(p, cols).length;
+  const kokerSom = dkKokerPosities(p, cols).reduce((t, ci)=> t + dkKokerMM(p, "V" + ci) + 8, 0);
   return {
-    breedte: DK_RAND_MM*2 + kolB.reduce((t, b)=> t + b, 0) + nKoker*(p.kokerV + 8),
+    breedte: DK_RAND_MM*2 + kolB.reduce((t, b)=> t + b, 0) + kokerSom,
     hoogte: zone + Math.max(0, ...kolH) + DK_RAND_MM,
     rail: dkRailBreedte(dk, p) + DK_RAND_MM*2
   };
@@ -264,7 +272,7 @@ function dkPlanKast(dk){
     codes[id] = lab;
     railModule(id, "Verdeelblok " + lab, dkPhoenixBreedte(tot), "phoenix", klemmen, {lab, f, kleur: DK_PTFIX_KLEUR[f] || "grijs", blokken: dkPhoenixBlokken(n)});
   });
-  cols.flat().forEach(d=>{
+  dkOpNummer(cols.flat()).forEach(d=>{
     const lijst = dkKlemLijst(d, p);
     const klemmen = [];
     const dub = !!p.rkDubbel;
@@ -286,13 +294,13 @@ function dkPlanKast(dk){
   });
   const railLengte = rx - 3 + DK_RAND_MM;
   // --- horizontale koker naast de rail ---
-  const hk0 = railY1 + 6, hk1 = hk0 + p.kokerH;
+  const hk0 = railY1 + 6, hk1 = hk0 + dkKokerMM(p, "H");
   // --- kolommen en verticale kokers, van links naar rechts ---
   const kolPos = dkKokerPosities(p, cols);
   let x = DK_RAND_MM;
   const kolX = [], vKoker = {};
   for(let ci=0; ci<=k; ci++){
-    if(kolPos.includes(ci)){ x += 4; vKoker[ci] = {x0: x, x1: x + p.kokerV}; x += p.kokerV + 4; }
+    if(kolPos.includes(ci)){ const kb = dkKokerMM(p, "V" + ci); x += 4; vKoker[ci] = {x0: x, x1: x + kb, mm: kb}; x += kb + 4; }
     if(ci < k){
       const bk = Math.max(0, ...cols[ci].map(d=> dkDriverMaat(d).l));
       kolX[ci] = {x0: x, x1: x + bk};
@@ -319,9 +327,9 @@ function dkPlanKast(dk){
   });
   const totB = Math.max(p.breedte, breedteNodig, railLengte), totH = Math.max(H, hoogteNodig);
   const hkY0 = Math.min(yMM(hk0), yMM(hk1)), hkY1 = Math.max(yMM(hk0), yMM(hk1));
-  kokers.push({id: "H", soort: "h", x0: X0 + DK_RAND_MM*PX, x1: X0 + (totB - DK_RAND_MM)*PX, y0: Y0 + hkY0*PX, y1: Y0 + hkY1*PX, mm: p.kokerH});
+  kokers.push({id: "H", soort: "h", x0: X0 + DK_RAND_MM*PX, x1: X0 + (totB - DK_RAND_MM)*PX, y0: Y0 + hkY0*PX, y1: Y0 + hkY1*PX, mm: dkKokerMM(p, "H")});
   const vA = boven ? hk1 : (totH - (H - DK_RAND_MM)), vB = boven ? totH - DK_RAND_MM : H - hk1;
-  Object.entries(vKoker).forEach(([ci, v])=> kokers.push({id: "V" + ci, soort: "v", kol: +ci, x0: X0 + v.x0*PX, x1: X0 + v.x1*PX, y0: Y0 + Math.min(vA, vB)*PX, y1: Y0 + Math.max(vA, vB)*PX, mm: p.kokerV}));
+  Object.entries(vKoker).forEach(([ci, v])=> kokers.push({id: "V" + ci, soort: "v", kol: +ci, x0: X0 + v.x0*PX, x1: X0 + v.x1*PX, y0: Y0 + Math.min(vA, vB)*PX, y1: Y0 + Math.max(vA, vB)*PX, mm: v.mm}));
   const idx = state.driverkast.kasten.indexOf(dk);
   dkEigen(p, {
     rijen: [{id: "dk-alle", items: mods.map(md=> md.m)}],
@@ -409,7 +417,7 @@ function dkAchtergrondSvg(p, geo){
   const ry = y + (L.boven ? DK_RAND_MM + DK_RAIL_H_MM/2 - 17.5 : p.hoogte - DK_RAND_MM - DK_RAIL_H_MM/2 - 17.5)*PX;
   s += `<rect x="${x + 4}" y="${ry}" width="${(Math.max(p.breedte, L.railLengte) - 8)*PX}" height="${35*PX}" class="uv-rail"/>`;
   L.kokers.forEach(k=>{
-    s += `<rect x="${k.x0}" y="${k.y0}" width="${k.x1-k.x0}" height="${k.y1-k.y0}" class="dk-koker"/>`;
+    s += `<rect x="${k.x0}" y="${k.y0}" width="${k.x1-k.x0}" height="${k.y1-k.y0}" class="dk-koker${uvSelExtra==="koker:" + k.id ? " sel" : ""}" data-koker="${k.id}" data-tip="${escapeHtml((k.soort==="h" ? "Horizontale koker" : "Verticale koker") + " " + k.mm + " mm — klik om de breedte aan te passen")}"/>`;
     if(k.soort==="h") s += `<text x="${k.x1 - 6}" y="${k.y1 - 3}" class="dk-koker-lab" text-anchor="end">koker ${k.mm}</text>`;
     else s += `<text transform="translate(${(k.x0+k.x1)/2 + 3} ${k.y1 - 6}) rotate(-90)" class="dk-koker-lab">koker ${k.mm}</text>`;
   });
@@ -487,7 +495,7 @@ function dkOmzet(p){
   const dk = p._dk;
   p.bedrading = p.bedrading.filter(w=> !w.auto);
   const byId = Object.fromEntries(dkDrivers(dk).map(d=> [d.id, d]));
-  const drivers = p.kolommen.flat().map(id=> byId[id]).filter(Boolean);
+  const drivers = dkOpNummer(p.kolommen.flat().map(id=> byId[id]).filter(Boolean));
   const nieuw = [];
   const draad = (a, b, sectie)=>{ if(a && b) nieuw.push({id: cryptoId(), a, b, kleur: "Bruin", kleurAuto: true, sectie: sectie || "1.5", label: "", auto: true}); };
   const blok = (sl)=> "dkp_" + sl + "_" + dk.id;
@@ -556,7 +564,7 @@ function dkPastOp(dk, plaatB, plaatH){
 }
 function dkKastAdvies(dk){
   const p = dkPlan(dk);
-  const sig = JSON.stringify([dkDrivers(dk).map(d=> [d.naam, d.armaturen && d.armaturen.map(a=> a.aantal)]), p.klemExtra, p.draai, p.kokerV, p.kokerH, p.rkDubbel, dk.sturing,
+  const sig = JSON.stringify([dkDrivers(dk).map(d=> [d.naam, d.armaturen && d.armaturen.map(a=> a.aantal)]), p.klemExtra, p.draai, p.kokerV, p.kokerH, p.kokerBreedte, p.rkDubbel, dk.sturing,
     Object.keys(cadosInst).filter(k=> k.startsWith("driver_maat:")).map(k=> JSON.stringify(cadosInst[k]))]);
   if(dkAdviesCache.has(sig)) return dkAdviesCache.get(sig);
   const lijst = RITTAL_AX.map(k=> Object.assign({}, k, dkPastOp(dk, k.pb, k.ph)));
@@ -650,7 +658,7 @@ const UV_CTX_DK = {
         <label class="uv-veld">Hoogte (mm)<input type="number" min="200" step="5" class="dk-h" value="${p.hoogte}"></label>
       </div>`}
       <div class="uv-rij2">
-        <label class="uv-veld">Koker verticaal<select class="dk-kv">${DK_KOKERS.map(v=> `<option value="${v}" ${v===p.kokerV?"selected":""}>${v} mm</option>`).join("")}</select></label>
+        <label class="uv-veld" title="standaard voor alle verticale kokers; klik op een koker in de tekening om hem apart in te stellen">Koker verticaal<select class="dk-kv">${DK_KOKERS.map(v=> `<option value="${v}" ${v===p.kokerV?"selected":""}>${v} mm</option>`).join("")}</select></label>
         <label class="uv-veld">Koker bij rail<select class="dk-kh">${DK_KOKERS.map(v=> `<option value="${v}" ${v===p.kokerH?"selected":""}>${v} mm</option>`).join("")}</select></label>
       </div>
       <label class="uv-veld">DIN-rail (schakelaar, verdeelblokken, rijgklemmen)<select class="dk-rkpos">
@@ -682,6 +690,26 @@ const UV_CTX_DK = {
     box.querySelector(".dk-dub").addEventListener("change", e=>{ p.rkDubbel = e.target.value==="1"; save(); h.rerender(); });
     box.querySelector(".dk-herschik").addEventListener("click", ()=>{ dkVulIndeling(dk, true); save(); h.rerender(); });
     zone.appendChild(box);
+  },
+  extraDetail: (sel, zone, h)=>{
+    if(!String(sel).startsWith("koker:")) return false;
+    const p = h.kast, id = sel.slice(6);
+    const k = p._layout.kokers.find(x=> x.id===id);
+    if(!k) return false;
+    const huidig = dkKokerMM(p, id);
+    const eigen = DK_KOKERS.includes(p.kokerBreedte[id]);
+    const box = el(`<div class="card uv-detail"><div class="card-body uv-sidebody">
+      <div class="uv-detail-kop"><strong>${k.soort==="h" ? "Horizontale koker (bij de rail)" : "Verticale koker"}</strong><button class="uv-x dk-ksluit" title="sluiten (Esc)">✕</button></div>
+      <div class="uv-veld">Breedte<div class="uv-knoprij">${DK_KOKERS.map(v=> `<button class="btn small ${v===huidig ? "primary" : "ghost"} dk-kb" data-v="${v}">${v} mm</button>`).join("")}</div></div>
+      <div class="hint">${eigen ? "Eigen breedte voor deze koker." : "Volgt de standaard voor " + (k.soort==="h" ? "de koker bij de rail" : "verticale kokers") + "."} ${(()=>{ const n = p.bedrading.length; return ""; })()}</div>
+      ${eigen ? `<button class="btn small ghost dk-kstd">Standaardbreedte gebruiken</button>` : ""}
+    </div></div>`);
+    box.querySelectorAll(".dk-kb").forEach(b=> b.addEventListener("click", ()=>{ p.kokerBreedte[id] = parseInt(b.dataset.v); save(); h.rerender(); }));
+    const st = box.querySelector(".dk-kstd");
+    if(st) st.addEventListener("click", ()=>{ delete p.kokerBreedte[id]; save(); h.rerender(); });
+    box.querySelector(".dk-ksluit").addEventListener("click", ()=>{ uvSelExtra = null; h.teken(); });
+    zone.appendChild(box);
+    return true;
   },
   moduleDetail: (md, zone, h)=>{
     const p = h.kast, dk = p._dk, info = md._dk;   // md = de (pseudo)module zelf

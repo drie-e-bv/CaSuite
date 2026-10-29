@@ -351,6 +351,7 @@ let uvZoom = 1;
 let uvKleur = "Bruin", uvSectie = "2.5", uvKleurAuto = true;
 let uvPending = null;             // {m, k}: startklem van een nieuwe draad
 let uvSelWire = null, uvSelMod = null, uvSelKam = null;
+let uvSelExtra = null;            // bv. "koker:V1" in de driverkast
 let uvKamType = "1P+N", uvKamModus = false;
 let uvLaatsteOmzet = null;        // rapport van de laatste automatische omzetting (per kast-id)
 
@@ -1455,6 +1456,7 @@ function renderUitvoeringsplan(ctxArg){
     detail.innerHTML = "";
     const w = uvSelWire && kast.bedrading.find(x=> x.id===uvSelWire);
     const md = uvSelMod && uvAlleModules(kast).find(x=> x.id===uvSelMod);
+    if(uvSelExtra && !w && !md && ctx.extraDetail && ctx.extraDetail(uvSelExtra, detail, {teken, kast, rerender: ()=> selectTab(ctx.tab)})) return;
     const kam = uvSelKam && (kast.kamgeleiders||[]).find(x=> x.id===uvSelKam);
     if(kam){
       const om = uvKamOmschrijving(kast, kam);
@@ -2007,7 +2009,9 @@ function renderUitvoeringsplan(ctxArg){
     if(kamEl){ uvSelKam = kamEl.getAttribute("data-kam"); uvSelWire = null; uvSelMod = null; teken(); return; }
     const mod = e.target.closest(".uv-mod");
     if(mod){ uvSelMod = mod.getAttribute("data-mod"); uvSelWire = null; uvSelKam = null; teken(); return; }
-    if(uvSelWire || uvSelMod || uvSelKam){ uvSelWire = null; uvSelMod = null; uvSelKam = null; teken(); }
+    const extra = ctx.extraDetail && e.target.closest("[data-koker]");
+    if(extra){ uvSelExtra = "koker:" + extra.getAttribute("data-koker"); uvSelWire = null; uvSelMod = null; uvSelKam = null; teken(); return; }
+    if(uvSelWire || uvSelMod || uvSelKam || uvSelExtra){ uvSelWire = null; uvSelMod = null; uvSelKam = null; uvSelExtra = null; teken(); }
   });
   canvas.addEventListener("wheel", e=>{
     if(!(e.ctrlKey || e.metaKey)) return;
@@ -2072,7 +2076,7 @@ function renderUitvoeringsplan(ctxArg){
     if(ctrl || e.altKey) return;
     if(k==="Escape"){
       if(uvPending || uvKamModus || uvZoomVenster || uvVerplaats){ uvPending = null; uvKamModus = false; uvZoomVenster = false; uvVerplaats = null; tekenTools(); teken(); }
-      else if(uvSelWire || uvSelKam || uvSelMod){ uvSelWire = null; uvSelKam = null; uvSelMod = null; teken(); }
+      else if(uvSelWire || uvSelKam || uvSelMod || uvSelExtra){ uvSelWire = null; uvSelKam = null; uvSelMod = null; uvSelExtra = null; teken(); }
       return;
     }
     if(k==="f" || k==="F"){ e.preventDefault(); zetZoomModus("kast"); return; }
