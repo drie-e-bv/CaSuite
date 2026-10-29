@@ -347,3 +347,6 @@
 .uv-svg .dk-blok-lab{font-size:9px;font-weight:800;fill:#1f4f8a;text-anchor:middle;pointer-events:none;}
 #cados-app .dk-maatrij{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;}
 #cados-app .dk-maatrij input{padding:4px 6px;font-size:12px;}
+
+#cados-app .dk-advies{background:#eef6f1;border:1px solid #9cc7ad;border-radius:8px;padding:6px 8px;font-size:12px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
+#cados-app .dk-kast{font-size:12px;}

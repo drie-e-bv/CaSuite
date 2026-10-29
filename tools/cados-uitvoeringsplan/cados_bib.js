@@ -484,7 +484,7 @@ function uvGeometrie(kast){
       if(w <= 0) return;
       const x = padL + xRel[m.id].x;
       // modules onderaan uitgelijnd in hun rij (drivers van verschillende lengte: klemmen bij de goot)
-      const y = rijY[ri] + rijH[ri] - h;
+      const y = rij._uitlijn==="boven" ? rijY[ri] : rijY[ri] + rijH[ri] - h;
       mods.push({m, x, y, w, h, ri, rijId: rij.id, slot: xRel[m.id].slot, code: codes[m.id]||""});
       if(m.categorie==="Leeg") return;
       klemmenVoorModule(m).forEach(k=>{
@@ -1243,6 +1243,7 @@ function renderUitvoeringsplan(ctxArg){
   const hulp = wrap.querySelector("#uvHulp");
   const heeftModules = uvAlleModules(kast).some(m=> m.categorie!=="Leeg");
   let geoNu = null, routesNu = [];
+  let extraHerberekenen = null;
   let huidigeSchaal = 1;
 
   hulp.innerHTML = `<div class="card"><div class="card-body uv-sidebody">
@@ -1405,6 +1406,7 @@ function renderUitvoeringsplan(ctxArg){
     pasSchaalAan();
     canvas.scrollLeft = scrollL; canvas.scrollTop = scrollT;
     legHistorieVast();
+    if(extraHerberekenen) extraHerberekenen();
     if(uvPending){ const pts = uvPending.punten||[]; if(pts.length) toonDraadPreview(pts[pts.length-1]); }
     tekenBanner(); tekenSide(); tekenLijst(); tekenStatus();
   }
@@ -2041,7 +2043,16 @@ function renderUitvoeringsplan(ctxArg){
   aan(".uv-bib", "click", ()=> openModuleBibliotheek({ naSluiten: ()=>{ uvSyncEnOpruimen(kast); teken(); } }));
   wrap.querySelectorAll(".uv-export").forEach(b=> b.addEventListener("click", ()=> ctx.export()));
   aan(".uv-dxf", "click", ()=> downloadDxf(kast, kast.naam || ctx.titel));
-  if(ctx.extraKaart && bed) ctx.extraKaart(wrap.querySelector("#uvExtra"), {teken, kast, rerender: ()=> selectTab(ctx.tab)});
+  const extraZone = wrap.querySelector("#uvExtra");
+  const tekenExtra = ()=>{ if(!ctx.extraKaart || !bed) return; extraZone.innerHTML = ""; ctx.extraKaart(extraZone, {teken, kast, rerender: ()=> selectTab(ctx.tab)}); };
+  tekenExtra();
+  // zijkaart (bv. kastkeuze driverkast) bijwerken als de tekening verandert, even na de laatste wijziging
+  let extraTimer = null, extraSig = uvKastJson(kast);
+  extraHerberekenen = ()=>{
+    if(!ctx.extraKaart) return;
+    clearTimeout(extraTimer);
+    extraTimer = setTimeout(()=>{ if(!document.body.contains(wrap) || sleep) return; const sg = uvKastJson(kast); if(sg===extraSig) return; extraSig = sg; tekenExtra(); }, 700);
+  };
 
   /* ---------- sneltoetsen ---------- */
   if(uvToetsHandler) document.removeEventListener("keydown", uvToetsHandler);
