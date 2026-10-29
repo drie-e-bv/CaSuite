@@ -18638,8 +18638,7 @@ function toonBibEditor(ctx, bestaand, concept){
       verlaatEditor(ctx);
       toast("Module bewaard in de bibliotheek");
       if(ctx.opts.kies){ ctx.opts.kies(opgeslagen); ctx.sluit(); }
-      else if(ctx.opts.plaats && !bestaand && confirm(`"${opgeslagen.naam}" ook meteen in de zekeringkast plaatsen?`)){ const f = ctx.opts.plaats; ctx.opts.naSluiten = null; ctx.sluit(); f(opgeslagen); }
-      else toonBibLijst(ctx);
+      else{ if(ctx.opts.plaats && !bestaand) ctx.filter.q = opgeslagen.naam || ""; toonBibLijst(ctx); }
     }catch(err){
       const msg = String(err && err.message || err);
       alert(/duplicate|unique/i.test(msg) ? `Er bestaat al een module met de naam "${naam}". Kies een andere naam.` : "Bewaren mislukt: "+msg);
