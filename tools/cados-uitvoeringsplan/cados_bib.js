@@ -408,6 +408,14 @@ function uvSyncEnOpruimen(kast){
 // Geometrie met goten OP MAAT: elke goot (boven/tussen/onder de rijen) is zo hoog als nodig voor
 // de kamgeleider en het aantal draden dat erin loopt; een lege goot blijft smal.
 const UV_BAAN = 7, UV_MAX_BANEN = 20, UV_ZIJBAAN = 7;
+/* Zijgoot-weergave (2026-10-29, Peter: "functie om de zijdraden compact te maken, bij grote kasten kan
+   dit anders nogal breed worden — voor weergave of afdruk"): uitgespreid (elke draad een eigen baan
+   van 7), compact (dicht tegen elkaar) of gebundeld (alle draden samen in één bundel, met het aantal).
+   Geldt voor het scherm én de PDF-export; per gebruiker onthouden. */
+const UV_ZIJ_MODI = {uit: {label: "uitgespreid", stap: UV_ZIJBAAN}, compact: {label: "compact", stap: 2.6}, bundel: {label: "gebundeld", stap: 0}};
+let uvZijModus = (()=>{ try{ const v = localStorage.getItem("cados_uv_zijgoot"); return UV_ZIJ_MODI[v] ? v : "uit"; }catch(_e){ return "uit"; } })();
+function uvZetZijModus(v){ uvZijModus = UV_ZIJ_MODI[v] ? v : "uit"; try{ localStorage.setItem("cados_uv_zijgoot", uvZijModus); }catch(_e){} }
+function uvZijStap(){ return (UV_ZIJ_MODI[uvZijModus] || UV_ZIJ_MODI.uit).stap; }
 function uvGeometrie(kast){
   const codes = computeZekeringCodes();
   const nC = kast.rijen.length + 1;
@@ -431,7 +439,8 @@ function uvGeometrie(kast){
   const plan = uvBaanPlan(kast, gootVan, (e)=> xVan[uvKlemKey(e.m, e.k)], (e)=> zijdeVan[uvKlemKey(e.m, e.k)], nC, UV.PADX*2 + kast.maat*UV.MW);
   const banen = plan.banen;
   // zijgoten links/rechts zo breed als nodig: elke draad tussen de rijen een eigen baan van UV_ZIJBAAN
-  const padL = Math.max(UV.PADX, 34 + plan.zijN.L*UV_ZIJBAAN), padR = Math.max(UV.PADX, 34 + plan.zijN.R*UV_ZIJBAAN);
+  const zs = uvZijStap();
+  const padL = Math.max(UV.PADX, 40 + plan.zijN.L*zs), padR = Math.max(UV.PADX, 40 + plan.zijN.R*zs);
   const width = padL + kast.maat*UV.MW + padR;
   const kamBand = new Array(nC).fill(0);
   (kast.kamgeleiders||[]).forEach(k=>{
@@ -598,7 +607,8 @@ function uvRoutes(kast, geo){
       const ya = baanY(ca, pd.baan_a || 0), yb = baanY(cb, pd.baan_b || 0);
       const links = pd.kant ? pd.kant==="L" : (A.x + B.x)/2 < geo.width/2;
       const n = pd.zi || 0;
-      const xs = links ? (geo.padL - 16 - n*UV_ZIJBAAN) : (geo.kastR + 16 + n*UV_ZIJBAAN);
+      const zs = uvZijStap();
+      const xs = links ? (geo.padL - 16 - n*zs) : (geo.kastR + 16 + n*zs);
       verts = uvVereenvoudig([{x:A.x,y:A.y},{x:A.x,y:ya},{x:xs,y:ya},{x:xs,y:yb},{x:B.x,y:yb},{x:B.x,y:B.y}]);
     }
     return {w, A, B, verts, d: uvPad(verts), handmatig: !!(w.punten && w.punten.length), tussen};
@@ -702,6 +712,22 @@ function bouwBedradingSvg(kast, interactief, opts){
   // bedradingsgoten
   for(let c=0; c<=kast.rijen.length; c++){
     if(geo.hoogte[c] > 30) s += `<rect x="${geo.padL-6}" y="${geo.gootTop[c]+geo.kamBand[c]+4}" width="${geo.kastR-geo.padL+12}" height="${Math.max(6, geo.hoogte[c]-geo.kamBand[c]-10)}" rx="6" class="uv-goot"/>`;
+  }
+  // zijgoten links/rechts (bij compact/gebundeld duidelijk als één goot met het aantal draden)
+  if(geo.plan && geo.rijY.length){
+    const zs = uvZijStap();
+    const y0 = geo.gootTop[0] + 4, y1 = geo.height - 4;
+    [["L", geo.plan.zijN.L], ["R", geo.plan.zijN.R]].forEach(([k, n])=>{
+      if(!n) return;
+      const binnen = k==="L" ? geo.padL - 16 : geo.kastR + 16;
+      const buiten = k==="L" ? binnen - (n-1)*zs : binnen + (n-1)*zs;
+      const x = Math.min(binnen, buiten) - 6, w = Math.abs(buiten - binnen) + 12;
+      s += `<rect x="${x}" y="${y0}" width="${w}" height="${y1-y0}" rx="5" class="uv-zijgoot${uvZijModus!=="uit" ? " vol" : ""}"/>`;
+      if(uvZijModus!=="uit"){
+        const tx = k==="L" ? x - 5 : x + w + 5, ty = (y0 + y1)/2;
+        s += `<text x="${tx}" y="${ty}" class="uv-zijgoot-tel" transform="rotate(-90 ${tx} ${ty})">${n} draad${n>1?"en":""}</text>`;
+      }
+    });
   }
   // DIN-rails + rijnummer
   kast.rijen.forEach((rij, ri)=>{
@@ -1229,6 +1255,8 @@ function renderUitvoeringsplan(){
           <label class="uv-chk"><input type="checkbox" data-laag="labels" ${uvLagen.labels?"checked":""}> klemlabels</label>
           <label class="uv-chk"><input type="checkbox" data-laag="nummers" ${uvLagen.nummers?"checked":""}> draadnummers</label>
         </div>
+        <label class="uv-veld" title="hoe breed de zijgoten links/rechts getekend worden — op het scherm én in de PDF">Zijgoot (links/rechts)
+          <select class="uv-zijmodus">${Object.entries(UV_ZIJ_MODI).map(([k,v])=>`<option value="${k}" ${k===uvZijModus?"selected":""}>${v.label}</option>`).join("")}</select></label>
       </div>
       <div class="uv-sec uv-sec-meer">
         <button class="btn small ghost uv-bib">🔌 Modulebibliotheek</button>
@@ -1936,6 +1964,7 @@ function renderUitvoeringsplan(){
   aan(".uv-omzet", "click", doeOmzet);
   aan(".uv-kamtype", "change", e=>{ uvKamType = e.target.value; if(uvKamModus) teken(); });
   wrap.querySelectorAll("[data-laag]").forEach(c=> c.addEventListener("change", ()=>{ uvLagen[c.dataset.laag] = c.checked; teken(); }));
+  aan(".uv-zijmodus", "change", e=>{ uvZetZijModus(e.target.value); teken(); if(uvZoomModus!=="vrij") pasSchaalAan(); });
   aan(".uv-wis", "click", ()=>{
     const nk = (kast.kamgeleiders||[]).length;
     if(!kast.bedrading.length && !nk) return;

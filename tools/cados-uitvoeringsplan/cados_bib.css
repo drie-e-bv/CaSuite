@@ -316,3 +316,7 @@
 .uv-svg.focusmodus .uv-draad:not(.focus){opacity:.13;}
 .uv-svg.focusmodus .uv-draad.focus .uv-draad-rand{stroke:rgba(187,94,38,.75);}
 .uv-svg.heeft-sel:not(.focusmodus) .uv-draad:not(.sel){opacity:.3;}
+
+.uv-svg .uv-zijgoot{fill:none;stroke:#e3e6ea;stroke-dasharray:4 4;}
+.uv-svg .uv-zijgoot.vol{fill:#eef0f3;stroke:#c9ced4;stroke-dasharray:none;}
+.uv-svg .uv-zijgoot-tel{font-size:9px;font-weight:700;fill:#5c636b;text-anchor:middle;pointer-events:none;}
