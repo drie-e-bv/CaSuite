@@ -3716,6 +3716,12 @@
 #cados-app .mot-inline select{width:auto;}
 #cados-app .mot-waarschuwing{margin-top:10px;padding:8px 12px;border:1px solid #e7c27a;background:#fdf6e6;border-radius:8px;color:#7a5410;}
 
+/* lijnen volgen: focus bij hoveren, geselecteerde draad springt eruit */
+.uv-svg .uv-draad{transition:opacity .12s;}
+.uv-svg.focusmodus .uv-draad:not(.focus){opacity:.13;}
+.uv-svg.focusmodus .uv-draad.focus .uv-draad-rand{stroke:rgba(187,94,38,.75);}
+.uv-svg.heeft-sel:not(.focusmodus) .uv-draad:not(.sel){opacity:.3;}
+
 </style>
 </head>
 <body>
@@ -16166,19 +16172,32 @@ function uvSyncEnOpruimen(kast){
 
 // Geometrie met goten OP MAAT: elke goot (boven/tussen/onder de rijen) is zo hoog als nodig voor
 // de kamgeleider en het aantal draden dat erin loopt; een lege goot blijft smal.
-const UV_BAAN = 7, UV_MAX_BANEN = 12;
+const UV_BAAN = 7, UV_MAX_BANEN = 20, UV_ZIJBAAN = 7;
 function uvGeometrie(kast){
   const codes = computeZekeringCodes();
   const nC = kast.rijen.length + 1;
   // pass 1: in welke goot komt elke draad toe (zijde van de klem + rij van de module)
-  const zijdeVan = {}, rijVanMod = {};
-  kast.rijen.forEach((rij, ri)=> rij.items.forEach(m=>{
-    rijVanMod[m.id] = ri;
-    if(m.categorie!=="Leeg" && moduleBreedte(m) > 0) klemmenVoorModule(m).forEach(k=>{ zijdeVan[uvKlemKey(m.id, k.id)] = zijdeVanKlem(k); });
-  }));
+  const zijdeVan = {}, rijVanMod = {}, xVan = {};
+  kast.rijen.forEach((rij, ri)=>{
+    let slot = 0;
+    rij.items.forEach(m=>{
+      rijVanMod[m.id] = ri;
+      const b = moduleBreedte(m);
+      const x0 = UV.PADX + slot*UV.MW;
+      slot += b;
+      if(m.categorie!=="Leeg" && b > 0) klemmenVoorModule(m).forEach(k=>{
+        const key = uvKlemKey(m.id, k.id);
+        zijdeVan[key] = zijdeVanKlem(k);
+        xVan[key] = x0 + (parseFloat(k.x)||0)*b*UV.MW;
+      });
+    });
+  });
   const gootVan = (e)=>{ const z = zijdeVan[uvKlemKey(e.m, e.k)], ri = rijVanMod[e.m]; return (z===undefined || ri===undefined) ? null : (z==="boven" ? ri : ri+1); };
-  const banen = new Array(nC).fill(0);
-  (kast.bedrading||[]).forEach(w=>{ const ca = gootVan(w.a), cb = gootVan(w.b); if(ca===null || cb===null) return; banen[ca]++; if(cb!==ca) banen[cb]++; });
+  const plan = uvBaanPlan(kast, gootVan, (e)=> xVan[uvKlemKey(e.m, e.k)], (e)=> zijdeVan[uvKlemKey(e.m, e.k)], nC, UV.PADX*2 + kast.maat*UV.MW);
+  const banen = plan.banen;
+  // zijgoten links/rechts zo breed als nodig: elke draad tussen de rijen een eigen baan van UV_ZIJBAAN
+  const padL = Math.max(UV.PADX, 34 + plan.zijN.L*UV_ZIJBAAN), padR = Math.max(UV.PADX, 34 + plan.zijN.R*UV_ZIJBAAN);
+  const width = padL + kast.maat*UV.MW + padR;
   const kamBand = new Array(nC).fill(0);
   (kast.kamgeleiders||[]).forEach(k=>{
     const ri = kast.rijen.findIndex(r=> r.id===k.rijId);
@@ -16197,7 +16216,7 @@ function uvGeometrie(kast){
     let slot = 0;
     rij.items.forEach(m=>{
       const b = moduleBreedte(m);
-      const x = UV.PADX + slot*UV.MW;
+      const x = padL + slot*UV.MW;
       slot += b;
       if(b===0) return;
       mods.push({m, x, y, w: b*UV.MW, h: UV.MH, ri, rijId: rij.id, slot: slot - b, code: codes[m.id]||""});
@@ -16210,8 +16229,7 @@ function uvGeometrie(kast){
       });
     });
   });
-  const width = UV.PADX*2 + kast.maat*UV.MW;
-  return {mods, klemPos, width, height: yy, codes, gootTop, hoogte, kamBand, rijY};
+  return {mods, klemPos, width, height: yy, codes, gootTop, hoogte, kamBand, rijY, plan, padL, padR, kastR: padL + kast.maat*UV.MW};
 }
 
 // Orthogonale routering: uit de klem naar de bedradingsgoot boven/onder de rij, horizontaal, en zo
@@ -16220,21 +16238,22 @@ function uvGeometrie(kast){
 // Knikpunten van een draad worden bewaard t.o.v. de goot of rij waarin ze liggen (goot + fractie,
 // of rij + afstand), zodat ze mee verschuiven als de goten groter/kleiner worden.
 function uvEncodeerPunt(p, geo){
-  const x = Math.round(p.x*10)/10;
+  const x = Math.round((p.x - (geo.padL || UV.PADX))*10)/10;
   for(let c=0; c<geo.hoogte.length; c++){
     const t = geo.gootTop[c], h = geo.hoogte[c];
-    if(p.y >= t - 0.01 && p.y <= t + h + 0.01) return {x, g: c, f: Math.round((p.y - t)/h*1000)/1000};
+    if(p.y >= t - 0.01 && p.y <= t + h + 0.01) return {xr: x, g: c, f: Math.round((p.y - t)/h*1000)/1000};
   }
   for(let r=0; r<geo.rijY.length; r++){
     const t = geo.rijY[r];
-    if(p.y >= t && p.y <= t + UV.MH) return {x, r, dy: Math.round((p.y - t)*10)/10};
+    if(p.y >= t && p.y <= t + UV.MH) return {xr: x, r, dy: Math.round((p.y - t)*10)/10};
   }
-  return {x, g: geo.hoogte.length-1, f: 1};
+  return {xr: x, g: geo.hoogte.length-1, f: 1};
 }
 function uvDecodeerPunt(q, geo){
-  if(q.g !== undefined && geo.gootTop[q.g] !== undefined) return {x: q.x, y: geo.gootTop[q.g] + q.f*geo.hoogte[q.g]};
-  if(q.r !== undefined && geo.rijY[q.r] !== undefined) return {x: q.x, y: geo.rijY[q.r] + q.dy};
-  return {x: q.x, y: q.y || 0};
+  const x = q.xr !== undefined ? (geo.padL || UV.PADX) + q.xr : q.x - UV.PADX + (geo.padL || UV.PADX);
+  if(q.g !== undefined && geo.gootTop[q.g] !== undefined) return {x, y: geo.gootTop[q.g] + q.f*geo.hoogte[q.g]};
+  if(q.r !== undefined && geo.rijY[q.r] !== undefined) return {x, y: geo.rijY[q.r] + q.dy};
+  return {x, y: q.y || 0};
 }
 function uvVereenvoudig(v){
   const out = [];
@@ -16266,30 +16285,88 @@ function uvPad(v){ return "M" + v.map(p=> `${Math.round(p.x*10)/10} ${Math.round
 // Orthogonale routering: zonder knikpunten automatisch (uit de klem naar de goot boven/onder de rij,
 // horizontaal, en zo naar de andere klem; via de zijgoot als het een andere goot is), met knikpunten
 // haaks door die punten. Elke automatische draad krijgt een eigen baan in de goot.
+/* Banenplan (2026-10-29, op vraag van Peter: "manier om duidelijk de verschillende lijnen uit te volgen
+   ... helft links en helft rechts van de kast? vanaf midden draait het om?").
+   - Draden tussen twee goten (= tussen de rijen) gaan via de zijgoot aan de kant van de kast waar ze
+     zitten: linkerhelft links, rechterhelft rechts.
+   - In de zijgoot liggen ze genest: de draad die het dichtst bij de rand vertrekt, ligt het dichtst
+     tegen de kast; zo kruisen ze elkaar zo weinig mogelijk.
+   - In een goot delen draden die elkaar niet overlappen dezelfde baan (minder banen, kortere
+     aftakkingen); korte verbindingen liggen het dichtst bij de modules. */
+function uvBaanPlan(kast, gootVan, xVan, zijdeVanE, nC, width){
+  const midden = width/2;
+  const perDraad = {};
+  const items = Array.from({length: nC}, ()=> []);   // per goot: {id, lo, hi, prio, eind}
+  const zij = {L: [], R: []};
+  (kast.bedrading||[]).forEach(w=>{
+    if(Array.isArray(w.punten) && w.punten.length) return;
+    const ca = gootVan(w.a), cb = gootVan(w.b);
+    const xa = xVan(w.a), xb = xVan(w.b);
+    if(ca===null || cb===null || xa===undefined || xb===undefined) return;
+    if(ca===cb){
+      items[ca].push({id: w.id, e: "ab", lo: Math.min(xa, xb), hi: Math.max(xa, xb), prio: 0, lengte: Math.abs(xa - xb)});
+      return;
+    }
+    const kant = (xa + xb)/2 < midden ? "L" : "R";
+    const afstand = kant==="L" ? (xa + xb)/2 : width - (xa + xb)/2;
+    zij[kant].push({id: w.id, afstand});
+    perDraad[w.id] = {kant};
+    [["a", ca, xa, w.a], ["b", cb, xb, w.b]].forEach(([e, c, x, eind])=>{
+      // klem in de rij ONDER de goot (zijde boven) -> dichter bij de rand = dichter bij de rij (onderaan)
+      const vanOnder = zijdeVanE(eind)==="boven";
+      items[c].push({id: w.id, e, lo: kant==="L" ? 0 : x, hi: kant==="L" ? x : width, prio: 1, afstand, vanOnder});
+    });
+  });
+  // zijbanen genest: dichtst bij de rand = binnenste baan
+  ["L","R"].forEach(k=> zij[k].sort((p, q)=> p.afstand - q.afstand).forEach((z, i)=>{ perDraad[z.id].zi = i; }));
+  const banen = new Array(nC).fill(0);
+  items.forEach((lijst, c)=>{
+    // korte verbindingen in de goot eerst (bovenste banen); daarna de zijgoot-draden, genest
+    const intra = lijst.filter(it=> it.prio===0).sort((p, q)=> p.lengte - q.lengte);
+    const boven = lijst.filter(it=> it.prio===1 && !it.vanOnder).sort((p, q)=> p.afstand - q.afstand);
+    const onder = lijst.filter(it=> it.prio===1 && it.vanOnder).sort((p, q)=> q.afstand - p.afstand);
+    const rijen = [];   // per baan: bezette intervallen
+    const plaats = (it)=>{
+      let i = 0;
+      for(; i<rijen.length; i++) if(!rijen[i].some(([lo, hi])=> it.lo < hi + 8 && it.hi > lo - 8)) break;
+      if(i===rijen.length) rijen.push([]);
+      rijen[i].push([it.lo, it.hi]);
+      return i;
+    };
+    // zijgoot-draden onderling altijd in volgorde (ze overlappen elkaar aan de rand), dus nesting blijft
+    [...intra, ...boven, ...onder].forEach(it=>{
+      const i = plaats(it);
+      perDraad[it.id] = perDraad[it.id] || {};
+      perDraad[it.id]["baan_" + it.e] = i;
+    });
+    banen[c] = rijen.length;
+  });
+  return {perDraad, banen, zijN: {L: zij.L.length, R: zij.R.length}};
+}
+// Orthogonale routering: zonder knikpunten volgens het banenplan, met knikpunten haaks door die punten.
 function uvRoutes(kast, geo){
-  const baan = {};
-  const zij = {L:0, R:0};
-  const neemBaan = (c)=>{ baan[c] = (baan[c]||0) + 1; const n = (baan[c]-1) % UV_MAX_BANEN; return geo.gootTop[c] + geo.kamBand[c] + 12 + n*UV_BAAN; };
+  const plan = geo.plan || {perDraad: {}, zijN: {L: 0, R: 0}};
+  const baanY = (c, i)=> geo.gootTop[c] + geo.kamBand[c] + 12 + (i % UV_MAX_BANEN)*UV_BAAN;
   return kast.bedrading.map(w=>{
     const A = geo.klemPos[uvKlemKey(w.a.m, w.a.k)], B = geo.klemPos[uvKlemKey(w.b.m, w.b.k)];
     if(!A || !B) return null;
     const ca = A.zijde==="boven" ? A.ri : A.ri+1;
     const cb = B.zijde==="boven" ? B.ri : B.ri+1;
-    let verts;
+    const pd = plan.perDraad[w.id] || {};
+    let verts, tussen = ca!==cb;
     if(Array.isArray(w.punten) && w.punten.length){
-      if(ca===cb) neemBaan(ca); else { neemBaan(ca); neemBaan(cb); }
       verts = uvVertsVoor(A, B, w.punten.map(q=> uvDecodeerPunt(q, geo)));
-    } else if(ca===cb){
-      const yc = neemBaan(ca);
+    } else if(!tussen){
+      const yc = baanY(ca, pd.baan_ab || 0);
       verts = uvVereenvoudig([{x:A.x,y:A.y},{x:A.x,y:yc},{x:B.x,y:yc},{x:B.x,y:B.y}]);
     } else {
-      const ya = neemBaan(ca), yb = neemBaan(cb);
-      const links = (A.x + B.x)/2 < geo.width/2;
-      const n = links ? zij.L++ : zij.R++;
-      const xs = links ? (UV.PADX - 16 - (n % 5)*8) : (geo.width - UV.PADX + 16 + (n % 5)*8);
+      const ya = baanY(ca, pd.baan_a || 0), yb = baanY(cb, pd.baan_b || 0);
+      const links = pd.kant ? pd.kant==="L" : (A.x + B.x)/2 < geo.width/2;
+      const n = pd.zi || 0;
+      const xs = links ? (geo.padL - 16 - n*UV_ZIJBAAN) : (geo.kastR + 16 + n*UV_ZIJBAAN);
       verts = uvVereenvoudig([{x:A.x,y:A.y},{x:A.x,y:ya},{x:xs,y:ya},{x:xs,y:yb},{x:B.x,y:yb},{x:B.x,y:B.y}]);
     }
-    return {w, A, B, verts, d: uvPad(verts), handmatig: !!(w.punten && w.punten.length)};
+    return {w, A, B, verts, d: uvPad(verts), handmatig: !!(w.punten && w.punten.length), tussen};
   }).filter(Boolean);
 }
 
@@ -16339,16 +16416,23 @@ function uvWireSvg(r, interactief, nummer, toonNummer){
   const bw = draadBreedte(w.sectie);
   const sel = interactief && uvSelWire===w.id;
   const tip = r.A && r.B ? `#${nummer} · ${r.A.code||""} · ${r.A.k.label||""} → ${r.B.code||""} · ${r.B.k.label||""}\n${w.kleur||""} ${w.sectie||""} mm²${w.label?" · "+w.label:""}${r.handmatig?" · eigen route":""}` : "";
-  let s = `<g class="uv-draad${sel?" sel":""}" data-w="${w.id}" data-tip="${escapeHtml(tip)}">`;
+  let s = `<g class="uv-draad${sel?" sel":""}${r.tussen?" tussen":""}" data-w="${w.id}" data-ka="${escapeHtml(uvKlemKey(w.a.m, w.a.k))}" data-kb="${escapeHtml(uvKlemKey(w.b.m, w.b.k))}" data-tip="${escapeHtml(tip)}">`;
   if(interactief) s += `<path d="${r.d}" class="uv-draad-hit"/>`;
   s += `<path d="${r.d}" class="uv-draad-rand" style="stroke-width:${bw+1.6}"/>`;
   s += `<path d="${r.d}" style="stroke:${kleur};stroke-width:${bw}" class="uv-draad-kern"/>`;
   if(w.kleur==="Geel/groen") s += `<path d="${r.d}" style="stroke:#f2d600;stroke-width:${bw};stroke-dasharray:7 7" class="uv-draad-kern"/>`;
   if(toonNummer){
-    // nummer op het midden van het langste stuk
-    let best = null, lang = -1;
-    for(let i=0; i<r.verts.length-1; i++){ const a = r.verts[i], b = r.verts[i+1]; const l = Math.abs(a.x-b.x) + Math.abs(a.y-b.y); if(l > lang){ lang = l; best = {x: (a.x+b.x)/2, y: (a.y+b.y)/2}; } }
-    if(best){ const t = String(nummer); s += `<rect x="${best.x - 3 - t.length*2.6}" y="${best.y-5.5}" width="${6 + t.length*5.2}" height="11" rx="3" class="uv-draadnr-bg" style="stroke:${kleur}"/><text x="${best.x}" y="${best.y+3}" class="uv-draadnr">${t}</text>`; }
+    // draadnummer aan BEIDE uiteinden (zoals een draadmerker), vlak naast de klem op het eerste stuk
+    const t = String(nummer);
+    const merk = (p, q)=>{
+      const l = Math.abs(q.x-p.x) + Math.abs(q.y-p.y);
+      if(l < 4) return "";
+      const f = Math.min(16, l*0.5)/l;
+      const x = p.x + (q.x-p.x)*f, y = p.y + (q.y-p.y)*f;
+      return `<rect x="${x - 3 - t.length*2.6}" y="${y-5.5}" width="${6 + t.length*5.2}" height="11" rx="3" class="uv-draadnr-bg" style="stroke:${kleur}"/><text x="${x}" y="${y+3}" class="uv-draadnr">${t}</text>`;
+    };
+    const v = r.verts;
+    if(v.length > 1){ s += merk(v[0], v[1]) + merk(v[v.length-1], v[v.length-2]); }
   }
   s += `</g>`;
   if(sel){
@@ -16367,9 +16451,10 @@ function uvWireSvg(r, interactief, nummer, toonNummer){
   return s;
 }
 
-let uvLagen = { draden: true, kammen: true, labels: true, nummers: false };
+let uvLagen = { draden: true, tussen: true, kammen: true, labels: true, nummers: false };
 function bouwBedradingSvg(kast, interactief, opts){
-  const lagen = Object.assign({}, interactief ? uvLagen : { draden: true, kammen: true, labels: true, nummers: true }, (opts && opts.lagen) || {});
+  const lagen = Object.assign({}, interactief ? uvLagen : { draden: true, tussen: true, kammen: true, labels: true, nummers: true }, (opts && opts.lagen) || {});
+  const zichtbaar = (r)=> r.tussen ? lagen.tussen !== false : lagen.draden;
   const geo = uvGeometrie(kast);
   const routes = uvRoutes(kast, geo);
   const kammen = uvKamLayout(kast, geo);
@@ -16377,25 +16462,23 @@ function bouwBedradingSvg(kast, interactief, opts){
   const opKam = new Set();
   kast.bedrading.forEach(w=>{ verbonden.add(uvKlemKey(w.a.m, w.a.k)); verbonden.add(uvKlemKey(w.b.m, w.b.k)); });
   kammen.forEach(kl=> kl.tanden.forEach(t=>{ verbonden.add(t.key); opKam.add(t.key); }));
-  let s = `<svg xmlns="http://www.w3.org/2000/svg" class="uv-svg${interactief && uvKamModus ? " kammodus" : ""}" viewBox="0 0 ${geo.width} ${geo.height}" width="${Math.round(geo.width*(interactief?uvZoom:1))}" height="${Math.round(geo.height*(interactief?uvZoom:1))}">`;
+  let s = `<svg xmlns="http://www.w3.org/2000/svg" class="uv-svg${interactief && uvKamModus ? " kammodus" : ""}${interactief && uvSelWire ? " heeft-sel" : ""}" viewBox="0 0 ${geo.width} ${geo.height}" width="${Math.round(geo.width*(interactief?uvZoom:1))}" height="${Math.round(geo.height*(interactief?uvZoom:1))}">`;
   s += `<rect x="0" y="0" width="${geo.width}" height="${geo.height}" class="uv-achtergrond"/>`;
   // bedradingsgoten
   for(let c=0; c<=kast.rijen.length; c++){
-    if(geo.hoogte[c] > 30) s += `<rect x="${UV.PADX-6}" y="${geo.gootTop[c]+geo.kamBand[c]+4}" width="${geo.width-2*UV.PADX+12}" height="${Math.max(6, geo.hoogte[c]-geo.kamBand[c]-10)}" rx="6" class="uv-goot"/>`;
+    if(geo.hoogte[c] > 30) s += `<rect x="${geo.padL-6}" y="${geo.gootTop[c]+geo.kamBand[c]+4}" width="${geo.kastR-geo.padL+12}" height="${Math.max(6, geo.hoogte[c]-geo.kamBand[c]-10)}" rx="6" class="uv-goot"/>`;
   }
   // DIN-rails + rijnummer
   kast.rijen.forEach((rij, ri)=>{
     const y = geo.rijY[ri];
-    s += `<rect x="${UV.PADX-10}" y="${y+UV.MH/2-12}" width="${kast.maat*UV.MW+20}" height="24" class="uv-rail"/>`;
-    s += `<text x="${UV.PADX-24}" y="${y+UV.MH/2+4}" class="uv-rijnr">${ri+1}</text>`;
+    s += `<rect x="${geo.padL-10}" y="${y+UV.MH/2-12}" width="${kast.maat*UV.MW+20}" height="24" class="uv-rail"/>`;
+    s += `<text x="${geo.padL-24}" y="${y+UV.MH/2+4}" class="uv-rijnr">${ri+1}</text>`;
   });
   geo.mods.forEach(md=>{ s += uvModuleSvg(md); });
   if(lagen.kammen) kammen.forEach(kl=>{ s += uvKamSvg(kl, interactief); });
   const nrVan = {};
   kast.bedrading.forEach((w, i)=>{ nrVan[w.id] = i+1; });
-  if(lagen.draden){
-    routes.filter(r=> !(interactief && uvSelWire===r.w.id)).forEach(r=>{ s += uvWireSvg(r, interactief, nrVan[r.w.id], lagen.nummers); });
-  }
+  routes.filter(r=> zichtbaar(r) && !(interactief && uvSelWire===r.w.id)).forEach(r=>{ s += uvWireSvg(r, interactief, nrVan[r.w.id], lagen.nummers); });
   // klemmen bovenop
   Object.entries(geo.klemPos).forEach(([key, p])=>{
     const pend = uvPending && uvKlemKey(uvPending.m, uvPending.k)===key;
@@ -16419,7 +16502,7 @@ function bouwBedradingSvg(kast, interactief, opts){
     });
   });
   // de geselecteerde draad bovenaan, met zijn handgrepen
-  if(interactief && uvSelWire && lagen.draden){ const r = routes.find(x=> x.w.id===uvSelWire); if(r) s += uvWireSvg(r, true, nrVan[r.w.id], lagen.nummers); }
+  if(interactief && uvSelWire){ const r = routes.find(x=> x.w.id===uvSelWire); if(r && zichtbaar(r)) s += uvWireSvg(r, true, nrVan[r.w.id], lagen.nummers); }
   if(interactief) s += `<rect class="uv-kam-preview" x="0" y="0" width="0" height="0" style="display:none"/><rect class="uv-zoom-preview" x="0" y="0" width="0" height="0" style="display:none"/><path class="uv-draad-preview" d="" style="display:none"/>`;
   s += `</svg>`;
   return {svg: s, geo, routes};
@@ -16905,7 +16988,8 @@ function renderUitvoeringsplan(){
       <div class="uv-sec">
         <div class="uv-sec-titel">Lagen</div>
         <div class="uv-lagen">
-          <label class="uv-chk"><input type="checkbox" data-laag="draden" ${uvLagen.draden?"checked":""}> draden</label>
+          <label class="uv-chk" title="draden die in dezelfde goot blijven"><input type="checkbox" data-laag="draden" ${uvLagen.draden?"checked":""}> draden in de goot</label>
+          <label class="uv-chk" title="verbindingen tussen de rijen (via de zijgoot links/rechts)"><input type="checkbox" data-laag="tussen" ${uvLagen.tussen?"checked":""}> tussen de rijen</label>
           <label class="uv-chk"><input type="checkbox" data-laag="kammen" ${uvLagen.kammen?"checked":""}> kamgeleiders</label>
           <label class="uv-chk"><input type="checkbox" data-laag="labels" ${uvLagen.labels?"checked":""}> klemlabels</label>
           <label class="uv-chk"><input type="checkbox" data-laag="nummers" ${uvLagen.nummers?"checked":""}> draadnummers</label>
@@ -17674,6 +17758,28 @@ function renderUitvoeringsplan(){
 
   teken();
   if(!moduleBibGeladen || !cadosInstGeladen) laadAllesVoorUitvoering().then(()=>{ uvSyncEnOpruimen(kast); if(document.body.contains(wrap)){ hist.laatste = uvKastJson(kast); teken(); } });
+  // Lijnen volgen: hover over een draad = enkel die draad duidelijk, de rest vervaagt; hover over een
+  // klem = alle draden op die klem.
+  let focusSleutel = "";
+  canvas.addEventListener("pointermove", ev=>{
+    if(sleep || ev.pointerType==="touch") return;
+    const svg = canvas.querySelector("svg.uv-svg");
+    if(!svg) return;
+    const d = ev.target.closest && (ev.target.closest(".uv-draad") || (ev.target.closest(".uv-greep") && uvSelWire && svg.querySelector(`.uv-draad[data-w="${uvSelWire}"]`)));
+    const k = !d && ev.target.closest && ev.target.closest(".uv-klem");
+    const sl = d ? "w:" + d.getAttribute("data-w") : (k ? "k:" + k.getAttribute("data-m") + "|" + k.getAttribute("data-k") : "");
+    if(sl===focusSleutel) return;
+    focusSleutel = sl;
+    svg.querySelectorAll(".uv-draad.focus").forEach(x=> x.classList.remove("focus"));
+    let n = 0;
+    if(d){ svg.querySelectorAll(`.uv-draad[data-w="${d.getAttribute("data-w")}"]`).forEach(x=>{ x.classList.add("focus"); n++; }); }
+    else if(k){
+      const key = uvKlemKey(k.getAttribute("data-m"), k.getAttribute("data-k"));
+      svg.querySelectorAll(".uv-draad").forEach(x=>{ if(x.getAttribute("data-ka")===key || x.getAttribute("data-kb")===key){ x.classList.add("focus"); n++; } });
+    }
+    svg.classList.toggle("focusmodus", n > 0);
+  });
+  canvas.addEventListener("pointerleave", ()=>{ focusSleutel = ""; const svg = canvas.querySelector("svg.uv-svg"); if(svg){ svg.classList.remove("focusmodus"); svg.querySelectorAll(".uv-draad.focus").forEach(x=> x.classList.remove("focus")); } });
   // Zwevende uitleg bij hoveren: benaming + specs van de module, klem, draad.
   const tipEl = el(`<div class="uv-tip" style="display:none;"></div>`);
   canvasBox.appendChild(tipEl);

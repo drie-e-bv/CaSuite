@@ -310,3 +310,9 @@
 #cados-app .mot-inline{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;}
 #cados-app .mot-inline select{width:auto;}
 #cados-app .mot-waarschuwing{margin-top:10px;padding:8px 12px;border:1px solid #e7c27a;background:#fdf6e6;border-radius:8px;color:#7a5410;}
+
+/* lijnen volgen: focus bij hoveren, geselecteerde draad springt eruit */
+.uv-svg .uv-draad{transition:opacity .12s;}
+.uv-svg.focusmodus .uv-draad:not(.focus){opacity:.13;}
+.uv-svg.focusmodus .uv-draad.focus .uv-draad-rand{stroke:rgba(187,94,38,.75);}
+.uv-svg.heeft-sel:not(.focusmodus) .uv-draad:not(.sel){opacity:.3;}
