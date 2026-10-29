@@ -68,7 +68,8 @@ function dkPlan(dk){
   if(!(p.hoogte > 0)) p.hoogte = 775;
   if(!Array.isArray(p.kolommen)) p.kolommen = [];
   if(!p.draai || typeof p.draai !== "object") p.draai = {};
-  if(!p.klemPerSpot || typeof p.klemPerSpot !== "object") p.klemPerSpot = {};
+  if(!p.klemExtra || typeof p.klemExtra !== "object") p.klemExtra = {};
+  delete p.klemPerSpot;   // vroeger: klemmen per spot
   if(!Array.isArray(p.bedrading)) p.bedrading = [];
   if(!Array.isArray(p.kamgeleiders)) p.kamgeleiders = [];
   if(!DK_KOKERS.includes(p.kokerV)) p.kokerV = 40;
@@ -81,21 +82,12 @@ function dkPlan(dk){
 
 /* ---------- klemlijsten ---------- */
 function dkPushKringen(dk){ return [...new Set(dkDrivers(dk).map(d=> d.kringId).filter(Boolean))]; }
-// rijgklemmen van één driver: per spot (2 of 3) of 1 kabel per driver
+// Rijgklemmen van één driver (Peter, 29/10): altijd 1 kabel per driver (+ en −) — de serie- of
+// parallelschakeling gebeurt in de strip/spot zelf. Optie: 1 extra klem erbij.
+function dkKlemExtra(p, d){ return !!(p.klemExtra && p.klemExtra[d.id]); }
 function dkKlemLijst(d, p){
-  const perSpot = p.klemPerSpot[d.id] === undefined ? 2 : p.klemPerSpot[d.id];
-  const spots = dkSpots(d);
-  const lijst = [];
-  if(perSpot===0 || !spots){ lijst.push({sp: 0, pol: "+"}, {sp: 0, pol: "-"}); return lijst; }
-  let i = 0;
-  (d.armaturen||[]).forEach(a=>{
-    const n = Math.max(0, parseInt(a.aantal) || (a.naam ? 1 : 0));
-    for(let j=0; j<n; j++){
-      i++;
-      lijst.push({sp: i, pol: "+", arm: a}, {sp: i, pol: "-", arm: a});
-      if(perSpot===3) lijst.push({sp: i, pol: "s", arm: a});
-    }
-  });
+  const lijst = [{sp: 0, pol: "+"}, {sp: 0, pol: "-"}];
+  if(dkKlemExtra(p, d)) lijst.push({sp: 0, pol: "s"});
   return lijst;
 }
 function dkRailBreedte(dk, p){
@@ -281,15 +273,15 @@ function dkPlanKast(dk){
       const x = ((dub ? Math.floor(i/2) : i) + 0.5)/nPos;
       const niveau = dub ? i % 2 : 0;
       const yK = yKast + (boven ? -1 : 1)*niveau*0.13, yP = yKabel + (boven ? 1 : -1)*niveau*0.13;
-      const lab = (e.sp ? e.sp : "") + (e.pol==="+" ? "+" : (e.pol==="-" ? "−" : "s"));
+      const lab = e.pol==="+" ? "+" : (e.pol==="-" ? "−" : "x");
       const f = e.pol==="s" ? "contact" : e.pol;
-      const tip = [codes[d.id], e.arm ? (e.arm.naam || "") + " " + e.sp : "kabel", e.arm && e.arm.ruimte, e.pol==="+" ? "plus" : (e.pol==="-" ? "min" : "stuur")].filter(Boolean).join(" · ");
+      const tip = [codes[d.id], "kabel " + [...new Set((d.armaturen||[]).map(a=> a.ruimte).filter(Boolean))].join(", "), e.pol==="+" ? "plus" : (e.pol==="-" ? "min" : "extra klem")].filter(Boolean).join(" · ");
       const kl = e.pol==="+" ? "Rood" : (e.pol==="-" ? "Zwart" : "");
       klemmen.push({id: `k${i}`, label: lab, functie: f, kleur: kl, zijde: zijKast, x, y: yK, rijgSoort: "kast", tip: tip + " · kastzijde", _sp: e.sp, _pol: e.pol, geenLabel: dub && niveau===1});
       klemmen.push({id: `p${i}`, label: lab, functie: f, kleur: kl, zijde: zijKabel, x, y: yP, rijgSoort: "preflex", tip: tip + " · kabel", _sp: e.sp, _pol: e.pol, geenLabel: dub && niveau===1});
     });
     codes["dkk_" + d.id] = codes[d.id];
-    railModule("dkk_" + d.id, d.naam, dkRijgBreedte(lijst, p), "klemmen", klemmen, {driver: d, perSpot: p.klemPerSpot[d.id] === undefined ? 2 : p.klemPerSpot[d.id], spots: dkSpots(d)});
+    railModule("dkk_" + d.id, d.naam, dkRijgBreedte(lijst, p), "klemmen", klemmen, {driver: d, extra: dkKlemExtra(p, d), spots: dkSpots(d)});
   });
   const railLengte = rx - 3 + DK_RAND_MM;
   // --- horizontale koker naast de rail ---
@@ -458,7 +450,7 @@ function dkModuleSvg(md){
   const tip = soort==="schakelaar" ? "Werkschakelaar — voeding van de driverkast uitschakelen" :
     soort==="dali" ? "DALI-ingang — 2 rijgklemmen: DALI-kabel DA+ (zwart) en DA− (grijs), doorverbonden naar de verdeelblokken" :
     soort==="phoenix" ? `Phoenix ${DK_PTFIX_ART} (${info.kleur}) — verdeelblok ${info.lab}, ${info.blokken} blok(ken) van 1 voeding + 18 aansluitingen` :
-    [code + " — " + (d.naam||""), info.perSpot===0 ? "1 kabel per driver" : `${info.spots} spot(s) × ${info.perSpot} klemmen`, [...new Set((d.armaturen||[]).map(a=> a.ruimte).filter(Boolean))].join(", ")].filter(Boolean).join("\n");
+    [code + " — " + (d.naam||""), info.extra ? "1 kabel (+ en −) + 1 extra klem" : "1 kabel (+ en −)", `${info.spots} spot(s)/strip(s) — serie of parallel in de armatuur`, [...new Set((d.armaturen||[]).map(a=> a.ruimte).filter(Boolean))].join(", ")].filter(Boolean).join("\n");
   let s = `<g class="uv-mod dk-blok${sel} ${soort}" data-mod="${m.id}" data-tip="${escapeHtml(tip)}">`;
   s += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="3" class="dk-blok-body"/>`;
   if(soort==="klemmen"){
@@ -513,7 +505,7 @@ function dkOmzet(p){
     if(dk.sturing === "PUSH"){ if(d.kringId) draad({m: blok("P" + d.kringId), k: pt}, {m: d.id, k: "P"}); }
     else { draad({m: blok("DA+"), k: pt}, {m: d.id, k: "DA1"}); draad({m: blok("DA-"), k: pt}, {m: d.id, k: "DA2"}); }
   });
-  // uitgangen naar de rijgklemmen: stroomsturing in serie, spanning parallel
+  // uitgangen naar de rijgklemmen: 1 kabel per driver (+ rood, − zwart); de extra klem blijft vrij
   drivers.forEach(d=>{
     const lijst = dkKlemLijst(d, p);
     const B = (i)=> ({m: "dkk_" + d.id, k: "k" + i});
@@ -562,7 +554,7 @@ function dkPastOp(dk, plaatB, plaatH){
 }
 function dkKastAdvies(dk){
   const p = dkPlan(dk);
-  const sig = JSON.stringify([dkDrivers(dk).map(d=> [d.naam, d.armaturen && d.armaturen.map(a=> a.aantal)]), p.klemPerSpot, p.draai, p.kokerV, p.kokerH, p.rkDubbel, dk.sturing,
+  const sig = JSON.stringify([dkDrivers(dk).map(d=> [d.naam, d.armaturen && d.armaturen.map(a=> a.aantal)]), p.klemExtra, p.draai, p.kokerV, p.kokerH, p.rkDubbel, dk.sturing,
     Object.keys(cadosInst).filter(k=> k.startsWith("driver_maat:")).map(k=> JSON.stringify(cadosInst[k]))]);
   if(dkAdviesCache.has(sig)) return dkAdviesCache.get(sig);
   const lijst = RITTAL_AX.map(k=> Object.assign({}, k, dkPastOp(dk, k.pb, k.ph)));
@@ -690,16 +682,16 @@ const UV_CTX_DK = {
     }
     const d = info.driver;
     const maat = dkDriverMaat(d);
-    const perSpot = p.klemPerSpot[d.id] === undefined ? 2 : p.klemPerSpot[d.id];
+    const extra = dkKlemExtra(p, d);
     const isDriver = info.soort==="driver";
     const twee = dkTweeKanten(d);
     const box = el(`<div class="card uv-detail"><div class="card-body uv-sidebody">
       <div class="uv-detail-kop"><strong>${escapeHtml(codes[d.id]||"")} ${escapeHtml(d.naam||"driver")}</strong></div>
       <div class="hint">${escapeHtml((d.armaturen||[]).filter(a=> a.naam).map(a=> (parseInt(a.aantal)||1) + "× " + a.naam + (a.ruimte ? " (" + a.ruimte + ")" : "")).join(", ") || "geen armaturen")}<br>${dkIsSpanning(d) ? "spanningsgestuurd — spots/strips parallel" : "stroomgestuurd — spots in serie"}</div>
       <label class="uv-veld">Rijgklemmen<select class="dk-ps">
-        <option value="2" ${perSpot===2?"selected":""}>2 per spot/strip (+ en −)</option>
-        <option value="3" ${perSpot===3?"selected":""}>3 per spot (+, − en stuurdraad)</option>
-        <option value="0" ${perSpot===0?"selected":""}>1 kabel per driver (2 klemmen)</option></select></label>
+        <option value="0" ${!extra?"selected":""}>1 kabel: + en − (2 klemmen)</option>
+        <option value="1" ${extra?"selected":""}>1 kabel + 1 extra klem (3 klemmen)</option></select></label>
+      <div class="hint">Serie- of parallelschakeling gebeurt in de strip of spot zelf.</div>
       ${isDriver ? `${twee ? `<div class="hint">Aansluitingen links (ingang) én rechts (uitgang) — kokers aan beide kanten.</div>` : `<div class="uv-veld">Aansluitingen<div class="uv-knoprij">
           <button class="btn small ${info.kant==="L"?"primary":"ghost"} dk-kant" data-k="L">◧ links</button><button class="btn small ${info.kant==="R"?"primary":"ghost"} dk-kant" data-k="R">rechts ◨</button></div></div>`}
       <div class="uv-veld">Maat (L × B × H mm)${maat.onbekend ? ' <span class="uv-fout-tel">onbekend</span>' : ""}
@@ -710,7 +702,7 @@ const UV_CTX_DK = {
         <button class="btn small ghost dk-mv" data-r="links" title="naar de kolom links">← kolom</button><button class="btn small ghost dk-mv" data-r="rechts" title="naar de kolom rechts (of een nieuwe)">kolom →</button></div></div>` : ""}
       <div class="uv-knoprij"><button class="btn small ghost dk-layout">Op tabblad Driverkast</button></div>
     </div></div>`);
-    box.querySelector(".dk-ps").addEventListener("change", e=>{ p.klemPerSpot[d.id] = parseInt(e.target.value); save(); h.rerender(); });
+    box.querySelector(".dk-ps").addEventListener("change", e=>{ if(e.target.value==="1") p.klemExtra[d.id] = true; else delete p.klemExtra[d.id]; save(); h.rerender(); });
     box.querySelectorAll(".dk-mv").forEach(b=> b.addEventListener("click", ()=>{ dkVerplaats(p, d.id, b.dataset.r); save(); h.rerender(); }));
     box.querySelectorAll(".dk-kant").forEach(b=> b.addEventListener("click", ()=>{ p.draai[d.id] = b.dataset.k; save(); h.rerender(); }));
     const ml = box.querySelector(".dk-ml");
