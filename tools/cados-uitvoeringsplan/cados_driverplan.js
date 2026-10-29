@@ -28,21 +28,25 @@ const DK_TOP_PX = 18;
 // Maten (L x B x H in mm) van de drivers die Casentis gebruikt, opgezocht op 29/10/2026.
 // Aanpasbaar per type in het zijpaneel (gedeeld via elektro_cados_instellingen).
 const DK_DRIVER_MATEN = [
-  {re: /maxi\s*jol+[iy]/i, l: 124, b: 79, h: 22, aansl: "eind", bron: "TCI DC MAXI JOLLY US DALI (122413) — verlichting.be"},
-  {re: /mini\s*jol+[iy]/i, l: 110, b: 52, h: 22, aansl: "eind", bron: "TCI DC MINI JOLLY DALI (122403) — Onninen"},
-  {re: /jol+[iy]/i,        l: 103, b: 67, h: 21, aansl: "eind", bron: "TCI DC JOLLY DALI (122424) — TCI-datasheet via Rexel"},
-  {re: /pwm-?\s*120/i,     l: 191, b: 63, h: 37.5, aansl: "twee", bron: "Mean Well PWM-120 — datasheet"},
-  {re: /pwm-?\s*90/i,      l: 171, b: 63, h: 37.5, aansl: "twee", bron: "Mean Well PWM-90 — datasheet"},
-  {re: /pwm-?\s*60/i,      l: 150, b: 53, h: 35, aansl: "twee", bron: "Mean Well PWM-60 — datasheet"},
+  {re: /maxi\s*jol+[iy]/i, l: 124, b: 79, h: 22, aansl: "eind", gat: {hoh: 111, d: 4.2}, bron: "TCI DC MAXI JOLLY US DALI (122413) — verlichting.be"},
+  {re: /mini\s*jol+[iy]/i, l: 110, b: 52, h: 22, aansl: "eind", gat: {hoh: 98, d: 4.2, schat: true}, bron: "TCI DC MINI JOLLY DALI (122403) — Onninen"},
+  {re: /jol+[iy]/i,        l: 103, b: 67, h: 21, aansl: "eind", gat: {hoh: 91, d: 4.2, schat: true}, bron: "TCI DC JOLLY DALI (122424) — TCI-datasheet via Rexel"},
+  {re: /pwm-?\s*120/i,     l: 191, b: 63, h: 37.5, aansl: "twee", gat: {hoh: 181, d: 4.5, schat: true}, bron: "Mean Well PWM-120 — datasheet"},
+  {re: /pwm-?\s*90/i,      l: 171, b: 63, h: 37.5, aansl: "twee", gat: {hoh: 161, d: 4.5, schat: true}, bron: "Mean Well PWM-90 — datasheet"},
+  {re: /pwm-?\s*60/i,      l: 150, b: 53, h: 35, aansl: "twee", gat: {hoh: 140, d: 4.5}, bron: "Mean Well PWM-60 — datasheet"},
 ];
+// ruimte tussen de DIN-rail (zone van 48 mm) en de horizontale koker, instelbaar (Peter, 29/10)
+function dkRailKoker(p){ const v = parseFloat(p.railKoker); return v >= 0 && v <= 200 ? v : 6; }
 function dkMaatSleutel(naam){ return "driver_maat:" + String(naam||"").trim().toLowerCase(); }
 function dkDriverMaat(d){
   const naam = d.naam || d.type || "";
   const eigen = cadosInst[dkMaatSleutel(naam)];
   const std = DK_DRIVER_MATEN.find(x=> x.re.test(naam));
-  if(eigen && eigen.l && eigen.b) return Object.assign({aansl: (std && std.aansl) || "eind"}, eigen, {eigen: true, bron: "eigen maat (gedeeld)"});
-  if(std) return {l: std.l, b: std.b, h: std.h, aansl: std.aansl, bron: std.bron};
-  return {l: 120, b: 60, h: 30, aansl: "eind", onbekend: true, bron: "maat onbekend — vul ze in"};
+  // boorgaten (Peter, 29/10): 2 gaten op de middellijn, hart-op-hart in de lengte; eigen waarde gaat voor
+  const stdGat = (l)=> (std && std.gat) ? std.gat : {hoh: Math.max(0, l - 12), d: 4.5, schat: true};
+  if(eigen && eigen.l && eigen.b) return Object.assign({aansl: (std && std.aansl) || "eind"}, eigen, {eigen: true, bron: "eigen maat (gedeeld)", gat: eigen.gat && eigen.gat.hoh > 0 ? Object.assign({eigen: true}, eigen.gat) : stdGat(eigen.l)});
+  if(std) return {l: std.l, b: std.b, h: std.h, aansl: std.aansl, bron: std.bron, gat: stdGat(std.l)};
+  return {l: 120, b: 60, h: 30, aansl: "eind", onbekend: true, bron: "maat onbekend — vul ze in", gat: stdGat(120)};
 }
 // stroomsturing (350/500/700 mA, in serie) of spanning (12/24 V, parallel)?
 function dkIsSpanning(d){
@@ -202,7 +206,7 @@ function dkVerdeel(drivers, k, p){
 }
 // Maten (mm) van een kolomindeling
 function dkMeetIndeling(dk, p, cols){
-  const zone = DK_RAND_MM + DK_RAIL_H_MM + 6 + dkKokerMM(p, "H") + 8;
+  const zone = DK_RAND_MM + DK_RAIL_H_MM + dkRailKoker(p) + dkKokerMM(p, "H") + 8;
   const kolB = cols.map(c=> Math.max(0, ...c.map(d=> dkDriverMaat(d).l)));
   const kolH = cols.map(c=> c.reduce((t, d, i)=> t + dkDriverMaat(d).b + (i ? DK_TUSSEN_MM : 0), 0));
   const kokerSom = dkKokerPosities(p, cols).reduce((t, ci)=> t + dkKokerMM(p, "V" + ci) + 8, 0);
@@ -333,7 +337,7 @@ function dkPlanKast(dk){
   });
   const railLengte = rx - 3 + DK_RAND_MM;
   // --- horizontale koker naast de rail ---
-  const hk0 = railY1 + 6, hk1 = hk0 + dkKokerMM(p, "H");
+  const hk0 = railY1 + dkRailKoker(p), hk1 = hk0 + dkKokerMM(p, "H");
   // --- kolommen en verticale kokers, van links naar rechts ---
   const kolPos = dkKokerPosities(p, cols);
   let x = DK_RAND_MM;
@@ -489,11 +493,37 @@ function dkModuleSvg(md){
       s += `<text x="${kx}" y="${y + k.y*h + 2.5}" class="dk-kl">${escapeHtml(k.label)}</text>`;
     });
     const cx = x + w/2;
-    s += `<rect x="${cx-16}" y="${y + 5}" width="32" height="16" rx="4" class="uv-code-bg"/><text x="${cx}" y="${y + 16.5}" class="uv-code">${escapeHtml(code)}</text>`;
+    // boorgaten
+    if(maat.gat && maat.gat.hoh > 0){
+      const gr = Math.max(2, maat.gat.d/2*DK_PXMM), gy = y + h/2;
+      [-1, 1].forEach(z=>{ const gx = cx + z*maat.gat.hoh/2*DK_PXMM; s += `<circle cx="${gx}" cy="${gy}" r="${gr}" class="dk-gat"/><path d="M${gx-gr-2} ${gy}H${gx+gr+2}M${gx} ${gy-gr-2}V${gy+gr+2}" class="dk-gat-kruis"/>`; });
+    }
+    s += `<rect x="${cx-18}" y="${y + 4}" width="36" height="15" rx="4" class="uv-code-bg"/><text x="${cx}" y="${y + 15}" class="uv-code">${escapeHtml(code)}</text>`;
     const naam = String(d.naam || "driver").replace(/^tci\s+/i, "TCI ").replace(/meanwel+\b/i, "Mean Well");
-    const maxC = Math.max(6, Math.floor((w - 2*sw - 10)/5.2));
-    s += `<text x="${cx}" y="${y + h*0.58}" class="dk-naam">${escapeHtml(naam.slice(0, maxC))}</text>`;
-    s += `<text x="${cx}" y="${y + h*0.58 + 10}" class="dk-maat">${escapeHtml((maat.l + "×" + maat.b + " mm" + (arm ? " · " + dkSpots(d) + "× " + ((d.armaturen||[])[0]||{}).naam : "")).slice(0, maxC + 4))}</text>`;
+    // omschrijving (Peter, 29/10): per armatuur het draadnummer (armatuurcode), aantal × armatuur en de ruimte
+    const binnen = w - 2*sw - 2*Math.max(6, (maat.gat ? maat.gat.d : 4)*DK_PXMM) - 8;
+    const maxC = Math.max(8, Math.floor(binnen/5));
+    const kort = (t)=> t.length > maxC ? t.slice(0, maxC - 1) + "…" : t;
+    const ac = computeDriverCodes();
+    const regels = (d.armaturen||[]).filter(a=> a.naam).map(a=> ({nr: ac[a.id] || "", t: `${parseInt(a.aantal)||1}× ${a.naam}`, r: a.ruimte || ""}));
+    const lh = 10;
+    const plaats = Math.max(1, Math.floor((h - 26 - 12) / lh));   // regels onder code en naam, boven de maat
+    let ty = y + 28;
+    s += `<text x="${cx}" y="${ty}" class="dk-naam">${escapeHtml(kort(naam))}</text>`;
+    ty += lh + 1;
+    const toon = [];
+    regels.forEach(r=>{ toon.push({nr: r.nr, t: r.t}); if(r.r) toon.push({t: r.r, ruimte: true}); });
+    if(toon.length > plaats - 1){
+      // te weinig plaats: draadnummer + aantal × armatuur + ruimte op één regel
+      toon.length = 0; regels.forEach(r=> toon.push({nr: r.nr, t: r.t + (r.r ? " · " + r.r : "")}));
+    }
+    toon.slice(0, Math.max(1, plaats - 1)).forEach((r, i, a)=>{
+      const meer = i === a.length - 1 && toon.length > a.length ? ` (+${toon.length - a.length})` : "";
+      s += r.nr ? `<text x="${cx}" y="${ty}" class="dk-arm"><tspan class="dk-draadnr">${escapeHtml(r.nr)}</tspan> ${escapeHtml(kort(r.t + meer).slice(0, Math.max(4, maxC - r.nr.length - 1)))}</text>`
+                : `<text x="${cx}" y="${ty}" class="dk-ruimte">${escapeHtml(kort(r.t + meer))}</text>`;
+      ty += lh;
+    });
+    s += `<text x="${cx}" y="${y + h - 5}" class="dk-maat">${escapeHtml(kort(maat.l + "×" + maat.b + " mm"))}</text>`;
     s += `</g>`;
     return s;
   }
@@ -962,6 +992,7 @@ const UV_CTX_DK = {
         <label class="uv-veld" title="standaard voor alle verticale kokers; klik op een koker in de tekening om hem apart in te stellen">Koker verticaal<select class="dk-kv">${DK_KOKERS.map(v=> `<option value="${v}" ${v===p.kokerV?"selected":""}>${v} mm</option>`).join("")}</select></label>
         <label class="uv-veld">Koker bij rail<select class="dk-kh">${DK_KOKERS.map(v=> `<option value="${v}" ${v===p.kokerH?"selected":""}>${v} mm</option>`).join("")}</select></label>
       </div>
+      <label class="uv-veld" title="vrije ruimte tussen de zone van de DIN-rail (48 mm) en de horizontale koker">Ruimte DIN-rail ↔ koker (mm)<input type="number" min="0" max="200" step="1" class="dk-rk" value="${dkRailKoker(p)}"></label>
       <label class="uv-veld">DIN-rail (schakelaar, verdeelblokken, rijgklemmen)<select class="dk-rkpos">
         <option value="boven" ${p.rkPositie!=="onder"?"selected":""}>Bovenaan</option>
         <option value="onder" ${p.rkPositie==="onder"?"selected":""}>Onderaan</option></select></label>
@@ -994,6 +1025,7 @@ const UV_CTX_DK = {
     if(ib){ ib.addEventListener("change", zet); box.querySelector(".dk-h").addEventListener("change", zet); }
     box.querySelector(".dk-kv").addEventListener("change", e=>{ p.kokerV = parseInt(e.target.value); save(); h.rerender(); });
     box.querySelector(".dk-kh").addEventListener("change", e=>{ p.kokerH = parseInt(e.target.value); save(); h.rerender(); });
+    box.querySelector(".dk-rk").addEventListener("change", e=>{ const v = parseFloat(e.target.value); p.railKoker = v >= 0 ? Math.min(200, v) : 6; save(); h.rerender(); });
     box.querySelector(".dk-rkpos").addEventListener("change", e=>{ p.rkPositie = e.target.value; save(); h.rerender(); });
     box.querySelector(".dk-dub").addEventListener("change", e=>{ p.rkDubbel = e.target.value==="1"; save(); h.rerender(); });
     box.querySelector(".dk-sort").addEventListener("change", e=>{ p.sorteer = e.target.value; dkVulIndeling(dk, true); save(); h.rerender(); });
@@ -1067,6 +1099,9 @@ const UV_CTX_DK = {
       <div class="uv-veld">Maat (L × B × H mm)${maat.onbekend ? ' <span class="uv-fout-tel">onbekend</span>' : ""}
         <div class="dk-maatrij"><input type="number" class="dk-ml" value="${maat.l}"><input type="number" class="dk-mb" value="${maat.b}"><input type="number" class="dk-mh" value="${maat.h}"></div>
         <div class="hint">${escapeHtml(maat.bron)} — geldt voor alle "${escapeHtml(d.naam||"")}"</div></div>
+      <div class="uv-veld">Boorgaten (hart-op-hart × Ø mm)${maat.gat && maat.gat.schat ? ' <span class="uv-fout-tel" title="nog niet op een datasheet nagekeken — meet na en vul in">te controleren</span>' : ""}
+        <div class="dk-maatrij"><input type="number" step="0.5" class="dk-gh" value="${maat.gat ? maat.gat.hoh : ""}"><input type="number" step="0.1" class="dk-gd" value="${maat.gat ? maat.gat.d : ""}"><span></span></div>
+        <div class="hint">2 gaten op de middellijn, in de lengte van de driver — ook in de DXF (laag BOORGATEN).</div></div>
       <div class="uv-veld">Plaats (kolom ${info.kolom + 1} van ${p.kolommen.length})<div class="uv-knoprij">
         <button class="btn small ghost dk-mv" data-r="op" title="hoger in de kolom">↑</button><button class="btn small ghost dk-mv" data-r="neer" title="lager in de kolom">↓</button>
         <button class="btn small ghost dk-mv" data-r="links" title="naar de kolom links">← kolom</button><button class="btn small ghost dk-mv" data-r="rechts" title="naar de kolom rechts (of een nieuwe)">kolom →</button></div></div>` : ""}
@@ -1082,12 +1117,15 @@ const UV_CTX_DK = {
     if(ml){
       const zetMaat = async ()=>{
         const l = parseFloat(box.querySelector(".dk-ml").value), b = parseFloat(box.querySelector(".dk-mb").value), hh = parseFloat(box.querySelector(".dk-mh").value);
+        const gh = parseFloat(box.querySelector(".dk-gh").value), gd = parseFloat(box.querySelector(".dk-gd").value);
         if(!(l > 0 && b > 0)) return;
-        try{ await bewaarCadosInst(dkMaatSleutel(d.naam||d.type), {l, b, h: hh || 0}); toast(`Maat van "${d.naam}" bewaard (${l} × ${b} mm) — geldt voor alle projecten`); }
+        const waarde = {l, b, h: hh || 0};
+        if(gh > 0) waarde.gat = {hoh: gh, d: gd > 0 ? gd : 4.5};
+        try{ await bewaarCadosInst(dkMaatSleutel(d.naam||d.type), waarde); toast(`Maat van "${d.naam}" bewaard (${l} × ${b} mm) — geldt voor alle projecten`); }
         catch(err){ alert("Bewaren mislukt: " + (err.message||err)); }
         h.rerender();
       };
-      ["dk-ml","dk-mb","dk-mh"].forEach(c=> box.querySelector("." + c).addEventListener("change", zetMaat));
+      ["dk-ml","dk-mb","dk-mh","dk-gh","dk-gd"].forEach(c=> box.querySelector("." + c).addEventListener("change", zetMaat));
     }
     box.querySelector(".dk-layout").addEventListener("click", ()=> selectTab("driverkast"));
     const nk = box.querySelector(".dk-naarkast");

@@ -9,7 +9,7 @@
    ========================================================================= */
 const DXF_PXMM = UV.MW / 18;
 const DXF_KLEUR = {"Bruin": 34, "Blauw": 5, "Zwart": 7, "Grijs": 8, "Geel/groen": 3, "Rood": 1, "Oranje": 30, "Wit": 9, "Violet": 200, "Roze": 221, "Geel": 2};
-const DXF_LAGEN = [["KAST", 8], ["GOTEN", 9], ["RAILS", 8], ["MODULES", 7], ["KLEMMEN", 7], ["KLEMLABELS", 8], ["DRADEN", 7], ["DRAADNUMMERS", 7], ["KAMGELEIDERS", 30], ["TEKST", 7]];
+const DXF_LAGEN = [["KAST", 8], ["GOTEN", 9], ["RAILS", 8], ["MODULES", 7], ["KLEMMEN", 7], ["KLEMLABELS", 8], ["DRADEN", 7], ["DRAADNUMMERS", 7], ["KAMGELEIDERS", 30], ["BOORGATEN", 1], ["TEKST", 7]];
 function dxfTekst(t){
   return String(t == null ? "" : t)
     .replace(/[—–]/g, "-").replace(/×/g, "x").replace(/²/g, "2").replace(/[↑▲]/g, "^").replace(/[↓▼]/g, "v").replace(/−/g, "-").replace(/·/g, "-")
@@ -77,14 +77,23 @@ function bouwDxf(kast, titel){
     if(m.categorie==="Leeg") return;
     d.rect(md.x, md.y, md.w, md.h, "MODULES");
     const cx = md.x + md.w/2;
-    if(md.code) d.tekst(cx, md.y + md.h*0.3, md.code, 3.5, "TEKST");
+    if(md.code) d.tekst(cx, md.y + md.h*(m._dk && m._dk.soort==="driver" ? 0.14 : 0.3), md.code, 3.5, "TEKST");
     let regels = [];
-    if(m._dk && m._dk.soort==="driver"){ const mt = m._dk.maat; regels = [m.naam, `${mt.l}x${mt.b} mm`]; }
+    if(m._dk && m._dk.soort==="driver"){
+      const mt = m._dk.maat; regels = [m.naam, `${mt.l}x${mt.b} mm`];
+      if(mt.gat && mt.gat.hoh > 0){
+        const gy = md.y + md.h/2;
+        [-1, 1].forEach(z=>{ const gx = cx + z*mt.gat.hoh/2*DXF_PXMM; d.cirkel(gx, gy, mt.gat.d/2*DXF_PXMM, "BOORGATEN"); d.lijn(gx - 4*DXF_PXMM, gy, gx + 4*DXF_PXMM, gy, "BOORGATEN"); d.lijn(gx, gy - 4*DXF_PXMM, gx, gy + 4*DXF_PXMM, "BOORGATEN"); });
+      }
+      const ac = computeDriverCodes();
+      (m._dk.driver.armaturen||[]).filter(a=> a.naam).forEach(a=> regels.push(`${ac[a.id]||""} ${parseInt(a.aantal)||1}x ${a.naam}${a.ruimte ? " - " + a.ruimte : ""}`));
+    }
     else if(m._dk) regels = [m._dk.soort==="schakelaar" ? "Q werkschakelaar" : (m._dk.soort==="phoenix" ? m._dk.lab : "")];
     else regels = [typeof chipSpecText === "function" ? chipSpecText(m) : "", m.naam || ""];
     regels.filter(Boolean).forEach((r, i)=>{
       const hMm = Math.min(2.5, (md.w / DXF_PXMM) / Math.max(4, r.length) * 1.6);
-      d.tekst(cx, md.y + md.h*0.45 + i*5*DXF_PXMM, r, hMm, "TEKST");
+      const drv = m._dk && m._dk.soort==="driver";
+      d.tekst(cx, drv ? md.y + md.h*0.3 + i*4*DXF_PXMM : md.y + md.h*0.45 + i*5*DXF_PXMM, r, hMm, "TEKST");
     });
   });
   // kamgeleiders
