@@ -114,7 +114,9 @@ function dkDriverKlemmen(d, sturing, kant){
   const k = [];
   const mk = (lijst, zijde)=> lijst.forEach(([id, f, lab], i)=>{
     const y = lijst.length===1 ? 0.5 : 0.14 + 0.72*i/(lijst.length-1);
-    k.push({id, label: lab, functie: f, zijde: zijde==="L" ? "links" : "rechts", x: zijde==="L" ? 0 : 1, y: Math.round(y*1000)/1000, geenLabel: true,
+    // kleuren (Peter, 29/10): DALI oranje (DA+) en paars (DA−) via de klemfunctie, uitgangen rood (+) en zwart (−)
+    const kleur = f==="+" ? "Rood" : (f==="-" ? "Zwart" : "");
+    k.push({id, label: lab, functie: f, kleur, zijde: zijde==="L" ? "links" : "rechts", x: zijde==="L" ? 0 : 1, y: Math.round(y*1000)/1000, geenLabel: true,
       tip: lab==="DA" ? "DALI-bus" : (f==="push" ? "drukknop (push)" : (f==="+"||f==="-" ? "uitgang LED " + f : f))});
   });
   if(kant === "beide"){ mk(inn, "L"); mk(uit, "R"); }
@@ -271,8 +273,9 @@ function dkPlanKast(dk){
       const lab = (e.sp ? e.sp : "") + (e.pol==="+" ? "+" : (e.pol==="-" ? "−" : "s"));
       const f = e.pol==="s" ? "contact" : e.pol;
       const tip = [codes[d.id], e.arm ? (e.arm.naam || "") + " " + e.sp : "kabel", e.arm && e.arm.ruimte, e.pol==="+" ? "plus" : (e.pol==="-" ? "min" : "stuur")].filter(Boolean).join(" · ");
-      klemmen.push({id: `k${i}`, label: lab, functie: f, zijde: zijKast, x, y: yK, rijgSoort: "kast", tip: tip + " · kastzijde", _sp: e.sp, _pol: e.pol, geenLabel: dub && niveau===1});
-      klemmen.push({id: `p${i}`, label: lab, functie: f, zijde: zijKabel, x, y: yP, rijgSoort: "preflex", tip: tip + " · kabel", _sp: e.sp, _pol: e.pol, geenLabel: dub && niveau===1});
+      const kl = e.pol==="+" ? "Rood" : (e.pol==="-" ? "Zwart" : "");
+      klemmen.push({id: `k${i}`, label: lab, functie: f, kleur: kl, zijde: zijKast, x, y: yK, rijgSoort: "kast", tip: tip + " · kastzijde", _sp: e.sp, _pol: e.pol, geenLabel: dub && niveau===1});
+      klemmen.push({id: `p${i}`, label: lab, functie: f, kleur: kl, zijde: zijKabel, x, y: yP, rijgSoort: "preflex", tip: tip + " · kabel", _sp: e.sp, _pol: e.pol, geenLabel: dub && niveau===1});
     });
     codes["dkk_" + d.id] = codes[d.id];
     railModule("dkk_" + d.id, d.naam, dkRijgBreedte(lijst, p), "klemmen", klemmen, {driver: d, perSpot: p.klemPerSpot[d.id] === undefined ? 2 : p.klemPerSpot[d.id], spots: dkSpots(d)});
