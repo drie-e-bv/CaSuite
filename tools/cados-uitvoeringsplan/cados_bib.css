@@ -328,7 +328,9 @@
 #cados-app .uv-rk-kabelrij input{padding:3px 6px;font-size:12px;}
 
 /* driverkast plan */
-.uv-svg .dk-plaat{fill:#f3f1ec;stroke:none;}
+.uv-svg .dk-plaat{fill:#f3f1ec;stroke:#6b7178;stroke-width:2;}
+.uv-svg .dk-plaat.te-klein{stroke:#b3261e;}
+.uv-svg .dk-buiten{fill:rgba(179,38,30,.08);stroke:#b3261e;stroke-width:1;stroke-dasharray:6 4;}
 .uv-svg .dk-kast{fill:none;stroke:#8a9099;stroke-width:2;stroke-dasharray:8 5;}
 .uv-svg .dk-kast.te-klein{stroke:#b3261e;}
 .uv-svg .dk-kastmaat{font-size:10px;font-weight:700;fill:#5c636b;text-anchor:end;pointer-events:none;}

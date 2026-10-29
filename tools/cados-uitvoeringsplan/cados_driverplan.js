@@ -504,8 +504,11 @@ function dkAchtergrondSvg(p, geo){
   const x = UV.PADX, w = p.breedte*PX, h = p.hoogte*PX, y = DK_TOP_PX;
   const nodigB = Math.max(L.breedteNodig, L.railLengte);
   const teH = L.hoogteNodig > p.hoogte + 0.5, teB = nodigB > p.breedte + 0.5;
-  let s = `<rect x="${x}" y="${y}" width="${Math.max(w, nodigB*PX)}" height="${Math.max(h, L.hoogteNodig*PX)}" class="dk-plaat"/>`;
-  s += `<rect x="${x}" y="${y}" width="${w}" height="${h}" class="dk-kast${teH || teB ? " te-klein" : ""}"/>`;
+  // Peter (29/10): altijd tekenen op de montageplaat, niet op de buitenmaten van de kast. Wat er niet op
+  // past, steekt in het rood gearceerd buiten de plaat uit.
+  let s = "";
+  if(teH || teB) s += `<rect x="${x}" y="${y}" width="${Math.max(w, nodigB*PX)}" height="${Math.max(h, L.hoogteNodig*PX)}" class="dk-buiten"/>`;
+  s += `<rect x="${x}" y="${y}" width="${w}" height="${h}" class="dk-plaat${teH || teB ? " te-klein" : ""}"/>`;
   const ry = y + (L.boven ? DK_RAND_MM + DK_RAIL_H_MM/2 - 17.5 : p.hoogte - DK_RAND_MM - DK_RAIL_H_MM/2 - 17.5)*PX;
   s += `<rect x="${x + 4}" y="${ry}" width="${(Math.max(p.breedte, L.railLengte) - 8)*PX}" height="${35*PX}" class="uv-rail"/>`;
   L.kokers.forEach(k=>{
@@ -513,7 +516,7 @@ function dkAchtergrondSvg(p, geo){
     if(k.soort==="h") s += `<text x="${k.x1 - 6}" y="${k.y1 - 3}" class="dk-koker-lab" text-anchor="end">koker ${k.mm}</text>`;
     else s += `<text transform="translate(${(k.x0+k.x1)/2 + 3} ${k.y1 - 6}) rotate(-90)" class="dk-koker-lab">koker ${k.mm}</text>`;
   });
-  const kastTekst = p.kast ? `Rittal ${p.kast.naam} ${p.kast.b}×${p.kast.h}×${p.kast.d} — montageplaat ${p.breedte} × ${p.hoogte} mm` : `montageplaat ${p.breedte} × ${p.hoogte} mm`;
+  const kastTekst = `Montageplaat ${p.breedte} × ${p.hoogte} mm` + (p.kast ? ` (in Rittal ${p.kast.naam}, kast ${p.kast.b}×${p.kast.h}×${p.kast.d})` : "");
   const probleem = [teH ? `te laag (nodig ±${Math.ceil(L.hoogteNodig/5)*5} mm)` : "", teB ? `te smal (nodig ±${Math.ceil(nodigB/5)*5} mm${L.railLengte > p.breedte ? " voor de rail" : ""})` : ""].filter(Boolean).join(", ");
   s += `<text x="${x + w - 4}" y="${y - 5}" class="dk-kastmaat">${escapeHtml(kastTekst)}${probleem ? " — " + escapeHtml(probleem) : ""}</text>`;
   return s;
@@ -686,7 +689,7 @@ function dkPastOp(dk, plaatB, plaatH){
 }
 function dkKastAdvies(dk){
   const p = dkPlan(dk);
-  const sig = JSON.stringify([dkDrivers(dk).map(d=> [d.naam, d.armaturen && d.armaturen.map(a=> a.aantal)]), p.klemExtra, p.draai, p.kokerV, p.kokerH, p.kokerBreedte, p.rkDubbel, dk.sturing,
+  const sig = JSON.stringify([dkDrivers(dk).map(d=> [d.naam, d.armaturen && d.armaturen.map(a=> a.aantal)]), p.klemExtra, p.draai, p.kokerV, p.kokerH, p.kokerBreedte, p.rkDubbel, p.railKoker, p.sorteer, dk.sturing,
     Object.keys(cadosInst).filter(k=> k.startsWith("driver_maat:")).map(k=> JSON.stringify(cadosInst[k]))]);
   if(dkAdviesCache.has(sig)) return dkAdviesCache.get(sig);
   const lijst = RITTAL_AX.map(k=> Object.assign({}, k, dkPastOp(dk, k.pb, k.ph)));

@@ -58,7 +58,7 @@ function bouwDxf(kast, titel){
   // kast / montageplaat
   if(kast._dxfExtra){
     kast._dxfExtra(d, geo);
-    const kt = kast.kast ? `Rittal ${kast.kast.naam} ${kast.kast.b}x${kast.kast.h}x${kast.kast.d} - montageplaat ${kast.breedte} x ${kast.hoogte} mm` : `montageplaat ${kast.breedte} x ${kast.hoogte} mm`;
+    const kt = `montageplaat ${kast.breedte} x ${kast.hoogte} mm` + (kast.kast ? ` (Rittal ${kast.kast.naam}, kast ${kast.kast.b}x${kast.kast.h}x${kast.kast.d})` : "");
     d.tekst(geo.padL + kastB/2, 4, `${titel} - ${kt} - schaal 1:1 (mm)`, 5, "TEKST");
   } else {
     d.rect(geo.padL - 14, 0, kastB + 28, geo.height, "KAST");

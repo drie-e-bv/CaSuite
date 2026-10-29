@@ -3732,7 +3732,9 @@
 #cados-app .uv-rk-kabelrij input{padding:3px 6px;font-size:12px;}
 
 /* driverkast plan */
-.uv-svg .dk-plaat{fill:#f3f1ec;stroke:none;}
+.uv-svg .dk-plaat{fill:#f3f1ec;stroke:#6b7178;stroke-width:2;}
+.uv-svg .dk-plaat.te-klein{stroke:#b3261e;}
+.uv-svg .dk-buiten{fill:rgba(179,38,30,.08);stroke:#b3261e;stroke-width:1;stroke-dasharray:6 4;}
 .uv-svg .dk-kast{fill:none;stroke:#8a9099;stroke-width:2;stroke-dasharray:8 5;}
 .uv-svg .dk-kast.te-klein{stroke:#b3261e;}
 .uv-svg .dk-kastmaat{font-size:10px;font-weight:700;fill:#5c636b;text-anchor:end;pointer-events:none;}
@@ -20447,8 +20449,11 @@ function dkAchtergrondSvg(p, geo){
   const x = UV.PADX, w = p.breedte*PX, h = p.hoogte*PX, y = DK_TOP_PX;
   const nodigB = Math.max(L.breedteNodig, L.railLengte);
   const teH = L.hoogteNodig > p.hoogte + 0.5, teB = nodigB > p.breedte + 0.5;
-  let s = `<rect x="${x}" y="${y}" width="${Math.max(w, nodigB*PX)}" height="${Math.max(h, L.hoogteNodig*PX)}" class="dk-plaat"/>`;
-  s += `<rect x="${x}" y="${y}" width="${w}" height="${h}" class="dk-kast${teH || teB ? " te-klein" : ""}"/>`;
+  // Peter (29/10): altijd tekenen op de montageplaat, niet op de buitenmaten van de kast. Wat er niet op
+  // past, steekt in het rood gearceerd buiten de plaat uit.
+  let s = "";
+  if(teH || teB) s += `<rect x="${x}" y="${y}" width="${Math.max(w, nodigB*PX)}" height="${Math.max(h, L.hoogteNodig*PX)}" class="dk-buiten"/>`;
+  s += `<rect x="${x}" y="${y}" width="${w}" height="${h}" class="dk-plaat${teH || teB ? " te-klein" : ""}"/>`;
   const ry = y + (L.boven ? DK_RAND_MM + DK_RAIL_H_MM/2 - 17.5 : p.hoogte - DK_RAND_MM - DK_RAIL_H_MM/2 - 17.5)*PX;
   s += `<rect x="${x + 4}" y="${ry}" width="${(Math.max(p.breedte, L.railLengte) - 8)*PX}" height="${35*PX}" class="uv-rail"/>`;
   L.kokers.forEach(k=>{
@@ -20456,7 +20461,7 @@ function dkAchtergrondSvg(p, geo){
     if(k.soort==="h") s += `<text x="${k.x1 - 6}" y="${k.y1 - 3}" class="dk-koker-lab" text-anchor="end">koker ${k.mm}</text>`;
     else s += `<text transform="translate(${(k.x0+k.x1)/2 + 3} ${k.y1 - 6}) rotate(-90)" class="dk-koker-lab">koker ${k.mm}</text>`;
   });
-  const kastTekst = p.kast ? `Rittal ${p.kast.naam} ${p.kast.b}×${p.kast.h}×${p.kast.d} — montageplaat ${p.breedte} × ${p.hoogte} mm` : `montageplaat ${p.breedte} × ${p.hoogte} mm`;
+  const kastTekst = `Montageplaat ${p.breedte} × ${p.hoogte} mm` + (p.kast ? ` (in Rittal ${p.kast.naam}, kast ${p.kast.b}×${p.kast.h}×${p.kast.d})` : "");
   const probleem = [teH ? `te laag (nodig ±${Math.ceil(L.hoogteNodig/5)*5} mm)` : "", teB ? `te smal (nodig ±${Math.ceil(nodigB/5)*5} mm${L.railLengte > p.breedte ? " voor de rail" : ""})` : ""].filter(Boolean).join(", ");
   s += `<text x="${x + w - 4}" y="${y - 5}" class="dk-kastmaat">${escapeHtml(kastTekst)}${probleem ? " — " + escapeHtml(probleem) : ""}</text>`;
   return s;
@@ -20629,7 +20634,7 @@ function dkPastOp(dk, plaatB, plaatH){
 }
 function dkKastAdvies(dk){
   const p = dkPlan(dk);
-  const sig = JSON.stringify([dkDrivers(dk).map(d=> [d.naam, d.armaturen && d.armaturen.map(a=> a.aantal)]), p.klemExtra, p.draai, p.kokerV, p.kokerH, p.kokerBreedte, p.rkDubbel, dk.sturing,
+  const sig = JSON.stringify([dkDrivers(dk).map(d=> [d.naam, d.armaturen && d.armaturen.map(a=> a.aantal)]), p.klemExtra, p.draai, p.kokerV, p.kokerH, p.kokerBreedte, p.rkDubbel, p.railKoker, p.sorteer, dk.sturing,
     Object.keys(cadosInst).filter(k=> k.startsWith("driver_maat:")).map(k=> JSON.stringify(cadosInst[k]))]);
   if(dkAdviesCache.has(sig)) return dkAdviesCache.get(sig);
   const lijst = RITTAL_AX.map(k=> Object.assign({}, k, dkPastOp(dk, k.pb, k.ph)));
@@ -21236,7 +21241,7 @@ function bouwDxf(kast, titel){
   // kast / montageplaat
   if(kast._dxfExtra){
     kast._dxfExtra(d, geo);
-    const kt = kast.kast ? `Rittal ${kast.kast.naam} ${kast.kast.b}x${kast.kast.h}x${kast.kast.d} - montageplaat ${kast.breedte} x ${kast.hoogte} mm` : `montageplaat ${kast.breedte} x ${kast.hoogte} mm`;
+    const kt = `montageplaat ${kast.breedte} x ${kast.hoogte} mm` + (kast.kast ? ` (Rittal ${kast.kast.naam}, kast ${kast.kast.b}x${kast.kast.h}x${kast.kast.d})` : "");
     d.tekst(geo.padL + kastB/2, 4, `${titel} - ${kt} - schaal 1:1 (mm)`, 5, "TEKST");
   } else {
     d.rect(geo.padL - 14, 0, kastB + 28, geo.height, "KAST");
