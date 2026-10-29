@@ -1307,6 +1307,7 @@ function renderUitvoeringsplan(ctxArg){
       </div>
       <div class="uv-sec uv-sec-meer">
         <button class="btn small ghost uv-bib">🔌 Modulebibliotheek</button>
+        ${ctx.zekering ? `<button class="btn small primary uv-bib-plaats" title="een module uit de bibliotheek in deze kast zetten (naast de geselecteerde module, of op de eerste rij met plaats)">＋ Module uit bibliotheek</button>` : ""}
         <button class="btn small ghost uv-export">⎙ Exporteer (PDF)</button>
         <button class="btn small ghost uv-dxf" title="tekening als DXF voor AutoCAD — in mm, schaal 1:1, met lagen">⬇ DXF (AutoCAD)</button>
         <button class="btn small ghost uv-wis" title="alle draden en kamgeleiders van deze kast wissen">🗑 Alles wissen</button>
@@ -2079,7 +2080,18 @@ function renderUitvoeringsplan(ctxArg){
     if(!confirm(`Alle ${kast.bedrading.length} draden en ${nk} kamgeleider(s) van ${kast.naam} wissen? (Ctrl+Z maakt dit ongedaan)`)) return;
     kast.bedrading = []; kast.kamgeleiders = []; uvSelWire = null; uvSelKam = null; uvPending = null; uvLaatsteOmzet = null; save(); teken();
   });
-  aan(".uv-bib", "click", ()=> openModuleBibliotheek({ naSluiten: ()=>{ uvSyncEnOpruimen(kast); teken(); } }));
+  // Peter (29/10): "in de zekeringkast geen materialen uit de bib toevoegen die er nog niet op staan" ->
+  // vanuit het plan een bibliotheekmodule rechtstreeks in de kast plaatsen.
+  const plaatsUitBib = (row)=>{
+    const m = uvNieuweModuleUitBib(row);
+    const plek = uvPlaatsInKast(kast, m, uvSelMod);
+    uvSelMod = m.id; uvSelWire = null;
+    save(); uvSyncEnOpruimen(kast);
+    toast(`${row.naam} geplaatst in rij ${plek + 1}${ctx.layoutTab ? " — schuif hem eventueel op het tabblad Zekeringen naar de juiste plaats" : ""}.`);
+    selectTab(ctx.tab);
+  };
+  aan(".uv-bib", "click", ()=> openModuleBibliotheek({ plaats: ctx.zekering ? plaatsUitBib : null, naSluiten: ()=>{ uvSyncEnOpruimen(kast); teken(); } }));
+  aan(".uv-bib-plaats", "click", ()=> openModuleBibliotheek({ plaats: plaatsUitBib, naSluiten: ()=>{ uvSyncEnOpruimen(kast); teken(); } }));
   wrap.querySelectorAll(".uv-export").forEach(b=> b.addEventListener("click", ()=> ctx.export()));
   aan(".uv-dxf", "click", ()=> downloadDxf(kast, kast.naam || ctx.titel));
   const extraZone = wrap.querySelector("#uvExtra");
@@ -2331,6 +2343,31 @@ function wisConcept(sleutel){ if(conceptenGeheugen[sleutel]){ delete conceptenGe
 function conceptTijd(c){ try{ return new Date(c.tijd).toLocaleString("nl-BE", {day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit"}); }catch(e){ return ""; } }
 const NIET_BEWAARD_VRAAG = "Je wijzigingen zijn nog niet bewaard.\n\nOK = sluiten (je werk blijft als concept bewaard, je kan later verder)\nAnnuleren = verder werken";
 
+// nieuwe zekeringmodule op basis van een bibliotheekmodule (zelfde standaardwaarden als "+ Module toevoegen")
+function uvNieuweModuleUitBib(row){
+  const cat = (row.categorie && MODULE_CATEGORIEEN[row.categorie]) ? row.categorie : "Automaat";
+  const preset = MODULE_CATEGORIEEN[cat] || {};
+  const m = {id: cryptoId(), categorie: cat, type: "", polen: preset.polen || "", mA: preset.mA || "", A: preset.A || "",
+    breedte: typeof polenToBreedte === "function" ? polenToBreedte(preset.polen) : 1, naam: "", isRem: false, kabelOpKlemmen: false, kabelType: "", kabelAantal: 1};
+  applyBibOpModule(m, row);
+  if(!(Number(m.breedte) > 0)) m.breedte = 1;
+  return m;
+}
+// plaats: naast de geselecteerde module als die rij nog plaats heeft, anders de eerste rij met plaats,
+// anders een nieuwe rij. Geeft de rij-index terug.
+function uvPlaatsInKast(kast, m, naId){
+  const b = Number(m.breedte) || 1;
+  const vrij = (rij)=> (kast.maat || 24) - rij.items.reduce((t, x)=> t + (Number(x.breedte)||0), 0);
+  let ri = -1, idx = -1;
+  if(naId) kast.rijen.forEach((rij, i)=>{ const j = rij.items.findIndex(x=> x.id===naId); if(j >= 0 && vrij(rij) >= b){ ri = i; idx = j + 1; } });
+  if(ri < 0){ ri = kast.rijen.findIndex(rij=> rij.items.length && vrij(rij) >= b); }
+  if(ri < 0){ ri = kast.rijen.findIndex(rij=> vrij(rij) >= b); }
+  if(ri < 0){ kast.rijen.push({id: cryptoId(), items: []}); ri = kast.rijen.length - 1; }
+  const rij = kast.rijen[ri];
+  if(idx < 0) idx = rij.items.length;
+  rij.items.splice(idx, 0, m);
+  return ri;
+}
 function openModuleBibliotheek(opts){
   opts = opts || {};
   const oud = document.getElementById("mbib-overlay");
@@ -2370,7 +2407,7 @@ async function toonBibLijst(ctx){
   const cats = Object.keys(MODULE_CATEGORIEEN).filter(k=> k!=="Leeg");
   ctx.tab = "modules";
   ctx.body.innerHTML = bibTabsHtml(ctx) + `
-    <p class="mbib-hint">Gedeeld over alle projecten. Elke module heeft zijn (zelf getekende) tekening en aansluitklemmen — die gebruikt het Uitvoeringsplan om de bedrading te tekenen.${ctx.opts.kies ? " <strong>Tik op \"Kiezen\" om de module aan je zekering te koppelen.</strong>" : ""}</p>
+    <p class="mbib-hint">Gedeeld over alle projecten. Elke module heeft zijn (zelf getekende) tekening en aansluitklemmen — die gebruikt het Uitvoeringsplan om de bedrading te tekenen.${ctx.opts.kies ? " <strong>Tik op \"Kiezen\" om de module aan je zekering te koppelen.</strong>" : (ctx.opts.plaats ? " <strong>Tik op \"＋ In kast plaatsen\" om een module in de zekeringkast te zetten. Staat hij er nog niet in? Maak hem eerst aan met \"+ Nieuwe module\".</strong>" : "")}</p>
     <div class="mbib-filter">
       <input type="search" class="mbib-q" placeholder="Zoek op merk, type, artikelnummer…" value="${escapeHtml(ctx.filter.q)}">
       <select class="mbib-cat"><option value="">Alle soorten</option>${cats.map(c=>`<option value="${c}" ${ctx.filter.cat===c?"selected":""}>${escapeHtml(MODULE_CATEGORIEEN[c].label)}</option>`).join("")}</select>
@@ -2424,11 +2461,13 @@ async function toonBibLijst(ctx){
         <div class="mbib-card-body"><div class="mbib-card-naam">${escapeHtml(r.naam)}</div>
         <div class="mbib-card-spec">${escapeHtml(bibSpecTekst(r))}</div>
         <div class="mbib-card-spec dim">${(r.klemmen||[]).length} klemmen${r.tekening_url ? " · met foto" : " · zelf getekend"}</div>
-        <div class="mbib-card-acties">${ctx.opts.kies ? `<button type="button" class="mbib-btn primary mbib-kies">Kiezen</button>` : ""}
+        <div class="mbib-card-acties">${ctx.opts.kies ? `<button type="button" class="mbib-btn primary mbib-kies">Kiezen</button>` : ""}${!ctx.opts.kies && ctx.opts.plaats ? `<button type="button" class="mbib-btn primary mbib-plaats" title="nieuwe module in de kast zetten">＋ In kast plaatsen</button>` : ""}
           <button type="button" class="mbib-btn ghost mbib-edit">Bewerken</button>
           <button type="button" class="mbib-btn ghost mbib-del" title="verwijderen">🗑</button></div></div>`;
       const kb = card.querySelector(".mbib-kies");
       if(kb) kb.addEventListener("click", ()=>{ ctx.opts.kies(r); ctx.sluit(); });
+      const pb = card.querySelector(".mbib-plaats");
+      if(pb) pb.addEventListener("click", ()=>{ const f = ctx.opts.plaats; ctx.opts.naSluiten = null; ctx.sluit(); f(r); });
       card.querySelector(".mbib-edit").addEventListener("click", ()=> toonBibEditor(ctx, r));
       card.querySelector(".mbib-del").addEventListener("click", async ()=>{
         if(!confirm(`"${r.naam}" uit de bibliotheek verwijderen? Projecten die hem gebruiken houden hun kopie van de tekening.`)) return;
@@ -2730,6 +2769,7 @@ function toonBibEditor(ctx, bestaand, concept){
       verlaatEditor(ctx);
       toast("Module bewaard in de bibliotheek");
       if(ctx.opts.kies){ ctx.opts.kies(opgeslagen); ctx.sluit(); }
+      else if(ctx.opts.plaats && !bestaand && confirm(`"${opgeslagen.naam}" ook meteen in de zekeringkast plaatsen?`)){ const f = ctx.opts.plaats; ctx.opts.naSluiten = null; ctx.sluit(); f(opgeslagen); }
       else toonBibLijst(ctx);
     }catch(err){
       const msg = String(err && err.message || err);
