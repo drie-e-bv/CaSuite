@@ -3770,6 +3770,10 @@
 .uv-svg .dk-koker:hover{fill:#dfe3e8;}
 .uv-svg .dk-koker.sel{fill:#fbeee3;stroke:#bb5e26;stroke-width:2;stroke-dasharray:none;}
 
+.uv-svg .uv-mod.versleept{opacity:.75;pointer-events:none;filter:drop-shadow(0 4px 6px rgba(0,0,0,.3));}
+.uv-svg .dk-driver{cursor:grab;}
+.uv-svg .dk-drop{fill:none;stroke:#2F7A4D;stroke-width:3;stroke-dasharray:6 4;pointer-events:none;}
+
 </style>
 </head>
 <body>
@@ -7207,12 +7211,13 @@ function computeDriverCodes(){
   const codes = {};
   let huidig = 0;
   const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-  state.driverkast.kasten.forEach(kast=>{
+  const meerKasten = state.driverkast.kasten.filter(k=> k.items.some(d=> !d.leeg)).length > 1;
+  state.driverkast.kasten.forEach((kast, ki)=>{
     kast.items.forEach(driver=>{
       const override = parseInt(driver.manueelNummer);
       const nummer = (driver.manueelNummer!=="" && !Number.isNaN(override)) ? override : huidig+1;
       huidig = nummer;
-      const code = "D"+nummer;
+      const code = (meerKasten ? (ki+1) + "." : "") + "D"+nummer;
       codes[driver.id] = code;
       driver.armaturen.forEach((arm, ai)=>{
         codes[arm.id] = code + (letters[ai] || ai);
@@ -10595,6 +10600,7 @@ function renderDriverkast(){
     if(!movingRef || movingRef.type!=="driver") return;
     const item = movingRef.item;
     if(!movingRef.isNew){
+      state.driverkast.kasten.forEach(k=>{ if(k!==kast){ const c = k.items.indexOf(item); if(c!==-1) k.items.splice(c,1); } });
       const cur = kast.items.indexOf(item);
       if(cur!==-1){
         kast.items.splice(cur,1);
@@ -15170,6 +15176,7 @@ function snelmodusBronnen(bronType){
 // blijven klem-eigen en worden dus nooit overschreven.
 function syncKlemBronnen(){
   let gewijzigd = false;
+  if(typeof autoZekeringKlemmen==="function" && autoZekeringKlemmen()) gewijzigd = true;
   state.interlex.items.forEach(klem=>{
     if(!klem.bronType || !klem.bronId) return;
     const bron = snelmodusBronnen(klem.bronType).find(b=>b.id===klem.bronId);
@@ -16191,6 +16198,7 @@ function uvAlleModules(kast){ const f = []; kast.rijen.forEach(r=> r.items.forEa
 function uvSyncEnOpruimen(kast){
   if(!Array.isArray(kast.bedrading)) kast.bedrading = [];
   let gewijzigd = false;
+  if(!kast._dk && autoZekeringKlemmen()) gewijzigd = true;
   const mods = uvAlleModules(kast);
   if(moduleBibGeladen){
     mods.forEach(m=>{
@@ -17267,7 +17275,7 @@ function renderUitvoeringsplan(ctxArg){
       return;
     }
     if(!uvPending && !kast.bedrading.length && !(kast.kamgeleiders||[]).length){
-      const b = el(`<div class="move-banner uv-omzet-banner">Nog geen uitvoering voor deze kast — maak een voorstel vanuit de layout. <button class="btn small primary">⚡ Automatisch omzetten</button></div>`);
+      const b = el(`<div class="move-banner uv-omzet-banner">Nog geen draden in deze kast — ${ctx.zekering ? "maak een voorstel vanuit de layout" : "laat ze automatisch voorstellen"}. <button class="btn small primary">⚡ ${escapeHtml(ctx.omzetLabel || "Automatisch omzetten")}</button></div>`);
       b.querySelector("button").addEventListener("click", doeOmzet);
       banner.appendChild(b);
       return;
@@ -17677,6 +17685,14 @@ function renderUitvoeringsplan(ctxArg){
       return;
     }
     if(ev.target.closest && ev.target.closest(".uv-klem")) return;
+    // modules verslepen (bv. drivers in de driverkast), als de context dat toelaat
+    const modEl = ctx.moduleSleep && ev.target.closest && ev.target.closest(".uv-mod[data-mod]");
+    if(modEl && p && ctx.moduleSleep.mag(modEl.getAttribute("data-mod"))){
+      ev.preventDefault();
+      sleep = {soort: "mod", id: modEl.getAttribute("data-mod"), el: modEl, p0: p, p, bewogen: false};
+      try{ canvas.setPointerCapture(ev.pointerId); }catch(_e){}
+      return;
+    }
     if(ev.pointerType==="touch") return;    // vinger: gewoon scrollen
     sleep = {soort: "pan", cx: ev.clientX, cy: ev.clientY, sl: canvas.scrollLeft, st: canvas.scrollTop, bewogen: false};
   });
@@ -17705,6 +17721,16 @@ function renderUitvoeringsplan(ctxArg){
       return;
     }
     if(sleep.soort==="kam"){ sleep.x1 = p.x; toonKamPreview(sleep); return; }
+    if(sleep.soort==="mod"){
+      const dx = p.x - sleep.p0.x, dy = p.y - sleep.p0.y;
+      if(!sleep.bewogen && Math.abs(dx) + Math.abs(dy) < 4) return;
+      sleep.bewogen = true; sleep.p = p;
+      sleep.el.setAttribute("transform", `translate(${dx} ${dy})`);
+      sleep.el.classList.add("versleept");
+      canvas.querySelector("svg").classList.add("sleept-mod");
+      if(ctx.moduleSleep.voorbeeld) ctx.moduleSleep.voorbeeld(kast, sleep.id, p, canvas.querySelector("svg"));
+      return;
+    }
     sleep.bewogen = true;
     if(sleep.soort==="eind"){
       const ander = sleep.e==="a" ? sleep.r.B : sleep.r.A;
@@ -17743,6 +17769,13 @@ function renderUitvoeringsplan(ctxArg){
     const svg = canvas.querySelector("svg");
     if(svg) svg.classList.remove("sleept");
     if(s.soort==="pan"){ if(s.bewogen) negeerVolgendeKlik(); return; }
+    if(s.soort==="mod"){
+      const svgM = canvas.querySelector("svg"); if(svgM) svgM.classList.remove("sleept-mod");
+      if(!s.bewogen) return;   // gewone klik: selecteren
+      negeerVolgendeKlik();
+      if(ctx.moduleSleep.drop(kast, s.id, s.p, s.p0)){ save(); selectTab(ctx.tab); } else teken();
+      return;
+    }
     negeerVolgendeKlik();
     if(s.soort==="zoomvenster"){
       const rx = Math.min(s.x0, s.x1), ry = Math.min(s.y0, s.y1), rw = Math.abs(s.x1 - s.x0), rh = Math.abs(s.y1 - s.y0);
@@ -19511,6 +19544,71 @@ function herkoppelKlemBronnen(){
   return {gekoppeld, afwijkend};
 }
 
+/* Zekeringkast: "voedingskabel komt op klemmen" aangevinkt -> automatisch rijgklemmen (2026-10-29, Peter:
+   "In ontwerp van zekeringkast kun je aanvinken of deze dient gekableerd te worden op klemmen. Dan komt
+   er automatisch een klem bij"). Per kabel (kabelAantal) zoveel klemmen als het kabeltype aders heeft
+   (zonder de aarding, zoals de Snelmodus), gekoppeld aan de zekering zodat naam/kamer meevolgen, en
+   meteen op de rijgklemmenmodule van dezelfde kast als die er is. Vink je het af, dan verdwijnen enkel
+   de automatisch aangemaakte klemmen weer. */
+function autoZekeringKlemmen(){
+  if(!state.interlex || !Array.isArray(state.interlex.items) || typeof snelmodusBronnen !== "function") return false;
+  const il = state.interlex;
+  if(!Array.isArray(il.gebruikteBronnen)) il.gebruikteBronnen = [];
+  let gewijzigd = false;
+  const bronnen = snelmodusBronnen("zekeringen");
+  const gewenst = new Set(bronnen.map(b=> b.id));
+  // 1. automatisch aangemaakte klemmen waarvan de kabel niet meer op klemmen komt: weg
+  const weg = il.items.filter(k=> k.autoZek && !gewenst.has(k.bronId));
+  if(weg.length){
+    const ids = new Set(weg.map(k=> k.id));
+    il.items = il.items.filter(k=> !ids.has(k.id));
+    il.gebruikteBronnen = il.gebruikteBronnen.filter(g=> !(g.bronType==="zekeringen" && weg.some(k=> k.bronId===g.bronId)));
+    state.zekeringen.kasten.forEach(kast=> kast.rijen.forEach(r=> r.items.forEach(m=>{
+      if(m.categorie==="Rijgklemmenmodule" && Array.isArray(m.rijgklemKlemIds) && m.rijgklemKlemIds.some(id=> ids.has(id))){
+        m.rijgklemKlemIds = m.rijgklemKlemIds.filter(id=> !ids.has(id));
+        if(typeof berekenRijgklemBreedte==="function") m.breedte = berekenRijgklemBreedte(m.rijgklemKlemIds.length);
+      }
+    })));
+    gewijzigd = true;
+  }
+  // 2. nieuwe kabels op klemmen: klemmen aanmaken
+  const dubbel = il.type === "dubbel";
+  bronnen.forEach(b=>{
+    const bestaat = il.items.some(k=> k.bronType==="zekeringen" && k.bronId===b.id) ||
+      il.gebruikteBronnen.some(g=> g.bronType==="zekeringen" && g.bronId===b.id) ||
+      il.items.some(k=> k.onder && String(k.onder.watwaar||"").startsWith(b.label + " - ader"));
+    if(bestaat) return;
+    const n = (typeof parseAderAantalUitKabel==="function" && parseAderAantalUitKabel(b.kabeltype)) || 2;
+    const nieuw = [];
+    let klem = null;
+    for(let i=1; i<=n; i++){
+      const zijde = (dubbel && i%2===0) ? "boven" : "onder";
+      if(zijde==="onder"){
+        klem = typeof newKlem==="function" ? newKlem() : {id: cryptoId(), kamer: "", info: "", onder: {kleur: "", watwaar: "", aansluiting: "", aderNr: 0}, boven: {kleur: "", watwaar: "", aansluiting: "", aderNr: 0}};
+        klem.kamer = b.kamer || ""; klem.info = b.info || "";
+        klem.bronType = "zekeringen"; klem.bronId = b.id; klem.autoZek = true;
+        if(b.kabeltype) klem.kabeltype = b.kabeltype;
+        nieuw.push(klem);
+      }
+      klem[zijde].watwaar = [b.label, "ader " + i].filter(Boolean).join(" - ");
+      klem[zijde].kleur = (il.standaardKleuren || [])[i-1] || "";
+      klem[zijde].aderNr = i;
+    }
+    il.items.push(...nieuw);
+    il.gebruikteBronnen.push({bronType: "zekeringen", bronId: b.id});
+    // op de rijgklemmenmodule van de kast waar de zekering in zit
+    const modId = String(b.id).split("::")[0];
+    const kast = state.zekeringen.kasten.find(k=> k.rijen.some(r=> r.items.some(m=> m.id===modId)));
+    const rk = kast && kast.rijen.flatMap(r=> r.items).find(m=> m.categorie==="Rijgklemmenmodule");
+    if(rk){
+      rk.rijgklemKlemIds = (rk.rijgklemKlemIds || []).concat(nieuw.map(k=> k.id));
+      if(typeof berekenRijgklemBreedte==="function") rk.breedte = berekenRijgklemBreedte(rk.rijgklemKlemIds.length);
+    }
+    gewijzigd = true;
+  });
+  return gewijzigd;
+}
+
 
 /* =========================================================================
    MOTOREN — screens, gordijnen, rolluiken, ... (2026-10-28, op vraag van Peter: "Ook motoren
@@ -19832,7 +19930,7 @@ function dkDrivers(dk){ return (dk.items||[]).filter(d=> !d.leeg && (d.categorie
 // Volgorde op de rail en de verdeelblokken: op drivernummer (D1, D2, ... D30), niet op plaats in de kast
 function dkOpNummer(drivers){
   const codes = computeDriverCodes();
-  const nr = (d)=>{ const m = /(\d+)/.exec(codes[d.id] || ""); return m ? parseInt(m[1]) : 1e9; };
+  const nr = (d)=>{ const m = /D(\d+)/.exec(codes[d.id] || ""); return m ? parseInt(m[1]) : 1e9; };
   return drivers.slice().sort((a, b)=> nr(a) - nr(b));
 }
 function dkKringCodes(){ try{ return computeKringCodes(); }catch(_e){ return {}; } }
@@ -20342,6 +20440,96 @@ function dkKastAdvies(dk){
   return res;
 }
 
+/* ---------- slepen, verplaatsen naar een andere kast, splitsen ---------- */
+// kolommen (x-bereik in px) uit de getekende drivers
+function dkKolomBereiken(p){
+  const b = [];
+  p._layout.mods.forEach(md=>{
+    const i = md.m._dk && md.m._dk.soort==="driver" ? md.m._dk.kolom : -1;
+    if(i < 0) return;
+    const r = b[i] || (b[i] = {x0: Infinity, x1: -Infinity, mods: []});
+    r.x0 = Math.min(r.x0, md.x); r.x1 = Math.max(r.x1, md.x + md.w); r.mods.push(md);
+  });
+  return b;
+}
+// waar komt een gesleepte driver terecht? {kol, index} of {kol: nieuw}
+function dkDropDoel(p, id, pt){
+  const b = dkKolomBereiken(p);
+  let kol = -1, best = Infinity;
+  b.forEach((r, i)=>{ if(!r) return; const c = (r.x0 + r.x1)/2; const d = Math.abs(pt.x - c); if(d < best){ best = d; kol = i; } });
+  const laatste = b[b.length-1];
+  if(laatste && pt.x > laatste.x1 + 40) return {kol: b.length, index: 0, nieuw: true};
+  if(b[0] && pt.x < b[0].x0 - 40) return {kol: 0, index: 0, nieuwLinks: true};
+  const leden = (b[kol] ? b[kol].mods : []).filter(md=> md.m.id !== id).sort((a, c)=> a.y - c.y);
+  const boven = p.rkPositie !== "onder";
+  let index = leden.filter(md=> (md.y + md.h/2) < pt.y).length;
+  if(!boven) index = leden.length - index;   // rail onderaan: kolom loopt van onder naar boven
+  return {kol, index};
+}
+function dkDrop(p, id, pt){
+  const doel = dkDropDoel(p, id, pt);
+  const van = p.kolommen.findIndex(c=> c.includes(id));
+  if(van < 0) return false;
+  const oud = JSON.stringify(p.kolommen);
+  p.kolommen[van] = p.kolommen[van].filter(x=> x !== id);
+  if(doel.nieuw) p.kolommen.push([id]);
+  else if(doel.nieuwLinks) p.kolommen.unshift([id]);
+  else (p.kolommen[doel.kol] || (p.kolommen[doel.kol] = [])).splice(doel.index, 0, id);
+  if(doel.nieuw || doel.nieuwLinks || doel.kol !== van) delete p.draai[id];
+  p.kolommen = p.kolommen.filter(c=> c.length);
+  return JSON.stringify(p.kolommen) !== oud;
+}
+function dkDropVoorbeeld(p, id, pt, svg){
+  let r = svg.querySelector(".dk-drop");
+  if(!r){ r = document.createElementNS("http://www.w3.org/2000/svg", "rect"); r.setAttribute("class", "dk-drop"); svg.appendChild(r); }
+  const doel = dkDropDoel(p, id, pt);
+  const b = dkKolomBereiken(p);
+  if(doel.nieuw || doel.nieuwLinks){
+    const x = doel.nieuw ? b[b.length-1].x1 + 20 : b[0].x0 - 40;
+    r.setAttribute("x", x); r.setAttribute("y", pt.y - 40); r.setAttribute("width", 20); r.setAttribute("height", 80);
+    return;
+  }
+  const kol = b[doel.kol];
+  if(!kol) return;
+  const leden = kol.mods.filter(md=> md.m.id !== id).sort((a, c)=> a.y - c.y);
+  const boven = p.rkPositie !== "onder";
+  const i = boven ? doel.index : leden.length - doel.index;
+  const y = i < leden.length ? leden[i].y - 6 : (leden.length ? leden[leden.length-1].y + leden[leden.length-1].h + 4 : pt.y);
+  r.setAttribute("x", kol.x0 - 4); r.setAttribute("y", y - 2); r.setAttribute("width", kol.x1 - kol.x0 + 8); r.setAttribute("height", 4);
+}
+// driver naar een andere driverkast (of een nieuwe) verplaatsen
+function dkNaarKast(dk, d, doelId){
+  let doel = state.driverkast.kasten.find(k=> k.id===doelId);
+  if(!doel){
+    doel = newDriverKast();
+    doel.sturing = dk.sturing; doel.kamer = dk.kamer || ""; doel.verdieping = dk.verdieping || "";
+    const i = state.driverkast.kasten.indexOf(dk);
+    state.driverkast.kasten.splice(i + 1, 0, doel);
+  }
+  dk.items = dk.items.filter(x=> x !== d);
+  doel.items.push(d);
+  if(dk.plan){
+    dk.plan.bedrading = (dk.plan.bedrading||[]).filter(w=> w.a.m !== d.id && w.b.m !== d.id && w.a.m !== "dkk_" + d.id && w.b.m !== "dkk_" + d.id);
+    delete dk.plan.draai[d.id];
+  }
+  return doel;
+}
+// kast splitsen: de rechtse kolommen (ongeveer de helft van de drivers) naar een nieuwe kast
+function dkSplits(dk){
+  const p = dkPlan(dk);
+  const byId = Object.fromEntries(dkDrivers(dk).map(d=> [d.id, d]));
+  const totaal = p.kolommen.flat().length;
+  if(totaal < 2) return null;
+  let teller = 0;
+  const weg = [];
+  p.kolommen.forEach(c=>{ c.forEach(id=>{ teller++; if(teller > Math.ceil(totaal/2)) weg.push(id); }); });
+  let nieuw = null;
+  weg.forEach(id=>{ const d = byId[id]; if(!d) return; nieuw = dkNaarKast(dk, d, nieuw ? nieuw.id : null); });
+  dkVulIndeling(dk, true);
+  if(dk.plan) dk.plan.bedrading = dk.plan.bedrading.filter(w=> !w.auto);
+  return nieuw;
+}
+
 let dkHuidigId = null;
 function dkHuidig(){
   if(!state.driverkast || !Array.isArray(state.driverkast.kasten)) return null;
@@ -20406,6 +20594,11 @@ const UV_CTX_DK = {
   omzetLabel: "Draden voorstellen", omzetTitel: "werkschakelaar, verdeelblokken (L/N/DALI of push) en de uitgangen naar de rijgklemmen automatisch tekenen",
   omzet: (p)=> dkOmzet(p),
   voorTeken: (p)=>{ if(p._dk) dkPlanKast(p._dk); },
+  moduleSleep: {
+    mag: (id)=>{ const dk = dkHuidig(); return !!(dk && dkDrivers(dk).some(d=> d.id===id)); },
+    voorbeeld: (p, id, pt, svg)=> dkDropVoorbeeld(p, id, pt, svg),
+    drop: (p, id, pt)=> dkDrop(p, id, pt),
+  },
   export: ()=> dkExport(),
   hulpTekst: "Welke drivers en armaturen er in de kast zitten, pas je aan op het tabblad Driverkast. Hier kies je de kast, de kokers en de plaats en draaiing van de drivers.",
   extraKaart: (zone, h)=>{
@@ -20437,7 +20630,11 @@ const UV_CTX_DK = {
         <option value="1" ${p.rkDubbel?"selected":""}>Dubbel (2 niveaus: + en − op 1 klem)</option></select></label>
       ${L.railLengte > p.breedte ? `<div class="uv-fout">De DIN-rail is ±${Math.ceil(L.railLengte/5)*5} mm lang en past niet op de montageplaat van ${p.breedte} mm${p.rkDubbel ? "" : " — met dubbele rijgklemmen wordt hij korter"}.</div>` : ""}
       <div class="hint">Sturing ${escapeHtml(dk.sturing||"DALI")} · ${dkDrivers(dk).length} drivers in ${p.kolommen.length} kolom(men) · ${dkDrivers(dk).reduce((t, d)=> t + dkSpots(d), 0)} spots/strips</div>
-      <button class="btn small ghost dk-herschik" title="alle drivers opnieuw verdelen over kolommen volgens de montageplaat">↻ Drivers herschikken</button>
+      <div class="uv-knoprij">
+        <button class="btn small ghost dk-herschik" title="alle drivers opnieuw verdelen over kolommen volgens de montageplaat">↻ Drivers herschikken</button>
+        <button class="btn small ghost dk-splits" title="de helft van de drivers (de rechtse kolommen) naar een nieuwe driverkast">✂ Splitsen in 2 kasten</button>
+      </div>
+      <div class="hint">Sleep een driver om hem te verplaatsen (naar een andere kolom, of naast de laatste kolom voor een nieuwe kolom).</div>
     </div></div>`);
     const kiesKast = (art)=>{
       const k = RITTAL_AX.find(x=> x.art===art);
@@ -20457,6 +20654,17 @@ const UV_CTX_DK = {
     box.querySelector(".dk-rkpos").addEventListener("change", e=>{ p.rkPositie = e.target.value; save(); h.rerender(); });
     box.querySelector(".dk-dub").addEventListener("change", e=>{ p.rkDubbel = e.target.value==="1"; save(); h.rerender(); });
     box.querySelector(".dk-herschik").addEventListener("click", ()=>{ dkVulIndeling(dk, true); save(); h.rerender(); });
+    box.querySelector(".dk-splits").addEventListener("click", ()=>{
+      const n = dkDrivers(dk).length;
+      if(!confirm(`Driverkast splitsen? Ongeveer de helft van de ${n} drivers (de rechtse kolommen) gaat naar een nieuwe driverkast. De automatische draden worden opnieuw voorgesteld; dat kan ook op het tabblad Driverkast.`)) return;
+      const nieuw = dkSplits(dk);
+      if(!nieuw) return;
+      dkOmzet(dkPlanKast(dk));
+      dkOmzet(dkPlanKast(nieuw));
+      save();
+      toast(`Gesplitst: ${dkDrivers(dk).length} drivers in deze kast, ${dkDrivers(nieuw).length} in de nieuwe kast.`);
+      h.rerender();
+    });
     zone.appendChild(box);
   },
   extraDetail: (sel, zone, h)=>{
@@ -20512,6 +20720,9 @@ const UV_CTX_DK = {
       <div class="uv-veld">Plaats (kolom ${info.kolom + 1} van ${p.kolommen.length})<div class="uv-knoprij">
         <button class="btn small ghost dk-mv" data-r="op" title="hoger in de kolom">↑</button><button class="btn small ghost dk-mv" data-r="neer" title="lager in de kolom">↓</button>
         <button class="btn small ghost dk-mv" data-r="links" title="naar de kolom links">← kolom</button><button class="btn small ghost dk-mv" data-r="rechts" title="naar de kolom rechts (of een nieuwe)">kolom →</button></div></div>` : ""}
+      ${isDriver ? `<label class="uv-veld">Kast<select class="dk-naarkast">
+        ${state.driverkast.kasten.map((k, i)=> `<option value="${k.id}" ${k===dk?"selected":""}>Driverkast ${i+1}${k.kamer ? " · " + escapeHtml(k.kamer) : ""}</option>`).join("")}
+        <option value="__nieuw">＋ Nieuwe driverkast</option></select></label>` : ""}
       <div class="uv-knoprij"><button class="btn small ghost dk-layout">Op tabblad Driverkast</button></div>
     </div></div>`);
     box.querySelector(".dk-ps").addEventListener("change", e=>{ if(e.target.value==="1") p.klemExtra[d.id] = true; else delete p.klemExtra[d.id]; save(); h.rerender(); });
@@ -20529,6 +20740,14 @@ const UV_CTX_DK = {
       ["dk-ml","dk-mb","dk-mh"].forEach(c=> box.querySelector("." + c).addEventListener("change", zetMaat));
     }
     box.querySelector(".dk-layout").addEventListener("click", ()=> selectTab("driverkast"));
+    const nk = box.querySelector(".dk-naarkast");
+    if(nk) nk.addEventListener("change", e=>{
+      const doel = dkNaarKast(dk, d, e.target.value==="__nieuw" ? null : e.target.value);
+      uvSelMod = null;
+      save();
+      toast(`${codes[d.id]||"Driver"} verplaatst naar Driverkast ${state.driverkast.kasten.indexOf(doel)+1}.`);
+      h.rerender();
+    });
     zone.appendChild(box);
   },
 };

@@ -193,6 +193,17 @@ vervang('  {grp:"Elektro", id:"driverkast", label:"Driverkast", toggle:"driverka
         '  {grp:"Elektro", id:"driverplan", label:"Driverkast plan", toggle:"driverkast"},', "TABS driverplan")
 vervang('  driverkast: renderDriverkast,', '  driverkast: renderDriverkast,\n  driverplan: renderDriverplan,', "RENDERERS driverplan")
 
+# 14. Driverkast: drivernummer met het nummer van de kast als er meer dan 1 driverkast is (1.D3, 2.D14)
+vervang('  state.driverkast.kasten.forEach(kast=>{\n    kast.items.forEach(driver=>{\n      const override = parseInt(driver.manueelNummer);',
+        '  const meerKasten = state.driverkast.kasten.filter(k=> k.items.some(d=> !d.leeg)).length > 1;\n'
+        '  state.driverkast.kasten.forEach((kast, ki)=>{\n    kast.items.forEach(driver=>{\n      const override = parseInt(driver.manueelNummer);', "driver codes kast")
+vervang('      const code = "D"+nummer;', '      const code = (meerKasten ? (ki+1) + "." : "") + "D"+nummer;', "driver code prefix")
+# 15. Driverkast-tab: een driver naar een andere kast verplaatsen haalt hem uit de oude kast
+vervang('    if(!movingRef.isNew){\n      const cur = kast.items.indexOf(item);',
+        '    if(!movingRef.isNew){\n      state.driverkast.kasten.forEach(k=>{ if(k!==kast){ const c = k.items.indexOf(item); if(c!==-1) k.items.splice(c,1); } });\n      const cur = kast.items.indexOf(item);', "driver move other kast")
+# 16. Rijgklemmen-tab: automatische klemmen voor zekeringen met "kabel op klemmen"
+vervang('function syncKlemBronnen(){\n  let gewijzigd = false;', 'function syncKlemBronnen(){\n  let gewijzigd = false;\n  if(typeof autoZekeringKlemmen==="function" && autoZekeringKlemmen()) gewijzigd = true;', "auto zek klemmen")
+
 if test:
     html = re.sub(r"<title>([^<]*)</title>", lambda m: f"<title>TEST · {m.group(1)}</title>", html, count=1)
     m = re.search(r"<body[^>]*>", html)

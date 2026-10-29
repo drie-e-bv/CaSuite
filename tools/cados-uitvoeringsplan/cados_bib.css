@@ -365,3 +365,7 @@
 .uv-svg .dk-koker{cursor:pointer;}
 .uv-svg .dk-koker:hover{fill:#dfe3e8;}
 .uv-svg .dk-koker.sel{fill:#fbeee3;stroke:#bb5e26;stroke-width:2;stroke-dasharray:none;}
+
+.uv-svg .uv-mod.versleept{opacity:.75;pointer-events:none;filter:drop-shadow(0 4px 6px rgba(0,0,0,.3));}
+.uv-svg .dk-driver{cursor:grab;}
+.uv-svg .dk-drop{fill:none;stroke:#2F7A4D;stroke-width:3;stroke-dasharray:6 4;pointer-events:none;}

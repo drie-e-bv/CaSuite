@@ -364,6 +364,7 @@ function uvAlleModules(kast){ const f = []; kast.rijen.forEach(r=> r.items.forEa
 function uvSyncEnOpruimen(kast){
   if(!Array.isArray(kast.bedrading)) kast.bedrading = [];
   let gewijzigd = false;
+  if(!kast._dk && autoZekeringKlemmen()) gewijzigd = true;
   const mods = uvAlleModules(kast);
   if(moduleBibGeladen){
     mods.forEach(m=>{
@@ -1440,7 +1441,7 @@ function renderUitvoeringsplan(ctxArg){
       return;
     }
     if(!uvPending && !kast.bedrading.length && !(kast.kamgeleiders||[]).length){
-      const b = el(`<div class="move-banner uv-omzet-banner">Nog geen uitvoering voor deze kast — maak een voorstel vanuit de layout. <button class="btn small primary">⚡ Automatisch omzetten</button></div>`);
+      const b = el(`<div class="move-banner uv-omzet-banner">Nog geen draden in deze kast — ${ctx.zekering ? "maak een voorstel vanuit de layout" : "laat ze automatisch voorstellen"}. <button class="btn small primary">⚡ ${escapeHtml(ctx.omzetLabel || "Automatisch omzetten")}</button></div>`);
       b.querySelector("button").addEventListener("click", doeOmzet);
       banner.appendChild(b);
       return;
@@ -1850,6 +1851,14 @@ function renderUitvoeringsplan(ctxArg){
       return;
     }
     if(ev.target.closest && ev.target.closest(".uv-klem")) return;
+    // modules verslepen (bv. drivers in de driverkast), als de context dat toelaat
+    const modEl = ctx.moduleSleep && ev.target.closest && ev.target.closest(".uv-mod[data-mod]");
+    if(modEl && p && ctx.moduleSleep.mag(modEl.getAttribute("data-mod"))){
+      ev.preventDefault();
+      sleep = {soort: "mod", id: modEl.getAttribute("data-mod"), el: modEl, p0: p, p, bewogen: false};
+      try{ canvas.setPointerCapture(ev.pointerId); }catch(_e){}
+      return;
+    }
     if(ev.pointerType==="touch") return;    // vinger: gewoon scrollen
     sleep = {soort: "pan", cx: ev.clientX, cy: ev.clientY, sl: canvas.scrollLeft, st: canvas.scrollTop, bewogen: false};
   });
@@ -1878,6 +1887,16 @@ function renderUitvoeringsplan(ctxArg){
       return;
     }
     if(sleep.soort==="kam"){ sleep.x1 = p.x; toonKamPreview(sleep); return; }
+    if(sleep.soort==="mod"){
+      const dx = p.x - sleep.p0.x, dy = p.y - sleep.p0.y;
+      if(!sleep.bewogen && Math.abs(dx) + Math.abs(dy) < 4) return;
+      sleep.bewogen = true; sleep.p = p;
+      sleep.el.setAttribute("transform", `translate(${dx} ${dy})`);
+      sleep.el.classList.add("versleept");
+      canvas.querySelector("svg").classList.add("sleept-mod");
+      if(ctx.moduleSleep.voorbeeld) ctx.moduleSleep.voorbeeld(kast, sleep.id, p, canvas.querySelector("svg"));
+      return;
+    }
     sleep.bewogen = true;
     if(sleep.soort==="eind"){
       const ander = sleep.e==="a" ? sleep.r.B : sleep.r.A;
@@ -1916,6 +1935,13 @@ function renderUitvoeringsplan(ctxArg){
     const svg = canvas.querySelector("svg");
     if(svg) svg.classList.remove("sleept");
     if(s.soort==="pan"){ if(s.bewogen) negeerVolgendeKlik(); return; }
+    if(s.soort==="mod"){
+      const svgM = canvas.querySelector("svg"); if(svgM) svgM.classList.remove("sleept-mod");
+      if(!s.bewogen) return;   // gewone klik: selecteren
+      negeerVolgendeKlik();
+      if(ctx.moduleSleep.drop(kast, s.id, s.p, s.p0)){ save(); selectTab(ctx.tab); } else teken();
+      return;
+    }
     negeerVolgendeKlik();
     if(s.soort==="zoomvenster"){
       const rx = Math.min(s.x0, s.x1), ry = Math.min(s.y0, s.y1), rw = Math.abs(s.x1 - s.x0), rh = Math.abs(s.y1 - s.y0);
@@ -3682,4 +3708,69 @@ function herkoppelKlemBronnen(){
     if(aders && aders !== n) afwijkend.push(`${bron.label}: ${bron.kabeltype} = ${aders} aders, ${n} op de klemmen`);
   });
   return {gekoppeld, afwijkend};
+}
+
+/* Zekeringkast: "voedingskabel komt op klemmen" aangevinkt -> automatisch rijgklemmen (2026-10-29, Peter:
+   "In ontwerp van zekeringkast kun je aanvinken of deze dient gekableerd te worden op klemmen. Dan komt
+   er automatisch een klem bij"). Per kabel (kabelAantal) zoveel klemmen als het kabeltype aders heeft
+   (zonder de aarding, zoals de Snelmodus), gekoppeld aan de zekering zodat naam/kamer meevolgen, en
+   meteen op de rijgklemmenmodule van dezelfde kast als die er is. Vink je het af, dan verdwijnen enkel
+   de automatisch aangemaakte klemmen weer. */
+function autoZekeringKlemmen(){
+  if(!state.interlex || !Array.isArray(state.interlex.items) || typeof snelmodusBronnen !== "function") return false;
+  const il = state.interlex;
+  if(!Array.isArray(il.gebruikteBronnen)) il.gebruikteBronnen = [];
+  let gewijzigd = false;
+  const bronnen = snelmodusBronnen("zekeringen");
+  const gewenst = new Set(bronnen.map(b=> b.id));
+  // 1. automatisch aangemaakte klemmen waarvan de kabel niet meer op klemmen komt: weg
+  const weg = il.items.filter(k=> k.autoZek && !gewenst.has(k.bronId));
+  if(weg.length){
+    const ids = new Set(weg.map(k=> k.id));
+    il.items = il.items.filter(k=> !ids.has(k.id));
+    il.gebruikteBronnen = il.gebruikteBronnen.filter(g=> !(g.bronType==="zekeringen" && weg.some(k=> k.bronId===g.bronId)));
+    state.zekeringen.kasten.forEach(kast=> kast.rijen.forEach(r=> r.items.forEach(m=>{
+      if(m.categorie==="Rijgklemmenmodule" && Array.isArray(m.rijgklemKlemIds) && m.rijgklemKlemIds.some(id=> ids.has(id))){
+        m.rijgklemKlemIds = m.rijgklemKlemIds.filter(id=> !ids.has(id));
+        if(typeof berekenRijgklemBreedte==="function") m.breedte = berekenRijgklemBreedte(m.rijgklemKlemIds.length);
+      }
+    })));
+    gewijzigd = true;
+  }
+  // 2. nieuwe kabels op klemmen: klemmen aanmaken
+  const dubbel = il.type === "dubbel";
+  bronnen.forEach(b=>{
+    const bestaat = il.items.some(k=> k.bronType==="zekeringen" && k.bronId===b.id) ||
+      il.gebruikteBronnen.some(g=> g.bronType==="zekeringen" && g.bronId===b.id) ||
+      il.items.some(k=> k.onder && String(k.onder.watwaar||"").startsWith(b.label + " - ader"));
+    if(bestaat) return;
+    const n = (typeof parseAderAantalUitKabel==="function" && parseAderAantalUitKabel(b.kabeltype)) || 2;
+    const nieuw = [];
+    let klem = null;
+    for(let i=1; i<=n; i++){
+      const zijde = (dubbel && i%2===0) ? "boven" : "onder";
+      if(zijde==="onder"){
+        klem = typeof newKlem==="function" ? newKlem() : {id: cryptoId(), kamer: "", info: "", onder: {kleur: "", watwaar: "", aansluiting: "", aderNr: 0}, boven: {kleur: "", watwaar: "", aansluiting: "", aderNr: 0}};
+        klem.kamer = b.kamer || ""; klem.info = b.info || "";
+        klem.bronType = "zekeringen"; klem.bronId = b.id; klem.autoZek = true;
+        if(b.kabeltype) klem.kabeltype = b.kabeltype;
+        nieuw.push(klem);
+      }
+      klem[zijde].watwaar = [b.label, "ader " + i].filter(Boolean).join(" - ");
+      klem[zijde].kleur = (il.standaardKleuren || [])[i-1] || "";
+      klem[zijde].aderNr = i;
+    }
+    il.items.push(...nieuw);
+    il.gebruikteBronnen.push({bronType: "zekeringen", bronId: b.id});
+    // op de rijgklemmenmodule van de kast waar de zekering in zit
+    const modId = String(b.id).split("::")[0];
+    const kast = state.zekeringen.kasten.find(k=> k.rijen.some(r=> r.items.some(m=> m.id===modId)));
+    const rk = kast && kast.rijen.flatMap(r=> r.items).find(m=> m.categorie==="Rijgklemmenmodule");
+    if(rk){
+      rk.rijgklemKlemIds = (rk.rijgklemKlemIds || []).concat(nieuw.map(k=> k.id));
+      if(typeof berekenRijgklemBreedte==="function") rk.breedte = berekenRijgklemBreedte(rk.rijgklemKlemIds.length);
+    }
+    gewijzigd = true;
+  });
+  return gewijzigd;
 }
