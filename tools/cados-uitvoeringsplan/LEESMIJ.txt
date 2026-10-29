@@ -6,7 +6,9 @@ TESTVERSIE (staat naast de gewone apps, verandert niets aan de live versie):
 Beide werken op de ECHTE gegevens (zelfde Supabase).
 
 Bronbestanden: cados_bib.js + cados_bib.css (uitvoeringsplan, bibliotheek, ontwerper),
-cados_motoren.js (nieuw onderdeel Motoren: screens, gordijnen, rolluiken). patch.py voegt alles in.
+cados_motoren.js (nieuw onderdeel Motoren: screens, gordijnen, rolluiken),
+cados_driverplan.js (tabblad Driverkast plan: kastmaat, drivers op schaal, rijgklemmen per spot,
+draden; gebruikt hetzelfde tekenwerk als het uitvoeringsplan). patch.py voegt alles in.
 
 Uitvoeringsplan (versie 28/10 avond): compacte kopbalk, werkvlak over de volle schermhoogte,
 gereedschap in de zijkolom, zoom (−/+, volledige kast F, breedte W, zoomvenster Z, Ctrl+muiswiel),

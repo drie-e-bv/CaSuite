@@ -13,7 +13,7 @@ html = pathlib.Path(bron).read_text(encoding="utf-8")
 if "MODULEBIBLIOTHEEK + UITVOERINGSPLAN" in html:
     sys.exit(f"{bron}: is al gepatcht")
 
-JS = (HIER / "cados_bib.js").read_text(encoding="utf-8") + "\n" + (HIER / "cados_motoren.js").read_text(encoding="utf-8")
+JS = (HIER / "cados_bib.js").read_text(encoding="utf-8") + "\n" + (HIER / "cados_motoren.js").read_text(encoding="utf-8") + "\n" + (HIER / "cados_driverplan.js").read_text(encoding="utf-8")
 CSS = (HIER / "cados_bib.css").read_text(encoding="utf-8")
 
 OUTER = r"""
@@ -186,6 +186,13 @@ vervang('  wrap.querySelector("#smMaak").addEventListener("click", ()=>{',
         '  });\n'
         '  wrap.querySelector("#smMaak").addEventListener("click", ()=>{', "herkoppel listener")
 
+# 13. Driverkast plan: nieuw tabblad naast Driverkast
+vervang('  {grp:"Elektro", id:"driverkast", label:"Driverkast", toggle:"driverkast"},',
+        '  {grp:"Elektro", id:"driverkast", label:"Driverkast", toggle:"driverkast"},\n'
+        '  // 2026-10-29: plan van de driverkast (kastmaat, drivers op schaal, rijgklemmen per spot, draden)\n'
+        '  {grp:"Elektro", id:"driverplan", label:"Driverkast plan", toggle:"driverkast"},', "TABS driverplan")
+vervang('  driverkast: renderDriverkast,', '  driverkast: renderDriverkast,\n  driverplan: renderDriverplan,', "RENDERERS driverplan")
+
 if test:
     html = re.sub(r"<title>([^<]*)</title>", lambda m: f"<title>TEST · {m.group(1)}</title>", html, count=1)
     m = re.search(r"<body[^>]*>", html)
@@ -212,7 +219,7 @@ if test:
     hm = re.search(r"<head[^>]*>", html)
     html = html[:hm.end()] + FOUTMELDER + html[hm.end():]
     m = re.search(r"<body[^>]*>", html)
-    html = html[:m.end()] + '\n<div class="casuite-testlint">TESTVERSIE — Uitvoeringsplan &amp; Modulebibliotheek · Motoren · werkt op de echte gegevens</div>' + html[m.end():]
+    html = html[:m.end()] + '\n<div class="casuite-testlint">TESTVERSIE — Uitvoeringsplan &amp; Modulebibliotheek · Motoren · Driverkast plan · werkt op de echte gegevens</div>' + html[m.end():]
 
 pathlib.Path(doel).write_text(html, encoding="utf-8")
 print(f"{doel}: OK ({'test' if test else 'definitief'})")
