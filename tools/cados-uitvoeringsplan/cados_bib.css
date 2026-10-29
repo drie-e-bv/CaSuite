@@ -320,3 +320,9 @@
 .uv-svg .uv-zijgoot{fill:none;stroke:#e3e6ea;stroke-dasharray:4 4;}
 .uv-svg .uv-zijgoot.vol{fill:#eef0f3;stroke:#c9ced4;stroke-dasharray:none;}
 .uv-svg .uv-zijgoot-tel{font-size:9px;font-weight:700;fill:#5c636b;text-anchor:middle;pointer-events:none;}
+
+#cados-app .uv-rk-kabels{display:flex;flex-direction:column;gap:4px;max-height:260px;overflow:auto;}
+#cados-app .uv-rk-kabelrij{display:grid;grid-template-columns:1fr 92px;gap:6px;align-items:center;font-weight:500;color:var(--ink);}
+#cados-app .uv-rk-kabelrij span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+#cados-app .uv-rk-kabelrij small{color:var(--ink-dim);}
+#cados-app .uv-rk-kabelrij input{padding:3px 6px;font-size:12px;}

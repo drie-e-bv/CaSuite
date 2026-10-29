@@ -384,6 +384,13 @@ function uvSyncEnOpruimen(kast){
     // draden met "kleur volgt klem" volgen de (eventueel gewijzigde) klemkleur
     const klemVan = {};
     mods.forEach(m=> klemmenVoorModule(m).forEach(k=>{ klemVan[uvKlemKey(m.id, k.id)] = k; }));
+    const modVan = {};
+    mods.forEach(m=>{ modVan[m.id] = m; });
+    kast.bedrading.forEach(w=>{
+      if(!w.sectieAuto) return;
+      const ns = uvSectieVoorKlemmen(modVan[w.a.m], klemVan[uvKlemKey(w.a.m, w.a.k)], modVan[w.b.m], klemVan[uvKlemKey(w.b.m, w.b.k)]);
+      if(ns && ns !== String(w.sectie)){ w.sectie = ns; gewijzigd = true; }
+    });
     kast.bedrading.forEach(w=>{
       if(!w.kleurAuto) return;
       const nk = draadKleurVoorKlemmen(klemVan[uvKlemKey(w.a.m, w.a.k)], klemVan[uvKlemKey(w.b.m, w.b.k)]);
@@ -1467,7 +1474,7 @@ function renderUitvoeringsplan(){
         save(); teken();
       });
       box.querySelector(".sw-kleurauto").addEventListener("change", e=>{ w.kleurAuto = e.target.checked; if(w.kleurAuto) uvSyncEnOpruimen(kast); save(); teken(); });
-      box.querySelector(".sw-sectie").addEventListener("change", e=>{ w.sectie = e.target.value; w.auto = false; save(); teken(); });
+      box.querySelector(".sw-sectie").addEventListener("change", e=>{ w.sectie = e.target.value; w.sectieAuto = false; w.auto = false; save(); teken(); });
       box.querySelector(".sw-label").addEventListener("change", e=>{ w.label = e.target.value; save(); teken(); });
       box.querySelector(".sw-va").addEventListener("click", ()=>{ uvVerplaats = {w: w.id, e: "a"}; uvPending = null; teken(); });
       box.querySelector(".sw-vb").addEventListener("click", ()=>{ uvVerplaats = {w: w.id, e: "b"}; uvPending = null; teken(); });
@@ -1488,6 +1495,7 @@ function renderUitvoeringsplan(){
           <option value="" ${!md.rijgklemPositie?"selected":""}>Automatisch (nu: ${rijgklemPositie(Object.assign({}, md, {rijgklemPositie: ""}))==="boven" ? "bovenaan" : "onderaan"})</option>
           <option value="boven" ${md.rijgklemPositie==="boven"?"selected":""}>Bovenaan — Preflex boven, kast onder</option>
           <option value="onder" ${md.rijgklemPositie==="onder"?"selected":""}>Onderaan — kast boven, Preflex onder</option></select></label>` : ""}
+        ${md.categorie==="Rijgklemmenmodule" && (md.rijgklemKlemIds||[]).length ? `<div class="uv-veld">Kabels op deze module<div class="uv-rk-kabels"></div></div>` : ""}
         <label class="uv-veld">Bibliotheekmodule<select class="sm-bib"></select></label>
         <div class="hint">${klemmen.length} klemmen — ${Array.isArray(md.klemmenEigen) && md.klemmenEigen.length ? "eigen aanpassing" : (md.categorie==="Rijgklemmenmodule" ? "uit het tabblad Rijgklemmen" : (md.bib && md.bib.klemmen && md.bib.klemmen.length ? "uit de bibliotheek" : (sjabloonVoor(md) ? "aangepaste standaard" : "standaard")))}</div>
         <div class="uv-knoprij">
@@ -1496,6 +1504,20 @@ function renderUitvoeringsplan(){
           <button class="btn small ghost sm-layout">In layout openen</button>
         </div>
       </div></div>`);
+      const rkZone = box.querySelector(".uv-rk-kabels");
+      if(rkZone){
+        const alleKl = (state.interlex && state.interlex.items) || [];
+        rijgklemIndeling(md).groepen.filter(g=> g.toon).forEach(g=>{
+          const r = el(`<div class="uv-rk-kabelrij"><span title="${escapeHtml([g.naam, g.locatie].filter(Boolean).join(" · "))}">${escapeHtml(g.naam || g.locatie)} <small>${g.leden.length}×</small></span><input value="${escapeHtml(g.kabelBekend ? g.kabel : "")}" placeholder="${escapeHtml(g.kabelBekend ? "" : "bv. 4G1.5")}" list="dl-uv-kabels"></div>`);
+          r.querySelector("input").addEventListener("change", e=>{
+            const v = e.target.value.trim();
+            g.klemIds.forEach(id=>{ const k = alleKl.find(x=> x.id===id); if(k){ if(v) k.kabeltype = v; else delete k.kabeltype; } });
+            uvSyncEnOpruimen(kast); save(); teken();
+          });
+          rkZone.appendChild(r);
+        });
+        rkZone.appendChild(el(`<datalist id="dl-uv-kabels">${["3G1.5","3G2.5","4G1.5","5G1.5","5G2.5","2x1.5","EIB-Y(St)Y 2x2x0.8","SVV 4x0.8"].map(k=>`<option value="${k}">`).join("")}</datalist>`));
+      }
       const rkp = box.querySelector(".sm-rkpos");
       if(rkp) rkp.addEventListener("change", e=>{ if(e.target.value) md.rijgklemPositie = e.target.value; else delete md.rijgklemPositie; save(); teken(); });
       const sel = box.querySelector(".sm-bib");
@@ -1672,7 +1694,9 @@ function renderUitvoeringsplan(){
     const kleur = uvKleurAuto ? (draadKleurVoorKlemmen(pa && pa.k, pb && pb.k) || uvKleur) : uvKleur;
     const fouten = uvAansluitFouten(kleur, pa && pa.k, pb && pb.k);
     if(!bevestigAansluiting(fouten)){ teken(); return; }
-    const nw = {id: cryptoId(), a: {m: a.m, k: a.k}, b, kleur, kleurAuto: uvKleurAuto, sectie: uvSectie, label: ""};
+    const sectieKabel = uvSectieVoorKlemmen(pa && pa.m, pa && pa.k, pb && pb.m, pb && pb.k);
+    const nw = {id: cryptoId(), a: {m: a.m, k: a.k}, b, kleur, kleurAuto: uvKleurAuto, sectie: sectieKabel || uvSectie, label: ""};
+    if(sectieKabel){ nw.sectieAuto = true; if(sectieKabel !== uvSectie) toast(`Doorsnede ${sectieKabel} mm² volgens de kabel op de rijgklem`); }
     if(fouten.length) nw.bewustAfwijkend = true;
     const pts = (uvPending && uvPending.punten) || [];
     if(pts.length) nw.punten = pts.map(p=> uvEncodeerPunt(p, geoNu));
@@ -1692,6 +1716,7 @@ function renderUitvoeringsplan(){
     if(!bevestigAansluiting(fouten)) return false;
     w[e] = {m: naar.m, k: naar.k};
     w.kleur = kleurNa;
+    if(w.sectieAuto !== false){ const ns = uvSectieVoorKlemmen(pa && pa.m, pa && pa.k, po && po.m, po && po.k); if(ns){ w.sectie = ns; w.sectieAuto = true; } }
     w.bewustAfwijkend = fouten.length > 0;
     w.auto = false;
     delete w.punten;
@@ -3421,25 +3446,56 @@ function draadKleurVoorKlemmen(ka, kb){
    groep: tussen twee kabels komt een tussenruimte met scheidingslijn, en gecentreerd boven de groep
    staan de naam van de kabel, het kabeltype en de locatie. */
 const RK_TUSSENRUIMTE = 0.8;   // in klembreedtes
+function rijgklemKabelNaam(k){
+  const ww = (k.onder && k.onder.watwaar) || (k.boven && k.boven.watwaar) || "";
+  // enkel als de tekst het patroon van de Snelmodus heeft ("<kabel> - ader N"); vrije tekst zoals
+  // "Keuken spots L" / "Keuken spots N" hoort bij dezelfde kabel en valt terug op info + kamer
+  const m = ww.match(/^(.*?)\s*[-–]\s*ader\s*\d+\s*$/i);
+  return m ? m[1].trim() : "";
+}
+function rijgklemAderNr(k){ return parseInt((k.onder && k.onder.aderNr) || (k.boven && k.boven.aderNr)) || 0; }
+// kabeltype van een groep: op de klem zelf bewaard (Snelmodus / zijpaneel), anders van de bron
+// (bv. verlichting "101 — TBP" -> typeKabel), anders het aantal aders
+function rijgklemKabelInfo(k, naam){
+  if(k.kabeltype) return {kabel: k.kabeltype};
+  if(typeof snelmodusBronnen !== "function") return {kabel: ""};
+  const types = k.bronType ? [k.bronType] : ["verlichting","verwarming","laadpalen","motoren","zekeringen"];
+  for(const t of types){
+    try{
+      const lijst = snelmodusBronnen(t) || [];
+      const b = k.bronId ? lijst.find(x=> x.id===k.bronId) : (naam ? lijst.find(x=> String(x.label||"").trim()===naam) : null);
+      if(b) return {kabel: b.kabeltype || "", naam: b.label || ""};
+    }catch(_e){}
+  }
+  return {kabel: ""};
+}
+/* Groepering per kabel (2026-10-29, Peter: "waarom lopen 102, 103 en 104 hier door elkaar"): eerst
+   de bron, anders de kabelnaam uit "wat/waar" (bv. "103 — TBP" uit "103 — TBP - ader 2"), anders
+   info + kamer. Begint de adernummering opnieuw bij 1, dan is het ook een nieuwe kabel. */
 function rijgklemIndeling(m){
   const items = (state.interlex && state.interlex.items) || [];
   const ids = m.rijgklemKlemIds || [];
   const groepen = [];
   ids.forEach((kid, i)=>{
     const k = items.find(x=> x.id===kid) || {};
-    const sleutel = k.bronId ? "b:"+k.bronType+"|"+k.bronId : ((k.info || k.kamer) ? "i:"+(k.info||"")+"|"+(k.kamer||"") : "x:"+kid);
+    const kn = rijgklemKabelNaam(k);
+    const sleutel = k.bronId ? "b:"+k.bronType+"|"+k.bronId : (kn ? "w:"+kn+"|"+(k.kamer||"") : ((k.info || k.kamer) ? "i:"+(k.info||"")+"|"+(k.kamer||"") : "x:"+kid));
+    const nr = rijgklemAderNr(k);
     const vorige = groepen[groepen.length-1];
-    if(vorige && vorige.sleutel===sleutel && !sleutel.startsWith("x:")) vorige.leden.push(i);
-    else groepen.push({sleutel, leden: [i], klem: k});
+    const nieuweKabel = vorige && nr && vorige.laatsteNr && nr <= vorige.laatsteNr;
+    if(vorige && vorige.sleutel===sleutel && !sleutel.startsWith("x:") && !nieuweKabel){ vorige.leden.push(i); vorige.laatsteNr = nr; }
+    else groepen.push({sleutel, leden: [i], klem: k, klemIds: [], laatsteNr: nr});
+    groepen[groepen.length-1].klemIds.push(kid);
   });
   groepen.forEach(g=>{
     const k = g.klem;
-    let naam = "", kabel = "";
-    if(k.bronId && typeof snelmodusBronnen === "function"){
-      try{ const b = snelmodusBronnen(k.bronType).find(x=> x.id===k.bronId); if(b){ naam = b.label || ""; kabel = b.kabeltype || ""; } }catch(_e){}
-    }
-    if(!naam){ const ww = (k.onder && k.onder.watwaar) || ""; naam = ww.replace(/\s*[-–]\s*ader\s*\d+\s*$/i, "") || k.info || ""; }
-    g.naam = naam; g.kabel = kabel; g.locatie = k.kamer || "";
+    let naam = rijgklemKabelNaam(k);
+    const info = rijgklemKabelInfo(k, naam);
+    if(!naam) naam = info.naam || k.info || "";
+    g.naam = naam;
+    g.kabel = info.kabel || (g.leden.length > 1 ? g.leden.length + " aders" : "");
+    g.kabelBekend = !!info.kabel;
+    g.locatie = k.kamer || "";
     g.toon = !g.sleutel.startsWith("x:") && !!(g.naam || g.locatie);
   });
   // posities: een tussenruimte tussen twee groepen als minstens één van beide een kabelgroep is
@@ -3454,6 +3510,30 @@ function rijgklemIndeling(m){
   const eenheden = Math.max(1, pos);
   return { eenheden, groepen, xs: ids.map((_, i)=> (posVan[i] + 0.5)/eenheden) };
 }
+/* Doorsnede volgens de kabel (2026-10-29, Peter: "als er bv. een 5G1,5 op de klemmen zit, mag de
+   verbinding ook met 1,5 uitgevoerd worden"). Een draad naar een rijgklem neemt de doorsnede van de
+   kabel op die klem over (5G1,5 -> 1.5 mm², 3G2.5 -> 2.5 mm²); zolang je hem niet zelf wijzigt, volgt
+   hij ook later een gewijzigd kabeltype. */
+function sectieUitKabel(kabel){
+  const t = String(kabel||"").replace(/,/g, ".");
+  const alle = [...t.matchAll(/(?<=\d)\s*[gGxX×]\s*(\d+(?:\.\d+)?)/g)];
+  const m = alle.length ? alle[alle.length-1] : t.match(/(\d+(?:\.\d+)?)\s*mm/);
+  if(!m) return null;
+  const v = parseFloat(m[1]);
+  if(!(v > 0)) return null;
+  let best = null, d = Infinity;
+  DRAAD_SECTIES.forEach(x=>{ const dd = Math.abs(parseFloat(x) - v); if(dd < d){ d = dd; best = x; } });
+  return d < 0.11 ? best : null;
+}
+function uvKabelVanKlem(m, k){
+  if(!m || !k || m.categorie!=="Rijgklemmenmodule" || !k.rijgSoort) return "";
+  const kid = String(k.id).replace(/^r[kp]2?_/, "");
+  const g = rijgklemIndeling(m).groepen.find(g=> g.klemIds.includes(kid));
+  return g && g.kabelBekend ? g.kabel : "";
+}
+function uvSectieVoorKlemmen(ma, ka, mb, kb){
+  return sectieUitKabel(uvKabelVanKlem(ma, ka)) || sectieUitKabel(uvKabelVanKlem(mb, kb)) || null;
+}
 function rijgklemGroepenSvg(m, x, y, w, h){
   const ind = rijgklemIndeling(m);
   let s = "";
@@ -3465,6 +3545,7 @@ function rijgklemGroepenSvg(m, x, y, w, h){
     }
     if(!g.toon) return;
     const r1 = g.naam || g.locatie, r2 = [g.kabel, g.naam ? g.locatie : ""].filter(Boolean).join(" · ");
+    const tipTekst = [g.naam, g.kabel ? "kabel " + g.kabel : "", g.locatie, g.leden.length + " klem(men)"].filter(Boolean).join(" · ");
     const breed = x1 - x0, cx = (x0 + x1)/2, cy = y + h/2;
     const lang = Math.max(r1.length, r2.length) * 5.4;
     if(breed >= lang + 6){
@@ -3473,9 +3554,11 @@ function rijgklemGroepenSvg(m, x, y, w, h){
     } else {
       const max = Math.floor((h - 70)/5.4);
       s += `<text transform="translate(${cx - (r2 ? 4 : -3)} ${cy}) rotate(-90)" class="uv-rk-kabel">${escapeHtml(r1.slice(0, max))}</text>`;
-      if(r2 && breed >= 18) s += `<text transform="translate(${cx + 7} ${cy}) rotate(-90)" class="uv-rk-kabel sub">${escapeHtml(r2.slice(0, max))}</text>`;
+      const max2 = Math.floor((h - 56)/4.3);
+      const r2k = r2.length > max2 ? (g.kabel || r2).slice(0, max2) : r2;
+      if(r2 && breed >= 18) s += `<text transform="translate(${cx + 7} ${cy}) rotate(-90)" class="uv-rk-kabel sub">${escapeHtml(r2k)}</text>`;
     }
-    s += `<rect x="${x0+1}" y="${y+24}" width="${Math.max(2, x1-x0-2)}" height="${h-48}" rx="3" class="uv-rk-groep"><title>${escapeHtml([r1, r2].filter(Boolean).join(" — "))}</title></rect>`;
+    s += `<rect x="${x0+1}" y="${y+24}" width="${Math.max(2, x1-x0-2)}" height="${h-48}" rx="3" class="uv-rk-groep" data-tip="${escapeHtml(tipTekst)}"></rect>`;
   });
   return s;
 }

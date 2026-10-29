@@ -165,6 +165,10 @@ vervang('  if(bronType==="zekeringen"){',
 vervang('  {key:"laadpalen", label:"Laadpalen", fn:()=>exportLaadpalenVoorWerf',
         '  {key:"motoren", label:"Motoren", fn:()=>exportMotorenVoorWerf, schema:false, lijst:true, heeftData:()=> !!(state.motoren && state.motoren.items.length)},\n  {key:"laadpalen", label:"Laadpalen", fn:()=>exportLaadpalenVoorWerf', "EXPORT motoren")
 
+# 11. Snelmodus rijgklemmen: het ingevulde kabeltype op de klemmen bewaren (voor de kabelgroepen in het uitvoeringsplan)
+vervang('        state.interlex.items.push(klem);\n      }\n      klem[zijde].watwaar',
+        '        if(smKabeltype.value.trim()) klem.kabeltype = smKabeltype.value.trim();\n        state.interlex.items.push(klem);\n      }\n      klem[zijde].watwaar', "snelmodus kabeltype")
+
 if test:
     html = re.sub(r"<title>([^<]*)</title>", lambda m: f"<title>TEST · {m.group(1)}</title>", html, count=1)
     m = re.search(r"<body[^>]*>", html)
