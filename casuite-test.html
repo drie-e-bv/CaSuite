@@ -19782,6 +19782,7 @@ const DK_PTFIX_KLEUR = {L: "bruin", N: "blauw", "DA+": "grijs", "DA-": "grijs", 
 // rijgklemmen: enkel (1 niveau) of dubbel (2 niveaus: + boven, − eronder op dezelfde klem)
 function dkRijgBreedte(lijst, p){ return (p.rkDubbel ? Math.ceil(lijst.length/2) : lijst.length) * DK_KLEM_MM; }
 const DK_KOKERS = [30, 40, 50, 60];
+const DK_PLAN_VERSIE = 3;   // ophogen als het automatische draadvoorstel wijzigt
 const DK_TOP_PX = 18;
 // Maten (L x B x H in mm) van de drivers die Casentis gebruikt, opgezocht op 29/10/2026.
 // Aanpasbaar per type in het zijpaneel (gedeeld via elektro_cados_instellingen).
@@ -20283,6 +20284,7 @@ function dkOmzet(p){
     }
   });
   p.bedrading.push(...nieuw);
+  p.versie = DK_PLAN_VERSIE;
   return `Voorstel: ${nieuw.length} draden (werkschakelaar, verdeelblokken ${dk.sturing==="PUSH" ? "L/N/push" : "L/N/DALI"} en uitgangen naar de rijgklemmen).`;
 }
 
@@ -20366,7 +20368,21 @@ function dkVerplaats(p, id, richting){
 }
 const UV_CTX_DK = {
   tab: "driverplan", panelId: "panel-driverplan", titel: "Driverkast plan", zekering: false, eendraad: false, kam: false,
-  kast: ()=>{ const dk = dkHuidig(); return dk ? dkPlanKast(dk) : null; },
+  kast: ()=>{
+    const dk = dkHuidig();
+    if(!dk) return null;
+    const p = dkPlanKast(dk);
+    // Draden die nog volgens een vorige testversie automatisch voorgesteld werden (doorlussen van driver
+    // naar driver, klemmen per spot, ...) eenmalig vervangen door het huidige voorstel; zelf getekende
+    // draden blijven staan.
+    if(p.versie !== DK_PLAN_VERSIE){
+      const oud = p.bedrading.filter(w=> w.auto).length;
+      if(oud){ dkOmzet(p); toast(`Driverkast: ${oud} automatische draden van een vorige testversie vervangen door het nieuwe voorstel.`); }
+      p.versie = DK_PLAN_VERSIE;
+      save();
+    }
+    return p;
+  },
   huidigId: ()=> dkHuidigId,
   kasten: ()=> state.driverkast.kasten.map((k, i)=> ({id: k.id, naam: "Driverkast " + (i+1) + (k.kamer ? " · " + k.kamer : "")})),
   kiesKast: (id)=>{ dkHuidigId = id; },
