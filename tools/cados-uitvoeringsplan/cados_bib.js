@@ -1211,7 +1211,8 @@ function renderUitvoeringsplan(ctxArg){
       </div>
       <button class="btn small ghost uv-help ${uvHulpOpen?"actief":""}" title="uitleg en sneltoetsen">ⓘ</button>
     </div>
-    <div class="uv-werk">
+    <div class="uv-werk${ctx.linksPaneel ? " met-links" : ""}">
+      ${ctx.linksPaneel ? `<aside class="uv-links" id="uvLinks"></aside>` : ""}
       <div class="uv-canvas-box">
         <div class="uv-canvas-wrap" id="uvCanvas"></div>
         <div id="uvBanner" class="uv-banner"></div>
@@ -1415,6 +1416,8 @@ function renderUitvoeringsplan(ctxArg){
     if(extraHerberekenen) extraHerberekenen();
     if(uvPending){ const pts = uvPending.punten||[]; if(pts.length) toonDraadPreview(pts[pts.length-1]); }
     tekenBanner(); tekenSide(); tekenLijst(); tekenStatus();
+    const lz = wrap.querySelector("#uvLinks");
+    if(lz && ctx.linksPaneel){ lz.innerHTML = ""; ctx.linksPaneel(lz, {teken, kast, selecteer: (id)=>{ uvSelMod = id; uvSelWire = null; uvSelKam = null; uvSelExtra = null; teken(); }}); }
   }
   function tekenStatus(){
     let t;
@@ -2010,6 +2013,8 @@ function renderUitvoeringsplan(ctxArg){
     if(view!=="bedrading" || uvKamModus || uvZoomVenster || negeerKlik) return;
     if(e.target.closest(".uv-greep")) return;
     const klem = e.target.closest(".uv-klem");
+    const enkelSlepen = ctx.alleenSlepen && ctx.alleenSlepen(kast);
+    if(klem && enkelSlepen){ toast("In het overzicht van alle kasten kan je enkel drivers verslepen — open één kast om draden te tekenen."); return; }
     if(klem){
       const eind = {m: klem.getAttribute("data-m"), k: klem.getAttribute("data-k")};
       if(uvVerplaats){ const v = uvVerplaats; uvVerplaats = null; verplaatsEinde(v.w, v.e, eind); teken(); return; }
@@ -2029,7 +2034,7 @@ function renderUitvoeringsplan(ctxArg){
       return;
     }
     if(uvVerplaats) return;
-    const draad = e.target.closest(".uv-draad");
+    const draad = !enkelSlepen && e.target.closest(".uv-draad");
     if(draad){ uvSelWire = draad.getAttribute("data-w"); uvSelMod = null; uvSelKam = null; teken(); return; }
     const kamEl = e.target.closest(".uv-kam");
     if(kamEl){ uvSelKam = kamEl.getAttribute("data-kam"); uvSelWire = null; uvSelMod = null; teken(); return; }

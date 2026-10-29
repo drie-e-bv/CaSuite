@@ -3775,6 +3775,18 @@
 .uv-svg .dk-driver{cursor:grab;}
 .uv-svg .dk-drop{fill:none;stroke:#2F7A4D;stroke-width:3;stroke-dasharray:6 4;pointer-events:none;}
 
+#cados-app .uv-werk.met-links{grid-template-columns:250px minmax(0,1fr) 260px;}
+@media (max-width:1200px){ #cados-app .uv-werk.met-links{grid-template-columns:minmax(0,1fr) 260px;} #cados-app .uv-links{display:none;} }
+#cados-app .uv-links{display:flex;flex-direction:column;gap:6px;overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-lg);padding:8px;}
+#cados-app .dk-lijst-kop{font-size:12px;font-weight:800;color:var(--ink-dim);text-transform:uppercase;letter-spacing:.04em;margin:4px 2px 0;display:flex;justify-content:space-between;}
+#cados-app .dk-lijst-rij{display:grid;grid-template-columns:42px 1fr;gap:2px 6px;padding:5px 6px;border:1px solid var(--line);border-radius:7px;cursor:pointer;font-size:11.5px;line-height:1.3;background:var(--surface);}
+#cados-app .dk-lijst-rij:hover{border-color:#bb5e26;}
+#cados-app .dk-lijst-rij.sel{background:#fbeee3;border-color:#bb5e26;}
+#cados-app .dk-lijst-rij .c{grid-row:span 3;font:800 12px var(--mono);color:#1f4f8a;align-self:center;}
+#cados-app .dk-lijst-rij .n{font-weight:700;}
+#cados-app .dk-lijst-rij .s{color:var(--ink-dim);}
+.uv-svg .dk-kasttitel{font-size:14px;font-weight:800;fill:#1f4f8a;}
+
 </style>
 </head>
 <body>
@@ -10949,6 +10961,7 @@ function renderDriverEditor(driver, rebuildAll, selectItem, code, onDelete){
       <div class="field"><label>Nummer (handmatig, optioneel)</label><input class="di-nummer" type="number" value="${escapeHtml(driver.manueelNummer)}" placeholder="automatisch"></div>
       <div class="field"><label>Kring</label><select class="di-kring"><option value="">— geen —</option>${(()=>{const kc=computeKringCodes(); return state.kringen.items.map(k=>`<option value="${k.id}" ${driver.kringId===k.id?"selected":""}>${escapeHtml(kringLabel(k, kc[k.id]))}</option>`).join("");})()}</select></div>
       <div class="field"><label>Gevoed door automaat</label><select class="di-zekering"><option value="">— geen —</option>${alleZekeringAutomaten().map(a=>`<option value="${a.id}" ${driver.zekeringModuleId===a.id?"selected":""}>${escapeHtml(a.code)}${a.naam?" — "+escapeHtml(a.naam):""}</option>`).join("")}</select></div>
+      ${typeof dkKastVeld==="function" ? dkKastVeld(driver) : ""}
       <div class="field wide"><label>Merk / type (eigen notitie)</label><input class="di-type" value="${escapeHtml(driver.type)}" placeholder="bv. Tridonic 24W"></div>
     </div>
     <div class="hint" style="margin:6px 0 2px;">Laat leeg voor automatische nummering (telt door vanaf de vorige driver). Vul je hier iets in, dan tellen alle volgende drivers automatisch verder vanaf dát nummer — tot de volgende handmatige aanpassing.</div>
@@ -10969,6 +10982,8 @@ function renderDriverEditor(driver, rebuildAll, selectItem, code, onDelete){
     save(); rebuildAll();
   });
   box.querySelector(".di-type").addEventListener("input", e=>{ driver.type=e.target.value; save(); });
+  const dkKastSel = box.querySelector(".di-dkkast");
+  if(dkKastSel) dkKastSel.addEventListener("change", e=>{ dkVerhuisDriver(driver, e.target.value); save(); rebuildAll(); });
 
   return box;
 }
@@ -17046,7 +17061,8 @@ function renderUitvoeringsplan(ctxArg){
       </div>
       <button class="btn small ghost uv-help ${uvHulpOpen?"actief":""}" title="uitleg en sneltoetsen">ⓘ</button>
     </div>
-    <div class="uv-werk">
+    <div class="uv-werk${ctx.linksPaneel ? " met-links" : ""}">
+      ${ctx.linksPaneel ? `<aside class="uv-links" id="uvLinks"></aside>` : ""}
       <div class="uv-canvas-box">
         <div class="uv-canvas-wrap" id="uvCanvas"></div>
         <div id="uvBanner" class="uv-banner"></div>
@@ -17250,6 +17266,8 @@ function renderUitvoeringsplan(ctxArg){
     if(extraHerberekenen) extraHerberekenen();
     if(uvPending){ const pts = uvPending.punten||[]; if(pts.length) toonDraadPreview(pts[pts.length-1]); }
     tekenBanner(); tekenSide(); tekenLijst(); tekenStatus();
+    const lz = wrap.querySelector("#uvLinks");
+    if(lz && ctx.linksPaneel){ lz.innerHTML = ""; ctx.linksPaneel(lz, {teken, kast, selecteer: (id)=>{ uvSelMod = id; uvSelWire = null; uvSelKam = null; uvSelExtra = null; teken(); }}); }
   }
   function tekenStatus(){
     let t;
@@ -17845,6 +17863,8 @@ function renderUitvoeringsplan(ctxArg){
     if(view!=="bedrading" || uvKamModus || uvZoomVenster || negeerKlik) return;
     if(e.target.closest(".uv-greep")) return;
     const klem = e.target.closest(".uv-klem");
+    const enkelSlepen = ctx.alleenSlepen && ctx.alleenSlepen(kast);
+    if(klem && enkelSlepen){ toast("In het overzicht van alle kasten kan je enkel drivers verslepen — open één kast om draden te tekenen."); return; }
     if(klem){
       const eind = {m: klem.getAttribute("data-m"), k: klem.getAttribute("data-k")};
       if(uvVerplaats){ const v = uvVerplaats; uvVerplaats = null; verplaatsEinde(v.w, v.e, eind); teken(); return; }
@@ -17864,7 +17884,7 @@ function renderUitvoeringsplan(ctxArg){
       return;
     }
     if(uvVerplaats) return;
-    const draad = e.target.closest(".uv-draad");
+    const draad = !enkelSlepen && e.target.closest(".uv-draad");
     if(draad){ uvSelWire = draad.getAttribute("data-w"); uvSelMod = null; uvSelKam = null; teken(); return; }
     const kamEl = e.target.closest(".uv-kam");
     if(kamEl){ uvSelKam = kamEl.getAttribute("data-kam"); uvSelWire = null; uvSelMod = null; teken(); return; }
@@ -20014,7 +20034,29 @@ function dkKokerPosities(p, cols){
 }
 // Verdeelt de drivers over k kolommen: 24V-drivers (aansluitingen links en rechts) in de middelste
 // kolom, de stroomgestuurde in de minst gevulde andere kolom; telkens van boven naar onder.
-function dkVerdeel(drivers, k){
+function dkModelSleutel(d){ const m = dkDriverMaat(d); return String(d.naam||d.type||"").trim().toLowerCase() + "|" + m.l + "x" + m.b; }
+// "Sorteer op model" (Peter, 29/10): drivers per model/maat bij elkaar, binnen een model op nummer;
+// de kolommen worden na elkaar gevuld zodat een model zoveel mogelijk in één blok staat.
+function dkPerModel(drivers){
+  const opNr = dkOpNummer(drivers);
+  const eerste = {};
+  opNr.forEach((d, i)=>{ const s = dkModelSleutel(d); if(!(s in eerste)) eerste[s] = i; });
+  return opNr.slice().sort((a, b)=> eerste[dkModelSleutel(a)] - eerste[dkModelSleutel(b)] || opNr.indexOf(a) - opNr.indexOf(b));
+}
+function dkVerdeel(drivers, k, p){
+  if(p && p.sorteer === "model"){
+    const lijst = dkPerModel(drivers);
+    const cols = Array.from({length: k}, ()=> []);
+    const hd = (d)=> dkDriverMaat(d).b + DK_TUSSEN_MM;
+    const totaal = lijst.reduce((t, d)=> t + hd(d), 0);
+    let ci = 0, h = 0;
+    lijst.forEach((d, i)=>{
+      const rest = lijst.length - i;
+      if(ci < k-1 && cols[ci].length && (h + hd(d)/2 > totaal/k || rest <= k-1-ci)){ ci++; h = 0; }
+      cols[ci].push(d); h += hd(d);
+    });
+    return cols;
+  }
   const cols = Array.from({length: k}, ()=> []);
   const midden = Math.floor((k-1)/2);
   const hoogteVan = (c)=> c.reduce((t, d)=> t + dkDriverMaat(d).b + DK_TUSSEN_MM, 0);
@@ -20048,11 +20090,11 @@ function dkAutoKolommen(dk, p){
   // dan zo weinig mogelijk kolommen; past niets, dan de laagste indeling die nog in de breedte past
   const opties = [];
   for(let k=1; k<=drivers.length; k++){
-    const cols = dkVerdeel(drivers, k);
+    const cols = dkVerdeel(drivers, k, p);
     const m = dkMeetIndeling(dk, p, cols);
     opties.push({cols, m, k, past: m.breedte <= p.breedte && m.hoogte <= p.hoogte, inBreedte: m.breedte <= p.breedte});
   }
-  const score = (o)=> [o.past ? 0 : 1, gemengd && o.k < 3 ? 1 : 0, o.past ? o.k : 0, o.inBreedte ? 0 : 1, o.m.hoogte];
+  const score = (o)=> [o.past ? 0 : 1, gemengd && o.k < 3 && p.sorteer !== "model" ? 1 : 0, o.past ? o.k : 0, o.inBreedte ? 0 : 1, o.m.hoogte];
   opties.sort((a, b)=>{ const sa = score(a), sb = score(b); for(let i=0; i<sa.length; i++) if(sa[i] !== sb[i]) return sa[i] - sb[i]; return 0; });
   return opties[0].cols.map(c=> c.map(d=> d.id));
 }
@@ -20183,7 +20225,10 @@ function dkPlanKast(dk){
       const maat = dkDriverMaat(d);
       const kant = dkKant(p, d, ci, k);
       // tegen de koker aan de aansluitkant schuiven
-      const kx = kant === "L" ? kolX[ci].x0 : (kant === "R" ? kolX[ci].x1 - maat.l : (kolX[ci].x0 + kolX[ci].x1 - maat.l)/2);
+      // uitlijning (Peter, 29/10): kolom links van een koker → links uitlijnen, rechts van een koker →
+      // rechts, koker aan beide kanten (of geen) → gecentreerd
+      const kL = kolPos.includes(ci), kR = kolPos.includes(ci+1);
+      const kx = (kR && !kL) ? kolX[ci].x0 : ((kL && !kR) ? kolX[ci].x1 - maat.l : (kolX[ci].x0 + kolX[ci].x1 - maat.l)/2);
       const yTop = boven ? y : H - y - maat.b;
       const m = {id: d.id, categorie: "Driver", naam: d.naam, breedte: 1, _dk: {soort: "driver", driver: d, maat, spanning: dkIsSpanning(d), kant, kolom: ci},
         klemmenEigen: dkDriverKlemmen(d, dk.sturing, kant)};
@@ -20571,9 +20616,147 @@ function dkVerplaats(p, id, richting){
   p.kolommen = p.kolommen.filter(x=> x.length);
   if(!p.kolommen.length) p.kolommen = [[]];
 }
+
+/* ---------- overzicht van alle driverkasten naast elkaar (Peter, 29/10) ----------
+   Een samengestelde "kast": elke driverkast met zijn eigen geometrie, horizontaal verschoven. Enkel
+   om drivers tussen kasten te verslepen; draden tekenen gebeurt in de kast zelf. */
+let dkOverzicht = false;
+const DK_ALLE_GAP = 90, DK_ALLE_TOP = 26;
+function dkAlleKast(){
+  const delen = [];
+  let ox = 0, width = 0, height = 0;
+  const mods = [], klemPos = {}, routes = [], codes = {};
+  let achter = "";
+  state.driverkast.kasten.forEach((dk, i)=>{
+    if(!dkDrivers(dk).length) return;
+    const p = dkPlanKast(dk);
+    uvSyncEnOpruimen(p);
+    const g = dkGeometrie(p);
+    const oy = DK_ALLE_TOP;
+    const sx = (pt)=> ({x: pt.x + ox, y: pt.y + oy});
+    g.mods.forEach(md=> mods.push(Object.assign({}, md, {x: md.x + ox, y: md.y + oy})));
+    Object.entries(g.klemPos).forEach(([k, v])=> klemPos[k] = Object.assign({}, v, sx(v)));
+    dkRoutes(p, g).forEach(r=>{ const verts = r.verts.map(sx); routes.push(Object.assign({}, r, {verts, d: uvPad(verts), A: klemPos[uvKlemKey(r.w.a.m, r.w.a.k)], B: klemPos[uvKlemKey(r.w.b.m, r.w.b.k)]})); });
+    Object.assign(codes, p._codes);
+    const naam = "Driverkast " + (i+1) + (dk.kamer ? " · " + dk.kamer : "");
+    achter += `<g transform="translate(${ox} ${oy})">${dkAchtergrondSvg(p, g).replace(/ data-koker="[^"]*"/g, "")}</g>`;
+    achter += `<text x="${ox + UV.PADX}" y="${oy + DK_TOP_PX - 22}" class="dk-kasttitel">${escapeHtml(naam)} — ${dkDrivers(dk).length} drivers</text>`;
+    delen.push({dk, p, ox, oy, x0: ox, x1: ox + g.width, nr: i+1, naam});
+    width = ox + g.width; height = Math.max(height, g.height + oy);
+    ox += g.width + DK_ALLE_GAP;
+  });
+  const c = {id: "__alle_driverkasten", bedrading: routes.map(r=> r.w)};
+  const geo = {mods, klemPos, width: width + 40, height, codes, gootTop: [], hoogte: [], kamBand: [], rijY: [], rijH: [],
+    plan: {perDraad: {}, banen: [], zijN: {L: 0, R: 0}}, padL: UV.PADX, padR: UV.PADX, kastR: width - UV.PADX,
+    _eigen: true, _absoluut: true, _router: ()=> routes, kokers: []};
+  dkEigen(c, {rijen: [{id: "dk-alle", items: mods.map(md=> md.m)}], maat: 1, naam: "Alle driverkasten", _dk: {alle: true}, _alle: true, _delen: delen, _codes: codes,
+    _breedtePx: width - 2*UV.PADX, _geometrie: ()=> geo, _dkAchtergrond: ()=> achter, kolommen: [], klemExtra: {}, draai: {}});
+  return c;
+}
+function dkDeelVoorX(c, x){
+  const d = c._delen;
+  if(!d.length) return null;
+  return d.find(q=> x >= q.x0 - DK_ALLE_GAP/2 && x <= q.x1 + DK_ALLE_GAP/2) || (x < d[0].x0 ? d[0] : d[d.length-1]);
+}
+function dkDeelVanDriver(c, id){ return c._delen.find(q=> dkDrivers(q.dk).some(d=> d.id===id)); }
+function dkAlleVoorbeeld(c, id, pt, svg){
+  const laatste = c._delen[c._delen.length-1];
+  let r = svg.querySelector(".dk-drop");
+  if(laatste && pt.x > laatste.x1 + DK_ALLE_GAP/2){
+    if(!r){ r = document.createElementNS("http://www.w3.org/2000/svg", "rect"); r.setAttribute("class", "dk-drop"); svg.appendChild(r); }
+    r.setAttribute("x", laatste.x1 + 20); r.setAttribute("y", DK_ALLE_TOP + DK_TOP_PX); r.setAttribute("width", 30); r.setAttribute("height", 160);
+    return;
+  }
+  const q = dkDeelVoorX(c, pt.x);
+  if(!q) return;
+  dkDropVoorbeeld(q.p, id, {x: pt.x - q.ox, y: pt.y - q.oy}, svg);
+  r = svg.querySelector(".dk-drop");
+  if(r){ r.setAttribute("x", parseFloat(r.getAttribute("x")) + q.ox); r.setAttribute("y", parseFloat(r.getAttribute("y")) + q.oy); }
+}
+function dkAlleDrop(c, id, pt){
+  const van = dkDeelVanDriver(c, id);
+  if(!van) return false;
+  const laatste = c._delen[c._delen.length-1];
+  const d = dkDrivers(van.dk).find(x=> x.id===id);
+  if(pt.x > laatste.x1 + DK_ALLE_GAP/2){
+    const doel = dkNaarKast(van.dk, d, null);
+    dkVulIndeling(van.dk);
+    dkOmzet(dkPlanKast(van.dk)); dkOmzet(dkPlanKast(doel));
+    toast(`${computeDriverCodes()[id] || "Driver"} naar een nieuwe Driverkast ${state.driverkast.kasten.indexOf(doel)+1}.`);
+    return true;
+  }
+  const naar = dkDeelVoorX(c, pt.x);
+  const lokaal = {x: pt.x - naar.ox, y: pt.y - naar.oy};
+  if(naar.dk === van.dk) return dkDrop(van.p, id, lokaal);
+  const doel = dkDropDoel(naar.p, id, lokaal);
+  dkNaarKast(van.dk, d, naar.dk.id);
+  const p = dkPlan(naar.dk);
+  if(doel.nieuw) p.kolommen.push([id]);
+  else if(doel.nieuwLinks) p.kolommen.unshift([id]);
+  else (p.kolommen[doel.kol] || (p.kolommen[doel.kol] = [])).splice(doel.index, 0, id);
+  van.dk.plan.kolommen = van.dk.plan.kolommen.map(k=> k.filter(x=> x !== id)).filter(k=> k.length);
+  // automatische draden van beide kasten opnieuw voorstellen (zelf getekende blijven)
+  dkOmzet(dkPlanKast(van.dk)); dkOmzet(dkPlanKast(naar.dk));
+  toast(`${computeDriverCodes()[id] || "Driver"} verplaatst naar Driverkast ${naar.nr} — draden van beide kasten opnieuw voorgesteld.`);
+  return true;
+}
+
+/* ---------- lijst van de drivers links van de kast ---------- */
+function dkLijstPaneel(zone, h){
+  const kast = h.kast;
+  const delen = kast._alle ? kast._delen.map(q=> ({dk: q.dk, p: q.p, naam: q.naam})) : [{dk: kast._dk, p: kast, naam: kast.naam}];
+  const codes = computeDriverCodes();
+  zone.appendChild(el(`<div class="dk-lijst-kop"><span>Drivers</span><span>${delen.reduce((t, q)=> t + dkDrivers(q.dk).length, 0)}</span></div>`));
+  delen.forEach(q=>{
+    const drivers = q.p.sorteer === "model" ? dkPerModel(dkDrivers(q.dk)) : dkOpNummer(dkDrivers(q.dk));
+    const watt = drivers.reduce((t, d)=> t + (parseFloat(d.vermogen)||0), 0);
+    if(kast._alle) zone.appendChild(el(`<div class="dk-lijst-kop"><span>${escapeHtml(q.naam)}</span><span>${drivers.length}</span></div>`));
+    let vorigModel = null;
+    drivers.forEach(d=>{
+      const maat = dkDriverMaat(d);
+      const kol = q.p.kolommen.findIndex(c=> c.includes(d.id));
+      const arm = (d.armaturen||[]).filter(a=> a.naam).map(a=> (parseInt(a.aantal)||1) + "× " + a.naam).join(", ");
+      const ruimte = [...new Set((d.armaturen||[]).map(a=> a.ruimte).filter(Boolean))].join(", ");
+      const model = dkModelSleutel(d);
+      const nieuwModel = q.p.sorteer === "model" && model !== vorigModel;
+      vorigModel = model;
+      const rij = el(`<div class="dk-lijst-rij${uvSelMod===d.id ? " sel" : ""}${nieuwModel ? " modelstart" : ""}" data-id="${d.id}" title="klik om te selecteren">
+        <span class="c">${escapeHtml(codes[d.id] || "")}</span>
+        <span class="n">${escapeHtml(d.naam || "driver")}</span>
+        <span class="s">${maat.l}×${maat.b} mm · ${dkIsSpanning(d) ? "spanning" : "stroom"} · ${dkSpots(d)} spot(s)${kol >= 0 ? " · kolom " + (kol+1) : ""}</span>
+        <span class="s">${escapeHtml(arm || "geen armaturen")}${ruimte ? " · " + escapeHtml(ruimte) : ""}</span>
+      </div>`);
+      rij.addEventListener("click", ()=> h.selecteer(d.id));
+      zone.appendChild(rij);
+    });
+    void watt;
+  });
+}
+
+/* Ontwerp (tabblad Driverkast): een driver een nummer in een andere kast geven (Peter, 29/10) */
+function dkKastVanDriver(driver){ return state.driverkast.kasten.find(k=> k.items.includes(driver)); }
+function dkKastVeld(driver){
+  const huidig = dkKastVanDriver(driver);
+  return `<div class="field"><label>Driverkast (nummer volgt de kast)</label><select class="di-dkkast">
+    ${state.driverkast.kasten.map((k, i)=> `<option value="${k.id}" ${k===huidig?"selected":""}>Driverkast ${i+1}${k.kamer ? " · " + escapeHtml(k.kamer) : ""}</option>`).join("")}
+    <option value="__nieuw">＋ Nieuwe driverkast</option></select></div>`;
+}
+function dkVerhuisDriver(driver, doelId){
+  const van = dkKastVanDriver(driver);
+  if(!van || van.id === doelId) return null;
+  const doel = dkNaarKast(van, driver, doelId === "__nieuw" ? null : doelId);
+  if(van.plan) van.plan.kolommen = (van.plan.kolommen||[]).map(c=> c.filter(x=> x !== driver.id)).filter(c=> c.length);
+  try{
+    [van, doel].forEach(k=>{ if(k.plan && dkDrivers(k).length) dkOmzet(dkPlanKast(k)); });
+  }catch(_e){}
+  toast(`${computeDriverCodes()[driver.id] || "Driver"} staat nu in Driverkast ${state.driverkast.kasten.indexOf(doel)+1}.`);
+  return doel;
+}
 const UV_CTX_DK = {
   tab: "driverplan", panelId: "panel-driverplan", titel: "Driverkast plan", zekering: false, eendraad: false, kam: false,
   kast: ()=>{
+    if(dkOverzicht && state.driverkast.kasten.filter(k=> dkDrivers(k).length).length > 1) return dkAlleKast();
+    dkOverzicht = false;
     const dk = dkHuidig();
     if(!dk) return null;
     const p = dkPlanKast(dk);
@@ -20588,21 +20771,44 @@ const UV_CTX_DK = {
     }
     return p;
   },
-  huidigId: ()=> dkHuidigId,
-  kasten: ()=> state.driverkast.kasten.map((k, i)=> ({id: k.id, naam: "Driverkast " + (i+1) + (k.kamer ? " · " + k.kamer : "")})),
-  kiesKast: (id)=>{ dkHuidigId = id; },
+  huidigId: ()=> dkOverzicht ? "__alle" : dkHuidigId,
+  kasten: ()=>{
+    const l = state.driverkast.kasten.map((k, i)=> ({id: k.id, naam: "Driverkast " + (i+1) + (k.kamer ? " · " + k.kamer : "")}));
+    if(state.driverkast.kasten.filter(k=> dkDrivers(k).length).length > 1) l.push({id: "__alle", naam: "▦ Alle kasten"});
+    return l;
+  },
+  kiesKast: (id)=>{ if(id === "__alle"){ dkOverzicht = true; return; } dkOverzicht = false; dkHuidigId = id; },
+  alleenSlepen: (kast)=> !!kast._alle,
+  linksPaneel: (zone, h)=> dkLijstPaneel(zone, h),
   layoutTab: "driverkast", layoutTitel: "drivers en armaturen aanpassen op het tabblad Driverkast",
   omzetLabel: "Draden voorstellen", omzetTitel: "werkschakelaar, verdeelblokken (L/N/DALI of push) en de uitgangen naar de rijgklemmen automatisch tekenen",
-  omzet: (p)=> dkOmzet(p),
-  voorTeken: (p)=>{ if(p._dk) dkPlanKast(p._dk); },
+  omzet: (p)=>{
+    if(!p._alle) return dkOmzet(p);
+    p._delen.forEach(q=> dkOmzet(dkPlanKast(q.dk)));
+    return `Draden voorgesteld in ${p._delen.length} driverkasten.`;
+  },
+  voorTeken: (p)=>{ if(p._dk && !p._alle) dkPlanKast(p._dk); },
   moduleSleep: {
-    mag: (id)=>{ const dk = dkHuidig(); return !!(dk && dkDrivers(dk).some(d=> d.id===id)); },
-    voorbeeld: (p, id, pt, svg)=> dkDropVoorbeeld(p, id, pt, svg),
-    drop: (p, id, pt)=> dkDrop(p, id, pt),
+    mag: (id)=>{
+      if(dkOverzicht) return state.driverkast.kasten.some(k=> dkDrivers(k).some(d=> d.id===id));
+      const dk = dkHuidig(); return !!(dk && dkDrivers(dk).some(d=> d.id===id));
+    },
+    voorbeeld: (p, id, pt, svg)=> p._alle ? dkAlleVoorbeeld(p, id, pt, svg) : dkDropVoorbeeld(p, id, pt, svg),
+    drop: (p, id, pt)=> p._alle ? dkAlleDrop(p, id, pt) : dkDrop(p, id, pt),
   },
   export: ()=> dkExport(),
   hulpTekst: "Welke drivers en armaturen er in de kast zitten, pas je aan op het tabblad Driverkast. Hier kies je de kast, de kokers en de plaats en draaiing van de drivers.",
   extraKaart: (zone, h)=>{
+    if(h.kast._alle){
+      const c = h.kast;
+      const box = el(`<div class="card"><div class="card-body uv-sidebody">
+        <strong>Alle driverkasten</strong>
+        ${c._delen.map(q=> `<div class="hint"><strong>${escapeHtml(q.naam)}</strong> — ${dkDrivers(q.dk).length} drivers · ${q.p.kast ? escapeHtml(q.p.kast.naam) + " " + q.p.kast.b + "×" + q.p.kast.h : "plaat " + q.p.breedte + "×" + q.p.hoogte} mm</div>`).join("")}
+        <div class="hint">Sleep een driver naar een andere kast (of rechts naast de laatste kast voor een nieuwe kast). De automatische draden van beide kasten worden daarna opnieuw voorgesteld. Draden tekenen doe je in de kast zelf.</div>
+      </div></div>`);
+      zone.appendChild(box);
+      return;
+    }
     const p = h.kast, dk = p._dk, L = p._layout;
     const adv = dkKastAdvies(dk);
     const huidig = p.kast && RITTAL_AX.find(k=> k.art===p.kast.art);
@@ -20629,6 +20835,9 @@ const UV_CTX_DK = {
       <label class="uv-veld">Rijgklemmen<select class="dk-dub">
         <option value="0" ${!p.rkDubbel?"selected":""}>Enkel (1 niveau, 5,2 mm per klem)</option>
         <option value="1" ${p.rkDubbel?"selected":""}>Dubbel (2 niveaus: + en − op 1 klem)</option></select></label>
+      <label class="uv-veld">Volgorde bij herschikken<select class="dk-sort">
+        <option value="nummer" ${p.sorteer!=="model"?"selected":""}>Op nummer (24V-drivers in het midden)</option>
+        <option value="model" ${p.sorteer==="model"?"selected":""}>Per model/maat (zelfde drivers samen)</option></select></label>
       ${L.railLengte > p.breedte ? `<div class="uv-fout">De DIN-rail is ±${Math.ceil(L.railLengte/5)*5} mm lang en past niet op de montageplaat van ${p.breedte} mm${p.rkDubbel ? "" : " — met dubbele rijgklemmen wordt hij korter"}.</div>` : ""}
       <div class="hint">Sturing ${escapeHtml(dk.sturing||"DALI")} · ${dkDrivers(dk).length} drivers in ${p.kolommen.length} kolom(men) · ${dkDrivers(dk).reduce((t, d)=> t + dkSpots(d), 0)} spots/strips</div>
       <div class="uv-knoprij">
@@ -20654,6 +20863,7 @@ const UV_CTX_DK = {
     box.querySelector(".dk-kh").addEventListener("change", e=>{ p.kokerH = parseInt(e.target.value); save(); h.rerender(); });
     box.querySelector(".dk-rkpos").addEventListener("change", e=>{ p.rkPositie = e.target.value; save(); h.rerender(); });
     box.querySelector(".dk-dub").addEventListener("change", e=>{ p.rkDubbel = e.target.value==="1"; save(); h.rerender(); });
+    box.querySelector(".dk-sort").addEventListener("change", e=>{ p.sorteer = e.target.value; dkVulIndeling(dk, true); save(); h.rerender(); });
     box.querySelector(".dk-herschik").addEventListener("click", ()=>{ dkVulIndeling(dk, true); save(); h.rerender(); });
     box.querySelector(".dk-splits").addEventListener("click", ()=>{
       const n = dkDrivers(dk).length;
@@ -20669,7 +20879,7 @@ const UV_CTX_DK = {
     zone.appendChild(box);
   },
   extraDetail: (sel, zone, h)=>{
-    if(!String(sel).startsWith("koker:")) return false;
+    if(h.kast._alle || !String(sel).startsWith("koker:")) return false;
     const p = h.kast, id = sel.slice(6);
     const k = p._layout.kokers.find(x=> x.id===id);
     if(!k) return false;
@@ -20689,6 +20899,12 @@ const UV_CTX_DK = {
     return true;
   },
   moduleDetail: (md, zone, h)=>{
+    if(h.kast._alle){
+      const q = h.kast._delen.find(x=> x.p._layout.mods.some(m=> m.m.id===md.id));
+      if(!q) return;
+      const m2 = q.p._layout.mods.find(m=> m.m.id===md.id).m;
+      return UV_CTX_DK.moduleDetail(m2, zone, Object.assign({}, h, {kast: q.p}));
+    }
     const p = h.kast, dk = p._dk, info = md._dk;   // md = de (pseudo)module zelf
     const codes = p._codes;
     if(info.soort==="dali"){

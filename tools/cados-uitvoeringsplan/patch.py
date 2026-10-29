@@ -204,6 +204,12 @@ vervang('    if(!movingRef.isNew){\n      const cur = kast.items.indexOf(item);'
 # 16. Rijgklemmen-tab: automatische klemmen voor zekeringen met "kabel op klemmen"
 vervang('function syncKlemBronnen(){\n  let gewijzigd = false;', 'function syncKlemBronnen(){\n  let gewijzigd = false;\n  if(typeof autoZekeringKlemmen==="function" && autoZekeringKlemmen()) gewijzigd = true;', "auto zek klemmen")
 
+# 17. Driverkast-tab (ontwerp): in de editor van een driver de kast kiezen -> nieuw nummer in die kast
+vervang('      <div class="field wide"><label>Merk / type (eigen notitie)</label><input class="di-type"',
+        '      ${typeof dkKastVeld==="function" ? dkKastVeld(driver) : ""}\n      <div class="field wide"><label>Merk / type (eigen notitie)</label><input class="di-type"', "driver editor kast veld")
+vervang('  box.querySelector(".di-type").addEventListener("input", e=>{ driver.type=e.target.value; save(); });\n\n  return box;\n}\n\nfunction renderArmatuurEditor',
+        '  box.querySelector(".di-type").addEventListener("input", e=>{ driver.type=e.target.value; save(); });\n  const dkKastSel = box.querySelector(".di-dkkast");\n  if(dkKastSel) dkKastSel.addEventListener("change", e=>{ dkVerhuisDriver(driver, e.target.value); save(); rebuildAll(); });\n\n  return box;\n}\n\nfunction renderArmatuurEditor', "driver editor kast handler")
+
 if test:
     html = re.sub(r"<title>([^<]*)</title>", lambda m: f"<title>TEST · {m.group(1)}</title>", html, count=1)
     m = re.search(r"<body[^>]*>", html)
