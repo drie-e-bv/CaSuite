@@ -231,7 +231,7 @@
 // geleverde index.html, app-iconen teruggehaald uit werf/planning/cados/cacalc.html) en is er een
 // nieuwe basis-regressiesuite (test-basis.js, 28 controles) + test-fototekenen.js (21 controles),
 // als vervanging voor de verloren suite van 924 controles.
-const CACHE_VERSION = 'casnap-v2026-10-22-installeren';
+const CACHE_VERSION = 'casnap-v2026-10-29-cados-uitvoeringsplan';
 const NETWORK_TIMEOUT_MS = 4000;
 
 self.addEventListener('install', () => {
