@@ -1175,12 +1175,56 @@ function bevestigAansluiting(fouten){
 
 /* Het uitvoeringsplan is generiek: de zekeringkast (standaard) en de driverkast (UV_CTX_DK) gebruiken
    hetzelfde tekenwerk, elk met hun eigen "context" (welke kast, welke tab, eigen zijpaneel/omzetting). */
+/* Modules in de zekeringkast verslepen in het uitvoeringsplan (Peter, 30/10: "wanneer ik een module uit de
+   bibliotheek plaats moet ik deze kunnen drag-and-droppen naar een andere plaats"). Werkt op de layout zelf
+   (zelfde gegevens als het tabblad Zekeringen). */
+function uvZekDropDoel(kast, id, pt){
+  const geo = uvGeometrie(kast);
+  let ri = -1, best = Infinity;
+  kast.rijen.forEach((rij, i)=>{ const c = geo.rijY[i] + (geo.rijH[i]||UV.MH)/2; const d = Math.abs(pt.y - c); if(d < best){ best = d; ri = i; } });
+  if(ri < 0) return null;
+  const rij = kast.rijen[ri];
+  const mdVan = Object.fromEntries(geo.mods.map(md=> [md.m.id, md]));
+  const leden = rij.items.filter(x=> x.id !== id);
+  const index = leden.filter(x=>{ const md = mdVan[x.id]; return md && (md.x + md.w/2) < pt.x; }).length;
+  return {ri, rij, index, leden, mdVan, geo};
+}
+function uvZekVrij(kast, rij, zonderId){ return (kast.maat || 24) - rij.items.filter(x=> x.id !== zonderId).reduce((t, x)=> t + (typeof moduleBreedte === "function" ? moduleBreedte(x) : (Number(x.breedte)||0)), 0); }
+function uvZekModBreedte(m){ return typeof moduleBreedte === "function" ? moduleBreedte(m) : (Number(m.breedte)||1); }
+const UV_ZEK_SLEEP = {
+  mag: (id)=>{ const kast = huidigeZekeringKast(); return !!kast && kast.rijen.some(r=> r.items.some(m=> m.id===id)); },
+  voorbeeld: (kast, id, pt, svg)=>{
+    let r = svg.querySelector(".dk-drop");
+    if(!r){ r = document.createElementNS("http://www.w3.org/2000/svg", "rect"); r.setAttribute("class", "dk-drop"); svg.appendChild(r); }
+    const d = uvZekDropDoel(kast, id, pt);
+    if(!d) return;
+    const m = kast.rijen.flatMap(x=> x.items).find(x=> x.id===id);
+    const past = uvZekVrij(kast, d.rij, id) >= uvZekModBreedte(m);
+    const volgende = d.leden[d.index], vorige = d.leden[d.index - 1];
+    const x = volgende && d.mdVan[volgende.id] ? d.mdVan[volgende.id].x - 3 : (vorige && d.mdVan[vorige.id] ? d.mdVan[vorige.id].x + d.mdVan[vorige.id].w + 1 : d.geo.padL);
+    r.setAttribute("x", x); r.setAttribute("y", d.geo.rijY[d.ri]); r.setAttribute("width", 3); r.setAttribute("height", d.geo.rijH[d.ri] || UV.MH);
+    r.style.stroke = past ? "" : "#b3261e";
+  },
+  drop: (kast, id, pt)=>{
+    const d = uvZekDropDoel(kast, id, pt);
+    if(!d) return false;
+    const van = kast.rijen.find(r=> r.items.some(m=> m.id===id));
+    const m = van.items.find(x=> x.id===id);
+    if(van !== d.rij && uvZekVrij(kast, d.rij, id) < uvZekModBreedte(m)){ toast(`Rij ${d.ri + 1} is vol — er is geen plaats voor ${uvZekModBreedte(m)} module(s).`); return false; }
+    const oudIndex = van.items.indexOf(m);
+    van.items.splice(oudIndex, 1);
+    d.rij.items.splice(d.index, 0, m);
+    if(van === d.rij && oudIndex === d.index) return false;
+    return true;
+  },
+};
 const UV_CTX_ZEK = {
   tab: "uitvoering", panelId: "panel-uitvoering", titel: "Uitvoeringsplan", zekering: true, eendraad: true, kam: true,
   kast: ()=> huidigeZekeringKast(),
   kasten: ()=> state.zekeringen.kasten.map(k=> ({id: k.id, naam: k.naam})),
   kiesKast: (id)=>{ zekeringHuidigeKastId = id; },
   layoutTab: "zekeringen", layoutTitel: "layout aanpassen op het tabblad Zekeringen",
+  moduleSleep: UV_ZEK_SLEEP,
   export: ()=> exportUitvoeringVoorWerf(true),
 };
 function renderUitvoeringsplan(ctxArg){

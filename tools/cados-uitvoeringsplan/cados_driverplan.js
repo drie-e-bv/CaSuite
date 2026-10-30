@@ -102,7 +102,7 @@ function dkSpots(d){
    meeste drivers van die kamer; drivers van die kamer in een andere kast worden oranje gemarkeerd. */
 function dkDriverKamers(d){ return [...new Set((d.armaturen||[]).map(a=> String(a.ruimte||"").trim()).filter(Boolean))]; }
 function dkKamerElders(){
-  const kasten = (state.driverkast && state.driverkast.kasten) || [];
+  const kasten = dkFysiekeKasten();
   const tel = {};   // kamer -> [aantal per kastindex]
   kasten.forEach((k, ki)=> dkDrivers(k).forEach(d=> dkDriverKamers(d).forEach(r=>{ (tel[r] || (tel[r] = []))[ki] = ((tel[r]||[])[ki]||0) + 1; })));
   const hoofd = {};
@@ -115,6 +115,44 @@ function dkKamerElders(){
   return uit;
 }
 function dkEldersTekst(e){ return e.map(x=> `${x.kamer}: de meeste drivers staan in Driverkast ${x.kast}`).join("; "); }
+/* Fysieke driverkasten (Peter, 30/10): het tabblad Driverkast (ontwerp) blijft één overzicht van alle
+   drivers met hun originele nummers (die staan op de kabels). Splitsen in meer kasten gebeurt enkel in
+   het plan: per ontwerpkast bewaren we extra plandelen (bron.planDelen = [{id, plan}]) en welke driver in
+   welk deel zit (bron.planVan = {driverId: deelId}). Elk deel krijgt hier een "virtuele" kast met de
+   vorm die de rest van het plan verwacht ({id, items, sturing, kamer, plan}). */
+const dkVirt = new Map();
+function dkFysiekeKasten(){
+  const uit = [];
+  const bronnen = (state.driverkast && Array.isArray(state.driverkast.kasten)) ? state.driverkast.kasten : [];
+  bronnen.forEach(bron=>{
+    if(!Array.isArray(bron.items)) bron.items = [];
+    const delen = Array.isArray(bron.planDelen) ? bron.planDelen : [];
+    const van = bron.planVan || {};
+    const ids = new Set(delen.map(x=> x.id));
+    const deelVan = (d)=> (!d.leeg && ids.has(van[d.id])) ? van[d.id] : bron.id;
+    // lege plandelen (alle drivers weggesleept) opruimen
+    if(delen.length){
+      const gebruikt = new Set(bron.items.map(deelVan));
+      const over = delen.filter(x=> gebruikt.has(x.id));
+      if(over.length !== delen.length) bron.planDelen = over;
+    }
+    [{id: bron.id, houder: bron}].concat((bron.planDelen||[]).map(x=> ({id: x.id, houder: x}))).forEach(dl=>{
+      let v = dkVirt.get(dl.id);
+      if(!v){
+        v = {};
+        Object.defineProperty(v, "plan", {get(){ return v._houder.plan; }, set(x){ v._houder.plan = x; }, enumerable: false, configurable: true});
+        dkVirt.set(dl.id, v);
+      }
+      v.id = dl.id; v._houder = dl.houder; v._bron = bron;
+      v.sturing = bron.sturing; v.kamer = bron.kamer || ""; v.verdieping = bron.verdieping || "";
+      v.items = bron.items.filter(d=> deelVan(d) === dl.id);
+      uit.push(v);
+    });
+  });
+  return uit;
+}
+function dkFysiekNr(v){ return dkFysiekeKasten().findIndex(x=> x.id === v.id) + 1; }
+function dkFysiekNaam(v){ const n = dkFysiekNr(v); return "Driverkast " + n + (v.kamer && !(v._bron.planDelen||[]).length ? " · " + v.kamer : ""); }
 function dkDrivers(dk){ return (dk.items||[]).filter(d=> !d.leeg && (d.categorie||"Driver")==="Driver"); }
 // Volgorde op de rail en de verdeelblokken: op drivernummer (D1, D2, ... D30), niet op plaats in de kast
 function dkOpNummer(drivers){
@@ -422,7 +460,7 @@ function dkPlanKast(dk){
   kokers.push({id: "H", soort: "h", x0: X0 + DK_RAND_MM*PX, x1: X0 + (totB - DK_RAND_MM)*PX, y0: Y0 + hkY0*PX, y1: Y0 + hkY1*PX, mm: dkKokerMM(p, "H")});
   const vA = boven ? hk1 : (totH - (H - DK_RAND_MM)), vB = boven ? totH - DK_RAND_MM : H - hk1;
   Object.entries(vKoker).forEach(([ci, v])=> kokers.push({id: "V" + ci, soort: "v", kol: +ci, x0: X0 + v.x0*PX, x1: X0 + v.x1*PX, y0: Y0 + Math.min(vA, vB)*PX, y1: Y0 + Math.max(vA, vB)*PX, mm: v.mm}));
-  const idx = state.driverkast.kasten.indexOf(dk);
+  const idx = dkFysiekeKasten().findIndex(x=> x.id === dk.id);
   dkEigen(p, {
     rijen: [{id: "dk-alle", items: mods.map(md=> md.m)}],
     maat: Math.ceil(p.breedte/18), naam: "Driverkast " + (idx+1), _dk: dk, _codes: codes, _breedtePx: p.breedte*PX,
@@ -757,40 +795,31 @@ function dkDropVoorbeeld(p, id, pt, svg){
   r.setAttribute("x", kol.x0 - 4); r.setAttribute("y", y - 2); r.setAttribute("width", kol.x1 - kol.x0 + 8); r.setAttribute("height", 4);
 }
 // driver naar een andere driverkast (of een nieuwe) verplaatsen
-/* Drivernummers = kabelnummers op de werf (Peter, 29/10: "kloppen de nummers van de klemmen nog volgens
-   de nummers van de kabels?"). De nummering telt door over de kasten heen, dus een driver naar een andere
-   kast verplaatsen zou alle volgende nummers doen verschuiven. Daarom houden we bij een verplaatsing de
-   oude nummers vast (handmatig nummer), enkel het kastvoorvoegsel (1. / 2.) volgt de kast. */
-function dkNummerVan(code){ const m = /D(\d+)/.exec(code || ""); return m ? parseInt(m[1]) : null; }
-function dkHoudNummers(fn){
-  const voor = {}, c0 = computeDriverCodes();
-  state.driverkast.kasten.forEach(k=> k.items.forEach(d=>{ voor[d.id] = dkNummerVan(c0[d.id]); }));
-  const r = fn();
-  for(let ronde=0; ronde<500; ronde++){
-    const c = computeDriverCodes();
-    let fout = null;
-    state.driverkast.kasten.some(k=> k.items.some(d=>{ if(voor[d.id] != null && dkNummerVan(c[d.id]) !== voor[d.id]){ fout = d; return true; } return false; }));
-    if(!fout) break;
-    fout.manueelNummer = String(voor[fout.id]);
-  }
-  return r;
-}
-function dkNaarKast(dk, d, doelId){ return dkHoudNummers(()=> dkNaarKastRuw(dk, d, doelId)); }
-function dkNaarKastRuw(dk, d, doelId){
-  let doel = state.driverkast.kasten.find(k=> k.id===doelId);
+// driver naar een andere fysieke kast (of een nieuwe) in het plan; het ontwerp en de nummers veranderen niet
+function dkNaarKast(dk, d, doelId){
+  const bron = dk._bron;
+  if(!bron) return null;
+  let doel = doelId ? dkFysiekeKasten().find(k=> k.id===doelId) : null;
+  if(doel && doel._bron !== bron){ toast("Een driver kan enkel naar een kast van dezelfde ontwerpkast (zelfde sturing)."); return null; }
   if(!doel){
-    doel = newDriverKast();
-    doel.sturing = dk.sturing; doel.kamer = dk.kamer || ""; doel.verdieping = dk.verdieping || "";
-    const i = state.driverkast.kasten.indexOf(dk);
-    state.driverkast.kasten.splice(i + 1, 0, doel);
+    if(!Array.isArray(bron.planDelen)) bron.planDelen = [];
+    const id = "dkd" + Math.random().toString(36).slice(2, 9);
+    const basis = dkPlan(dk);
+    bron.planDelen.push({id, plan: {breedte: basis.breedte, hoogte: basis.hoogte, kast: basis.kast ? Object.assign({}, basis.kast) : undefined, kokerV: basis.kokerV, kokerH: basis.kokerH, rkDubbel: basis.rkDubbel, rkPositie: basis.rkPositie}});
+    if(!bron.planVan) bron.planVan = {};
+    bron.planVan[d.id] = id;
+    doel = dkFysiekeKasten().find(k=> k.id===id);
+  } else {
+    if(!bron.planVan) bron.planVan = {};
+    if(doel.id === bron.id) delete bron.planVan[d.id]; else bron.planVan[d.id] = doel.id;
   }
-  dk.items = dk.items.filter(x=> x !== d);
-  doel.items.push(d);
   if(dk.plan){
     dk.plan.bedrading = (dk.plan.bedrading||[]).filter(w=> w.a.m !== d.id && w.b.m !== d.id && w.a.m !== "dkk_" + d.id && w.b.m !== "dkk_" + d.id);
     delete dk.plan.draai[d.id];
+    dk.plan.kolommen = (dk.plan.kolommen||[]).map(c=> c.filter(x=> x !== d.id)).filter(c=> c.length);
   }
-  return doel;
+  dkFysiekeKasten();
+  return dkFysiekeKasten().find(k=> k.id===doel.id) || doel;
 }
 // kast splitsen: de rechtse kolommen (ongeveer de helft van de drivers) naar een nieuwe kast
 function dkSplits(dk){
@@ -810,8 +839,9 @@ function dkSplits(dk){
 
 let dkHuidigId = null;
 function dkHuidig(){
-  if(!state.driverkast || !Array.isArray(state.driverkast.kasten)) return null;
-  let dk = state.driverkast.kasten.find(k=> k.id===dkHuidigId) || state.driverkast.kasten[0] || null;
+  const lijst = dkFysiekeKasten();
+  if(!lijst.length) return null;
+  let dk = lijst.find(k=> k.id===dkHuidigId) || lijst.find(k=> dkDrivers(k).length) || lijst[0] || null;
   if(dk) dkHuidigId = dk.id;
   return dk;
 }
@@ -819,7 +849,7 @@ function dkExport(){
   const container = document.getElementById("printExport");
   container.innerHTML = "";
   const projectNaam = state.instellingen.project || "Naamloos project";
-  state.driverkast.kasten.forEach((dk, i)=>{
+  dkFysiekeKasten().forEach((dk, i)=>{
     if(!dkDrivers(dk).length) return;
     const p = dkPlanKast(dk);
     uvSyncEnOpruimen(p);
@@ -859,7 +889,7 @@ function dkAlleKast(){
   let ox = 0, width = 0, height = 0;
   const mods = [], klemPos = {}, routes = [], codes = {};
   let achter = "";
-  state.driverkast.kasten.forEach((dk, i)=>{
+  dkFysiekeKasten().forEach((dk, i)=>{
     if(!dkDrivers(dk).length) return;
     const p = dkPlanKast(dk);
     uvSyncEnOpruimen(p);
@@ -870,7 +900,7 @@ function dkAlleKast(){
     Object.entries(g.klemPos).forEach(([k, v])=> klemPos[k] = Object.assign({}, v, sx(v)));
     dkRoutes(p, g).forEach(r=>{ const verts = r.verts.map(sx); routes.push(Object.assign({}, r, {verts, d: uvPad(verts), A: klemPos[uvKlemKey(r.w.a.m, r.w.a.k)], B: klemPos[uvKlemKey(r.w.b.m, r.w.b.k)]})); });
     Object.assign(codes, p._codes);
-    const naam = "Driverkast " + (i+1) + (dk.kamer ? " · " + dk.kamer : "");
+    const naam = dkFysiekNaam(dk);
     achter += `<g transform="translate(${ox} ${oy})">${dkAchtergrondSvg(p, g).replace(/ data-koker="[^"]*"/g, "")}</g>`;
     achter += `<text x="${ox + UV.PADX}" y="${oy + DK_TOP_PX - 22}" class="dk-kasttitel">${escapeHtml(naam)} — ${dkDrivers(dk).length} drivers</text>`;
     delen.push({dk, p, ox, oy, x0: ox, x1: ox + g.width, nr: i+1, naam});
@@ -912,16 +942,17 @@ function dkAlleDrop(c, id, pt){
   const d = dkDrivers(van.dk).find(x=> x.id===id);
   if(pt.x > laatste.x1 + DK_ALLE_GAP/2){
     const doel = dkNaarKast(van.dk, d, null);
+    if(!doel) return false;
     dkVulIndeling(van.dk);
     dkOmzet(dkPlanKast(van.dk)); dkOmzet(dkPlanKast(doel));
-    toast(`${computeDriverCodes()[id] || "Driver"} naar een nieuwe Driverkast ${state.driverkast.kasten.indexOf(doel)+1}.`);
+    toast(`${computeDriverCodes()[id] || "Driver"} naar een nieuwe ${dkFysiekNaam(doel)}.`);
     return true;
   }
   const naar = dkDeelVoorX(c, pt.x);
   const lokaal = {x: pt.x - naar.ox, y: pt.y - naar.oy};
   if(naar.dk === van.dk) return dkDrop(van.p, id, lokaal);
   const doel = dkDropDoel(naar.p, id, lokaal);
-  dkNaarKast(van.dk, d, naar.dk.id);
+  if(!dkNaarKast(van.dk, d, naar.dk.id)) return false;
   const p = dkPlan(naar.dk);
   if(doel.nieuw) p.kolommen.push([id]);
   else if(doel.nieuwLinks) p.kolommen.unshift([id]);
@@ -967,29 +998,10 @@ function dkLijstPaneel(zone, h){
   });
 }
 
-/* Ontwerp (tabblad Driverkast): een driver een nummer in een andere kast geven (Peter, 29/10) */
-function dkKastVanDriver(driver){ return state.driverkast.kasten.find(k=> k.items.includes(driver)); }
-function dkKastVeld(driver){
-  const huidig = dkKastVanDriver(driver);
-  return `<div class="field"><label>Driverkast (nummer volgt de kast)</label><select class="di-dkkast">
-    ${state.driverkast.kasten.map((k, i)=> `<option value="${k.id}" ${k===huidig?"selected":""}>Driverkast ${i+1}${k.kamer ? " · " + escapeHtml(k.kamer) : ""}</option>`).join("")}
-    <option value="__nieuw">＋ Nieuwe driverkast</option></select></div>`;
-}
-function dkVerhuisDriver(driver, doelId){
-  const van = dkKastVanDriver(driver);
-  if(!van || van.id === doelId) return null;
-  const doel = dkNaarKast(van, driver, doelId === "__nieuw" ? null : doelId);
-  if(van.plan) van.plan.kolommen = (van.plan.kolommen||[]).map(c=> c.filter(x=> x !== driver.id)).filter(c=> c.length);
-  try{
-    [van, doel].forEach(k=>{ if(k.plan && dkDrivers(k).length) dkOmzet(dkPlanKast(k)); });
-  }catch(_e){}
-  toast(`${computeDriverCodes()[driver.id] || "Driver"} staat nu in Driverkast ${state.driverkast.kasten.indexOf(doel)+1}.`);
-  return doel;
-}
 const UV_CTX_DK = {
   tab: "driverplan", panelId: "panel-driverplan", titel: "Driverkast plan", zekering: false, eendraad: false, kam: false,
   kast: ()=>{
-    if(dkOverzicht && state.driverkast.kasten.filter(k=> dkDrivers(k).length).length > 1) return dkAlleKast();
+    if(dkOverzicht && dkFysiekeKasten().filter(k=> dkDrivers(k).length).length > 1) return dkAlleKast();
     dkOverzicht = false;
     const dk = dkHuidig();
     if(!dk) return null;
@@ -1007,8 +1019,9 @@ const UV_CTX_DK = {
   },
   huidigId: ()=> dkOverzicht ? "__alle" : dkHuidigId,
   kasten: ()=>{
-    const l = state.driverkast.kasten.map((k, i)=> ({id: k.id, naam: "Driverkast " + (i+1) + (k.kamer ? " · " + k.kamer : "")}));
-    if(state.driverkast.kasten.filter(k=> dkDrivers(k).length).length > 1) l.push({id: "__alle", naam: "▦ Alle kasten"});
+    const alle = dkFysiekeKasten();
+    const l = alle.filter(k=> dkDrivers(k).length || k.id === dkHuidigId).map(k=> ({id: k.id, naam: dkFysiekNaam(k)}));
+    if(alle.filter(k=> dkDrivers(k).length).length > 1) l.push({id: "__alle", naam: "▦ Alle kasten"});
     return l;
   },
   kiesKast: (id)=>{ if(id === "__alle"){ dkOverzicht = true; return; } dkOverzicht = false; dkHuidigId = id; },
@@ -1024,7 +1037,7 @@ const UV_CTX_DK = {
   voorTeken: (p)=>{ if(p._dk && !p._alle) dkPlanKast(p._dk); },
   moduleSleep: {
     mag: (id)=>{
-      if(dkOverzicht) return state.driverkast.kasten.some(k=> dkDrivers(k).some(d=> d.id===id));
+      if(dkOverzicht) return dkFysiekeKasten().some(k=> dkDrivers(k).some(d=> d.id===id));
       const dk = dkHuidig(); return !!(dk && dkDrivers(dk).some(d=> d.id===id));
     },
     voorbeeld: (p, id, pt, svg)=> p._alle ? dkAlleVoorbeeld(p, id, pt, svg) : dkDropVoorbeeld(p, id, pt, svg),
@@ -1077,7 +1090,7 @@ const UV_CTX_DK = {
       <div class="hint">Sturing ${escapeHtml(dk.sturing||"DALI")} · ${dkDrivers(dk).length} drivers in ${p.kolommen.length} kolom(men) · ${dkDrivers(dk).reduce((t, d)=> t + dkSpots(d), 0)} spots/strips</div>
       <div class="uv-knoprij">
         <button class="btn small ghost dk-herschik" title="alle drivers opnieuw verdelen over kolommen volgens de montageplaat">↻ Drivers herschikken</button>
-        <button class="btn small ghost dk-splits" title="de helft van de drivers (de rechtse kolommen) naar een nieuwe driverkast">✂ Splitsen in 2 kasten</button>
+        <button class="btn small ghost dk-splits" title="de helft van de drivers (de rechtse kolommen) naar een nieuwe driverkast — enkel in het plan, het tabblad Driverkast en de nummers blijven gelijk">✂ Splitsen in 2 kasten</button>
       </div>
       <div class="hint">Sleep een driver om hem te verplaatsen (naar een andere kolom, of naast de laatste kolom voor een nieuwe kolom).</div>
     </div></div>`);
@@ -1192,7 +1205,7 @@ const UV_CTX_DK = {
         <button class="btn small ghost dk-mv" data-r="op" title="hoger in de kolom">↑</button><button class="btn small ghost dk-mv" data-r="neer" title="lager in de kolom">↓</button>
         <button class="btn small ghost dk-mv" data-r="links" title="naar de kolom links">← kolom</button><button class="btn small ghost dk-mv" data-r="rechts" title="naar de kolom rechts (of een nieuwe)">kolom →</button></div></div>` : ""}
       ${isDriver ? `<label class="uv-veld">Kast<select class="dk-naarkast">
-        ${state.driverkast.kasten.map((k, i)=> `<option value="${k.id}" ${k===dk?"selected":""}>Driverkast ${i+1}${k.kamer ? " · " + escapeHtml(k.kamer) : ""}</option>`).join("")}
+        ${dkFysiekeKasten().filter(k=> k._bron === dk._bron).map(k=> `<option value="${k.id}" ${k.id===dk.id?"selected":""}>${escapeHtml(dkFysiekNaam(k))}</option>`).join("")}
         <option value="__nieuw">＋ Nieuwe driverkast</option></select></label>` : ""}
       <div class="uv-knoprij"><button class="btn small ghost dk-layout">Op tabblad Driverkast</button></div>
     </div></div>`);
@@ -1218,9 +1231,10 @@ const UV_CTX_DK = {
     const nk = box.querySelector(".dk-naarkast");
     if(nk) nk.addEventListener("change", e=>{
       const doel = dkNaarKast(dk, d, e.target.value==="__nieuw" ? null : e.target.value);
+      if(!doel){ h.rerender(); return; }
       uvSelMod = null;
       save();
-      toast(`${codes[d.id]||"Driver"} verplaatst naar Driverkast ${state.driverkast.kasten.indexOf(doel)+1}.`);
+      toast(`${codes[d.id]||"Driver"} verplaatst naar ${dkFysiekNaam(doel)} (nummer blijft ${codes[d.id]||""}).`);
       h.rerender();
     });
     zone.appendChild(box);

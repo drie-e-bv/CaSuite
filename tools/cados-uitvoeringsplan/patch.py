@@ -193,22 +193,14 @@ vervang('  {grp:"Elektro", id:"driverkast", label:"Driverkast", toggle:"driverka
         '  {grp:"Elektro", id:"driverplan", label:"Driverkast plan", toggle:"driverkast"},', "TABS driverplan")
 vervang('  driverkast: renderDriverkast,', '  driverkast: renderDriverkast,\n  driverplan: renderDriverplan,', "RENDERERS driverplan")
 
-# 14. Driverkast: drivernummer met het nummer van de kast als er meer dan 1 driverkast is (1.D3, 2.D14)
-vervang('  state.driverkast.kasten.forEach(kast=>{\n    kast.items.forEach(driver=>{\n      const override = parseInt(driver.manueelNummer);',
-        '  const meerKasten = state.driverkast.kasten.filter(k=> k.items.some(d=> !d.leeg)).length > 1;\n'
-        '  state.driverkast.kasten.forEach((kast, ki)=>{\n    kast.items.forEach(driver=>{\n      const override = parseInt(driver.manueelNummer);', "driver codes kast")
-vervang('      const code = "D"+nummer;', '      const code = (meerKasten ? (ki+1) + "." : "") + "D"+nummer;', "driver code prefix")
+# 14. (vervallen 30/10: drivernummers blijven zoals in het ontwerp — ze staan op de kabels)
 # 15. Driverkast-tab: een driver naar een andere kast verplaatsen haalt hem uit de oude kast
 vervang('    if(!movingRef.isNew){\n      const cur = kast.items.indexOf(item);',
         '    if(!movingRef.isNew){\n      state.driverkast.kasten.forEach(k=>{ if(k!==kast){ const c = k.items.indexOf(item); if(c!==-1) k.items.splice(c,1); } });\n      const cur = kast.items.indexOf(item);', "driver move other kast")
 # 16. Rijgklemmen-tab: automatische klemmen voor zekeringen met "kabel op klemmen"
 vervang('function syncKlemBronnen(){\n  let gewijzigd = false;', 'function syncKlemBronnen(){\n  let gewijzigd = false;\n  if(typeof autoZekeringKlemmen==="function" && autoZekeringKlemmen()) gewijzigd = true;', "auto zek klemmen")
 
-# 17. Driverkast-tab (ontwerp): in de editor van een driver de kast kiezen -> nieuw nummer in die kast
-vervang('      <div class="field wide"><label>Merk / type (eigen notitie)</label><input class="di-type"',
-        '      ${typeof dkKastVeld==="function" ? dkKastVeld(driver) : ""}\n      <div class="field wide"><label>Merk / type (eigen notitie)</label><input class="di-type"', "driver editor kast veld")
-vervang('  box.querySelector(".di-type").addEventListener("input", e=>{ driver.type=e.target.value; save(); });\n\n  return box;\n}\n\nfunction renderArmatuurEditor',
-        '  box.querySelector(".di-type").addEventListener("input", e=>{ driver.type=e.target.value; save(); });\n  const dkKastSel = box.querySelector(".di-dkkast");\n  if(dkKastSel) dkKastSel.addEventListener("change", e=>{ dkVerhuisDriver(driver, e.target.value); save(); rebuildAll(); });\n\n  return box;\n}\n\nfunction renderArmatuurEditor', "driver editor kast handler")
+# 17. (vervallen 30/10: het ontwerp blijft één overzicht; splitsen in kasten enkel in het plan)
 
 # 18. Driverkast-tab: drivers van een kamer die over meer kasten verspreid is, oranje
 vervang("""  const block = el(`<div class="rackitem cat-driver ${selected?'selected':''} ${driver.leeg?'is-leeg':''}" data-id="${driver.id}">""",
