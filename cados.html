@@ -17163,22 +17163,44 @@ function kcAlleKasten(){
     dkFysiekeKasten().forEach(v=>{
       const drivers = dkDrivers(v);
       if(!drivers.length) return;
-      uit.push({sleutel: "dk:" + v.id, naam: dkFysiekNaam(v), houder: v._houder, verwacht: dkOpNummer(drivers).map(d=>({
+      const verwacht = dkOpNummer(drivers).map(d=>({
         code: kcCode(codes[d.id] || ""), naam: [...new Set((d.armaturen||[]).map(a=> a.ruimte).filter(Boolean))].join(", ") || (d.naam || ""),
-        kabel: (d.armaturen||[]).filter(a=> a.naam).map(a=> (parseInt(a.aantal)||1) + "× " + a.naam).join(", "), mods: [d.id, "dkk_" + d.id]}))});
+        kabel: (d.armaturen||[]).filter(a=> a.naam).map(a=> (parseInt(a.aantal)||1) + "× " + a.naam).join(", "), mods: [d.id, "dkk_" + d.id]}));
+      // voedingskabel van de driverkast: komt van een zekering in de zekeringkast en ligt dus aan BEIDE
+      // kasten (Peter 10/11: "de kabel driverkast is natuurlijk de voeding voor de driverkast")
+      try{
+        const vd = dkVoeding(v, v.plan);
+        (vd.codes || []).forEach(c=>{ const code = kcCode(c); if(code && !verwacht.some(x=> x.code===code)) verwacht.unshift({code, naam: "voeding (werkschakelaar)", kabel: "", mods: ["dks_" + v.id], voeding: true, beideKanten: true}); });
+      }catch(_e){}
+      uit.push({sleutel: "dk:" + v.id, naam: dkFysiekNaam(v), houder: v._houder, verwacht});
     });
   }
   return uit;
 }
+function kcMarkeerGedeeld(alle){
+  // een kabel die in twee kasten verwacht wordt (bv. voeding driverkast: zekering in de zekeringkast,
+  // werkschakelaar in de driverkast) mag aan beide kanten liggen: nooit oranje, enkel groen of rood
+  const tel = {};
+  alle.forEach(k=> k.verwacht.forEach(v=>{ tel[v.code] = (tel[v.code] || 0) + 1; }));
+  alle.forEach(k=> k.verwacht.forEach(v=>{
+    if(tel[v.code] > 1){
+      v.beideKanten = true;
+      const ander = alle.find(o=> o !== k && o.verwacht.some(x=> x.code === v.code));
+      if(ander && v.automaat && !/voeding/i.test(v.naam)) v.naam = (v.naam ? v.naam + " · " : "") + "voeding " + ander.naam;
+    }
+  }));
+  return alle;
+}
 function kcGenoteerd(k){ return ((k.houder.kabelcheck && k.houder.kabelcheck.kabels) || []).map(kcCode).filter(Boolean); }
 function kcStatus(sleutel){
-  const alle = kcAlleKasten();
+  const alle = kcMarkeerGedeeld(kcAlleKasten());
   const k = alle.find(x=> x.sleutel===sleutel);
   if(!k) return null;
   const hier = new Set(kcGenoteerd(k));
   const anderen = alle.filter(x=> x !== k).map(x=> ({k: x, set: new Set(kcGenoteerd(x))}));
   const verwacht = k.verwacht.map(v=>{
     if(hier.has(v.code)) return Object.assign({status: "groen"}, v);
+    if(v.beideKanten) return Object.assign({status: "rood", elders: ""}, v);
     const el = anderen.find(o=> o.set.has(v.code));
     return Object.assign({status: el ? "oranje" : "rood", elders: el ? el.k.naam : ""}, v);
   });
@@ -17371,7 +17393,7 @@ function kcGroepAders(g){
   return g.klemIds.reduce((t, id)=>{ const k = items.find(x=> x.id===id) || {}; return t + ((k.onder && (k.onder.aderNr || k.onder.watwaar)) ? 1 : 0) + ((k.boven && (k.boven.aderNr || k.boven.watwaar)) ? 1 : 0); }, 0);
 }
 function kcScan(){
-  const alle = kcAlleKasten();
+  const alle = kcMarkeerGedeeld(kcAlleKasten());
   const rapport = alle.map(k=>({k, ok: [], controle: [], acties: []}));
   const zcodes = (()=>{ try{ return computeZekeringCodes(); }catch(_e){ return {}; } })();
   alle.forEach((k, ki)=>{
@@ -17423,17 +17445,8 @@ function kcScan(){
     });
     st.extra.forEach(x=>{
       if(x.status === "grijs"){ R.controle.push({code: x.code, tekst: `${x.code}: nummer niet gekend in het ontwerp`}); return; }
-      R.controle.push({code: x.code, tekst: `${x.code} ligt hier, maar hoort bij ${x.hoortBij}`});
-      // driver waarvan de kabel in deze driverkast toekomt: in het plan naar deze kast verplaatsen
-      if(!isZek){
-        const eig = alle.find(o=> o.naam === x.hoortBij);
-        const fys = dkFysiekeKasten();
-        const dkHier = fys.find(o=> "dk:" + o.id === k.sleutel), dkEig = eig && fys.find(o=> "dk:" + o.id === eig.sleutel);
-        const v = eig && eig.verwacht.find(o=> o.code === x.code);
-        const d = dkEig && v && dkDrivers(dkEig).find(o=> v.mods.includes(o.id));
-        if(d && dkHier && dkEig._bron === dkHier._bron)
-          R.acties.push({id: "dkm:" + d.id, standaard: true, tekst: `${x.code} in het plan verplaatsen naar ${k.naam} (de kabel komt hier toe)`, doe: ()=>{ dkNaarKast(dkEig, d, dkHier.id); }});
-      }
+      // geen automatische verplaatsing voorstellen (Peter 10/11: "zomaar kabels verplaatsen gaat niet")
+      R.controle.push({code: x.code, tekst: `${x.code} ligt hier, maar hoort volgens het ontwerp bij ${x.hoortBij} — nakijken (kabel of label)`});
     });
     (kc.tekst || []).forEach(t=>{
       R.controle.push({code: "", tekst: `"${t}" nog niet gekoppeld`});
