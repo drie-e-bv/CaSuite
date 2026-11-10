@@ -3804,6 +3804,25 @@
 .uv-svg .dk-voeding{font-size:8px;font-weight:800;fill:#b3261e;text-anchor:middle;pointer-events:none;}
 .uv-svg .dk-voeding.leeg{fill:#9aa0a6;font-weight:600;}
 
+/* kabelcheck */
+.uv-svg.kc-aan .uv-rk-groep{fill:rgba(0,0,0,.02);}
+.uv-svg .uv-rk-groep.kc-groen{fill:rgba(30,142,62,.28);stroke:#1e8e3e;stroke-width:2.5;}
+.uv-svg .uv-rk-groep.kc-rood{fill:rgba(179,38,30,.22);stroke:#b3261e;stroke-width:2.5;}
+.uv-svg .uv-rk-groep.kc-oranje{fill:rgba(224,122,18,.28);stroke:#e07a12;stroke-width:2.5;}
+.uv-svg .uv-mod.kc-groen > rect:first-of-type, .uv-svg .uv-mod.kc-groen .dk-body{fill:#d6f3dd;stroke:#1e8e3e;stroke-width:3;}
+.uv-svg .uv-mod.kc-rood > rect:first-of-type, .uv-svg .uv-mod.kc-rood .dk-body{fill:#f8d9d6;stroke:#b3261e;stroke-width:3;}
+.uv-svg .uv-mod.kc-oranje > rect:first-of-type, .uv-svg .uv-mod.kc-oranje .dk-body{fill:#ffe1c2;stroke:#e07a12;stroke-width:3;}
+#cados-app .kc-tellers{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:12px;}
+#cados-app .kc-t{padding:2px 8px;border-radius:999px;background:#eef0f2;font-weight:700;}
+#cados-app .kc-t.groen{background:#d6f3dd;color:#145c29;} #cados-app .kc-t.rood{background:#f8d9d6;color:#7d1a14;}
+#cados-app .kc-t.oranje{background:#ffe1c2;color:#7a3e05;} #cados-app .kc-t.grijs{background:#e6e8eb;color:#4a4f55;}
+#cados-app .kc-form{display:flex;gap:6px;} #cados-app .kc-form .kc-in{flex:1;min-width:0;font-size:16px;padding:8px 10px;}
+#cados-app .kc-lijst{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:6px;}
+#cados-app .kc-chip{display:flex;flex-direction:column;align-items:flex-start;gap:1px;padding:7px 8px;border-radius:9px;border:2px solid #c9ccd1;background:#fff;text-align:left;cursor:pointer;min-height:44px;}
+#cados-app .kc-chip b{font:800 14px var(--mono, monospace);overflow-wrap:anywhere;max-width:100%;} #cados-app .kc-chip small{font-size:10.5px;color:#4a4f55;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+#cados-app .kc-chip.groen{border-color:#1e8e3e;background:#e6f6ea;} #cados-app .kc-chip.rood{border-color:#b3261e;background:#fbe9e7;}
+#cados-app .kc-chip.oranje{border-color:#e07a12;background:#fff1e0;} #cados-app .kc-chip.grijs{border-color:#9aa0a6;background:#f1f3f4;}
+
 </style>
 </head>
 <body>
@@ -16215,6 +16234,7 @@ let uvZoom = 1;
 let uvKleur = "Bruin", uvSectie = "2.5", uvKleurAuto = true;
 let uvPending = null;             // {m, k}: startklem van een nieuwe draad
 let uvSelWire = null, uvSelMod = null, uvSelKam = null;
+let uvCheck = false;               // kabelcheck-modus (werf)
 let uvSelExtra = null;            // bv. "koker:V1" in de driverkast
 let uvKamType = "1P+N", uvKamModus = false;
 let uvLaatsteOmzet = null;        // rapport van de laatste automatische omzetting (per kast-id)
@@ -17039,6 +17059,153 @@ function bevestigAansluiting(fouten){
 
 /* Het uitvoeringsplan is generiek: de zekeringkast (standaard) en de driverkast (UV_CTX_DK) gebruiken
    hetzelfde tekenwerk, elk met hun eigen "context" (welke kast, welke tab, eigen zijpaneel/omzetting). */
+/* ---------- Kabelcheck op de werf (Peter, 10/11) ----------
+   "Wanneer ik op de werf alle kabels noteer die aan elke kast voorzien zijn, lichten ze rood of groen op
+   als ze er zijn of niet, en oranje als ze aan een andere kast liggen."
+   Per kast (zekeringkast of driverkast in het plan) noteer je de kabelnummers die je ter plaatse ziet.
+   Verwacht = de kabels op de rijgklemmen (zekeringkast) of de drivers (driverkast, 1 kabel per driver).
+   Groen: genoteerd aan deze kast · rood: nergens genoteerd · oranje: genoteerd aan een andere kast.
+   De notities worden bij de kast zelf bewaard (kast.kabelcheck = {kabels: [...], bijgewerkt}). */
+function kcCode(t){
+  let c = String(t == null ? "" : t).split(" — ")[0].split(" - ")[0].trim().toUpperCase().replace(/\s+/g, "");
+  c = c.replace(/^\d+\.(?=[A-Z])/, "");          // oud kastvoorvoegsel 1.D3
+  c = c.replace(/^([A-Z]+)0+(?=\d)/, "$1");        // D03 -> D3
+  return c;
+}
+function kcAlleKasten(){
+  const uit = [];
+  ((state.zekeringen && state.zekeringen.kasten) || []).forEach((kast, i)=>{
+    const verwacht = [];
+    kast.rijen.forEach(r=> r.items.forEach(m=>{
+      if(m.categorie !== "Rijgklemmenmodule") return;
+      rijgklemIndeling(m).groepen.forEach(g=>{
+        if(!g.toon) return;
+        const code = kcCode(g.naam || g.locatie);
+        if(!code) return;
+        let v = verwacht.find(x=> x.code===code);
+        if(!v){ v = {code, naam: String(g.naam||"").split(" — ").slice(1).join(" — ") || g.locatie || "", kabel: g.kabel || "", mods: []}; verwacht.push(v); }
+        if(!v.mods.includes(m.id)) v.mods.push(m.id);
+      });
+    }));
+    uit.push({sleutel: "zek:" + kast.id, naam: kast.naam || ("Zekeringkast " + (i+1)), houder: kast, verwacht});
+  });
+  if(typeof dkFysiekeKasten === "function"){
+    const codes = computeDriverCodes();
+    dkFysiekeKasten().forEach(v=>{
+      const drivers = dkDrivers(v);
+      if(!drivers.length) return;
+      uit.push({sleutel: "dk:" + v.id, naam: dkFysiekNaam(v), houder: v._houder, verwacht: dkOpNummer(drivers).map(d=>({
+        code: kcCode(codes[d.id] || ""), naam: [...new Set((d.armaturen||[]).map(a=> a.ruimte).filter(Boolean))].join(", ") || (d.naam || ""),
+        kabel: (d.armaturen||[]).filter(a=> a.naam).map(a=> (parseInt(a.aantal)||1) + "× " + a.naam).join(", "), mods: [d.id, "dkk_" + d.id]}))});
+    });
+  }
+  return uit;
+}
+function kcGenoteerd(k){ return ((k.houder.kabelcheck && k.houder.kabelcheck.kabels) || []).map(kcCode).filter(Boolean); }
+function kcStatus(sleutel){
+  const alle = kcAlleKasten();
+  const k = alle.find(x=> x.sleutel===sleutel);
+  if(!k) return null;
+  const hier = new Set(kcGenoteerd(k));
+  const anderen = alle.filter(x=> x !== k).map(x=> ({k: x, set: new Set(kcGenoteerd(x))}));
+  const verwacht = k.verwacht.map(v=>{
+    if(hier.has(v.code)) return Object.assign({status: "groen"}, v);
+    const el = anderen.find(o=> o.set.has(v.code));
+    return Object.assign({status: el ? "oranje" : "rood", elders: el ? el.k.naam : ""}, v);
+  });
+  const codesHier = new Set(k.verwacht.map(v=> v.code));
+  const extra = [...hier].filter(c=> !codesHier.has(c)).map(c=>{
+    const eig = alle.find(x=> x !== k && x.verwacht.some(v=> v.code===c));
+    return {code: c, status: eig ? "oranje" : "grijs", hoortBij: eig ? eig.naam : ""};
+  });
+  const tel = {groen: 0, oranje: 0, rood: 0};
+  verwacht.forEach(v=> tel[v.status]++);
+  return {k, verwacht, extra, tel};
+}
+function kcSleutels(ctx, kast){
+  if(ctx.zekering) return ["zek:" + kast.id];
+  if(kast._alle) return kast._delen.map(q=> "dk:" + q.dk.id);
+  return kast._dk ? ["dk:" + kast._dk.id] : [];
+}
+function kcZet(k, codes){
+  if(!k.houder.kabelcheck) k.houder.kabelcheck = {kabels: []};
+  k.houder.kabelcheck.kabels = [...new Set(codes.map(kcCode).filter(Boolean))];
+  k.houder.kabelcheck.bijgewerkt = new Date().toISOString();
+  save();
+}
+// kleuren in de tekening
+function kcKleurSvg(svg, ctx, kast){
+  if(!svg) return;
+  kcSleutels(ctx, kast).forEach(sl=>{
+    const st = kcStatus(sl);
+    if(!st) return;
+    st.verwacht.forEach(v=>{
+      if(ctx.zekering){
+        svg.querySelectorAll(`.uv-rk-groep[data-kabel="${CSS.escape(v.code)}"]`).forEach(e=> e.classList.add("kc-" + v.status));
+      } else {
+        v.mods.forEach(id=> svg.querySelectorAll(`.uv-mod[data-mod="${CSS.escape(id)}"]`).forEach(e=> e.classList.add("kc-" + v.status)));
+      }
+    });
+  });
+}
+function kcKaart(ctx, kast, teken){
+  const sl = kcSleutels(ctx, kast);
+  const box = el(`<div class="card uv-detail kc-kaart"><div class="card-body uv-sidebody">
+    <div class="uv-detail-kop"><strong>✓ Kabelcheck</strong><button class="uv-x kc-sluit" title="kabelcheck sluiten">✕</button></div></div></div>`);
+  const body = box.querySelector(".uv-sidebody");
+  box.querySelector(".kc-sluit").addEventListener("click", ()=>{ uvCheck = false; selectTab(ctx.tab); });
+  if(sl.length !== 1){
+    body.appendChild(el(`<div class="hint">Kies één kast in de balk bovenaan om er de kabels te noteren. Overzicht:</div>`));
+    sl.forEach(x=>{ const st = kcStatus(x); if(st) body.appendChild(el(`<div class="kc-tellers"><strong>${escapeHtml(st.k.naam)}</strong> <span class="kc-t groen">${st.tel.groen}</span> <span class="kc-t oranje">${st.tel.oranje}</span> <span class="kc-t rood">${st.tel.rood}</span></div>`)); });
+    return box;
+  }
+  const st = kcStatus(sl[0]);
+  if(!st){ body.appendChild(el(`<div class="hint">Geen kabels gekend voor deze kast.</div>`)); return box; }
+  const genoteerd = kcGenoteerd(st.k);
+  const opnieuw = ()=>{ teken(); };
+  body.appendChild(el(`<div class="hint">${escapeHtml(st.k.naam)} — noteer de kabelnummers die je aan deze kast ziet. Groen = aanwezig, rood = ontbreekt, oranje = genoteerd aan een andere kast.</div>`));
+  body.appendChild(el(`<div class="kc-tellers"><span class="kc-t groen" title="aanwezig">✓ ${st.tel.groen}</span><span class="kc-t oranje" title="aan een andere kast">⇄ ${st.tel.oranje}</span><span class="kc-t rood" title="ontbreekt">✕ ${st.tel.rood}</span><span class="kc-t">van ${st.verwacht.length}</span>${st.extra.length ? `<span class="kc-t grijs" title="genoteerd maar niet verwacht">+${st.extra.length}</span>` : ""}</div>`));
+  const form = el(`<form class="kc-form"><input class="kc-in" inputmode="text" autocomplete="off" placeholder="kabelnummer(s), bv. 103 of D3 D4"><button class="btn small primary" type="submit">＋</button></form>`);
+  form.addEventListener("submit", e=>{
+    e.preventDefault();
+    const inp = form.querySelector(".kc-in");
+    const nieuw = String(inp.value||"").split(/[\s,;]+/).map(kcCode).filter(Boolean);
+    if(!nieuw.length) return;
+    kcZet(st.k, genoteerd.concat(nieuw));
+    uvCheckFocus = true;
+    opnieuw();
+  });
+  body.appendChild(form);
+  const lijst = el(`<div class="kc-lijst"></div>`);
+  st.verwacht.forEach(v=>{
+    const titel = v.status==="groen" ? "aanwezig — tik om weg te halen" : (v.status==="oranje" ? `genoteerd aan ${v.elders} — tik als hij toch hier ligt` : "ontbreekt — tik als hij er is");
+    const c = el(`<button type="button" class="kc-chip ${v.status}" title="${escapeHtml(titel)}"><b>${escapeHtml(v.code)}</b><small>${escapeHtml([v.naam, v.kabel].filter(Boolean).join(" · "))}${v.status==="oranje" ? " ⇄ " + escapeHtml(v.elders) : ""}</small></button>`);
+    c.addEventListener("click", ()=>{
+      const set = new Set(kcGenoteerd(st.k));
+      if(set.has(v.code)) set.delete(v.code); else set.add(v.code);
+      kcZet(st.k, [...set]); opnieuw();
+    });
+    lijst.appendChild(c);
+  });
+  body.appendChild(lijst);
+  if(st.extra.length){
+    body.appendChild(el(`<div class="uv-sec-titel">Genoteerd, maar niet voor deze kast</div>`));
+    const ex = el(`<div class="kc-lijst"></div>`);
+    st.extra.forEach(x=>{
+      const c = el(`<button type="button" class="kc-chip ${x.status}" title="tik om de notitie te verwijderen"><b>${escapeHtml(x.code)}</b><small>${x.hoortBij ? "hoort bij " + escapeHtml(x.hoortBij) : "onbekend nummer"}</small></button>`);
+      c.addEventListener("click", ()=>{ kcZet(st.k, kcGenoteerd(st.k).filter(c2=> c2 !== x.code)); opnieuw(); });
+      ex.appendChild(c);
+    });
+    body.appendChild(ex);
+  }
+  const w = el(`<div class="uv-knoprij"><button class="btn small ghost kc-wis">Notities van deze kast wissen</button></div>`);
+  w.querySelector(".kc-wis").addEventListener("click", ()=>{ if(confirm("Alle genoteerde kabels van deze kast wissen?")){ kcZet(st.k, []); opnieuw(); } });
+  body.appendChild(w);
+  if(uvCheckFocus) setTimeout(()=>{ const i = box.querySelector(".kc-in"); if(i) i.focus(); uvCheckFocus = false; }, 0);
+  return box;
+}
+let uvCheckFocus = false;
+
 /* Modules in de zekeringkast verslepen in het uitvoeringsplan (Peter, 30/10: "wanneer ik een module uit de
    bibliotheek plaats moet ik deze kunnen drag-and-droppen naar een andere plaats"). Werkt op de layout zelf
    (zelfde gegevens als het tabblad Zekeringen). */
@@ -17214,6 +17381,7 @@ function renderUitvoeringsplan(ctxArg){
           <select class="uv-zijmodus">${Object.entries(UV_ZIJ_MODI).map(([k,v])=>`<option value="${k}" ${k===uvZijModus?"selected":""}>${v.label}</option>`).join("")}</select></label>
       </div>
       <div class="uv-sec uv-sec-meer">
+        <button class="btn small ${uvCheck ? "primary" : "ghost"} uv-check" title="op de werf: noteer de kabels aan deze kast — groen = aanwezig, rood = ontbreekt, oranje = aan een andere kast">✓ Kabelcheck${uvCheck ? " (aan)" : ""}</button>
         <button class="btn small ghost uv-bib">🔌 Modulebibliotheek</button>
         ${ctx.zekering ? `<button class="btn small primary uv-bib-plaats" title="een module uit de bibliotheek in deze kast zetten (naast de geselecteerde module, of op de eerste rij met plaats)">＋ Module uit bibliotheek</button>` : ""}
         <button class="btn small ghost uv-export">⎙ Exporteer (PDF)</button>
@@ -17325,6 +17493,7 @@ function renderUitvoeringsplan(ctxArg){
     if(extraHerberekenen) extraHerberekenen();
     if(uvPending){ const pts = uvPending.punten||[]; if(pts.length) toonDraadPreview(pts[pts.length-1]); }
     tekenBanner(); tekenSide(); tekenLijst(); tekenStatus();
+    if(uvCheck){ const sv = canvas.querySelector("svg"); if(sv){ sv.classList.add("kc-aan"); kcKleurSvg(sv, ctx, kast); } }
     const lz = wrap.querySelector("#uvLinks");
     if(lz && ctx.linksPaneel){ lz.innerHTML = ""; ctx.linksPaneel(lz, {teken, kast, selecteer: (id)=>{ uvSelMod = id; uvSelWire = null; uvSelKam = null; uvSelExtra = null; teken(); }}); }
   }
@@ -17340,6 +17509,12 @@ function renderUitvoeringsplan(ctxArg){
   }
   function tekenBanner(){
     banner.innerHTML = "";
+    if(uvCheck){
+      const b = el(`<div class="move-banner">✓ Kabelcheck: noteer rechts de kabels aan deze kast — <strong style="color:#1e8e3e">groen</strong> aanwezig, <strong style="color:#b3261e">rood</strong> ontbreekt, <strong style="color:#e07a12">oranje</strong> aan een andere kast. <button class="btn small ghost">Stoppen</button></div>`);
+      b.querySelector("button").addEventListener("click", ()=>{ uvCheck = false; selectTab(ctx.tab); });
+      banner.appendChild(b);
+      return;
+    }
     if(uvKamModus){
       const b = el(`<div class="move-banner">▭ Kamgeleider <strong>${escapeHtml((KAM_TYPES[uvKamType]||{}).label||uvKamType)}</strong>: sleep onderaan over de modules. <button class="btn small ghost">Annuleren</button></div>`);
       b.querySelector("button").addEventListener("click", ()=>{ uvKamModus = false; selectTab(ctx.tab); });
@@ -17367,6 +17542,7 @@ function renderUitvoeringsplan(ctxArg){
   }
   function tekenSide(){
     detail.innerHTML = "";
+    if(uvCheck){ detail.appendChild(kcKaart(ctx, kast, teken)); return; }
     const w = uvSelWire && kast.bedrading.find(x=> x.id===uvSelWire);
     const md = uvSelMod && uvAlleModules(kast).find(x=> x.id===uvSelMod);
     if(uvSelExtra && !w && !md && ctx.extraDetail && ctx.extraDetail(uvSelExtra, detail, {teken, kast, rerender: ()=> selectTab(ctx.tab)})) return;
@@ -17998,6 +18174,7 @@ function renderUitvoeringsplan(ctxArg){
     toast(`${row.naam} geplaatst in rij ${plek + 1}${ctx.layoutTab ? " — schuif hem eventueel op het tabblad Zekeringen naar de juiste plaats" : ""}.`);
     selectTab(ctx.tab);
   };
+  aan(".uv-check", "click", ()=>{ uvCheck = !uvCheck; uvSelWire = null; uvSelMod = null; uvSelKam = null; uvSelExtra = null; uvPending = null; uvCheckFocus = uvCheck; selectTab(ctx.tab); });
   aan(".uv-bib", "click", ()=> openModuleBibliotheek({ plaats: ctx.zekering ? plaatsUitBib : null, naSluiten: ()=>{ uvSyncEnOpruimen(kast); teken(); } }));
   aan(".uv-bib-plaats", "click", ()=> openModuleBibliotheek({ plaats: plaatsUitBib, naSluiten: ()=>{ uvSyncEnOpruimen(kast); teken(); } }));
   wrap.querySelectorAll(".uv-export").forEach(b=> b.addEventListener("click", ()=> ctx.export()));
@@ -19599,7 +19776,7 @@ function rijgklemGroepenSvg(m, x, y, w, h){
       const r2k = r2.length > max2 ? (g.kabel || r2).slice(0, max2) : r2;
       if(r2 && breed >= 18) s += `<text transform="translate(${cx + 7} ${cy}) rotate(-90)" class="uv-rk-kabel sub">${escapeHtml(r2k)}</text>`;
     }
-    s += `<rect x="${x0+1}" y="${y+24}" width="${Math.max(2, x1-x0-2)}" height="${h-48}" rx="3" class="uv-rk-groep" data-tip="${escapeHtml(tipTekst)}"></rect>`;
+    s += `<rect x="${x0+1}" y="${y+24}" width="${Math.max(2, x1-x0-2)}" height="${h-48}" rx="3" class="uv-rk-groep" data-kabel="${escapeHtml(kcCode(g.naam || g.locatie))}" data-tip="${escapeHtml(tipTekst)}"></rect>`;
   });
   return s;
 }
