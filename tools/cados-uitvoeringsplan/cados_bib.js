@@ -1189,6 +1189,39 @@ function kcCode(t){
   c = c.replace(/^([A-Z]+)0+(?=\d)/, "$1");        // D03 -> D3
   return c;
 }
+/* Lijst van de werf inlezen (Peter, 10/11: WhatsApp-lijstjes van collega's, bv. "3g2,5 BA", "5g1,5 101",
+   "D14", "18", "D4 living", "3g2,5 toilet"). Per regel: kabeltype eraf, het eerste woord dat op een
+   kabelnummer lijkt is de code; een los getal in de driverkast wordt D + getal als die driver bestaat.
+   Regels zonder nummer (bv. "toilet", "venti berging") blijven als tekstnotitie bewaard. */
+const KC_TYPE_RE = /\b\d+\s*[gGxX×]\s*\d+(?:[.,]\d+)?\b/g;
+function kcLeesLijst(tekst, opts){
+  const o = opts || {};
+  const codes = [], tekstNotities = [], dubbel = [];
+  const gezien = {};
+  String(tekst||"").split(/\r?\n/).forEach((regel, ri)=>{
+    const ruw = regel.trim();
+    if(!ruw) return;
+    const kabeltype = (ruw.match(KC_TYPE_RE) || [])[0] || "";
+    const rest = ruw.replace(KC_TYPE_RE, " ").replace(/[\u2013\u2014:;]/g, " ").trim();
+    const woorden = rest.split(/[\s,]+/).filter(Boolean);
+    let code = "";
+    for(const w of woorden){
+      let c = kcCode(w);
+      if(/^\d{1,4}$/.test(c) && o.dk && o.bestaat && o.bestaat("D" + c) && !o.bestaat(c)) c = "D" + c;
+      if(/^[A-Z]{1,3}\d{0,4}$/.test(c) && c.length <= 5 && (o.bestaat ? (o.bestaat(c) || /\d/.test(c) || c.length <= 2) : true)){ code = c; break; }
+      if(/^\d{1,4}$/.test(c)){ code = c; break; }
+      break;   // eerste woord is geen nummer: tekstregel
+    }
+    if(code){
+      if(gezien[code]) dubbel.push(code);
+      gezien[code] = true;
+      codes.push(code);
+    } else if(!(ri === 0 && !kabeltype && woorden.length && o.titelOk !== false && /kast/i.test(rest))){
+      tekstNotities.push(ruw);        // eerste regel "Plonkast" / "Driverkast inkom ..." = titel, overslaan
+    }
+  });
+  return {codes: [...new Set(codes)], tekstNotities, dubbel: [...new Set(dubbel)]};
+}
 function kcAlleKasten(){
   const uit = [];
   ((state.zekeringen && state.zekeringen.kasten) || []).forEach((kast, i)=>{
@@ -1203,6 +1236,16 @@ function kcAlleKasten(){
         if(!v){ v = {code, naam: String(g.naam||"").split(" — ").slice(1).join(" — ") || g.locatie || "", kabel: g.kabel || "", mods: []}; verwacht.push(v); }
         if(!v.mods.includes(m.id)) v.mods.push(m.id);
       });
+    }));
+    // kabels rechtstreeks op een automaat (geen rijgklemmen): het kabelnummer is de code van de
+    // automaat (bv. "3g2,5 BA" op de werf)
+    let zc = {};
+    try{ zc = computeZekeringCodes(); }catch(_e){}
+    kast.rijen.forEach(r=> r.items.forEach(m=>{
+      if(m.categorie !== "Automaat" || m.kabelOpKlemmen) return;
+      const code = kcCode(zc[m.id] || "");
+      if(!code || verwacht.some(x=> x.code===code)) return;
+      verwacht.push({code, naam: m.naam || "", kabel: m.kabelType || "", mods: [m.id], automaat: true});
     }));
     uit.push({sleutel: "zek:" + kast.id, naam: kast.naam || ("Zekeringkast " + (i+1)), houder: kast, verwacht});
   });
@@ -1244,9 +1287,11 @@ function kcSleutels(ctx, kast){
   if(kast._alle) return kast._delen.map(q=> "dk:" + q.dk.id);
   return kast._dk ? ["dk:" + kast._dk.id] : [];
 }
-function kcZet(k, codes){
+let kcLaatsteDubbel = [];
+function kcZet(k, codes, tekstNotities){
   if(!k.houder.kabelcheck) k.houder.kabelcheck = {kabels: []};
   k.houder.kabelcheck.kabels = [...new Set(codes.map(kcCode).filter(Boolean))];
+  if(tekstNotities && tekstNotities.length) k.houder.kabelcheck.tekst = [...new Set((k.houder.kabelcheck.tekst || []).concat(tekstNotities))];
   k.houder.kabelcheck.bijgewerkt = new Date().toISOString();
   save();
 }
@@ -1257,7 +1302,7 @@ function kcKleurSvg(svg, ctx, kast){
     const st = kcStatus(sl);
     if(!st) return;
     st.verwacht.forEach(v=>{
-      if(ctx.zekering){
+      if(ctx.zekering && !v.automaat){
         svg.querySelectorAll(`.uv-rk-groep[data-kabel="${CSS.escape(v.code)}"]`).forEach(e=> e.classList.add("kc-" + v.status));
       } else {
         v.mods.forEach(id=> svg.querySelectorAll(`.uv-mod[data-mod="${CSS.escape(id)}"]`).forEach(e=> e.classList.add("kc-" + v.status)));
@@ -1282,17 +1327,32 @@ function kcKaart(ctx, kast, teken){
   const opnieuw = ()=>{ teken(); };
   body.appendChild(el(`<div class="hint">${escapeHtml(st.k.naam)} — noteer de kabelnummers die je aan deze kast ziet. Groen = aanwezig, rood = ontbreekt, oranje = genoteerd aan een andere kast.</div>`));
   body.appendChild(el(`<div class="kc-tellers"><span class="kc-t groen" title="aanwezig">✓ ${st.tel.groen}</span><span class="kc-t oranje" title="aan een andere kast">⇄ ${st.tel.oranje}</span><span class="kc-t rood" title="ontbreekt">✕ ${st.tel.rood}</span><span class="kc-t">van ${st.verwacht.length}</span>${st.extra.length ? `<span class="kc-t grijs" title="genoteerd maar niet verwacht">+${st.extra.length}</span>` : ""}</div>`));
-  const form = el(`<form class="kc-form"><input class="kc-in" inputmode="text" autocomplete="off" placeholder="kabelnummer(s), bv. 103 of D3 D4"><button class="btn small primary" type="submit">＋</button></form>`);
-  form.addEventListener("submit", e=>{
-    e.preventDefault();
+  const form = el(`<form class="kc-form"><textarea class="kc-in" rows="1" autocomplete="off" placeholder="kabelnummer(s), bv. 103 of D3 — of plak hier een lijst (WhatsApp)"></textarea><button class="btn small primary" type="submit">＋</button></form>`);
+  const alleCodes = new Set(kcAlleKasten().flatMap(x=> x.verwacht.map(v=> v.code)));
+  const verwerk = ()=>{
     const inp = form.querySelector(".kc-in");
-    const nieuw = String(inp.value||"").split(/[\s,;]+/).map(kcCode).filter(Boolean);
-    if(!nieuw.length) return;
-    kcZet(st.k, genoteerd.concat(nieuw));
+    const t = String(inp.value||"");
+    if(!t.trim()) return;
+    const meerRegels = /\n/.test(t.trim());
+    const res = meerRegels ? kcLeesLijst(t, {dk: !ctx.zekering, bestaat: (c)=> alleCodes.has(c)})
+      : {codes: t.split(/[\s,;]+/).map(kcCode).map(c=> (!ctx.zekering && /^\d{1,4}$/.test(c) && alleCodes.has("D" + c) && !alleCodes.has(c)) ? "D" + c : c).filter(Boolean), tekstNotities: [], dubbel: []};
+    kcZet(st.k, genoteerd.concat(res.codes), res.tekstNotities);
+    if(meerRegels){
+      const delen = [`${res.codes.length} kabelnummer(s) ingelezen`];
+      if(res.tekstNotities.length) delen.push(`${res.tekstNotities.length} regel(s) zonder nummer als notitie bewaard`);
+      if(res.dubbel.length) delen.push(`⚠ dubbel in de lijst: ${res.dubbel.join(", ")}`);
+      toast(delen.join(" · "));
+      kcLaatsteDubbel = res.dubbel;
+    }
     uvCheckFocus = true;
     opnieuw();
-  });
+  };
+  form.addEventListener("submit", e=>{ e.preventDefault(); verwerk(); });
+  const ta = form.querySelector(".kc-in");
+  ta.addEventListener("keydown", e=>{ if(e.key === "Enter" && !e.shiftKey && !/\n/.test(ta.value)){ e.preventDefault(); verwerk(); } });
+  ta.addEventListener("input", ()=>{ ta.style.height = "auto"; ta.style.height = Math.min(220, ta.scrollHeight) + "px"; });
   body.appendChild(form);
+  if(kcLaatsteDubbel.length) body.appendChild(el(`<div class="hint" style="color:#b3261e">⚠ Dubbel in de geplakte lijst: ${escapeHtml(kcLaatsteDubbel.join(", "))} — controleer de labels op de kabels.</div>`));
   const lijst = el(`<div class="kc-lijst"></div>`);
   st.verwacht.forEach(v=>{
     const titel = v.status==="groen" ? "aanwezig — tik om weg te halen" : (v.status==="oranje" ? `genoteerd aan ${v.elders} — tik als hij toch hier ligt` : "ontbreekt — tik als hij er is");
@@ -1315,8 +1375,20 @@ function kcKaart(ctx, kast, teken){
     });
     body.appendChild(ex);
   }
+  const tekstN = (st.k.houder.kabelcheck && st.k.houder.kabelcheck.tekst) || [];
+  if(tekstN.length){
+    body.appendChild(el(`<div class="uv-sec-titel">Regels zonder kabelnummer</div>`));
+    body.appendChild(el(`<div class="hint">Vink de juiste kabel hierboven zelf aan; tik een regel om ze weg te halen.</div>`));
+    const tl = el(`<div class="kc-lijst"></div>`);
+    tekstN.forEach(t=>{
+      const c = el(`<button type="button" class="kc-chip grijs" title="tik om te verwijderen"><small>${escapeHtml(t)}</small></button>`);
+      c.addEventListener("click", ()=>{ st.k.houder.kabelcheck.tekst = tekstN.filter(x=> x !== t); save(); opnieuw(); });
+      tl.appendChild(c);
+    });
+    body.appendChild(tl);
+  }
   const w = el(`<div class="uv-knoprij"><button class="btn small ghost kc-wis">Notities van deze kast wissen</button></div>`);
-  w.querySelector(".kc-wis").addEventListener("click", ()=>{ if(confirm("Alle genoteerde kabels van deze kast wissen?")){ kcZet(st.k, []); opnieuw(); } });
+  w.querySelector(".kc-wis").addEventListener("click", ()=>{ if(confirm("Alle genoteerde kabels van deze kast wissen?")){ kcZet(st.k, []); if(st.k.houder.kabelcheck) st.k.houder.kabelcheck.tekst = []; kcLaatsteDubbel = []; save(); opnieuw(); } });
   body.appendChild(w);
   if(uvCheckFocus) setTimeout(()=>{ const i = box.querySelector(".kc-in"); if(i) i.focus(); uvCheckFocus = false; }, 0);
   return box;
@@ -1627,7 +1699,7 @@ function renderUitvoeringsplan(ctxArg){
   function tekenBanner(){
     banner.innerHTML = "";
     if(uvCheck){
-      const b = el(`<div class="move-banner">✓ Kabelcheck: noteer rechts de kabels aan deze kast — <strong style="color:#1e8e3e">groen</strong> aanwezig, <strong style="color:#b3261e">rood</strong> ontbreekt, <strong style="color:#e07a12">oranje</strong> aan een andere kast. <button class="btn small ghost">Stoppen</button></div>`);
+      const b = el(`<div class="move-banner">✓ Kabelcheck: noteer rechts de kabels aan deze kast (of plak een lijst) — groen = aanwezig, rood = ontbreekt, oranje = aan een andere kast. <button class="btn small ghost">Stoppen</button></div>`);
       b.querySelector("button").addEventListener("click", ()=>{ uvCheck = false; selectTab(ctx.tab); });
       banner.appendChild(b);
       return;

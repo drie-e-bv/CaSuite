@@ -412,7 +412,7 @@
 #cados-app .kc-t{padding:2px 8px;border-radius:999px;background:#eef0f2;font-weight:700;}
 #cados-app .kc-t.groen{background:#d6f3dd;color:#145c29;} #cados-app .kc-t.rood{background:#f8d9d6;color:#7d1a14;}
 #cados-app .kc-t.oranje{background:#ffe1c2;color:#7a3e05;} #cados-app .kc-t.grijs{background:#e6e8eb;color:#4a4f55;}
-#cados-app .kc-form{display:flex;gap:6px;} #cados-app .kc-form .kc-in{flex:1;min-width:0;font-size:16px;padding:8px 10px;}
+#cados-app .kc-form{display:flex;gap:6px;} #cados-app .kc-form .kc-in{flex:1;min-width:0;font-size:16px;padding:8px 10px;resize:none;font-family:inherit;line-height:1.3;border:1px solid var(--line);border-radius:8px;}
 #cados-app .kc-lijst{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:6px;}
 #cados-app .kc-chip{display:flex;flex-direction:column;align-items:flex-start;gap:1px;padding:7px 8px;border-radius:9px;border:2px solid #c9ccd1;background:#fff;text-align:left;cursor:pointer;min-height:44px;}
 #cados-app .kc-chip b{font:800 14px var(--mono, monospace);overflow-wrap:anywhere;max-width:100%;} #cados-app .kc-chip small{font-size:10.5px;color:#4a4f55;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
