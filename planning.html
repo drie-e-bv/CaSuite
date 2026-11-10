@@ -3828,6 +3828,24 @@
 #cados-app .kc-chip .kc-link{color:#145c29;font-style:italic;}
 @media (max-width:600px){ #cados-app .kc-koppel-rij{grid-template-columns:minmax(0,1fr) auto auto;} #cados-app .kc-koppel-rij .kc-bron{grid-column:1 / -1;} }
 
+#cados-app .kc-overlay{position:fixed;inset:0;background:rgba(20,24,28,.45);z-index:9000;display:flex;align-items:center;justify-content:center;padding:16px;}
+#cados-app .kc-rapport-doos{background:var(--surface,#fff);border-radius:14px;width:min(860px,100%);max-height:calc(100vh - 32px);display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+#cados-app .kc-rapport-kop{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line);}
+#cados-app .kc-rapport-kop h2{margin:0;font-size:18px;}
+#cados-app .kc-rapport-body{overflow:auto;padding:6px 18px 14px;}
+#cados-app .kc-rapport-voet{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 18px;border-top:1px solid var(--line);font-size:12.5px;}
+#cados-app .kc-r-kast h3{margin:16px 0 6px;font-size:15px;color:#1f4f8a;}
+#cados-app .kc-r-kast h4{margin:10px 0 4px;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-dim);}
+#cados-app .kc-actie{display:flex;gap:8px;align-items:flex-start;padding:7px 10px;border:1px solid #f2c9a0;background:#fff7ee;border-radius:8px;margin:4px 0;cursor:pointer;font-size:13px;}
+#cados-app .kc-actie.rk{border-color:#e07a12;}
+#cados-app .kc-actie input{margin-top:2px;width:18px;height:18px;flex:none;}
+#cados-app .kc-r-lijst{margin:0;padding-left:18px;font-size:13px;line-height:1.5;}
+#cados-app .kc-r-lijst li.rood{color:#b3261e;}
+#cados-app .kc-r-ok{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;}
+#cados-app .kc-r-ok span{background:#e6f6ea;border:1px solid #1e8e3e;border-radius:6px;padding:1px 6px;font:700 12px var(--mono, monospace);}
+#cados-app .kc-r-kast details summary{cursor:pointer;font-size:12.5px;color:#145c29;font-weight:700;margin-top:8px;}
+#cados-app .kc-r-ok.rood span{background:#fbe9e7;border-color:#b3261e;color:#7d1a14;}
+
 </style>
 </head>
 <body>
@@ -17081,9 +17099,12 @@ function kcCode(t){
    kabelnummer lijkt is de code; een los getal in de driverkast wordt D + getal als die driver bestaat.
    Regels zonder nummer (bv. "toilet", "venti berging") blijven als tekstnotitie bewaard. */
 const KC_TYPE_RE = /\b\d+\s*[gGxX×]\s*\d+(?:[.,]\d+)?\b/g;
+function kcTypeTekst(t){ return String(t||"").toUpperCase().replace(/\s+/g, "").replace(/[X×]/g, "G").replace(/\./g, ","); }
+function kcAders(t){ const m = /(\d+)\s*[GgXx×]/.exec(String(t||"")); return m ? Math.max(0, parseInt(m[1]) - 1) : null; }   // zonder PE
+function kcSectie(t){ const m = /[GgXx×]\s*(\d+(?:[.,]\d+)?)/.exec(String(t||"")); return m ? parseFloat(m[1].replace(",", ".")) : null; }
 function kcLeesLijst(tekst, opts){
   const o = opts || {};
-  const codes = [], tekstNotities = [], dubbel = [];
+  const codes = [], tekstNotities = [], dubbel = [], types = {};
   const gezien = {};
   String(tekst||"").split(/\r?\n/).forEach((regel, ri)=>{
     const ruw = regel.trim();
@@ -17103,11 +17124,12 @@ function kcLeesLijst(tekst, opts){
       if(gezien[code]) dubbel.push(code);
       gezien[code] = true;
       codes.push(code);
+      if(kabeltype) types[code] = kcTypeTekst(kabeltype);
     } else if(!(ri === 0 && !kabeltype && woorden.length && o.titelOk !== false && /kast/i.test(rest))){
       tekstNotities.push(ruw);        // eerste regel "Plonkast" / "Driverkast inkom ..." = titel, overslaan
     }
   });
-  return {codes: [...new Set(codes)], tekstNotities, dubbel: [...new Set(dubbel)]};
+  return {codes: [...new Set(codes)], tekstNotities, dubbel: [...new Set(dubbel)], types};
 }
 function kcAlleKasten(){
   const uit = [];
@@ -17129,7 +17151,7 @@ function kcAlleKasten(){
     let zc = {};
     try{ zc = computeZekeringCodes(); }catch(_e){}
     kast.rijen.forEach(r=> r.items.forEach(m=>{
-      if(m.categorie !== "Automaat" || m.kabelOpKlemmen) return;
+      if(m.categorie !== "Automaat" || m.kabelOpKlemmen || /^\s*reserve\b/i.test(m.naam || "")) return;
       const code = kcCode(zc[m.id] || "");
       if(!code || verwacht.some(x=> x.code===code)) return;
       verwacht.push({code, naam: m.naam || "", kabel: m.kabelType || "", mods: [m.id], automaat: true});
@@ -17195,6 +17217,8 @@ function kcSuggesties(regel, kandidaten){
 function kcKoppel(k, code, bron){
   const kc = k.houder.kabelcheck || (k.houder.kabelcheck = {kabels: []});
   kc.links = Object.assign({}, kc.links, {[code]: bron});
+  const t = (String(bron).match(KC_TYPE_RE) || [])[0];
+  if(t) kc.types = Object.assign({}, kc.types, {[code]: kcTypeTekst(t)});
   kc.tekst = (kc.tekst || []).filter(t=> t !== bron);
   kcZet(k, kcGenoteerd(k).filter(c=> c !== kcCode(bron)).concat([code]));
 }
@@ -17223,8 +17247,9 @@ function kcKleurSvg(svg, ctx, kast){
 function kcKaart(ctx, kast, teken){
   const sl = kcSleutels(ctx, kast);
   const box = el(`<div class="card uv-detail kc-kaart"><div class="card-body uv-sidebody">
-    <div class="uv-detail-kop"><strong>✓ Kabelcheck</strong><button class="uv-x kc-sluit" title="kabelcheck sluiten">✕</button></div></div></div>`);
+    <div class="uv-detail-kop"><strong>✓ Kabelcheck</strong><span><button class="btn small primary kc-rapport" title="scan van alle kasten: wat is ok, wat te controleren, welke aanpassingen">📋 Rapport</button> <button class="uv-x kc-sluit" title="kabelcheck sluiten">✕</button></span></div></div></div>`);
   const body = box.querySelector(".uv-sidebody");
+  box.querySelector(".kc-rapport").addEventListener("click", ()=> kcToonRapport(ctx));
   box.querySelector(".kc-sluit").addEventListener("click", ()=>{ uvCheck = false; selectTab(ctx.tab); });
   if(sl.length !== 1){
     body.appendChild(el(`<div class="hint">Kies één kast in de balk bovenaan om er de kabels te noteren. Overzicht:</div>`));
@@ -17247,6 +17272,9 @@ function kcKaart(ctx, kast, teken){
     const res = meerRegels ? kcLeesLijst(t, {dk: !ctx.zekering, bestaat: (c)=> alleCodes.has(c)})
       : {codes: t.split(/[\s,;]+/).map(kcCode).map(c=> (!ctx.zekering && /^\d{1,4}$/.test(c) && alleCodes.has("D" + c) && !alleCodes.has(c)) ? "D" + c : c).filter(Boolean), tekstNotities: [], dubbel: []};
     kcZet(st.k, genoteerd.concat(res.codes), res.tekstNotities);
+    const kcObj = st.k.houder.kabelcheck;
+    if(res.types && Object.keys(res.types).length) kcObj.types = Object.assign({}, kcObj.types, res.types);
+    if(meerRegels) kcObj.dubbel = res.dubbel;
     if(meerRegels){
       const delen = [`${res.codes.length} kabelnummer(s) ingelezen`];
       if(res.tekstNotities.length) delen.push(`${res.tekstNotities.length} regel(s) zonder nummer als notitie bewaard`);
@@ -17333,6 +17361,224 @@ function kcKaart(ctx, kast, teken){
   return box;
 }
 let uvCheckFocus = false;
+
+/* ---------- Kabelcheck-rapport (Peter, 10/11) ----------
+   "Scan uitvoeren en rapport weergeven na de kabelcheck: wat is ok, wat moet gecontroleerd worden, waar
+   zijn extra rijgklemmen voor nodig — en een knop om die aanpassingen aan te vinken en uit te voeren." */
+function kcAutomaatAders(m){ const n = parseInt(String(m.polen||"").replace(/[^0-9]/g, "")) || 1; return n === 1 ? 2 : n; }   // 1P (+N) = L+N
+function kcGroepAders(g){
+  const items = (state.interlex && state.interlex.items) || [];
+  return g.klemIds.reduce((t, id)=>{ const k = items.find(x=> x.id===id) || {}; return t + ((k.onder && (k.onder.aderNr || k.onder.watwaar)) ? 1 : 0) + ((k.boven && (k.boven.aderNr || k.boven.watwaar)) ? 1 : 0); }, 0);
+}
+function kcScan(){
+  const alle = kcAlleKasten();
+  const rapport = alle.map(k=>({k, ok: [], controle: [], acties: []}));
+  const zcodes = (()=>{ try{ return computeZekeringCodes(); }catch(_e){ return {}; } })();
+  alle.forEach((k, ki)=>{
+    const R = rapport[ki];
+    const kc = k.houder.kabelcheck || {};
+    if(!(kc.kabels && kc.kabels.length) && !(kc.tekst && kc.tekst.length)){ R.leeg = true; return; }
+    const st = kcStatus(k.sleutel);
+    const types = kc.types || {};
+    const isZek = k.sleutel.startsWith("zek:");
+    const kast = isZek ? k.houder : null;
+    st.verwacht.forEach(v=>{
+      const tGen = types[v.code] || "";
+      if(v.status === "groen"){
+        let opm = "";
+        const aGen = kcAders(tGen), aOnt = kcAders(v.kabel), sGen = kcSectie(tGen), sOnt = kcSectie(v.kabel);
+        if(tGen && v.kabel && ((aGen != null && aOnt != null && aGen !== aOnt) || (sGen && sOnt && Math.abs(sGen - sOnt) > 0.01))){
+          opm = `ontwerp ${v.kabel}, werf ${tGen}`;
+          R.controle.push({code: v.code, tekst: `${v.code}: ander kabeltype — ${opm}`});
+          R.acties.push({id: "type:" + k.sleutel + ":" + v.code, standaard: true, tekst: `${v.code}: kabeltype in het ontwerp aanpassen naar ${tGen}`, doe: ()=> kcZetType(k, v, tGen)});
+        }
+        // extra rijgklemmen
+        if(isZek && tGen){
+          const ag = kcAders(tGen);
+          if(v.automaat){
+            const m = kast.rijen.flatMap(r=> r.items).find(x=> x.id === v.mods[0]);
+            if(m && ag != null && ag > kcAutomaatAders(m) && !m.kabelOpKlemmen){
+              R.acties.push({id: "klem:" + k.sleutel + ":" + v.code, standaard: true, rijgklem: true,
+                tekst: `${v.code} (${tGen} op een ${m.polen || "1P"}-automaat): ${ag - kcAutomaatAders(m)} ader(s) te veel → kabel op rijgklemmen zetten`,
+                doe: ()=>{ m.kabelOpKlemmen = true; if(!m.kabelType) m.kabelType = tGen; try{ autoZekeringKlemmen(); }catch(_e){} }});
+            }
+          } else {
+            const m = kast.rijen.flatMap(r=> r.items).find(x=> x.id === v.mods[0]);
+            const g = m && rijgklemIndeling(m).groepen.find(g=> kcCode(g.naam || g.locatie) === v.code);
+            const voorzien = g ? kcGroepAders(g) : 0;
+            if(g && ag != null && voorzien && ag < voorzien) R.controle.push({code: v.code, tekst: `${v.code}: ${ag} aders op de werf (${tGen}), ${voorzien} klemmen voorzien — kabel nakijken`});
+            if(g && ag != null && ag > voorzien){
+              R.acties.push({id: "rkx:" + k.sleutel + ":" + v.code, standaard: true, rijgklem: true,
+                tekst: `${v.code}: ${ag} aders op de werf (${tGen}), ${voorzien} klemmen voorzien → ${ag - voorzien} extra rijgklem(men)`,
+                doe: ()=> kcExtraAders(m, g, ag - voorzien, tGen)});
+            }
+          }
+        }
+        R.ok.push({code: v.code, tekst: v.code + (v.naam ? " — " + v.naam : "") + (opm ? " (kabeltype afwijkend)" : "")});
+      } else if(v.status === "oranje"){
+        R.controle.push({code: v.code, tekst: `${v.code} ligt aan ${v.elders}, niet hier`});
+      } else {
+        (R.ontbreekt || (R.ontbreekt = [])).push(v);
+      }
+    });
+    st.extra.forEach(x=>{
+      if(x.status === "grijs"){ R.controle.push({code: x.code, tekst: `${x.code}: nummer niet gekend in het ontwerp`}); return; }
+      R.controle.push({code: x.code, tekst: `${x.code} ligt hier, maar hoort bij ${x.hoortBij}`});
+      // driver waarvan de kabel in deze driverkast toekomt: in het plan naar deze kast verplaatsen
+      if(!isZek){
+        const eig = alle.find(o=> o.naam === x.hoortBij);
+        const fys = dkFysiekeKasten();
+        const dkHier = fys.find(o=> "dk:" + o.id === k.sleutel), dkEig = eig && fys.find(o=> "dk:" + o.id === eig.sleutel);
+        const v = eig && eig.verwacht.find(o=> o.code === x.code);
+        const d = dkEig && v && dkDrivers(dkEig).find(o=> v.mods.includes(o.id));
+        if(d && dkHier && dkEig._bron === dkHier._bron)
+          R.acties.push({id: "dkm:" + d.id, standaard: true, tekst: `${x.code} in het plan verplaatsen naar ${k.naam} (de kabel komt hier toe)`, doe: ()=>{ dkNaarKast(dkEig, d, dkHier.id); }});
+      }
+    });
+    (kc.tekst || []).forEach(t=>{
+      R.controle.push({code: "", tekst: `"${t}" nog niet gekoppeld`});
+      const tt = (t.match(KC_TYPE_RE) || [])[0] || "";
+      if(isZek && kast.rijen.some(r=> r.items.some(m=> m.categorie === "Rijgklemmenmodule"))){
+        R.acties.push({id: "rkn:" + k.sleutel + ":" + t, standaard: false, rijgklem: true,
+          tekst: `Rijgklemmen voorzien voor "${t}"${tt ? " (" + (kcAders(tt) || "?") + " aders)" : ""}`,
+          doe: ()=> kcNieuweKabelKlemmen(kast, t.replace(KC_TYPE_RE, " ").trim(), kcTypeTekst(tt), k)});
+      }
+    });
+    (kc.dubbel || []).forEach(c=> R.controle.push({code: c, tekst: `${c} stond 2× in de lijst — labels nakijken`}));
+  });
+  return rapport;
+}
+function kcZetType(k, v, type){
+  if(v.automaat){
+    const m = k.houder.rijen.flatMap(r=> r.items).find(x=> x.id === v.mods[0]);
+    if(m) m.kabelType = type;
+    return;
+  }
+  if(k.sleutel.startsWith("zek:")){
+    const m = k.houder.rijen.flatMap(r=> r.items).find(x=> x.id === v.mods[0]);
+    const g = m && rijgklemIndeling(m).groepen.find(g=> kcCode(g.naam || g.locatie) === v.code);
+    const items = (state.interlex && state.interlex.items) || [];
+    if(g) g.klemIds.forEach(id=>{ const kl = items.find(x=> x.id === id); if(kl) kl.kabeltype = type; });
+  }
+}
+function kcExtraAders(m, g, n, type, nieuweGroep){
+  const il = state.interlex; if(!il) return;
+  const basis = g.klem || {};
+  const label = rijgklemKabelNaam(basis) || g.naam || "kabel";
+  const start = nieuweGroep ? 1 : (g.laatsteNr || kcGroepAders(g)) + 1;
+  const dubbel = il.type === "dubbel";
+  const nieuw = [];
+  let klem = null;
+  for(let i=0; i<n; i++){
+    const nr = start + i;
+    const zijde = (dubbel && i%2===1) ? "boven" : "onder";
+    if(zijde === "onder"){
+      klem = typeof newKlem === "function" ? newKlem() : {id: cryptoId(), kamer: "", info: "", onder: {kleur: "", watwaar: "", aansluiting: "", aderNr: 0}, boven: {kleur: "", watwaar: "", aansluiting: "", aderNr: 0}};
+      klem.kamer = basis.kamer || ""; klem.info = basis.info || "";
+      if(basis.bronType){ klem.bronType = basis.bronType; klem.bronId = basis.bronId; }
+      klem.kabeltype = type;
+      nieuw.push(klem);
+    }
+    klem[zijde].watwaar = label + " - ader " + nr;
+    klem[zijde].aderNr = nr;
+    klem[zijde].kleur = (il.standaardKleuren || [])[nr-1] || "";
+  }
+  il.items.push(...nieuw);
+  if(!Array.isArray(m.rijgklemKlemIds)) m.rijgklemKlemIds = [];
+  if(nieuweGroep) m.rijgklemKlemIds.push(...nieuw.map(k=> k.id));
+  else {
+    const laatste = g.klemIds[g.klemIds.length - 1];
+    const idx = m.rijgklemKlemIds.indexOf(laatste);
+    m.rijgklemKlemIds.splice(idx + 1, 0, ...nieuw.map(k=> k.id));
+    if(type) g.klemIds.forEach(id=>{ const kl = il.items.find(x=> x.id === id); if(kl) kl.kabeltype = type; });
+  }
+  if(typeof berekenRijgklemBreedte === "function") m.breedte = berekenRijgklemBreedte(m.rijgklemKlemIds.length);
+}
+function kcNieuweKabelKlemmen(kast, naam, type, k){
+  const il = state.interlex; if(!il) return;
+  const rk = kast.rijen.flatMap(r=> r.items).find(m=> m.categorie === "Rijgklemmenmodule");
+  if(!rk) return;
+  const n = kcAders(type) || 2;
+  const label = naam || "kabel werf";
+  kcExtraAders(rk, {klem: {kamer: "", info: label}, naam: label, klemIds: [], laatsteNr: 0}, n, type || "", true);
+  // de nieuwe groep heet zoals de regel: als aanwezig noteren en de notitie koppelen
+  const kc = k.houder.kabelcheck || (k.houder.kabelcheck = {kabels: []});
+  const bron = (kc.tekst || []).find(t=> t.replace(KC_TYPE_RE, " ").trim() === naam);
+  kc.tekst = (kc.tekst || []).filter(t=> t !== bron);
+  const code = kcCode(label);
+  kc.kabels = [...new Set((kc.kabels || []).concat([code]))];
+  if(bron) kc.links = Object.assign({}, kc.links, {[code]: bron});
+  if(type) kc.types = Object.assign({}, kc.types, {[code]: type});
+}
+function kcToonRapport(ctx){
+  const rapport = kcScan();
+  const ov = el(`<div class="kc-overlay"><div class="kc-rapport-doos">
+    <div class="kc-rapport-kop"><h2>📋 Kabelcheck — rapport</h2><span><button class="btn small ghost kc-print">🖨 Afdrukken</button> <button class="uv-x kc-r-sluit">✕</button></span></div>
+    <div class="kc-rapport-body"></div>
+    <div class="kc-rapport-voet"><span class="kc-r-tel"></span><button class="btn primary kc-uitvoeren">Aangevinkte aanpassingen uitvoeren</button></div>
+  </div></div>`);
+  const body = ov.querySelector(".kc-rapport-body");
+  const acties = [];
+  const totaal = {ok: 0, controle: 0, acties: 0};
+  rapport.forEach(R=>{
+    const sec = el(`<section class="kc-r-kast"><h3>${escapeHtml(R.k.naam)}</h3></section>`);
+    if(R.leeg){ sec.appendChild(el(`<div class="hint">Nog geen kabels genoteerd voor deze kast.</div>`)); body.appendChild(sec); return; }
+    const ontb = R.ontbreekt || [];
+    totaal.ok += R.ok.length; totaal.controle += R.controle.length + ontb.length; totaal.acties += R.acties.length;
+    sec.appendChild(el(`<div class="kc-tellers"><span class="kc-t groen">✓ ${R.ok.length} ok</span><span class="kc-t rood">✕ ${ontb.length} niet gevonden</span><span class="kc-t oranje">⚠ ${R.controle.length} te controleren</span><span class="kc-t">🔧 ${R.acties.length} aanpassing(en)</span></div>`));
+    if(R.acties.length){
+      sec.appendChild(el(`<h4>Voorgestelde aanpassingen</h4>`));
+      R.acties.forEach(a=>{
+        acties.push(a);
+        const r = el(`<label class="kc-actie${a.rijgklem ? " rk" : ""}"><input type="checkbox" ${a.standaard ? "checked" : ""}> <span>${a.rijgklem ? "🔩 " : ""}${escapeHtml(a.tekst)}</span></label>`);
+        a.cb = r.querySelector("input");
+        sec.appendChild(r);
+      });
+    }
+    if(R.controle.length){
+      sec.appendChild(el(`<h4>Te controleren</h4>`));
+      const ul = el(`<ul class="kc-r-lijst"></ul>`);
+      R.controle.forEach(c=> ul.appendChild(el(`<li class="${c.ernst === "rood" ? "rood" : ""}">${escapeHtml(c.tekst)}</li>`)));
+      sec.appendChild(ul);
+    }
+    if(ontb.length){
+      sec.appendChild(el(`<h4>Niet gevonden (${ontb.length})</h4>`));
+      sec.appendChild(el(`<div class="kc-r-ok rood">${ontb.map(v=> `<span title="${escapeHtml([v.naam, v.kabel].filter(Boolean).join(" · "))}">${escapeHtml(v.code)}</span>`).join("")}</div>`));
+    }
+    if(R.ok.length){
+      const d = el(`<details><summary>OK (${R.ok.length})</summary><div class="kc-r-ok">${R.ok.map(o=> `<span>${escapeHtml(o.code)}</span>`).join("")}</div></details>`);
+      sec.appendChild(d);
+    }
+    body.appendChild(sec);
+  });
+  const telEl = ov.querySelector(".kc-r-tel");
+  const knop = ov.querySelector(".kc-uitvoeren");
+  const bijwerk = ()=>{ const n = acties.filter(a=> a.cb.checked).length; knop.disabled = !n; knop.textContent = n ? `${n} aanpassing(en) uitvoeren` : "Niets aangevinkt"; };
+  acties.forEach(a=> a.cb.addEventListener("change", bijwerk));
+  telEl.textContent = `Totaal: ${totaal.ok} ok · ${totaal.controle} te controleren · ${totaal.acties} voorgestelde aanpassing(en)`;
+  if(!acties.length){ knop.style.display = "none"; }
+  bijwerk();
+  const sluit = ()=> ov.remove();
+  ov.querySelector(".kc-r-sluit").addEventListener("click", sluit);
+  ov.addEventListener("click", e=>{ if(e.target === ov) sluit(); });
+  ov.querySelector(".kc-print").addEventListener("click", ()=>{
+    const w = window.open("", "_blank");
+    if(!w) return;
+    w.document.write(`<html><head><title>Kabelcheck rapport</title><style>body{font:13px sans-serif;margin:20px} h3{margin:18px 0 4px} li.rood{color:#b3261e} .kc-actie{display:block} details{display:block}</style></head><body><h2>Kabelcheck — ${escapeHtml(state.instellingen.project || "")}</h2>${body.innerHTML.replace(/<input[^>]*checked[^>]*>/g, "☑").replace(/<input[^>]*>/g, "☐")}</body></html>`);
+    w.document.close(); w.focus(); w.print();
+  });
+  knop.addEventListener("click", ()=>{
+    const gekozen = acties.filter(a=> a.cb.checked);
+    let ok = 0, fout = 0;
+    gekozen.forEach(a=>{ try{ a.doe(); ok++; }catch(e){ fout++; console.error(e); } });
+    save();
+    sluit();
+    toast(`${ok} aanpassing(en) uitgevoerd${fout ? `, ${fout} mislukt` : ""}.`);
+    selectTab(ctx.tab);
+    setTimeout(()=> kcToonRapport(ctx), 300);
+  });
+  document.getElementById("cados-app").appendChild(ov);
+}
 
 /* Modules in de zekeringkast verslepen in het uitvoeringsplan (Peter, 30/10: "wanneer ik een module uit de
    bibliotheek plaats moet ik deze kunnen drag-and-droppen naar een andere plaats"). Werkt op de layout zelf

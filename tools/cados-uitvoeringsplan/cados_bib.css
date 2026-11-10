@@ -439,3 +439,21 @@
 #cados-app .kc-koppel-rij .kc-sel{min-width:0;width:100%;font-size:14px;padding:6px;}
 #cados-app .kc-chip .kc-link{color:#145c29;font-style:italic;}
 @media (max-width:600px){ #cados-app .kc-koppel-rij{grid-template-columns:minmax(0,1fr) auto auto;} #cados-app .kc-koppel-rij .kc-bron{grid-column:1 / -1;} }
+
+#cados-app .kc-overlay{position:fixed;inset:0;background:rgba(20,24,28,.45);z-index:9000;display:flex;align-items:center;justify-content:center;padding:16px;}
+#cados-app .kc-rapport-doos{background:var(--surface,#fff);border-radius:14px;width:min(860px,100%);max-height:calc(100vh - 32px);display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+#cados-app .kc-rapport-kop{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line);}
+#cados-app .kc-rapport-kop h2{margin:0;font-size:18px;}
+#cados-app .kc-rapport-body{overflow:auto;padding:6px 18px 14px;}
+#cados-app .kc-rapport-voet{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 18px;border-top:1px solid var(--line);font-size:12.5px;}
+#cados-app .kc-r-kast h3{margin:16px 0 6px;font-size:15px;color:#1f4f8a;}
+#cados-app .kc-r-kast h4{margin:10px 0 4px;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-dim);}
+#cados-app .kc-actie{display:flex;gap:8px;align-items:flex-start;padding:7px 10px;border:1px solid #f2c9a0;background:#fff7ee;border-radius:8px;margin:4px 0;cursor:pointer;font-size:13px;}
+#cados-app .kc-actie.rk{border-color:#e07a12;}
+#cados-app .kc-actie input{margin-top:2px;width:18px;height:18px;flex:none;}
+#cados-app .kc-r-lijst{margin:0;padding-left:18px;font-size:13px;line-height:1.5;}
+#cados-app .kc-r-lijst li.rood{color:#b3261e;}
+#cados-app .kc-r-ok{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;}
+#cados-app .kc-r-ok span{background:#e6f6ea;border:1px solid #1e8e3e;border-radius:6px;padding:1px 6px;font:700 12px var(--mono, monospace);}
+#cados-app .kc-r-kast details summary{cursor:pointer;font-size:12.5px;color:#145c29;font-weight:700;margin-top:8px;}
+#cados-app .kc-r-ok.rood span{background:#fbe9e7;border-color:#b3261e;color:#7d1a14;}
