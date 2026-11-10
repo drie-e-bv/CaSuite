@@ -3819,6 +3819,15 @@
 #cados-app .uv-werk.kc-breed .kc-form .kc-in{min-height:64px;}
 @media (max-width:900px){ #cados-app .uv-werk.kc-breed, #cados-app .uv-werk.met-links.kc-breed{grid-template-columns:minmax(0,1fr);} #cados-app .uv-werk.kc-breed .uv-side{order:-1;max-height:none !important;} }
 
+#cados-app .kc-koppel{display:flex;flex-direction:column;gap:6px;}
+#cados-app .kc-koppel-rij{display:grid;grid-template-columns:minmax(110px,1fr) minmax(0,1.6fr) auto auto;gap:6px;align-items:center;padding:6px 8px;border:2px solid #9aa0a6;border-radius:9px;background:#f6f7f8;}
+#cados-app .kc-koppel-rij .kc-bron{display:flex;flex-direction:column;min-width:0;}
+#cados-app .kc-koppel-rij .kc-bron b{font-size:13px;overflow-wrap:anywhere;}
+#cados-app .kc-koppel-rij .kc-bron small{font-size:10.5px;color:#5f6368;}
+#cados-app .kc-koppel-rij .kc-sel{min-width:0;width:100%;font-size:14px;padding:6px;}
+#cados-app .kc-chip .kc-link{color:#145c29;font-style:italic;}
+@media (max-width:600px){ #cados-app .kc-koppel-rij{grid-template-columns:minmax(0,1fr) auto auto;} #cados-app .kc-koppel-rij .kc-bron{grid-column:1 / -1;} }
+
 </style>
 </head>
 <body>
@@ -17166,6 +17175,29 @@ function kcSleutels(ctx, kast){
   return kast._dk ? ["dk:" + kast._dk.id] : [];
 }
 let kcLaatsteDubbel = [];
+/* Overschietende regels koppelen (Peter, 10/11: "de kabels die overschieten moet je nog kunnen linken").
+   Voorstel: woorden van de regel (zonder kabeltype) tegen naam en kabeltype van de nog ontbrekende kabels. */
+function kcNormType(t){ return String(t||"").toLowerCase().replace(/,/g, ".").replace(/\s+/g, "").replace(/[x×]/g, "g"); }
+function kcSuggesties(regel, kandidaten){
+  const type = kcNormType((String(regel).match(KC_TYPE_RE) || [])[0] || "");
+  const woorden = String(regel).replace(KC_TYPE_RE, " ").toLowerCase().split(/[^a-z0-9à-ÿ]+/).filter(w=> w.length >= 3 || /^\d+$/.test(w));
+  const vws = kandidaten.map(v=> (v.naam + " " + v.code).toLowerCase().split(/[^a-z0-9à-ÿ]+/).filter(Boolean));
+  const treft = (w, vw)=> vw.some(x=> x === w) ? 1 : (vw.some(x=> x.length >= 4 && w.length >= 4 && (x.startsWith(w.slice(0, 4)) || w.startsWith(x.slice(0, 4)))) ? 0.7 : 0);
+  // zeldzame woorden wegen zwaarder ("venti" telt meer dan "slaapkamer" die bij veel kabels staat)
+  const gewicht = woorden.map(w=> 1 / Math.sqrt(Math.max(1, vws.filter(vw=> treft(w, vw)).length)));
+  return kandidaten.map((v, i)=>{
+    let score = 0;
+    woorden.forEach((w, wi)=>{ score += treft(w, vws[i]) * gewicht[wi] * 3; });
+    if(score && type && kcNormType(v.kabel).includes(type)) score += 0.5;
+    return {v, score};
+  }).filter(x=> x.score > 0.5).sort((a, b)=> b.score - a.score);
+}
+function kcKoppel(k, code, bron){
+  const kc = k.houder.kabelcheck || (k.houder.kabelcheck = {kabels: []});
+  kc.links = Object.assign({}, kc.links, {[code]: bron});
+  kc.tekst = (kc.tekst || []).filter(t=> t !== bron);
+  kcZet(k, kcGenoteerd(k).filter(c=> c !== kcCode(bron)).concat([code]));
+}
 function kcZet(k, codes, tekstNotities){
   if(!k.houder.kabelcheck) k.houder.kabelcheck = {kabels: []};
   k.houder.kabelcheck.kabels = [...new Set(codes.map(kcCode).filter(Boolean))];
@@ -17234,7 +17266,8 @@ function kcKaart(ctx, kast, teken){
   const lijst = el(`<div class="kc-lijst"></div>`);
   st.verwacht.forEach(v=>{
     const titel = v.status==="groen" ? "aanwezig — tik om weg te halen" : (v.status==="oranje" ? `genoteerd aan ${v.elders} — tik als hij toch hier ligt` : "ontbreekt — tik als hij er is");
-    const c = el(`<button type="button" class="kc-chip ${v.status}" title="${escapeHtml(titel)}"><b>${escapeHtml(v.code)}</b><small>${escapeHtml([v.naam, v.kabel].filter(Boolean).join(" · "))}${v.status==="oranje" ? " ⇄ " + escapeHtml(v.elders) : ""}</small></button>`);
+    const link = v.status==="groen" && st.k.houder.kabelcheck && (st.k.houder.kabelcheck.links || {})[v.code];
+    const c = el(`<button type="button" class="kc-chip ${v.status}" title="${escapeHtml(titel)}"><b>${escapeHtml(v.code)}</b><small>${escapeHtml([v.naam, v.kabel].filter(Boolean).join(" · "))}${v.status==="oranje" ? " ⇄ " + escapeHtml(v.elders) : ""}</small>${link ? `<small class="kc-link">🔗 ${escapeHtml(link)}</small>` : ""}</button>`);
     c.addEventListener("click", ()=>{
       const set = new Set(kcGenoteerd(st.k));
       if(set.has(v.code)) set.delete(v.code); else set.add(v.code);
@@ -17242,29 +17275,57 @@ function kcKaart(ctx, kast, teken){
     });
     lijst.appendChild(c);
   });
-  body.appendChild(lijst);
-  if(st.extra.length){
-    body.appendChild(el(`<div class="uv-sec-titel">Genoteerd, maar niet voor deze kast</div>`));
+  // overschot: oranje (hoort bij een andere kast) als chip; grijs (onbekend nummer) en regels zonder
+  // nummer als rij met "koppel aan"-keuze
+  const oranjeExtra = st.extra.filter(x=> x.status === "oranje");
+  let oranjeExtraBlok = null;
+  if(oranjeExtra.length){
+    oranjeExtraBlok = el(`<div><div class="uv-sec-titel">Genoteerd, maar hoort bij een andere kast</div></div>`);
     const ex = el(`<div class="kc-lijst"></div>`);
-    st.extra.forEach(x=>{
-      const c = el(`<button type="button" class="kc-chip ${x.status}" title="tik om de notitie te verwijderen"><b>${escapeHtml(x.code)}</b><small>${x.hoortBij ? "hoort bij " + escapeHtml(x.hoortBij) : "onbekend nummer"}</small></button>`);
+    oranjeExtra.forEach(x=>{
+      const c = el(`<button type="button" class="kc-chip oranje" title="tik om de notitie te verwijderen"><b>${escapeHtml(x.code)}</b><small>hoort bij ${escapeHtml(x.hoortBij)}</small></button>`);
       c.addEventListener("click", ()=>{ kcZet(st.k, kcGenoteerd(st.k).filter(c2=> c2 !== x.code)); opnieuw(); });
       ex.appendChild(c);
     });
-    body.appendChild(ex);
+    oranjeExtraBlok.appendChild(ex);
   }
-  const tekstN = (st.k.houder.kabelcheck && st.k.houder.kabelcheck.tekst) || [];
-  if(tekstN.length){
-    body.appendChild(el(`<div class="uv-sec-titel">Regels zonder kabelnummer</div>`));
-    body.appendChild(el(`<div class="hint">Vink de juiste kabel hierboven zelf aan; tik een regel om ze weg te halen.</div>`));
-    const tl = el(`<div class="kc-lijst"></div>`);
-    tekstN.forEach(t=>{
-      const c = el(`<button type="button" class="kc-chip grijs" title="tik om te verwijderen"><small>${escapeHtml(t)}</small></button>`);
-      c.addEventListener("click", ()=>{ st.k.houder.kabelcheck.tekst = tekstN.filter(x=> x !== t); save(); opnieuw(); });
-      tl.appendChild(c);
+  const overschot = st.extra.filter(x=> x.status === "grijs").map(x=> ({bron: x.code, soort: "code"}))
+    .concat(((st.k.houder.kabelcheck && st.k.houder.kabelcheck.tekst) || []).map(t=> ({bron: t, soort: "tekst"})));
+  if(overschot.length){
+    const ontbrekend = st.verwacht.filter(v=> v.status !== "groen");
+    body.appendChild(el(`<div class="uv-sec-titel">Overschot — koppel aan de juiste kabel (${overschot.length})</div>`));
+    const tabel = el(`<div class="kc-koppel"></div>`);
+    overschot.forEach(o=>{
+      const sug = kcSuggesties(o.bron, ontbrekend);
+      const sugCodes = new Set(sug.slice(0, 5).map(x=> x.v.code));
+      const opt = (v)=> `<option value="${escapeHtml(v.code)}">${escapeHtml(v.code)} — ${escapeHtml([v.naam, v.kabel].filter(Boolean).join(" · "))}${v.status === "oranje" ? " (⇄ " + escapeHtml(v.elders) + ")" : ""}</option>`;
+      const rij = el(`<div class="kc-koppel-rij">
+        <div class="kc-bron"><b>${escapeHtml(o.bron)}</b><small>${o.soort === "code" ? "onbekend nummer" : "geen kabelnummer"}</small></div>
+        <select class="kc-sel"><option value="">— kies de kabel —</option>
+          ${sug.length ? `<optgroup label="Voorstel">${sug.slice(0, 5).map(x=> opt(x.v)).join("")}</optgroup>` : ""}
+          <optgroup label="Nog niet gevonden">${ontbrekend.filter(v=> !sugCodes.has(v.code)).map(opt).join("")}</optgroup>
+        </select>
+        <button type="button" class="btn small primary kc-ok">Koppel</button>
+        <button type="button" class="uv-x kc-weg" title="regel verwijderen">✕</button>
+      </div>`);
+      const sel = rij.querySelector(".kc-sel"), okb = rij.querySelector(".kc-ok");
+      if(sug.length && sug[0].score >= 1.5 && (sug.length === 1 || sug[0].score > sug[1].score + 0.3)) sel.value = sug[0].v.code;
+      okb.disabled = !sel.value;
+      sel.addEventListener("change", ()=>{ okb.disabled = !sel.value; });
+      okb.addEventListener("click", ()=>{ if(!sel.value) return; kcKoppel(st.k, sel.value, o.bron); opnieuw(); });
+      rij.querySelector(".kc-weg").addEventListener("click", ()=>{
+        const kc = st.k.houder.kabelcheck;
+        if(o.soort === "tekst"){ kc.tekst = (kc.tekst || []).filter(t=> t !== o.bron); save(); }
+        else kcZet(st.k, kcGenoteerd(st.k).filter(c2=> c2 !== o.bron));
+        opnieuw();
+      });
+      tabel.appendChild(rij);
     });
-    body.appendChild(tl);
+    body.appendChild(tabel);
   }
+  body.appendChild(el(`<div class="uv-sec-titel">Kabels van deze kast (${st.verwacht.length})</div>`));
+  body.appendChild(lijst);
+  if(oranjeExtraBlok) body.appendChild(oranjeExtraBlok);
   const w = el(`<div class="uv-knoprij"><button class="btn small ghost kc-wis">Notities van deze kast wissen</button></div>`);
   w.querySelector(".kc-wis").addEventListener("click", ()=>{ if(confirm("Alle genoteerde kabels van deze kast wissen?")){ kcZet(st.k, []); if(st.k.houder.kabelcheck) st.k.houder.kabelcheck.tekst = []; kcLaatsteDubbel = []; save(); opnieuw(); } });
   body.appendChild(w);
