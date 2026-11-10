@@ -1327,7 +1327,7 @@ function kcKaart(ctx, kast, teken){
   const opnieuw = ()=>{ teken(); };
   body.appendChild(el(`<div class="hint">${escapeHtml(st.k.naam)} — noteer de kabelnummers die je aan deze kast ziet. Groen = aanwezig, rood = ontbreekt, oranje = genoteerd aan een andere kast.</div>`));
   body.appendChild(el(`<div class="kc-tellers"><span class="kc-t groen" title="aanwezig">✓ ${st.tel.groen}</span><span class="kc-t oranje" title="aan een andere kast">⇄ ${st.tel.oranje}</span><span class="kc-t rood" title="ontbreekt">✕ ${st.tel.rood}</span><span class="kc-t">van ${st.verwacht.length}</span>${st.extra.length ? `<span class="kc-t grijs" title="genoteerd maar niet verwacht">+${st.extra.length}</span>` : ""}</div>`));
-  const form = el(`<form class="kc-form"><textarea class="kc-in" rows="1" autocomplete="off" placeholder="kabelnummer(s), bv. 103 of D3 — of plak hier een lijst (WhatsApp)"></textarea><button class="btn small primary" type="submit">＋</button></form>`);
+  const form = el(`<form class="kc-form"><textarea class="kc-in" rows="2" autocomplete="off" placeholder="kabelnummer(s), bv. 103 of D3 — of plak hier een lijst (WhatsApp)"></textarea><button class="btn small primary" type="submit">＋</button></form>`);
   const alleCodes = new Set(kcAlleKasten().flatMap(x=> x.verwacht.map(v=> v.code)));
   const verwerk = ()=>{
     const inp = form.querySelector(".kc-in");
@@ -1682,6 +1682,8 @@ function renderUitvoeringsplan(ctxArg){
     if(extraHerberekenen) extraHerberekenen();
     if(uvPending){ const pts = uvPending.punten||[]; if(pts.length) toonDraadPreview(pts[pts.length-1]); }
     tekenBanner(); tekenSide(); tekenLijst(); tekenStatus();
+    const werkEl = wrap.querySelector(".uv-werk");
+    if(werkEl) werkEl.classList.toggle("kc-breed", !!uvCheck);
     if(uvCheck){ const sv = canvas.querySelector("svg"); if(sv){ sv.classList.add("kc-aan"); kcKleurSvg(sv, ctx, kast); } }
     const lz = wrap.querySelector("#uvLinks");
     if(lz && ctx.linksPaneel){ lz.innerHTML = ""; ctx.linksPaneel(lz, {teken, kast, selecteer: (id)=>{ uvSelMod = id; uvSelWire = null; uvSelKam = null; uvSelExtra = null; teken(); }}); }

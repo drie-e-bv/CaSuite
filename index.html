@@ -3806,6 +3806,18 @@
 #cados-app .kc-chip.groen{border-color:#1e8e3e;background:#e6f6ea;} #cados-app .kc-chip.rood{border-color:#b3261e;background:#fbe9e7;}
 #cados-app .kc-chip.oranje{border-color:#e07a12;background:#fff1e0;} #cados-app .kc-chip.grijs{border-color:#9aa0a6;background:#f1f3f4;}
 
+/* kabelcheck: bredere zijkolom (Peter 10/11: "het zit te geknepen aan de zijkant") */
+#cados-app .uv-werk.kc-breed{grid-template-columns:minmax(0,1fr) minmax(380px,44%);}
+#cados-app .uv-werk.met-links.kc-breed{grid-template-columns:minmax(0,1fr) minmax(380px,44%);}
+#cados-app .uv-werk.kc-breed .uv-links{display:none;}
+#cados-app .uv-werk.kc-breed .uv-side{max-height:calc(100vh - 150px) !important;}
+#cados-app .uv-werk.kc-breed .kc-lijst{grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:8px;}
+#cados-app .uv-werk.kc-breed .kc-chip{padding:9px 10px;min-height:52px;}
+#cados-app .uv-werk.kc-breed .kc-chip b{font-size:16px;}
+#cados-app .uv-werk.kc-breed .kc-chip small{font-size:11.5px;}
+#cados-app .uv-werk.kc-breed .kc-form .kc-in{min-height:64px;}
+@media (max-width:900px){ #cados-app .uv-werk.kc-breed, #cados-app .uv-werk.met-links.kc-breed{grid-template-columns:minmax(0,1fr);} #cados-app .uv-werk.kc-breed .uv-side{order:-1;max-height:none !important;} }
+
 </style>
 </head>
 <body>
@@ -17192,7 +17204,7 @@ function kcKaart(ctx, kast, teken){
   const opnieuw = ()=>{ teken(); };
   body.appendChild(el(`<div class="hint">${escapeHtml(st.k.naam)} — noteer de kabelnummers die je aan deze kast ziet. Groen = aanwezig, rood = ontbreekt, oranje = genoteerd aan een andere kast.</div>`));
   body.appendChild(el(`<div class="kc-tellers"><span class="kc-t groen" title="aanwezig">✓ ${st.tel.groen}</span><span class="kc-t oranje" title="aan een andere kast">⇄ ${st.tel.oranje}</span><span class="kc-t rood" title="ontbreekt">✕ ${st.tel.rood}</span><span class="kc-t">van ${st.verwacht.length}</span>${st.extra.length ? `<span class="kc-t grijs" title="genoteerd maar niet verwacht">+${st.extra.length}</span>` : ""}</div>`));
-  const form = el(`<form class="kc-form"><textarea class="kc-in" rows="1" autocomplete="off" placeholder="kabelnummer(s), bv. 103 of D3 — of plak hier een lijst (WhatsApp)"></textarea><button class="btn small primary" type="submit">＋</button></form>`);
+  const form = el(`<form class="kc-form"><textarea class="kc-in" rows="2" autocomplete="off" placeholder="kabelnummer(s), bv. 103 of D3 — of plak hier een lijst (WhatsApp)"></textarea><button class="btn small primary" type="submit">＋</button></form>`);
   const alleCodes = new Set(kcAlleKasten().flatMap(x=> x.verwacht.map(v=> v.code)));
   const verwerk = ()=>{
     const inp = form.querySelector(".kc-in");
@@ -17547,6 +17559,8 @@ function renderUitvoeringsplan(ctxArg){
     if(extraHerberekenen) extraHerberekenen();
     if(uvPending){ const pts = uvPending.punten||[]; if(pts.length) toonDraadPreview(pts[pts.length-1]); }
     tekenBanner(); tekenSide(); tekenLijst(); tekenStatus();
+    const werkEl = wrap.querySelector(".uv-werk");
+    if(werkEl) werkEl.classList.toggle("kc-breed", !!uvCheck);
     if(uvCheck){ const sv = canvas.querySelector("svg"); if(sv){ sv.classList.add("kc-aan"); kcKleurSvg(sv, ctx, kast); } }
     const lz = wrap.querySelector("#uvLinks");
     if(lz && ctx.linksPaneel){ lz.innerHTML = ""; ctx.linksPaneel(lz, {teken, kast, selecteer: (id)=>{ uvSelMod = id; uvSelWire = null; uvSelKam = null; uvSelExtra = null; teken(); }}); }
