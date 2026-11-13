@@ -234,7 +234,8 @@
 // 2026-11-13: tabblad Materialen (materialen- en prijsdatabank) + Chrome-extensie CaSuite Mand.
 // 2026-11-13 (b): samengevoegd met werfverslagformulier 11/11, Rooster-knop Planning-app 26/10 en
 // CaCalc-grondcorrecties (grondsoort, legging, IEC-buisfactor).
-const CACHE_VERSION = 'casnap-v2026-11-13-samengevoegd';
+// 2026-11-13 (c): CaCalc -- legging enkeladerig in het veld Kabeltype, label 'grond rond de buis'.
+const CACHE_VERSION = 'casnap-v2026-11-13-legging';
 const NETWORK_TIMEOUT_MS = 4000;
 
 self.addEventListener('install', () => {

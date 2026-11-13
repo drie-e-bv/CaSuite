@@ -25132,7 +25132,7 @@ function renderBoardDetail() {
       html += '<p class="hint">Ucc transfo toegepast: <strong>' + (r && r.uccEff != null ? (r.uccEff * 100).toFixed(2) + '%' : '—') + '</strong>' + (r && r.uccBron === 'fabrikant' ? ' (fabrikant, ingevuld)' : ' (standaard tabelwaarde, geïnterpoleerd)') + ' — instelbaar bij <strong>1. Project → Voeding &amp; normen</strong>.</p>';
     }
     html += '<div class="grid">';
-    html += field('Kabeltype', '<select data-f="kabeltype">' + opts(['Mono', 'Multi'], b.kabeltype) + '</select>');
+    html += field('Kabeltype', kabeltypeLeggingHtml(b, 'data-f'));
     html += field('Kabellengte L (m)', input('lengte', b.lengte, 'number'));
     html += field('Aantal geleiders parallel N', input('aantal', b.aantal, 'number'));
     html += field('Sectie A (mm²)', '<select' + clsAttr(r && r.iz_ok === false) + ' data-f="sectie">' + opts(SECTIONS, Number(b.sectie)) + '</select>' +
@@ -26121,7 +26121,7 @@ function grondVeldenHtml(obj, attr) {
     o += '<option value="' + escapeAttr(g.key) + '"' + (soort === g.key ? ' selected' : '') + '>' + escapeHtml(g.label) + '</option>';
   });
   o += '<option value="manueel"' + (soort === 'manueel' ? ' selected' : '') + '>Zelf ingeven (K·m/W)</option>';
-  h += field('Grond rond de kabel', '<select ' + attr + '="grondsoort">' + o + '</select>');
+  h += field(obj.constructie === 'In een ondergrondse (wacht)buis' ? 'Grond rond de buis' : 'Grond rond de kabel', '<select ' + attr + '="grondsoort">' + o + '</select>');
   if (soort === 'manueel') {
     var cur = Number(obj.bodemweerstand) > 0 ? Number(obj.bodemweerstand) : 2.5;
     h += field('Thermische weerstand grond (K·m/W)', '<select ' + attr + '="bodemweerstand">' +
@@ -26137,16 +26137,25 @@ function grondVeldenHtml(obj, attr) {
       '<option value="nat"' + (t === 'nat' ? ' selected' : '') + '>Blijvend nat' + (gs ? ' (' + String(gs.nat).replace('.', ',') + ' K·m/W)' : '') + '</option>' +
       '</select>');
   }
-  if (obj.kabeltype === 'Mono') {
-    var lw = obj.monoLegging === 'laag' ? 'laag' : 'klaverblad';
-    h += field('Legging enkeladerige kabels', '<select ' + attr + '="monoLegging">' +
-      '<option value="klaverblad"' + (lw === 'klaverblad' ? ' selected' : '') + '>In klaverblad</option>' +
-      '<option value="laag"' + (lw === 'laag' ? ' selected' : '') + '>In laag (naast elkaar)</option>' +
-      '</select>');
-  }
   return h;
 }
 function fmtFactor(x) { return x == null ? '—' : Number(x).toFixed(2).replace('.', ','); }
+// 2026-11-13 (b): Peter "klaverblad plaatsing heb ik nog niet gevonden" -- de legging van
+// enkeladerige kabels zit voortaan mee in het veld Kabeltype (Nexans-indeling: meeraderig /
+// enkeladerig in klaverblad / enkeladerig in laag). Bewaard als kabeltype + monoLegging, zodat
+// de rekenkern en bestaande projecten ongewijzigd blijven (Mono zonder legging = klaverblad).
+function kabeltypeLeggingHtml(obj, attr) {
+  var cur = obj.kabeltype === 'Multi' ? 'Multi' : ('Mono|' + (obj.monoLegging === 'laag' ? 'laag' : 'klaverblad'));
+  var keuzes = [['Multi', 'Multi — meeraderige kabel'], ['Mono|klaverblad', 'Mono — enkeladerig in klaverblad'], ['Mono|laag', 'Mono — enkeladerig in laag (naast elkaar)']];
+  return '<select ' + attr + '="kabeltypeLegging">' + keuzes.map(function (k) {
+    return '<option value="' + k[0] + '"' + (k[0] === cur ? ' selected' : '') + '>' + k[1] + '</option>';
+  }).join('') + '</select>';
+}
+function zetKabeltypeLegging(obj, val) {
+  var d = String(val || '').split('|');
+  obj.kabeltype = d[0] === 'Multi' ? 'Multi' : 'Mono';
+  if (obj.kabeltype === 'Mono') obj.monoLegging = d[1] === 'laag' ? 'laag' : 'klaverblad';
+}
 // Uitleg van de toegepaste grondcorrecties onder de kabelvelden.
 function grondHintHtml(r) {
   if (!r || !r.grond || !r.grond.actief) return '';
@@ -26167,6 +26176,7 @@ function grondHintHtml(r) {
   delen.push('temperatuur ×' + fmtFactor(r.tempCorr));
   var h = '<p class="hint"><strong>Grondcorrecties:</strong> ' + delen.join(' · ') + ' → totaal ×' + fmtFactor(r.kCumul) + '.';
   if (g.bodemBuitenTabel) h += ' <strong>Let op:</strong> deze grond is droger dan de IEC-tabel (max. 3 K·m/W) — de factor van 3 K·m/W wordt gebruikt, reken met extra marge.';
+  if (g.inBuis) h += ' Bij een kabel in een buis telt de grond rond de buis; de lucht in de buis zit al in de IEC-buisfactor.';
   h += ' Een zwaar belaste kabel droogt de grond rond zich zelf uit: kies "Blijvend nat" enkel als de grond aantoonbaar nat blijft (bv. onder het grondwaterpeil).</p>';
   return h;
 }
@@ -26178,6 +26188,7 @@ function onFieldChange(b, el) {
   var f = el.getAttribute('data-f');
   var val = el.value;
   if (f === 'voedend') { b.voedend = val || null; }
+  else if (f === 'kabeltypeLegging') { zetKabeltypeLegging(b, val); }
   else if (f === 'toonBijkomendeGegevens') { b.toonBijkomendeGegevens = el.checked; }
   else if (f === 'buitenScope') { b.buitenScope = el.checked; }
   else if (f === 'geenEindautomaten') { b.geenEindautomaten = el.checked; renderBordSchemaSelect(); }
@@ -26692,7 +26703,7 @@ function renderBoardBlad(b, r, parent, project) {
         bf('ΔU dit segment / cumulatief', fmtPct(r.spanningsvalFrac) + ' / ' + fmtPct(r.spanningsvalCum) + ' (start bij dit bord)', true))
     : bladSection('Kabel',
         bf('Type', escapeHtml(b.mantel) + ' (' + escapeHtml(r.isolatie) + ')') +
-        bf('Kern / samenstelling', escapeHtml(b.materiaal) + ' / ' + escapeHtml(b.kabeltype)) +
+        bf('Kern / samenstelling', escapeHtml(b.materiaal) + ' / ' + escapeHtml(b.kabeltype) + (b.kabeltype === 'Mono' ? (b.monoLegging === 'laag' ? ' in laag' : ' in klaverblad') : '')) +
         bf('Plaatsingswijze', escapeHtml(b.constructie), true) +
         bf('Lengte (m)', b.lengte) +
         bf('Aantal parallel N', b.aantal) +
@@ -26704,8 +26715,7 @@ function renderBoardBlad(b, r, parent, project) {
         bf('K groep (constructie)', fmt(r.constructieFactor, 2)) +
         bf('K aanvul (bundel)', fmt(r.bundelFactor, 2)) +
         (r.grond && r.grond.actief
-          ? bf('K grond (' + r.grond.bodemBron + ', ' + String(r.grond.bodemweerstand).replace('.', ',') + ' K·m/W)', fmt(r.bodemFactor, 2), true) +
-            (b.kabeltype === 'Mono' ? bf('Legging', r.grond.legwijze === 'laag' ? 'in laag' : 'in klaverblad') : '')
+          ? bf('K grond (' + r.grond.bodemBron + ', ' + String(r.grond.bodemweerstand).replace('.', ',') + ' K·m/W)', fmt(r.bodemFactor, 2), true)
           : '') +
         bf('K cumul', fmt(r.kCumul, 2)));
 
@@ -27600,7 +27610,7 @@ function renderNetkabelPanel() {
   var html = '';
   html += '<p class="hint">Enkel bedoeld om de sectie van dit kabeltracé te bepalen (Iz/Ib en spanningsval) -- telt bewust NIET mee in de kortsluitstroomketen of de cumulatieve spanningsval van de borden hieronder (die vertrekt van de Ik3-waarde aan de teller zelf, zie de hint hierboven). Dit tracé wordt in de praktijk meestal door de netbeheerder zelf aangelegd; deze rekenhulp is puur informatief voor je dossier.</p>';
   html += '<div class="grid">';
-  html += field('Kabeltype', '<select data-nk-f="kabeltype">' + opts(['Mono', 'Multi'], nk.kabeltype) + '</select>');
+  html += field('Kabeltype', kabeltypeLeggingHtml(nk, 'data-nk-f'));
   html += field('Kabellengte L (m)', '<input data-nk-f="lengte" type="number" step="any" value="' + escapeAttr(nk.lengte) + '">');
   html += field('Aantal geleiders parallel N', '<input data-nk-f="aantal" type="number" step="any" value="' + escapeAttr(nk.aantal) + '">');
   html += field('Sectie A (mm²)', '<select' + clsAttr(r && r.iz_ok === false) + ' data-nk-f="sectie">' + opts(SECTIONS, Number(nk.sectie)) + '</select>');
@@ -27625,7 +27635,8 @@ function renderNetkabelPanel() {
   holder.querySelectorAll('[data-nk-f]').forEach(function (el) {
     el.addEventListener('change', function () {
       var f = el.getAttribute('data-nk-f');
-      nk[f] = (['lengte', 'aantal', 'sectie', 'bodemweerstand'].indexOf(f) !== -1) ? Number(el.value) : el.value;
+      if (f === 'kabeltypeLegging') zetKabeltypeLegging(nk, el.value);
+      else nk[f] = (['lengte', 'aantal', 'sectie', 'bodemweerstand'].indexOf(f) !== -1) ? Number(el.value) : el.value;
       if (f === 'omgeving') {
         var cList = DATATABEL.constructie.filter(function (c) { return c.omgeving === nk.omgeving; });
         var bList = DATATABEL.bundel.filter(function (c) { return c.omgeving === nk.omgeving; });
