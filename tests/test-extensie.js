@@ -34,6 +34,26 @@ const REXEL = `<!doctype html><html><head><title>Netstore - Winkelmand</title></
 <tr><td>Art.nr: 1234567</td><td><a href="/p/1234567">HAGER MCN516 Automaat C16 1P+N 6kA</a><br>Merk: Hager<br>EAN 3250612240190</td><td><input name="qty_1" value="4"></td><td>€ 12,50</td><td>40 %</td><td>€ 7,50</td><td>€ 30,00</td></tr>
 <tr><td>Art.nr: 7654321</td><td><a href="/p/7654321">WAGO 221-413 verbindingsklem</a><br>Merk: WAGO</td><td><input name="qty_2" value="100"></td><td>€ 0,52</td><td>27 %</td><td>€ 0,38</td><td>€ 38,00</td></tr>
 </tbody></table><p>Totaal excl. btw: € 68,00</p></body></html>`;
+
+// Nagebootst op de echte Netstore-mandpagina (13/11, tekst uit Peters import): code als link,
+// omschrijving eronder, leverdag, aantal-vak, eenheid P, prijs/totaal met € achteraan, daarna
+// promocode-link, totaal ZBTW en ecotaks.
+const NETSTORE_DIV = `<!doctype html><html><head><title>Rexel Netstore</title></head><body>
+<div class="top"><a href="#">Click &amp; Collect</a> <a href="#">In voorraad (2)</a> <a href="#">Mijn referenties</a><div>Mijn mandje CASENTIS (1111634)</div><div>MIJN PRIJZEN</div></div>
+<div class="alert">Opgelet ! Uw order zal geblokkeerd worden.</div>
+<div class="cart">
+ <div class="hdr"><span>Omschrijving</span><span>Datum levering</span><span>Aantal</span><span>Eenheid</span><span>Prijs</span><span>Totaal</span></div>
+ <div class="line"><div class="prod"><img src="x.png" alt=""><div><a href="/NS/p?art=NIK17000000">NIK17000000</a><div>SOKKEL DRUKKNOP NO</div></div></div>
+   <div>Maandag</div><div><input class="qty" type="text" value="10"></div><div>P</div><div>4,27€</div><div>42,66€</div><a href="#" title="Opmerking">≡</a><a href="#" title="Verwijderen">✕</a></div>
+ <div class="line"><div class="prod"><img src="y.png" alt=""><div><a href="/NS/p?art=HAG-MCN516">HAG-MCN516</a><div>AUTOMAAT 1P+N C16 6KA</div></div></div>
+   <div>Dinsdag</div><div><input class="qty" type="text" value="4"></div><div>P</div><div>7,50€</div><div>30,00€</div></div>
+ <div class="promo"><a href="#">+ Voeg een promo code toe</a></div>
+ <div class="tot"><div>Totaal ZBTW</div><div>MIJN PRIJS</div><div>72,76€</div><div>Incl. Ecotax en andere kosten</div><div>0,10€</div></div>
+</div></body></html>`;
+const NETSTORE_TABEL = `<!doctype html><html><head><title>Rexel Netstore</title></head><body>
+<table class="cart"><thead><tr><th>Omschrijving</th><th>Datum levering</th><th>Aantal</th><th>Eenheid</th><th>Prijs</th><th>Totaal</th><th></th></tr></thead><tbody>
+<tr><td><img src="x.png"><a href="/NS/p?art=NIK17000000">NIK17000000</a><br>SOKKEL DRUKKNOP NO</td><td>Maandag</td><td><input class="qty" value="10"></td><td>P</td><td>4,27€</td><td>42,66€</td><td><a href="#">✕</a></td></tr>
+</tbody></table><div><a href="#">+ Voeg een promo code toe</a></div><div>Totaal ZBTW 42,76€ Incl. Ecotax en andere kosten 0,10€</div></body></html>`;
 const LEEG = `<!doctype html><html><body><h1>Welkom bij Rexel</h1><p>Uw mandje is leeg.</p></body></html>`;
 
 const res = []; const check = (n, ok) => res.push({ n, ok: !!ok });
@@ -54,6 +74,8 @@ const res = []; const check = (n, ok) => res.push({ n, ok: !!ok });
     if(u.includes('pdf.min.js')) return r.fulfill({ contentType: 'application/javascript', body: 'window.pdfjsLib={GlobalWorkerOptions:{}};' });
     if(u.includes('jszip')) return r.fulfill({ contentType: 'application/javascript', body: 'window.JSZip=function(){};' });
     if(u.startsWith('https://www.bol.com/be/nl/basket')) return r.fulfill({ body: BOL, contentType: 'text/html; charset=utf-8' });
+    if(u.startsWith('https://netstore.rexel.be/ns-div')) return r.fulfill({ body: NETSTORE_DIV, contentType: 'text/html; charset=utf-8' });
+    if(u.startsWith('https://netstore.rexel.be/ns-tabel')) return r.fulfill({ body: NETSTORE_TABEL, contentType: 'text/html; charset=utf-8' });
     if(u.startsWith('https://netstore.rexel.be/cart')) return r.fulfill({ body: REXEL, contentType: 'text/html; charset=utf-8' });
     if(u.startsWith('https://netstore.rexel.be/')) return r.fulfill({ body: LEEG, contentType: 'text/html; charset=utf-8' });
     return r.fulfill({ status: 404, body: '' });
@@ -103,6 +125,22 @@ const res = []; const check = (n, ok) => res.push({ n, ok: !!ok });
   check('4. bol.com: aantal 2, eenheidsprijs 12,49 incl. -> netto excl. 10,32', Number(st.aantal) === 2 && Number(st.prijs_incl) === 12.49 && Math.abs(Number(st.netto) - 10.3223) < 0.001 && Number(st.btw_pct) === 21);
   check('4. bol.com: EAN en productlink', st.ean === '4007123620005' && (st.url || '').includes('9300000012345'));
   check('4. bol.com: WAGO-regel 18,95 incl.', br.some(r => (r.omschrijving || '').startsWith('WAGO') && Number(r.prijs_incl) === 18.95));
+
+  // 6. Echte Netstore-opbouw (div) en tabelvariant
+  for(const [pad, n] of [['ns-div', 2], ['ns-tabel', 1]]){
+    const voor = (await cs.evaluate(() => window.__mockClient.__db.import_regels.length));
+    const p = await ctx.newPage();
+    await p.goto('https://netstore.rexel.be/' + pad); await p.waitForTimeout(500);
+    await p.locator('#casuite-mand-knop').click({ position: { x: 40, y: 20 } }); await cs.waitForTimeout(1500);
+    const rr = (await cs.evaluate(() => window.__mockClient.__db.import_regels)).slice(voor);
+    console.log(pad.toUpperCase(), JSON.stringify(rr.map(r => [r.artikelnr, r.omschrijving, r.aantal, r.eenheid, r.netto])));
+    const nik = rr.find(r => r.artikelnr === 'NIK17000000') || {};
+    check(`6. Netstore ${pad}: ${n} regel(s), geen promocode/ecotaks`, rr.length === n && !rr.some(r => /promo|referenties/i.test((r.omschrijving || '') + (r.artikelnr || ''))));
+    check(`6. Netstore ${pad}: NIK17000000 = SOKKEL DRUKKNOP NO, 10 st, netto 4,27`, nike(nik));
+    if(await cs.locator('#mat-review-modal').isVisible()) await cs.click('#mat-review-annuleer');
+    await cs.waitForTimeout(300); if(!p.isClosed()) await p.close();
+  }
+  function nike(r){ return r.omschrijving === 'SOKKEL DRUKKNOP NO' && Number(r.aantal) === 10 && Number(r.netto) === 4.27; }
   check('5. geen paginafouten in CaSuite', fouten.length === 0);
   if(fouten.length) console.log(fouten);
   await cs.screenshot({ path: path.join(__dirname, 's-ext-bol.png') });

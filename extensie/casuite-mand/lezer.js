@@ -59,9 +59,15 @@
   const aantalVeld = '[type=number], input[name*=qty i], input[name*=quant i], input[name*=aantal i], input[aria-label*=aantal i], input[aria-label*=quant i], input[id*=qty i], input[id*=quant i], input[class*=qty i], input[class*=quant i], select[name*=qty i], select[name*=quant i], select[name*=aantal i], select[aria-label*=aantal i], select[id*=quant i], select[class*=quant i]';
 
   function veldUit(tekst, re){ const m = tekst.match(re); return m ? m[m.length - 1].trim() : ''; }
+  const GEEN_PRODUCT = /verwijder|remove|delete|\bwis\b|bewaar|favoriet|wishlist|verlanglijst|promo|kortingscode|coupon|voucher|cadeaubon|voeg .* toe|wijzig|bewerk|opmerking|leverdatum|meer info/i;
+  function productLinks(rij){
+    return Array.from(rij.querySelectorAll('a[href]')).filter(a => zichtbaar(a) && tekstVan(a).length > 1 && !GEEN_PRODUCT.test(tekstVan(a) + ' ' + (a.getAttribute('aria-label') || '') + ' ' + (a.getAttribute('title') || '')));
+  }
+  // Een "code" = één woord met cijfers, geen gewone tekst (bv. NIK17000000, 1234567, 221-413).
+  const IS_CODE = t => /^[A-Z0-9][A-Z0-9\-\.\/]{3,30}$/i.test(t) && /\d/.test(t);
   function regelUit(rij){
     const tekst = tekstVan(rij);
-    const links = Array.from(rij.querySelectorAll('a[href]')).filter(a => zichtbaar(a) && !/verwijder|remove|delete|wis|bewaar|favoriet|wishlist|verlanglijst/i.test(tekstVan(a) + ' ' + (a.getAttribute('aria-label') || '')));
+    const links = productLinks(rij);
     const kop = rij.querySelector('h1,h2,h3,h4,h5,[class*=title i],[class*=name i],[class*=omschr i],[class*=descr i],[data-test*=title i]');
     let oms = '';
     const kandidaten = [kop, ...links].filter(Boolean).map(e => tekstVan(e)).filter(t => t.length > 3 && !PRIJS_TEST.test(t));
@@ -69,6 +75,13 @@
     if(!oms){ const img = rij.querySelector('img[alt]'); if(img && img.alt.length > 3) oms = img.alt.trim(); }
     if(!oms) oms = tekst.split('\n').map(s => s.trim()).filter(s => s.length > 3 && !/\d+[.,]\d{2}/.test(s)).sort((a, b) => b.length - a.length)[0] || '';
     oms = oms.split('\n')[0].slice(0, 300);
+    let codeUitLink = '';
+    if(IS_CODE(oms)){
+      codeUitLink = oms;
+      const regels = tekst.split('\n').map(x => x.trim()).filter(x => x.length > 3 && x !== codeUitLink && !PRIJS_TEST.test(x) && !/^\d+([.,]\d+)?$/.test(x)
+        && !/^(maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag|vandaag|morgen|in voorraad|op voorraad|niet op voorraad|levering|leverdatum)\b/i.test(x));
+      oms = regels.sort((a, b) => b.length - a.length)[0] || codeUitLink;
+    }
     const url = (links.find(a => tekstVan(a) && oms.startsWith(tekstVan(a).slice(0, 20))) || links[0] || {}).href || null;
     const aantal = aantalIn(rij);
     const prijzen = prijzenIn(rij).filter(p => p.waarde > 0);
@@ -83,7 +96,8 @@
       } else netto = Math.min(...echt);
     }
     if(oud.length){ bruto = aantal && aantal > 1 ? Math.min(...oud) : Math.max(...oud); if(bruto <= (netto || 0)) bruto = null; }
-    const art = veldUit(tekst, /(?:art(?:ikel)?\.?\s*(?:nr|nummer|code)?|artikelnummer|referentie|ref\.?|bestelnummer|bestelcode|product\s*code|productnummer|sku|item\s*(?:no|nr))\s*[:#.]?\s*([A-Z0-9][A-Z0-9\-\/\.]{2,30})/i);
+    let art = veldUit(tekst, /(?:^|[\s(])(?:art(?:ikel)?\.?\s*(?:nr|nummer|code)|artikelnummer|referentie|ref\.|bestelnummer|bestelcode|product\s*code|productnummer|sku|item\s*(?:no|nr))\s*[:#.]?\s*([A-Z0-9][A-Z0-9\-\/\.]{2,30})/i);
+    if(!art && codeUitLink) art = codeUitLink;
     let ean = veldUit(tekst, /(?:ean|gtin|barcode)\s*(?:code)?\s*[:#]?\s*(\d{8,14})/i);
     if(!ean){ const m = tekst.match(/\b(\d{13})\b/); if(m) ean = m[1]; }
     const merk = veldUit(tekst, /(?:merk|brand|fabrikant|manufacturer)\s*[:]\s*([^\n|•·]{2,40})/i);
@@ -134,13 +148,15 @@
       .filter(v => !v.closest('header, nav, footer, [role=dialog][aria-hidden=true]'));
     let rijen = [];
     velden.forEach(v => {
+      // Kleinste blok rond het aantal-veld met een prijs en een productlink of -afbeelding: dat is
+      // de mandregel. (Groter zoeken pakt anders ook promocode, totalen en ecotaks mee.)
       let el = v.parentElement, beste = null;
       while(el && el !== document.body){
-        const n = el.querySelectorAll(aantalVeld).length;
-        if(n > 1) break;
-        if(prijzenIn(el).length) beste = el;
+        if(el.querySelectorAll(aantalVeld).length > 1) break;
+        if(prijzenIn(el).length && (el.querySelector('img') || productLinks(el).length)){ beste = el; break; }
         el = el.parentElement;
       }
+      if(beste && beste.closest('tr') && beste.closest('tr').querySelectorAll(aantalVeld).length === 1) beste = beste.closest('tr');
       if(beste && !rijen.includes(beste)) rijen.push(beste);
     });
     // Zonder aantal-velden: tabelrijen met een prijs (klassieke B2B-mandjes)
