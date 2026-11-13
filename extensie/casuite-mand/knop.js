@@ -25,6 +25,8 @@
     try{
       const mand = window.__casuiteLezer.leesMand();
       if(!mand.regels.length){ meld('Geen artikels gevonden op deze pagina. Open eerst je winkelmandje en klik dan opnieuw.', true); return; }
+      // Details (merk, EAN, fabrikantnr., brutoprijs, korting…) van de productpagina's ophalen.
+      await window.__casuiteLezer.verrijk(mand.regels, (n, tot) => { tekst.textContent = `Details ${n}/${tot}…`; });
       const antwoord = await chrome.runtime.sendMessage({ type: 'mand', mand });
       meld(antwoord && antwoord.ok ? `${mand.regels.length} artikel${mand.regels.length === 1 ? '' : 's'} naar CaMat gestuurd. Controleer ze daar en klik op Importeren.` : 'Doorsturen naar CaMat mislukt.', !(antwoord && antwoord.ok));
     }catch(e){ meld('Uitlezen mislukt: ' + (e.message || e), true); }

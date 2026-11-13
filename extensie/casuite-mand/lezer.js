@@ -193,5 +193,90 @@
     return { bron: { url: location.href, host, titel: document.title, adapter: ad.naam, prijzenInclBtw: !!inclBtw }, regels };
   }
 
-  window.__casuiteLezer = { leesMand, algemeen, regelUit, getal };
+
+  // ---------- Verrijken met de productpagina (enkel lezen: een gewone GET zoals bij het openen van
+  // de pagina, met de eigen aanmelding van de gebruiker). Vult enkel velden aan die nog leeg zijn.
+  const LABELS = [
+    ['ean', /^(ean|ean-?code|gtin|gtin-?13|barcode|streepjescode)\b/i],
+    ['fabrikant_artnr', /^((ref(erentie)?|art(ikel)?\.?\s*(nr|nummer|code)?|nr|nummer|code)\.?\s*(van\s*de\s*)?(fabrikant|leverancier|producent)|fabrikant(en)?\s*(ref(erentie)?|art(ikel)?(nr|nummer)?|nr|nummer|code|referentie)|fabr\.?\s*(nr|ref|code)|mpn|manufacturer\s*(part|ref|no|number|code)|typenummer|type-?nr|bestelnummer fabrikant)/i],
+    ['merk', /^(merk|brand|fabrikant|producent|manufacturer|marque)\s*:?$/i],
+    ['bruto', /^(bruto(prijs)?|catalogus(prijs)?|lijstprijs|adviesprijs|publieke prijs|prix (brut|public)|list ?price)/i],
+    ['korting_pct', /^(korting|uw korting|discount|remise)/i],
+    ['type_model', /^(type|model|reeks|serie)\s*:?$/i],
+    ['categorie', /^(categorie|productgroep|productfamilie|familie|groep)\b/i],
+    ['verpakkingseenheid', /^(verpakking(seenheid)?|per verpakking|verkoopeenheid|colli|aantal per verpakking|inhoud)\b/i],
+    ['minimumafname', /^(minimum(\s*(afname|bestel\w*))?|min\.?\s*(afname|bestel\w*))/i],
+    ['eenheid', /^(eenheid|unit)\s*:?$/i]
+  ];
+  function labelVeld(l){ l = (l || '').replace(/[:*]+\s*$/, '').trim(); if(!l || l.length > 45) return null; const m = LABELS.find(([, re]) => re.test(l)); return m ? m[0] : null; }
+  function detailsUit(doc){
+    const uit = {};
+    const zet = (k, v) => { v = String(v == null ? '' : v).replace(/\s+/g, ' ').trim(); if(v && v.length < 120 && uit[k] == null) uit[k] = v; };
+    // 1. Gestructureerde data (JSON-LD / microdata)
+    doc.querySelectorAll('script[type="application/ld+json"]').forEach(sc => {
+      try{
+        const stapel = [JSON.parse(sc.textContent)];
+        while(stapel.length){
+          const o = stapel.pop(); if(!o || typeof o !== 'object') continue;
+          if(Array.isArray(o)){ stapel.push(...o); continue; }
+          if(o['@graph']) stapel.push(o['@graph']);
+          const t = [].concat(o['@type'] || []).join(' ');
+          if(/Product/i.test(t)){
+            zet('ean', o.gtin13 || o.gtin || o.gtin14 || o.gtin12 || o.gtin8);
+            zet('merk', o.brand && (o.brand.name || (typeof o.brand === 'string' ? o.brand : '')));
+            zet('fabrikant_artnr', o.mpn); zet('categorie', typeof o.category === 'string' ? o.category : '');
+            zet('lange_omschrijving', o.description);
+          }
+        }
+      }catch(e){}
+    });
+    [['gtin13', 'ean'], ['gtin', 'ean'], ['mpn', 'fabrikant_artnr'], ['brand', 'merk']].forEach(([ip, k]) => {
+      const e = doc.querySelector(`[itemprop="${ip}"]`); if(e) zet(k, e.getAttribute('content') || e.textContent);
+    });
+    // 2. Label/waarde-paren: tabellen, definitielijsten, "Label: waarde" en label-element + volgend element
+    doc.querySelectorAll('tr').forEach(tr => { const c = tr.querySelectorAll('th,td'); if(c.length >= 2){ const k = labelVeld(c[0].textContent); if(k) zet(k, c[1].textContent); } });
+    doc.querySelectorAll('dt').forEach(dt => { const dd = dt.nextElementSibling; const k = labelVeld(dt.textContent); if(k && dd) zet(k, dd.textContent); });
+    doc.querySelectorAll('body *').forEach(el => {
+      if(el.children.length > 3) return;
+      const t = (el.textContent || '').replace(/\s+/g, ' ').trim(); if(!t || t.length > 120) return;
+      const m = t.match(/^([^:]{2,45}):\s*(.+)$/);
+      if(m){ const k = labelVeld(m[1]); if(k) zet(k, m[2]); return; }
+      if(el.children.length === 0 && t.length <= 45){
+        const k = labelVeld(t); const nx = el.nextElementSibling;
+        if(k && nx && (nx.textContent || '').trim().length < 120) zet(k, nx.textContent);
+      }
+    });
+    if(uit.ean){ const m = uit.ean.match(/\d{8,14}/); uit.ean = m ? m[0] : null; }
+    ['bruto', 'korting_pct', 'verpakkingseenheid', 'minimumafname'].forEach(k => { if(uit[k] != null) uit[k] = getal((String(uit[k]).match(/-?\d[\d.,\s]*/) || [''])[0]); if(uit[k] != null) uit[k] = Math.abs(uit[k]); });
+    if(!uit.categorie){
+      const kruim = Array.from(doc.querySelectorAll('[class*=breadcrumb i] a, nav[aria-label*=breadcrumb i] a, [itemtype*=BreadcrumbList] [itemprop=name]')).map(a => (a.textContent || '').trim()).filter(t => t && !/^(home|start|producten|catalogus)$/i.test(t));
+      if(kruim.length) uit.categorie = kruim[kruim.length - 1].slice(0, 80);
+    }
+    if(uit.lange_omschrijving) uit.lange_omschrijving = uit.lange_omschrijving.slice(0, 500);
+    return uit;
+  }
+  async function verrijk(regels, voortgang){
+    const doel = regels.map((r, i) => [r, i]).filter(([r]) => {
+      if(!r.url) return false;
+      try{ const u = new URL(r.url, location.href); return u.origin === location.origin && !/^javascript:/i.test(r.url); }catch(e){ return false; }
+    }).slice(0, 60);
+    let klaar = 0;
+    const werk = async ([r]) => {
+      try{
+        const ant = await fetch(new URL(r.url, location.href).href, { credentials: 'include' });
+        if(ant.ok && /html/i.test(ant.headers.get('content-type') || 'text/html')){
+          const doc = new DOMParser().parseFromString(await ant.text(), 'text/html');
+          const d = detailsUit(doc);
+          Object.keys(d).forEach(k => { if(d[k] != null && d[k] !== '' && (r[k] == null || r[k] === '')) r[k] = d[k]; });
+          r.ruw = Object.assign({}, r.ruw, { detail: (doc.body ? doc.body.innerText || doc.body.textContent : '').replace(/\s+\n/g, '\n').slice(0, 2500), gevonden: Object.keys(d) });
+          if(r.bruto != null && r.netto != null && r.korting_pct == null && r.bruto > r.netto) r.korting_pct = Math.round((1 - r.netto / r.bruto) * 100000) / 1000;
+        }
+      }catch(e){ r.ruw = Object.assign({}, r.ruw, { detailFout: String(e && e.message || e) }); }
+      klaar++; if(voortgang) voortgang(klaar, doel.length);
+    };
+    for(let i = 0; i < doel.length; i += 4) await Promise.all(doel.slice(i, i + 4).map(werk));
+    return regels;
+  }
+
+  window.__casuiteLezer = { leesMand, algemeen, regelUit, getal, verrijk, detailsUit };
 })();

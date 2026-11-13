@@ -54,6 +54,17 @@ const NETSTORE_TABEL = `<!doctype html><html><head><title>Rexel Netstore</title>
 <table class="cart"><thead><tr><th>Omschrijving</th><th>Datum levering</th><th>Aantal</th><th>Eenheid</th><th>Prijs</th><th>Totaal</th><th></th></tr></thead><tbody>
 <tr><td><img src="x.png"><a href="/NS/p?art=NIK17000000">NIK17000000</a><br>SOKKEL DRUKKNOP NO</td><td>Maandag</td><td><input class="qty" value="10"></td><td>P</td><td>4,27€</td><td>42,66€</td><td><a href="#">✕</a></td></tr>
 </tbody></table><div><a href="#">+ Voeg een promo code toe</a></div><div>Totaal ZBTW 42,76€ Incl. Ecotax en andere kosten 0,10€</div></body></html>`;
+
+const PRODUCT_NIK = `<!doctype html><html><head><title>NIK17000000</title></head><body>
+<nav class="breadcrumb"><a href="/">Home</a> › <a href="#">Schakelmateriaal</a> › <a href="#">Sokkels</a></nav>
+<h1>SOKKEL DRUKKNOP NO</h1>
+<div class="specs"><table>
+<tr><th>Merk</th><td>NIKO</td></tr><tr><th>Referentie fabrikant</th><td>170-00000</td></tr>
+<tr><th>EAN-code</th><td>5413736123456</td></tr><tr><th>Bruto prijs</th><td>7,12 €</td></tr>
+<tr><th>Verpakkingseenheid</th><td>10 P</td></tr></table></div>
+<div><span class="lbl">Type</span><span>Basic</span></div></body></html>`;
+const PRODUCT_HAG = `<!doctype html><html><head><title>HAG</title>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Product","name":"Automaat","gtin13":"3250612240190","mpn":"MCN516","brand":{"@type":"Brand","name":"Hager"}}</script></head><body><h1>AUTOMAAT</h1><p>Brutoprijs: 12,50 €</p></body></html>`;
 const LEEG = `<!doctype html><html><body><h1>Welkom bij Rexel</h1><p>Uw mandje is leeg.</p></body></html>`;
 
 const res = []; const check = (n, ok) => res.push({ n, ok: !!ok });
@@ -74,6 +85,8 @@ const res = []; const check = (n, ok) => res.push({ n, ok: !!ok });
     if(u.includes('pdf.min.js')) return r.fulfill({ contentType: 'application/javascript', body: 'window.pdfjsLib={GlobalWorkerOptions:{}};' });
     if(u.includes('jszip')) return r.fulfill({ contentType: 'application/javascript', body: 'window.JSZip=function(){};' });
     if(u.startsWith('https://www.bol.com/be/nl/basket')) return r.fulfill({ body: BOL, contentType: 'text/html; charset=utf-8' });
+    if(u.startsWith('https://netstore.rexel.be/NS/p?art=NIK')) return r.fulfill({ body: PRODUCT_NIK, contentType: 'text/html; charset=utf-8' });
+    if(u.startsWith('https://netstore.rexel.be/NS/p?art=HAG')) return r.fulfill({ body: PRODUCT_HAG, contentType: 'text/html; charset=utf-8' });
     if(u.startsWith('https://netstore.rexel.be/ns-div')) return r.fulfill({ body: NETSTORE_DIV, contentType: 'text/html; charset=utf-8' });
     if(u.startsWith('https://netstore.rexel.be/ns-tabel')) return r.fulfill({ body: NETSTORE_TABEL, contentType: 'text/html; charset=utf-8' });
     if(u.startsWith('https://netstore.rexel.be/cart')) return r.fulfill({ body: REXEL, contentType: 'text/html; charset=utf-8' });
@@ -131,10 +144,12 @@ const res = []; const check = (n, ok) => res.push({ n, ok: !!ok });
     const voor = (await cs.evaluate(() => window.__mockClient.__db.import_regels.length));
     const p = await ctx.newPage();
     await p.goto('https://netstore.rexel.be/' + pad); await p.waitForTimeout(500);
-    await p.locator('#casuite-mand-knop').click({ position: { x: 40, y: 20 } }); await cs.waitForTimeout(1500);
+    await p.locator('#casuite-mand-knop').click({ position: { x: 40, y: 20 } }); await cs.waitForTimeout(2500);
     const rr = (await cs.evaluate(() => window.__mockClient.__db.import_regels)).slice(voor);
-    console.log(pad.toUpperCase(), JSON.stringify(rr.map(r => [r.artikelnr, r.omschrijving, r.aantal, r.eenheid, r.netto])));
+    console.log(pad.toUpperCase(), JSON.stringify(rr.map(r => [r.artikelnr, r.omschrijving, r.merk, r.fabrikant_artnr, r.ean, r.type_model, r.categorie, r.aantal, r.bruto, r.korting_pct, r.netto])));
     const nik = rr.find(r => r.artikelnr === 'NIK17000000') || {};
+    check(`7. ${pad}: details van de productpagina (merk NIKO, fab.-nr 170-00000, EAN, bruto 7,12, korting berekend, categorie Sokkels)`, nik.merk === 'NIKO' && nik.fabrikant_artnr === '170-00000' && nik.ean === '5413736123456' && Number(nik.bruto) === 7.12 && Math.abs(Number(nik.korting_pct) - 40.03) < 0.01 && nik.categorie === 'Sokkels' && nik.type_model === 'Basic');
+    if(pad === 'ns-div'){ const hg = rr.find(r => r.artikelnr === 'HAG-MCN516') || {}; check('7. JSON-LD: Hager, MCN516, EAN, bruto 12,50', hg.merk === 'Hager' && hg.fabrikant_artnr === 'MCN516' && hg.ean === '3250612240190' && Number(hg.bruto) === 12.5); }
     check(`6. Netstore ${pad}: ${n} regel(s), geen promocode/ecotaks`, rr.length === n && !rr.some(r => /promo|referenties/i.test((r.omschrijving || '') + (r.artikelnr || ''))));
     check(`6. Netstore ${pad}: NIK17000000 = SOKKEL DRUKKNOP NO, 10 st, netto 4,27`, nike(nik));
     if(await cs.locator('#mat-review-modal').isVisible()) await cs.click('#mat-review-annuleer');
