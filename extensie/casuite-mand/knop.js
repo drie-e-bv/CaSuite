@@ -16,7 +16,7 @@
     .m{background:#15241c;color:#fff;font-weight:500;padding:9px 12px;border-radius:10px;max-width:290px;box-shadow:0 4px 14px rgba(0,0,0,.25)}
     .m.f{background:#c0392b}
   </style>
-  <div class="w"><div class="m" hidden></div><button type="button" title="Leest je winkelmandje uit en stuurt het naar CaSuite. Er wordt niets besteld."><span>🛒</span><span class="t">Mand ophalen</span><span class="x" title="Verbergen">✕</span></button></div>`;
+  <div class="w"><div class="m" hidden></div><button type="button" title="Leest je winkelmandje uit en stuurt het naar CaMat. Er wordt niets besteld."><span>🛒</span><span class="t">Mand ophalen</span><span class="x" title="Verbergen">✕</span></button></div>`;
   const knop = sh.querySelector('button'), melding = sh.querySelector('.m'), tekst = sh.querySelector('.t');
   function meld(t, fout){ melding.textContent = t; melding.className = 'm' + (fout ? ' f' : ''); melding.hidden = false; clearTimeout(meld._t); meld._t = setTimeout(() => { melding.hidden = true; }, fout ? 8000 : 5000); }
   sh.querySelector('.x').addEventListener('click', e => { e.stopPropagation(); host.remove(); });
@@ -26,7 +26,7 @@
       const mand = window.__casuiteLezer.leesMand();
       if(!mand.regels.length){ meld('Geen artikels gevonden op deze pagina. Open eerst je winkelmandje en klik dan opnieuw.', true); return; }
       const antwoord = await chrome.runtime.sendMessage({ type: 'mand', mand });
-      meld(antwoord && antwoord.ok ? `${mand.regels.length} artikel${mand.regels.length === 1 ? '' : 's'} naar CaSuite gestuurd. Controleer ze daar en klik op Importeren.` : 'Doorsturen naar CaSuite mislukt.', !(antwoord && antwoord.ok));
+      meld(antwoord && antwoord.ok ? `${mand.regels.length} artikel${mand.regels.length === 1 ? '' : 's'} naar CaMat gestuurd. Controleer ze daar en klik op Importeren.` : 'Doorsturen naar CaMat mislukt.', !(antwoord && antwoord.ok));
     }catch(e){ meld('Uitlezen mislukt: ' + (e.message || e), true); }
     finally{ knop.disabled = false; tekst.textContent = 'Mand ophalen'; }
   });

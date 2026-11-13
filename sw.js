@@ -235,7 +235,8 @@
 // 2026-11-13 (b): samengevoegd met werfverslagformulier 11/11, Rooster-knop Planning-app 26/10 en
 // CaCalc-grondcorrecties (grondsoort, legging, IEC-buisfactor).
 // 2026-11-13 (c): CaCalc -- legging enkeladerig in het veld Kabeltype, label 'grond rond de buis'.
-const CACHE_VERSION = 'casnap-v2026-11-13-legging';
+// 2026-11-13 (middag): Materialen heet nu CaMat; extensie CaMat Mand 1.1.0.
+const CACHE_VERSION = 'casnap-v2026-11-13-camat';
 const NETWORK_TIMEOUT_MS = 4000;
 
 self.addEventListener('install', () => {

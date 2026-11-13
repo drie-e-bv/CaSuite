@@ -4189,8 +4189,8 @@
          project-afhankelijke "aanmaken"-stand zoals Dossier/Kabelberekening hierboven, zie
          tabsForPersonAccess()/kan_facturen_zien in het script). -->
     <button class="tab-btn" id="main-nav-btn-cafin" data-tab="cafin" type="button">Facturen</button>
-    <!-- Materialen (2026-11-13): materialen- en prijsdatabank, zie #tab-materialen. -->
-    <button class="tab-btn" id="main-nav-btn-materialen" data-tab="materialen" type="button">Materialen</button>
+    <!-- CaMat (2026-11-13, eerst "Materialen"): materialen- en prijsdatabank, zie #tab-materialen. -->
+    <button class="tab-btn" id="main-nav-btn-materialen" data-tab="materialen" type="button">CaMat</button>
   </nav>
 
   <div class="offline-banner" id="offline-banner" style="display:none;">
@@ -5611,14 +5611,14 @@
        Centrale artikels (artikelen) met per leverancier een eigen code (leverancier_artikelen) en
        historische prijzen (prijsregistraties, nooit overschreven). Artikels komen binnen via een
        tijdelijke importlijst (imports/import_regels) die de gebruiker eerst controleert: vanuit de
-       Chrome-extensie "CaSuite Mand" (knop "Mand ophalen" op de webshop), een Excel/CSV-bestand of
+       Chrome-extensie "CaMat Mand" (knop "Mand ophalen" op de webshop), een Excel/CSV-bestand of
        OCI. Zichtbaarheid: kan_materialen_zien / kan_materialen_beheren (zie tabsForPersonAccess()).
        Script: blok "Materialen" (functies mat*). Plan: claude/materialen-module-implementatieplan.md. -->
   <section class="tab-section" id="tab-materialen">
     <section class="card mat-card">
       <div class="mat-kop">
         <div>
-          <h2>Materialen</h2>
+          <h2>CaMat <span style="font-weight:500;color:var(--ink-faint)">· materialen</span></h2>
           <p class="hint">Centrale materialen- en prijsdatabank. Artikels komen binnen door het winkelmandje van een webshop op te halen, of uit een Excel-lijst.</p>
         </div>
         <div class="mat-kop-acties">
@@ -29097,8 +29097,8 @@ window.CaCalcApp = {
             <th title="Ziet werfverslagen/actiepunten/planning van ALLE projecten, ook zonder vaste werfleider/projectleider-koppeling of planningsafspraak (bv. een zaakvoerder/projectleider die ook als gewoon teamlid meewerkt)">Ziet alle projecten</th>
             <th title="Ziet het Facturen-tabblad (CaFin)">Facturen zien</th>
             <th title="Mag facturen goedkeuren/afkeuren">Facturen goedkeuren</th>
-            <th title="Ziet het tabblad Materialen">Materialen zien</th>
-            <th title="Mag winkelmandjes/Excel importeren en artikels aanpassen">Materialen importeren</th>
+            <th title="Ziet het tabblad Materialen">CaMat zien</th>
+            <th title="Mag winkelmandjes/Excel importeren en artikels aanpassen">CaMat importeren</th>
             <th title="Mag deze Beheer-pagina openen en ieders rechten aanpassen">Beheerder</th>
           </tr></thead>
           <tbody id="beheer-body"></tbody>
@@ -29347,8 +29347,8 @@ window.CaCalcApp = {
     ['ziet_alle_projecten', 'Ziet alle projecten'],
     ['kan_facturen_zien', 'Facturen zien'],
     ['kan_facturen_goedkeuren', 'Facturen goedkeuren'],
-    ['kan_materialen_zien', 'Materialen zien'],
-    ['kan_materialen_beheren', 'Materialen importeren']
+    ['kan_materialen_zien', 'CaMat zien'],
+    ['kan_materialen_beheren', 'CaMat importeren']
   ];
   function rolSjabloonVan(vz, vm, pz, pl, vsm, zap, fz, fg, mz, mb){
     return { kan_verslagen_zien: vz, kan_verslagen_maken: vm, kan_planning_zien: pz, is_planner: pl,
@@ -35295,8 +35295,8 @@ window.CaCalcApp = {
     // (data-short); updateAppTitleForWidth() hieronder kiest welke van de twee getoond wordt en
     // wordt bij elk resize/rotatie opnieuw uitgevoerd (zie fitAppBar()).
     (function(){
-      const appTitleFull = (tab === 'inzet') ? 'Planning opmaken' : (tab === 'cados') ? 'CaDos — Elektro & Domotica' : (tab === 'cacalc') ? 'CaCalc — Kabelberekening' : (tab === 'cafin') ? 'CaFin — Facturen' : (tab === 'materialen') ? 'Materialen' : (tab === 'projecten') ? 'Projecten' : (tab === 'bedrijf') ? 'Bedrijfsgegevens' : (tab === 'verslagen') ? 'Verslagen' : (tab === 'actiepunten') ? 'Actiepunten' : (tab === 'planning') ? 'Planningspunten' : (tab === 'uren') ? 'Uren' : (tab === 'mijn-planning') ? 'Mijn planning' : 'Werfverslag maken';
-      const appTitleShort = { inzet: 'Planning', cados: 'CaDos', cacalc: 'CaCalc', cafin: 'CaFin', materialen: 'Materialen', bedrijf: 'Bedrijf', planning: 'Planning', uren: 'Uren', 'mijn-planning': 'Mijn planning' }[tab] || appTitleFull;
+      const appTitleFull = (tab === 'inzet') ? 'Planning opmaken' : (tab === 'cados') ? 'CaDos — Elektro & Domotica' : (tab === 'cacalc') ? 'CaCalc — Kabelberekening' : (tab === 'cafin') ? 'CaFin — Facturen' : (tab === 'materialen') ? 'CaMat — Materialen' : (tab === 'projecten') ? 'Projecten' : (tab === 'bedrijf') ? 'Bedrijfsgegevens' : (tab === 'verslagen') ? 'Verslagen' : (tab === 'actiepunten') ? 'Actiepunten' : (tab === 'planning') ? 'Planningspunten' : (tab === 'uren') ? 'Uren' : (tab === 'mijn-planning') ? 'Mijn planning' : 'Werfverslag maken';
+      const appTitleShort = { inzet: 'Planning', cados: 'CaDos', cacalc: 'CaCalc', cafin: 'CaFin', materialen: 'CaMat', bedrijf: 'Bedrijf', planning: 'Planning', uren: 'Uren', 'mijn-planning': 'Mijn planning' }[tab] || appTitleFull;
       const h1El = el('app-title');
       h1El.dataset.full = appTitleFull;
       h1El.dataset.short = appTitleShort;
@@ -35345,7 +35345,7 @@ window.CaCalcApp = {
   // (historiek, nooit overschreven), view artikel_prijzen_actueel (laatste prijs per artikel per
   // leverancier), imports + import_regels (tijdelijke importlijst), functies import_voorstellen()
   // (herkenning: leverancierscode -> EAN -> merk+fabrikantnr -> merk+type) en import_bevestigen()
-  // (alles-of-niets). Bronnen van een import: de Chrome-extensie "CaSuite Mand" (postMessage
+  // (alles-of-niets). Bronnen van een import: de Chrome-extensie "CaMat Mand" (postMessage
   // 'casuite-mand'), Excel/CSV, of OCI (Edge Function oci-hook).
   // De extensie leest enkel uit: deze code stuurt de webshop nooit aan, plaatst niets in een mandje
   // en bestelt nooit iets.
@@ -35697,7 +35697,7 @@ window.CaCalcApp = {
     ws['!cols'] = Object.keys(rijen[0]).map(k => ({ wch: k === 'Omschrijving' ? 50 : Math.max(10, k.length + 2) }));
     const wb = window.XLSX.utils.book_new();
     window.XLSX.utils.book_append_sheet(wb, ws, 'Materialen');
-    window.XLSX.writeFile(wb, `CaSuite-materialen-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    window.XLSX.writeFile(wb, `CaMat-materialen-${new Date().toISOString().slice(0, 10)}.xlsx`);
   }
 
   // ---------- Import starten ----------
@@ -35714,8 +35714,8 @@ window.CaCalcApp = {
     matExtVersie();
     if(!matMagBeheren()){ matToast('Je hebt geen recht om te importeren.', true); return; }
     const ext = mat.extensie
-      ? `<div class="mat-ext ok">✓ De Chrome-extensie <b>CaSuite Mand</b> is actief (versie ${escapeHtml(mat.extensie)}). Open hieronder een webshop, vul je mandje en klik op de webshop op <b>Mand ophalen</b>.</div>`
-      : `<div class="mat-ext nee"><b>De Chrome-extensie CaSuite Mand is niet gevonden in deze browser.</b> Zonder extensie kan CaSuite het mandje van een webshop niet uitlezen. Installeer ze eenmalig (zie de handleiding bij Leveranciers), of importeer hieronder een Excel-lijst.</div>`;
+      ? `<div class="mat-ext ok">✓ De Chrome-extensie <b>CaMat Mand</b> is actief (versie ${escapeHtml(mat.extensie)}). Open hieronder een webshop, vul je mandje en klik op de webshop op <b>Mand ophalen</b>.</div>`
+      : `<div class="mat-ext nee"><b>De Chrome-extensie CaMat Mand is niet gevonden in deze browser.</b> Zonder extensie kan CaSuite het mandje van een webshop niet uitlezen. Installeer ze eenmalig (zie de handleiding bij Leveranciers), of importeer hieronder een Excel-lijst.</div>`;
     const shops = mat.leveranciers.filter(l => l.actief && l.webshop_url);
     el('mat-import-body').innerHTML = ext +
       `<div class="mat-blok-titel">1. Mandje uit een webshop</div>
@@ -36074,7 +36074,7 @@ window.CaCalcApp = {
     matExtVersie();
     const w = el('mat-lev-lijst');
     const telA = {}; mat.levArt.forEach(x => { telA[x.leverancier_id] = (telA[x.leverancier_id] || 0) + 1; });
-    w.innerHTML = `<div class="mat-ext ${mat.extensie ? 'ok' : 'nee'}">${mat.extensie ? `✓ Chrome-extensie CaSuite Mand actief (versie ${escapeHtml(mat.extensie)}).` : '<b>Chrome-extensie CaSuite Mand niet gevonden.</b> Installatie: <a href="./extensie/casuite-mand.zip" download>download casuite-mand.zip</a>, pak het uit, open <code>chrome://extensions</code>, zet rechtsboven <b>Ontwikkelaarsmodus</b> aan, klik <b>Uitgepakte extensie laden</b> en kies de uitgepakte map. Herlaad daarna CaSuite.'}</div>
+    w.innerHTML = `<div class="mat-ext ${mat.extensie ? 'ok' : 'nee'}">${mat.extensie ? `✓ Chrome-extensie CaMat Mand actief (versie ${escapeHtml(mat.extensie)}).` : '<b>Chrome-extensie CaMat Mand niet gevonden.</b> Installatie: <a href="./extensie/casuite-mand.zip" download>download casuite-mand.zip</a>, pak het uit, open <code>chrome://extensions</code>, zet rechtsboven <b>Ontwikkelaarsmodus</b> aan, klik <b>Uitgepakte extensie laden</b> en kies de uitgepakte map. Herlaad daarna CaSuite.'}</div>
       <table class="mat-tabel resp"><thead><tr><th>Leverancier</th><th>Webshop</th><th>Domeinen</th><th>Leveranciersnr.</th><th class="num">Artikels</th><th>OCI</th><th></th></tr></thead><tbody>` +
       mat.leveranciers.map(l => `<tr class="mat-klik" data-mat-lev="${escapeHtml(l.id)}"><td><b>${escapeHtml(l.naam)}</b>${l.actief ? '' : ' <span class="mat-badge overslaan">inactief</span>'}</td>
         <td data-l="Webshop">${l.webshop_url ? `<a href="${escapeHtml(l.webshop_url)}" target="_blank" rel="noopener" data-stop>${escapeHtml(matHost(l.webshop_url))}</a>` : '—'}</td>
@@ -37056,9 +37056,9 @@ window.CaCalcApp = {
       'Ziet het Facturen-tabblad (CaFin): binnenkomende facturen, koppelen aan een werf, status opvolgen.'));
     accessRow.appendChild(buildPermCheckbox('ip-p-facturen-goedkeuren', 'kan_facturen_goedkeuren', 'Mag facturen goedkeuren',
       'Mag een factuur goedkeuren of afkeuren (bv. de projectleider van de betreffende werf). Vereist ook "Ziet CaFin" om er effectief iets mee te kunnen doen.'));
-    accessRow.appendChild(buildPermCheckbox('ip-p-materialen-zien', 'kan_materialen_zien', 'Ziet Materialen',
+    accessRow.appendChild(buildPermCheckbox('ip-p-materialen-zien', 'kan_materialen_zien', 'Ziet CaMat',
       'Ziet het tabblad Materialen: artikels, leveranciersprijzen en prijshistoriek.'));
-    accessRow.appendChild(buildPermCheckbox('ip-p-materialen-beheren', 'kan_materialen_beheren', 'Mag materialen importeren',
+    accessRow.appendChild(buildPermCheckbox('ip-p-materialen-beheren', 'kan_materialen_beheren', 'Mag in CaMat importeren',
       'Mag winkelmandjes en Excel-lijsten importeren, koppelingen bevestigen en artikels/leveranciers aanpassen.'));
     // "Beheerder" zelf staat hier BEWUST niet als vinkje bij de rest (2026-09-25) -- enkel
     // aanpasbaar via de nieuwe, gebruikers-/rechtenbeheer-gate #beheer-modal (zie #btn-beheer),
