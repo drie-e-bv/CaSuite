@@ -938,14 +938,11 @@
   .extra-foto-del{position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;border:1px solid var(--line);background:#fff;font-size:11px;line-height:1;cursor:pointer;}
   /* Fase 1 doorlichting: projectgegevens-samenvatting, "+ Actiepunt", vaste "+ Punt", delen. */
   .vf-samenvatting{display:none;}
-  .btn-plus-punt{display:none;}
-  .add-actiepunt-btn{border-color:var(--app-werf, #d8701c);}
   @media (max-width:720px){
     .vf-card.vf-ingeklapt .vf-grid, .vf-card.vf-ingeklapt .vt-field{display:none !important;}
     .vf-card.vf-ingeklapt .vf-samenvatting{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 12px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--sunken, #f3f5f4);font-size:14px;font-weight:600;}
     .vf-sam-tekst{min-width:0;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
     .svz-card > .hint{display:none;}
-    .actions-bar .btn.btn-plus-punt{display:inline-flex;flex:0 0 auto;padding:0 14px;}
     body.kan-pdf-delen .actions-bar #btn-export{display:none;}
   }
   .svz-row{display:grid;grid-template-columns:200px 1fr auto;gap:8px;margin-bottom:8px;align-items:start;}
@@ -4203,6 +4200,12 @@
   </div>
 
   <nav class="tabs-secondary" id="werf-subbar">
+    <!-- 2026-10-26: in de LOSSE Planning-app (planning.html) was het tabblad "Uren" wel toegelaten
+         (zie PLANNING_TABS) maar onbereikbaar: de hoofdnav is daar verborgen (body.single-app) en
+         dit onderbalkje werd enkel op de Werfverslag-groepstabbladen getoond. Deze knop ("Rooster")
+         staat er enkel in die app (data-only-app, zie applyAccessRestrictions()) en vormt samen met
+         de knop "Uren" hieronder het onderbalkje van de Planning-app. -->
+    <button class="tab-btn" id="werf-subbar-inzet" data-tab="inzet" data-only-app="planning" type="button" style="display:none;">Rooster</button>
     <button class="tab-btn active" data-tab="verslag" type="button">Werfverslag</button>
     <button class="tab-btn" data-tab="verslagen" type="button">Verslagen</button>
     <button class="tab-btn" data-tab="actiepunten" type="button">Actiepunten</button>
@@ -4397,21 +4400,14 @@
       </div>
     </section>
 
-    <section class="card werf-only svz-card">
-      <h2>Stand van zaken per vakgebied</h2>
-      <p class="hint">Optioneel: een korte stand-van-zaken tekst per vakgebied/aannemer (bv. "Ruwbouw", "Elektriciteit", ...), los van de puntsgewijze verslagpunten hieronder -- net zoals in het ArchiSnapper-voorbeeldverslag.</p>
-      <div id="stand-van-zaken-rows"></div>
-      <button type="button" class="btn btn-secondary btn-sm" id="btn-svz-add"><span class="btn-ico" aria-hidden="true">＋</span> Vakgebied toevoegen</button>
-    </section>
-
     <section class="card">
       <h2>Verslagpunten</h2>
       <div id="items-list"></div>
       <div class="empty-hint" id="empty-hint" data-ico="📝"><strong>Nog geen punten toegevoegd.</strong> Klik hieronder om je eerste punt toe te voegen.</div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
         <button class="add-item-btn" id="add-item" style="flex:1 1 220px;">+ Punt toevoegen</button>
-        <!-- Fase 1 doorlichting (2026-10-14): meteen een Actiepunt (verantwoordelijke + deadline), zonder eerst de categorie om te zetten. -->
-        <button class="add-item-btn add-actiepunt-btn" id="add-actiepunt" type="button" style="flex:1 1 180px;">+ Actiepunt</button>
+        <!-- 2026-11-11, op vraag van Peter: de knop "+ Actiepunt" (fase 1 doorlichting) is hier weg --
+             hij voegt altijd eerst een gewoon punt toe en zet dat nadien om naar een actiepunt. -->
         <!-- Ronde 53 (punt 9, LetsBuild-aanrader): "Checklist toepassen" voegt in 1 keer een vast
              setje standaardpunten toe (bv. een AREI-opleveringschecklist) als nieuwe Actiepunten --
              zie #checklist-toepassen-modal verderop + openChecklistToepassenModal() in het script.
@@ -4482,6 +4478,13 @@
       <textarea id="f-notes" placeholder="Vrije tekst, bv. planning volgende werfvergadering..."></textarea>
     </section>
 
+    <section class="card werf-only svz-card">
+      <h2>Stand van zaken per vakgebied</h2>
+      <p class="hint">Optioneel: een korte stand-van-zaken tekst per vakgebied/aannemer (bv. "Ruwbouw", "Elektriciteit", ...), los van de puntsgewijze verslagpunten hieronder -- net zoals in het ArchiSnapper-voorbeeldverslag.</p>
+      <div id="stand-van-zaken-rows"></div>
+      <button type="button" class="btn btn-secondary btn-sm" id="btn-svz-add"><span class="btn-ico" aria-hidden="true">＋</span> Vakgebied toevoegen</button>
+    </section>
+
     <section class="card werf-only handtekening-card" id="handtekening-card">
       <h2>Handtekeningen</h2>
       <p class="hint">Optioneel — laat de bouwheer en/of aannemer rechtstreeks op het scherm tekenen (vinger, muis of stylus).</p>
@@ -4532,7 +4535,6 @@
     <div id="sp-banner-slot"></div>
 
     <div class="actions-bar">
-      <button class="btn btn-secondary btn-plus-punt" id="btn-plus-punt" type="button" title="Punt toevoegen">＋ Punt</button>
       <button class="btn btn-secondary" id="btn-save">Verslag opslaan</button>
       <button class="btn btn-primary" id="btn-export">Exporteer PDF</button>
       <!-- Fase 1 doorlichting (2026-10-14): op gsm/tablet de PDF in 1 tik delen via de ingebouwde
@@ -23328,6 +23330,93 @@ body #cacalc-app nav.tabs .cc-tab-short{display:none;}
 const NORMTABEL = [{"materiaal":"Koper","isolatie":"PVC","sectie":1.5,"kabeltype":"Mono","binnen":19.5,"buiten":19.5,"grond":22.0},{"materiaal":"Koper","isolatie":"PVC","sectie":2.5,"kabeltype":"Mono","binnen":27.0,"buiten":27.0,"grond":29.0},{"materiaal":"Koper","isolatie":"PVC","sectie":4.0,"kabeltype":"Mono","binnen":36.0,"buiten":36.0,"grond":38.0},{"materiaal":"Koper","isolatie":"PVC","sectie":6.0,"kabeltype":"Mono","binnen":46.0,"buiten":46.0,"grond":47.0},{"materiaal":"Koper","isolatie":"PVC","sectie":10.0,"kabeltype":"Mono","binnen":63.0,"buiten":63.0,"grond":63.0},{"materiaal":"Koper","isolatie":"PVC","sectie":16.0,"kabeltype":"Mono","binnen":85.0,"buiten":85.0,"grond":81.0},{"materiaal":"Koper","isolatie":"PVC","sectie":25.0,"kabeltype":"Mono","binnen":112.0,"buiten":112.0,"grond":104.0},{"materiaal":"Koper","isolatie":"PVC","sectie":35.0,"kabeltype":"Mono","binnen":138.0,"buiten":138.0,"grond":125.0},{"materiaal":"Koper","isolatie":"PVC","sectie":50.0,"kabeltype":"Mono","binnen":168.0,"buiten":168.0,"grond":148.0},{"materiaal":"Koper","isolatie":"PVC","sectie":70.0,"kabeltype":"Mono","binnen":213.0,"buiten":213.0,"grond":183.0},{"materiaal":"Koper","isolatie":"PVC","sectie":95.0,"kabeltype":"Mono","binnen":258.0,"buiten":258.0,"grond":216.0},{"materiaal":"Koper","isolatie":"PVC","sectie":120.0,"kabeltype":"Mono","binnen":299.0,"buiten":299.0,"grond":246.0},{"materiaal":"Koper","isolatie":"PVC","sectie":150.0,"kabeltype":"Mono","binnen":344.0,"buiten":344.0,"grond":278.0},{"materiaal":"Koper","isolatie":"PVC","sectie":185.0,"kabeltype":"Mono","binnen":392.0,"buiten":392.0,"grond":312.0},{"materiaal":"Koper","isolatie":"PVC","sectie":240.0,"kabeltype":"Mono","binnen":461.0,"buiten":461.0,"grond":361.0},{"materiaal":"Koper","isolatie":"PVC","sectie":300.0,"kabeltype":"Mono","binnen":530.0,"buiten":530.0,"grond":408.0},{"materiaal":"Koper","isolatie":"XLPE / PR","sectie":1.5,"kabeltype":"Mono","binnen":24.0,"buiten":24.0,"grond":26.0},{"materiaal":"Koper","isolatie":"XLPE / PR","sectie":2.5,"kabeltype":"Mono","binnen":33.0,"buiten":33.0,"grond":34.0},{"materiaal":"Koper","isolatie":"XLPE / PR","sectie":4.0,"kabeltype":"Mono","binnen":45.0,"buiten":45.0,"grond":44.0},{"materiaal":"Koper","isolatie":"XLPE / PR","sectie":6.0,"kabeltype":"Mono","binnen":58.0,"buiten":58.0,"grond":54.0},{"materiaal":"Koper","isolatie":"XLPE / PR","sectie":10.0,"kabeltype":"Mono","binnen":80.0,"buiten":80.0,"grond":72.0},{"materiaal":"Koper","isolatie":"XLPE / PR","sectie":16.0,"kabeltype":"Mono","binnen":107.0,"buiten":107.0,"grond":93.0},{"materiaal":"Koper","isolatie":"XLPE / PR","sectie":25.0,"kabeltype":"Mono","binnen":142.0,"buiten":142.0,"grond":121.0},{"materiaal":"Koper","isolatie":"XLPE / PR","sectie":35.0,"kabeltype":"Mono","binnen":175.0,"buiten":175.0,"grond":146.0},{"materiaal":"Koper","isolatie":"XLPE / PR","sectie":50.0,"kabeltype":"Mono","binnen":212.0,"buiten":212.0,"grond":173.0},{"materiaal":"Koper","isolatie":"XLPE / PR","sectie":70.0,"kabeltype":"Mono","binnen":270.0,"buiten":270.0,"grond":215.0},{"materiaal":"Koper","isolatie":"XLPE / PR","sectie":95.0,"kabeltype":"Mono","binnen":330.0,"buiten":330.0,"grond":255.0},{"materiaal":"Koper","isolatie":"XLPE / PR","sectie":120.0,"kabeltype":"Mono","binnen":382.0,"buiten":382.0,"grond":292.0},{"materiaal":"Koper","isolatie":"XLPE / PR","sectie":150.0,"kabeltype":"Mono","binnen":440.0,"buiten":440.0,"grond":331.0},{"materiaal":"Koper","isolatie":"XLPE / PR","sectie":185.0,"kabeltype":"Mono","binnen":504.0,"buiten":504.0,"grond":373.0},{"materiaal":"Koper","isolatie":"XLPE / PR","sectie":240.0,"kabeltype":"Mono","binnen":594.0,"buiten":594.0,"grond":433.0},{"materiaal":"Koper","isolatie":"XLPE / PR","sectie":300.0,"kabeltype":"Mono","binnen":683.0,"buiten":683.0,"grond":491.0},{"materiaal":"Aluminium","isolatie":"PVC","sectie":1.5,"kabeltype":"Mono","binnen":0.0,"buiten":0.0,"grond":0.0},{"materiaal":"Aluminium","isolatie":"PVC","sectie":2.5,"kabeltype":"Mono","binnen":0.0,"buiten":0.0,"grond":0.0},{"materiaal":"Aluminium","isolatie":"PVC","sectie":4.0,"kabeltype":"Mono","binnen":0.0,"buiten":0.0,"grond":0.0},{"materiaal":"Aluminium","isolatie":"PVC","sectie":6.0,"kabeltype":"Mono","binnen":0.0,"buiten":0.0,"grond":0.0},{"materiaal":"Aluminium","isolatie":"PVC","sectie":10.0,"kabeltype":"Mono","binnen":0.0,"buiten":0.0,"grond":0.0},{"materiaal":"Aluminium","isolatie":"PVC","sectie":16.0,"kabeltype":"Mono","binnen":66.0,"buiten":66.0,"grond":63.0},{"materiaal":"Aluminium","isolatie":"PVC","sectie":25.0,"kabeltype":"Mono","binnen":87.0,"buiten":87.0,"grond":81.0},{"materiaal":"Aluminium","isolatie":"PVC","sectie":35.0,"kabeltype":"Mono","binnen":107.0,"buiten":107.0,"grond":98.0},{"materiaal":"Aluminium","isolatie":"PVC","sectie":50.0,"kabeltype":"Mono","binnen":131.0,"buiten":131.0,"grond":116.0},{"materiaal":"Aluminium","isolatie":"PVC","sectie":70.0,"kabeltype":"Mono","binnen":166.0,"buiten":166.0,"grond":144.0},{"materiaal":"Aluminium","isolatie":"PVC","sectie":95.0,"kabeltype":"Mono","binnen":202.0,"buiten":202.0,"grond":170.0},{"materiaal":"Aluminium","isolatie":"PVC","sectie":120.0,"kabeltype":"Mono","binnen":235.0,"buiten":235.0,"grond":194.0},{"materiaal":"Aluminium","isolatie":"PVC","sectie":150.0,"kabeltype":"Mono","binnen":271.0,"buiten":271.0,"grond":220.0},{"materiaal":"Aluminium","isolatie":"PVC","sectie":185.0,"kabeltype":"Mono","binnen":310.0,"buiten":310.0,"grond":248.0},{"materiaal":"Aluminium","isolatie":"PVC","sectie":240.0,"kabeltype":"Mono","binnen":367.0,"buiten":367.0,"grond":287.0},{"materiaal":"Aluminium","isolatie":"PVC","sectie":300.0,"kabeltype":"Mono","binnen":424.0,"buiten":424.0,"grond":326.0},{"materiaal":"Aluminium","isolatie":"XLPE / PR","sectie":1.5,"kabeltype":"Mono","binnen":0.0,"buiten":0.0,"grond":0.0},{"materiaal":"Aluminium","isolatie":"XLPE / PR","sectie":2.5,"kabeltype":"Mono","binnen":0.0,"buiten":0.0,"grond":0.0},{"materiaal":"Aluminium","isolatie":"XLPE / PR","sectie":4.0,"kabeltype":"Mono","binnen":0.0,"buiten":0.0,"grond":0.0},{"materiaal":"Aluminium","isolatie":"XLPE / PR","sectie":6.0,"kabeltype":"Mono","binnen":0.0,"buiten":0.0,"grond":0.0},{"materiaal":"Aluminium","isolatie":"XLPE / PR","sectie":10.0,"kabeltype":"Mono","binnen":0.0,"buiten":0.0,"grond":0.0},{"materiaal":"Aluminium","isolatie":"XLPE / PR","sectie":16.0,"kabeltype":"Mono","binnen":76.0,"buiten":76.0,"grond":58.0},{"materiaal":"Aluminium","isolatie":"XLPE / PR","sectie":25.0,"kabeltype":"Mono","binnen":91.0,"buiten":91.0,"grond":74.0},{"materiaal":"Aluminium","isolatie":"XLPE / PR","sectie":35.0,"kabeltype":"Mono","binnen":114.0,"buiten":114.0,"grond":90.0},{"materiaal":"Aluminium","isolatie":"XLPE / PR","sectie":50.0,"kabeltype":"Mono","binnen":140.0,"buiten":140.0,"grond":107.0},{"materiaal":"Aluminium","isolatie":"XLPE / PR","sectie":70.0,"kabeltype":"Mono","binnen":180.0,"buiten":180.0,"grond":132.0},{"materiaal":"Aluminium","isolatie":"XLPE / PR","sectie":95.0,"kabeltype":"Mono","binnen":219.0,"buiten":219.0,"grond":157.0},{"materiaal":"Aluminium","isolatie":"XLPE / PR","sectie":120.0,"kabeltype":"Mono","binnen":254.0,"buiten":254.0,"grond":178.0},{"materiaal":"Aluminium","isolatie":"XLPE / PR","sectie":150.0,"kabeltype":"Mono","binnen":294.0,"buiten":294.0,"grond":201.0},{"materiaal":"Aluminium","isolatie":"XLPE / PR","sectie":185.0,"kabeltype":"Mono","binnen":337.0,"buiten":337.0,"grond":226.0},{"materiaal":"Aluminium","isolatie":"XLPE / PR","sectie":240.0,"kabeltype":"Mono","binnen":399.0,"buiten":399.0,"grond":261.0},{"materiaal":"Aluminium","isolatie":"XLPE / PR","sectie":300.0,"kabeltype":"Mono","binnen":462.0,"buiten":462.0,"grond":295.0},{"materiaal":"Koper","isolatie":"XLPE / PR","sectie":1.5,"kabeltype":"Multi","binnen":22.0,"buiten":22.0,"grond":22.0},{"materiaal":"Koper","isolatie":"XLPE / PR","sectie":2.5,"kabeltype":"Multi","binnen":30.0,"buiten":30.0,"grond":29.0},{"materiaal":"Koper","isolatie":"XLPE / PR","sectie":4.0,"kabeltype":"Multi","binnen":40.0,"buiten":40.0,"grond":38.0},{"materiaal":"Koper","isolatie":"XLPE / PR","sectie":6.0,"kabeltype":"Multi","binnen":52.0,"buiten":52.0,"grond":47.0},{"materiaal":"Koper","isolatie":"XLPE / PR","sectie":10.0,"kabeltype":"Multi","binnen":71.0,"buiten":71.0,"grond":63.0},{"materiaal":"Koper","isolatie":"XLPE / PR","sectie":16.0,"kabeltype":"Multi","binnen":96.0,"buiten":96.0,"grond":81.0},{"materiaal":"Koper","isolatie":"XLPE / PR","sectie":25.0,"kabeltype":"Multi","binnen":119.0,"buiten":119.0,"grond":104.0},{"materiaal":"Koper","isolatie":"XLPE / PR","sectie":35.0,"kabeltype":"Multi","binnen":147.0,"buiten":147.0,"grond":125.0},{"materiaal":"Koper","isolatie":"XLPE / PR","sectie":50.0,"kabeltype":"Multi","binnen":179.0,"buiten":179.0,"grond":148.0},{"materiaal":"Koper","isolatie":"XLPE / PR","sectie":70.0,"kabeltype":"Multi","binnen":229.0,"buiten":229.0,"grond":183.0},{"materiaal":"Koper","isolatie":"XLPE / PR","sectie":95.0,"kabeltype":"Multi","binnen":278.0,"buiten":278.0,"grond":216.0},{"materiaal":"Koper","isolatie":"XLPE / PR","sectie":120.0,"kabeltype":"Multi","binnen":322.0,"buiten":322.0,"grond":246.0},{"materiaal":"Koper","isolatie":"XLPE / PR","sectie":150.0,"kabeltype":"Multi","binnen":371.0,"buiten":371.0,"grond":278.0},{"materiaal":"Koper","isolatie":"XLPE / PR","sectie":185.0,"kabeltype":"Multi","binnen":424.0,"buiten":424.0,"grond":312.0},{"materiaal":"Koper","isolatie":"XLPE / PR","sectie":240.0,"kabeltype":"Multi","binnen":500.0,"buiten":500.0,"grond":361.0},{"materiaal":"Koper","isolatie":"XLPE / PR","sectie":300.0,"kabeltype":"Multi","binnen":573.0,"buiten":573.0,"grond":408.0},{"materiaal":"Aluminium","isolatie":"XLPE / PR","sectie":1.5,"kabeltype":"Multi","binnen":0.0,"buiten":0.0,"grond":0.0},{"materiaal":"Aluminium","isolatie":"XLPE / PR","sectie":2.5,"kabeltype":"Multi","binnen":0.0,"buiten":0.0,"grond":0.0},{"materiaal":"Aluminium","isolatie":"XLPE / PR","sectie":4.0,"kabeltype":"Multi","binnen":0.0,"buiten":0.0,"grond":0.0},{"materiaal":"Aluminium","isolatie":"XLPE / PR","sectie":6.0,"kabeltype":"Multi","binnen":0.0,"buiten":0.0,"grond":0.0},{"materiaal":"Aluminium","isolatie":"XLPE / PR","sectie":10.0,"kabeltype":"Multi","binnen":0.0,"buiten":0.0,"grond":0.0},{"materiaal":"Aluminium","isolatie":"XLPE / PR","sectie":16.0,"kabeltype":"Multi","binnen":74.0,"buiten":74.0,"grond":64.0},{"materiaal":"Aluminium","isolatie":"XLPE / PR","sectie":25.0,"kabeltype":"Multi","binnen":92.0,"buiten":92.0,"grond":82.0},{"materiaal":"Aluminium","isolatie":"XLPE / PR","sectie":35.0,"kabeltype":"Multi","binnen":114.0,"buiten":114.0,"grond":98.0},{"materiaal":"Aluminium","isolatie":"XLPE / PR","sectie":50.0,"kabeltype":"Multi","binnen":139.0,"buiten":139.0,"grond":117.0},{"materiaal":"Aluminium","isolatie":"XLPE / PR","sectie":70.0,"kabeltype":"Multi","binnen":179.0,"buiten":179.0,"grond":145.0},{"materiaal":"Aluminium","isolatie":"XLPE / PR","sectie":95.0,"kabeltype":"Multi","binnen":218.0,"buiten":218.0,"grond":172.0},{"materiaal":"Aluminium","isolatie":"XLPE / PR","sectie":120.0,"kabeltype":"Multi","binnen":254.0,"buiten":254.0,"grond":197.0},{"materiaal":"Aluminium","isolatie":"XLPE / PR","sectie":150.0,"kabeltype":"Multi","binnen":294.0,"buiten":294.0,"grond":223.0},{"materiaal":"Aluminium","isolatie":"XLPE / PR","sectie":185.0,"kabeltype":"Multi","binnen":338.0,"buiten":338.0,"grond":251.0},{"materiaal":"Aluminium","isolatie":"XLPE / PR","sectie":240.0,"kabeltype":"Multi","binnen":402.0,"buiten":402.0,"grond":292.0},{"materiaal":"Aluminium","isolatie":"XLPE / PR","sectie":300.0,"kabeltype":"Multi","binnen":463.0,"buiten":463.0,"grond":331.0},{"materiaal":"Aluminium","isolatie":"PVC","sectie":1.5,"kabeltype":"Multi","binnen":0.0,"buiten":0.0,"grond":0.0},{"materiaal":"Aluminium","isolatie":"PVC","sectie":2.5,"kabeltype":"Multi","binnen":0.0,"buiten":0.0,"grond":0.0},{"materiaal":"Aluminium","isolatie":"PVC","sectie":4.0,"kabeltype":"Multi","binnen":0.0,"buiten":0.0,"grond":0.0},{"materiaal":"Aluminium","isolatie":"PVC","sectie":6.0,"kabeltype":"Multi","binnen":0.0,"buiten":0.0,"grond":0.0},{"materiaal":"Aluminium","isolatie":"PVC","sectie":10.0,"kabeltype":"Multi","binnen":0.0,"buiten":0.0,"grond":0.0},{"materiaal":"Aluminium","isolatie":"PVC","sectie":16.0,"kabeltype":"Multi","binnen":61.0,"buiten":61.0,"grond":57.0},{"materiaal":"Aluminium","isolatie":"PVC","sectie":25.0,"kabeltype":"Multi","binnen":76.0,"buiten":76.0,"grond":73.0},{"materiaal":"Aluminium","isolatie":"PVC","sectie":35.0,"kabeltype":"Multi","binnen":94.0,"buiten":94.0,"grond":88.0},{"materiaal":"Aluminium","isolatie":"PVC","sectie":50.0,"kabeltype":"Multi","binnen":115.0,"buiten":115.0,"grond":104.0},{"materiaal":"Aluminium","isolatie":"PVC","sectie":70.0,"kabeltype":"Multi","binnen":148.0,"buiten":148.0,"grond":128.0},{"materiaal":"Aluminium","isolatie":"PVC","sectie":95.0,"kabeltype":"Multi","binnen":180.0,"buiten":180.0,"grond":152.0},{"materiaal":"Aluminium","isolatie":"PVC","sectie":120.0,"kabeltype":"Multi","binnen":210.0,"buiten":210.0,"grond":174.0},{"materiaal":"Aluminium","isolatie":"PVC","sectie":150.0,"kabeltype":"Multi","binnen":242.0,"buiten":242.0,"grond":196.0},{"materiaal":"Aluminium","isolatie":"PVC","sectie":185.0,"kabeltype":"Multi","binnen":278.0,"buiten":278.0,"grond":221.0},{"materiaal":"Aluminium","isolatie":"PVC","sectie":240.0,"kabeltype":"Multi","binnen":331.0,"buiten":331.0,"grond":256.0},{"materiaal":"Aluminium","isolatie":"PVC","sectie":300.0,"kabeltype":"Multi","binnen":381.0,"buiten":381.0,"grond":290.0},{"materiaal":"Koper","isolatie":"PVC","sectie":1.5,"kabeltype":"Multi","binnen":17.5,"buiten":17.5,"grond":18.5},{"materiaal":"Koper","isolatie":"PVC","sectie":2.5,"kabeltype":"Multi","binnen":24.0,"buiten":24.0,"grond":25.0},{"materiaal":"Koper","isolatie":"PVC","sectie":4.0,"kabeltype":"Multi","binnen":32.0,"buiten":32.0,"grond":33.0},{"materiaal":"Koper","isolatie":"PVC","sectie":6.0,"kabeltype":"Multi","binnen":41.0,"buiten":41.0,"grond":42.0},{"materiaal":"Koper","isolatie":"PVC","sectie":10.0,"kabeltype":"Multi","binnen":57.0,"buiten":57.0,"grond":56.0},{"materiaal":"Koper","isolatie":"PVC","sectie":16.0,"kabeltype":"Multi","binnen":76.0,"buiten":76.0,"grond":73.0},{"materiaal":"Koper","isolatie":"PVC","sectie":25.0,"kabeltype":"Multi","binnen":96.0,"buiten":96.0,"grond":95.0},{"materiaal":"Koper","isolatie":"PVC","sectie":35.0,"kabeltype":"Multi","binnen":119.0,"buiten":119.0,"grond":115.0},{"materiaal":"Koper","isolatie":"PVC","sectie":50.0,"kabeltype":"Multi","binnen":144.0,"buiten":144.0,"grond":137.0},{"materiaal":"Koper","isolatie":"PVC","sectie":70.0,"kabeltype":"Multi","binnen":184.0,"buiten":184.0,"grond":169.0},{"materiaal":"Koper","isolatie":"PVC","sectie":95.0,"kabeltype":"Multi","binnen":223.0,"buiten":223.0,"grond":201.0},{"materiaal":"Koper","isolatie":"PVC","sectie":120.0,"kabeltype":"Multi","binnen":259.0,"buiten":259.0,"grond":229.0},{"materiaal":"Koper","isolatie":"PVC","sectie":150.0,"kabeltype":"Multi","binnen":299.0,"buiten":299.0,"grond":258.0},{"materiaal":"Koper","isolatie":"PVC","sectie":185.0,"kabeltype":"Multi","binnen":341.0,"buiten":341.0,"grond":292.0},{"materiaal":"Koper","isolatie":"PVC","sectie":240.0,"kabeltype":"Multi","binnen":403.0,"buiten":403.0,"grond":339.0},{"materiaal":"Koper","isolatie":"PVC","sectie":300.0,"kabeltype":"Multi","binnen":464.0,"buiten":464.0,"grond":384.0},{"materiaal":"Koper","isolatie":"Rubber (H07RN-F)","sectie":1.5,"kabeltype":"Mono","binnen":23.0,"buiten":23.0,"grond":18.4},{"materiaal":"Koper","isolatie":"Rubber (H07RN-F)","sectie":2.5,"kabeltype":"Mono","binnen":32.0,"buiten":32.0,"grond":25.6},{"materiaal":"Koper","isolatie":"Rubber (H07RN-F)","sectie":4.0,"kabeltype":"Mono","binnen":43.0,"buiten":43.0,"grond":34.4},{"materiaal":"Koper","isolatie":"Rubber (H07RN-F)","sectie":6.0,"kabeltype":"Mono","binnen":56.0,"buiten":56.0,"grond":44.8},{"materiaal":"Koper","isolatie":"Rubber (H07RN-F)","sectie":10.0,"kabeltype":"Mono","binnen":77.0,"buiten":77.0,"grond":61.6},{"materiaal":"Koper","isolatie":"Rubber (H07RN-F)","sectie":16.0,"kabeltype":"Mono","binnen":102.0,"buiten":102.0,"grond":81.6},{"materiaal":"Koper","isolatie":"Rubber (H07RN-F)","sectie":25.0,"kabeltype":"Mono","binnen":136.0,"buiten":136.0,"grond":108.8},{"materiaal":"Koper","isolatie":"Rubber (H07RN-F)","sectie":35.0,"kabeltype":"Mono","binnen":168.0,"buiten":168.0,"grond":134.4},{"materiaal":"Koper","isolatie":"Rubber (H07RN-F)","sectie":50.0,"kabeltype":"Mono","binnen":203.0,"buiten":203.0,"grond":162.4},{"materiaal":"Koper","isolatie":"Rubber (H07RN-F)","sectie":70.0,"kabeltype":"Mono","binnen":254.0,"buiten":254.0,"grond":203.2},{"materiaal":"Koper","isolatie":"Rubber (H07RN-F)","sectie":95.0,"kabeltype":"Mono","binnen":315.0,"buiten":315.0,"grond":252.0},{"materiaal":"Koper","isolatie":"Rubber (H07RN-F)","sectie":120.0,"kabeltype":"Mono","binnen":363.0,"buiten":363.0,"grond":290.4},{"materiaal":"Koper","isolatie":"Rubber (H07RN-F)","sectie":150.0,"kabeltype":"Mono","binnen":416.0,"buiten":416.0,"grond":332.8},{"materiaal":"Koper","isolatie":"Rubber (H07RN-F)","sectie":185.0,"kabeltype":"Mono","binnen":475.0,"buiten":475.0,"grond":380.0},{"materiaal":"Koper","isolatie":"Rubber (H07RN-F)","sectie":240.0,"kabeltype":"Mono","binnen":559.0,"buiten":559.0,"grond":447.2},{"materiaal":"Koper","isolatie":"Rubber (H07RN-F)","sectie":300.0,"kabeltype":"Mono","binnen":637.0,"buiten":637.0,"grond":509.6},{"materiaal":"Koper","isolatie":"Rubber (H07RN-F)","sectie":1.5,"kabeltype":"Multi","binnen":23.0,"buiten":23.0,"grond":18.4},{"materiaal":"Koper","isolatie":"Rubber (H07RN-F)","sectie":2.5,"kabeltype":"Multi","binnen":32.0,"buiten":32.0,"grond":25.6},{"materiaal":"Koper","isolatie":"Rubber (H07RN-F)","sectie":4.0,"kabeltype":"Multi","binnen":43.0,"buiten":43.0,"grond":34.4},{"materiaal":"Koper","isolatie":"Rubber (H07RN-F)","sectie":6.0,"kabeltype":"Multi","binnen":56.0,"buiten":56.0,"grond":44.8},{"materiaal":"Koper","isolatie":"Rubber (H07RN-F)","sectie":10.0,"kabeltype":"Multi","binnen":77.0,"buiten":77.0,"grond":61.6},{"materiaal":"Koper","isolatie":"Rubber (H07RN-F)","sectie":16.0,"kabeltype":"Multi","binnen":102.0,"buiten":102.0,"grond":81.6},{"materiaal":"Koper","isolatie":"Rubber (H07RN-F)","sectie":25.0,"kabeltype":"Multi","binnen":136.0,"buiten":136.0,"grond":108.8},{"materiaal":"Koper","isolatie":"Rubber (H07RN-F)","sectie":35.0,"kabeltype":"Multi","binnen":168.0,"buiten":168.0,"grond":134.4},{"materiaal":"Koper","isolatie":"Rubber (H07RN-F)","sectie":50.0,"kabeltype":"Multi","binnen":203.0,"buiten":203.0,"grond":162.4},{"materiaal":"Koper","isolatie":"Rubber (H07RN-F)","sectie":70.0,"kabeltype":"Multi","binnen":262.0,"buiten":262.0,"grond":209.6},{"materiaal":"Koper","isolatie":"Rubber (H07RN-F)","sectie":95.0,"kabeltype":"Multi","binnen":320.0,"buiten":320.0,"grond":256.0},{"materiaal":"Koper","isolatie":"Rubber (H07RN-F)","sectie":120.0,"kabeltype":"Multi","binnen":373.0,"buiten":373.0,"grond":298.4},{"materiaal":"Koper","isolatie":"Rubber (H07RN-F)","sectie":150.0,"kabeltype":"Multi","binnen":432.0,"buiten":432.0,"grond":345.6},{"materiaal":"Koper","isolatie":"Rubber (H07RN-F)","sectie":185.0,"kabeltype":"Multi","binnen":495.0,"buiten":495.0,"grond":396.0},{"materiaal":"Koper","isolatie":"Rubber (H07RN-F)","sectie":240.0,"kabeltype":"Multi","binnen":587.0,"buiten":587.0,"grond":469.6},{"materiaal":"Koper","isolatie":"Rubber (H07RN-F)","sectie":300.0,"kabeltype":"Multi","binnen":680.0,"buiten":680.0,"grond":544.0}];
 const DATATABEL = {"ucc":[[50.0,0.04],[100.0,0.04],[160.0,0.04],[250.0,0.04],[400.0,0.04],[630.0,0.04],[800.0,0.06],[1000.0,0.06],[1250.0,0.06],[1600.0,0.06],[2000.0,0.06],[2500.0,0.06]],"reactance":[[1.5,0.000115],[2.5,0.000105],[4.0,9.8e-05],[6.0,9.3e-05],[10.0,8.8e-05],[16.0,8.5e-05],[25.0,8.3e-05],[35.0,8.2e-05],[50.0,8.1e-05],[70.0,8e-05],[95.0,8e-05],[120.0,7.9e-05],[150.0,7.9e-05],[185.0,7.8e-05],[240.0,7.8e-05],[300.0,7.7e-05]],"tempcorr":[{"label":"0 °C","binnen":1.22,"buiten":1.22,"grond":1.15},{"label":"5 °C","binnen":1.19,"buiten":1.19,"grond":1.12},{"label":"10 °C","binnen":1.15,"buiten":1.15,"grond":1.08},{"label":"15 °C","binnen":1.12,"buiten":1.12,"grond":1.04},{"label":"20 °C","binnen":1.08,"buiten":1.08,"grond":1.0},{"label":"25 °C","binnen":1.04,"buiten":1.04,"grond":0.96},{"label":"30 °C","binnen":1.0,"buiten":1.0,"grond":0.91},{"label":"35 °C","binnen":0.96,"buiten":0.96,"grond":0.87},{"label":"40 °C","binnen":0.91,"buiten":0.91,"grond":0.82},{"label":"45 °C","binnen":0.87,"buiten":0.87,"grond":0.76},{"label":"50 °C","binnen":0.82,"buiten":0.82,"grond":0.71},{"label":"55 °C","binnen":0.76,"buiten":0.76,"grond":0.65},{"label":"60 °C","binnen":0.71,"buiten":0.71,"grond":0.58},{"label":"70 °C","binnen":0.58,"buiten":0.58,"grond":0.41},{"label":"80 °C","binnen":0.41,"buiten":0.41,"grond":0.21},{"label":"90 °C","binnen":0.0,"buiten":0.0,"grond":0.0}],"constructie":[{"label":"Geperforeerde kabelgoot / ladeprofiel","factor":1.0,"omgeving":"Binnen"},{"label":"Gesloten kabelgoot / wandgoot","factor":0.95,"omgeving":"Binnen"},{"label":"Direct tegen wand of plafond","factor":0.9,"omgeving":"Binnen"},{"label":"In een opbouw/inbouwbuis of koker","factor":0.75,"omgeving":"Binnen"},{"label":"Ingeslepen in de muur en toegesmeerd","factor":0.8,"omgeving":"Binnen"},{"label":"Geperforeerde kabelgoot (schaduw/afdak)","factor":1.0,"omgeving":"Buiten"},{"label":"Geperforeerde kabelgoot (volle zon)","factor":0.85,"omgeving":"Buiten"},{"label":"In een buis tegen de buitenmuur","factor":0.75,"omgeving":"Buiten"},{"label":"Direct in de grond (in volle aarde)","factor":1.0,"omgeving":"Onder de grond"},{"label":"In een ondergrondse (wacht)buis","factor":0.8,"omgeving":"Onder de grond"},{"label":"In leidingbuis, ingewerkt in een thermisch geïsoleerde muur (IEC methode A1/A2)","factor":0.75,"omgeving":"Binnen"},{"label":"Volledig omgeven door isolatiemateriaal (geen luchtspleet)","factor":0.5,"omgeving":"Binnen"}],"bundel":[{"label":"Vrijstaand","factor":1.0,"omgeving":"Binnen"},{"label":"Gebundeld - 2 stroombanen naast elkaar","factor":0.8,"omgeving":"Binnen"},{"label":"Gebundeld - 3 stroombanen naast elkaar","factor":0.7,"omgeving":"Binnen"},{"label":"Gebundeld - 4 tot 5 stroombanen naast elkaar","factor":0.65,"omgeving":"Binnen"},{"label":"Gebundeld - 6 tot 9 stroombanen naast elkaar","factor":0.55,"omgeving":"Binnen"},{"label":"Vrijstaand","factor":1.0,"omgeving":"Buiten"},{"label":"Gebundeld - 2 stroombanen naast elkaar","factor":0.8,"omgeving":"Buiten"},{"label":"Gebundeld - 3 stroombanen naast elkaar","factor":0.7,"omgeving":"Buiten"},{"label":"Gebundeld - 4 tot 5 stroombanen naast elkaar","factor":0.65,"omgeving":"Buiten"},{"label":"Gebundeld - 6 tot 9 stroombanen naast elkaar","factor":0.55,"omgeving":"Buiten"},{"label":"Alleen","factor":1.0,"omgeving":"Onder de grond"},{"label":"Gebundeld - 2 kabels/buizen direct naast elkaar","factor":0.8,"omgeving":"Onder de grond"},{"label":"Gebundeld - 3 kabels/buizen direct naast elkaar","factor":0.7,"omgeving":"Onder de grond"},{"label":"Gebundeld - 4 kabels/buizen direct naast elkaar","factor":0.63,"omgeving":"Onder de grond"},{"label":"Klaverblad - 1 Driefasige kring","factor":1.0,"omgeving":"Onder de grond"}],"kfactor":[{"materiaal":"Koper","isolatie":"PVC","k":115.0},{"materiaal":"Koper","isolatie":"XLPE / PR","k":143.0},{"materiaal":"Aluminium","isolatie":"PVC","k":76.0},{"materiaal":"Aluminium","isolatie":"XLPE / PR","k":94.0},{"materiaal":"Koper","isolatie":"Rubber (H07RN-F)","k":141.0},{"materiaal":"Aluminium","isolatie":"Rubber (H07RN-F)","k":93.0}],"breakerIn":[10.0,16.0,20.0,25.0,32.0,40.0,50.0,63.0,80.0,100.0,125.0,160.0,200.0,250.0,315.0,400.0,500.0,630.0,800.0,1000.0,1250.0,1600.0],"resistivity":{"Koper":0.023,"Aluminium":0.036},"mantelmap":{"EXVB":"PVC","Preflex (VOB)":"PVC","XGB":"XLPE / PR","RZ1":"XLPE / PR","H07RN-F":"Rubber (H07RN-F)","Halogeenvrij (Cca/B2ca)":"XLPE / PR"}};
 const REF = { normtabel: NORMTABEL, datatabel: DATATABEL };
+// ---------------------------------------------------------------------------
+// 2026-11-13 -- Grondcorrecties (Peter, n.a.v. 70 m / 250 A in één buis:
+// "Nexans zegt 95mm, onze tool zegt 240"). Met Peters expliciete akkoord:
+//  (1) kabel IN EEN BUIS in de grond: niet langer een vaste factor 0,8 maar de
+//      echte IEC 60364-5-52-verhouding methode D1 (in buis) / D2 (direct in de
+//      grond) per materiaal/isolatie/sectie (drie belaste geleiders, tabellen
+//      B.52.2-B.52.5, overgenomen uit EUPEN Technical Data LV 0,6/1 kV, ed. 05-2022,
+//      §4.2.3). Bv. Cu XLPE 185 mm²: 281/324 = 0,867 i.p.v. 0,8.
+//  (2) bodemweerstand (thermische weerstand van de grond, K·m/W) instelbaar,
+//      met de correctiefactoren uit IEC 60364-5-52 tabel B.52.16 (aparte rij voor
+//      "in buis" en "direct in de grond"). Referentie = 2,5 K·m/W = factor 1,00,
+//      dus een project dat niets kiest rekent exact zoals voorheen.
+//      Peter: "mischien moeten we grondsoort selecteerbaar maken" -> keuze per
+//      grondsoort + toestand (nat/droog), richtwaarden uit Elek, "Typical thermal
+//      resistivity of soil and backfill" (tabel 3). De gekozen waarde wordt
+//      afgerond NAAR BOVEN op de volgende kolom van tabel B.52.16 (veilige kant).
+//  (3) groepering van kabels in de grond per legwijze -- Nexans België,
+//      "Correctiefactoren - Facteurs de correction", tabel "Plaatsing in de grond:
+//      nabijheid van andere kabels" (multipolair / monopolair in laag /
+//      monopolair in klaverblad).
+// ---------------------------------------------------------------------------
+DATATABEL.iecGrondD1D2 = {
+  // [D1 in buis, D2 direct in de grond] in A, drie belaste geleiders
+  Koper: {
+    PVC:  { '1.5': [18, 19], '2.5': [24, 24], '4': [30, 33], '6': [38, 41], '10': [50, 54], '16': [64, 70], '25': [82, 92], '35': [98, 110], '50': [116, 130], '70': [143, 162], '95': [169, 193], '120': [192, 220], '150': [217, 246], '185': [243, 278], '240': [280, 320], '300': [316, 359] },
+    XLPE: { '1.5': [21, 23], '2.5': [28, 30], '4': [36, 39], '6': [44, 49], '10': [58, 65], '16': [75, 84], '25': [96, 107], '35': [115, 129], '50': [135, 153], '70': [167, 188], '95': [197, 226], '120': [223, 257], '150': [251, 287], '185': [281, 324], '240': [324, 375], '300': [365, 419] }
+  },
+  Aluminium: {
+    PVC:  { '16': [50, 53], '25': [64, 69], '35': [77, 83], '50': [91, 99], '70': [112, 122], '95': [132, 148], '120': [150, 169], '150': [169, 189], '185': [190, 214], '240': [218, 250], '300': [247, 282] },
+    XLPE: { '16': [59, 64], '25': [75, 82], '35': [90, 98], '50': [106, 117], '70': [130, 144], '95': [154, 172], '120': [174, 197], '150': [197, 220], '185': [220, 250], '240': [253, 290], '300': [286, 326] }
+  }
+};
+// IEC 60364-5-52 tabel B.52.16 -- referentie 2,5 K·m/W, grond 20 °C
+DATATABEL.bodemweerstand = [
+  { kmw: 0.5, buis: 1.28, direct: 1.88 },
+  { kmw: 0.7, buis: 1.20, direct: 1.62 },
+  { kmw: 1.0, buis: 1.18, direct: 1.50 },
+  { kmw: 1.5, buis: 1.10, direct: 1.28 },
+  { kmw: 2.0, buis: 1.05, direct: 1.12 },
+  { kmw: 2.5, buis: 1.00, direct: 1.00 },
+  { kmw: 3.0, buis: 0.96, direct: 0.90 }
+];
+// Richtwaarden thermische weerstand per grondsoort (K·m/W), nat / droog
+DATATABEL.grondsoorten = [
+  { key: 'grind', label: 'Grind (fijn tot grof)', nat: 0.5, droog: 2.5 },
+  { key: 'grindzand', label: 'Grindhoudend zand', nat: 0.5, droog: 2.0 },
+  { key: 'zand', label: 'Zand (fijn tot grof)', nat: 0.5, droog: 1.7 },
+  { key: 'uniformzand', label: 'Uniform zand (bv. metsel-/duinzand)', nat: 0.55, droog: 3.5 },
+  { key: 'zandleem', label: 'Zandleem', nat: 0.65, droog: 2.5 },
+  { key: 'leem', label: 'Leem / silt', nat: 0.7, droog: 2.5 },
+  { key: 'klei', label: 'Klei (mager)', nat: 0.75, droog: 2.5 },
+  { key: 'zwareklei', label: 'Klei (vet/zwaar)', nat: 0.9, droog: 3.0 },
+  { key: 'steengruis', label: 'Steengruis / gestabiliseerd zand', nat: 0.45, droog: 1.1 }
+];
+// Nexans -- plaatsing in de grond, nabijheid van andere kabels(systemen)
+DATATABEL.grondGroepNexans = {
+  '2':  { multi: 0.82, laag: 0.82, klaverblad: 0.85 },
+  '3':  { multi: 0.76, laag: 0.73, klaverblad: 0.77 },
+  '4':  { multi: 0.69, laag: 0.68, klaverblad: 0.73 },
+  '5':  { multi: 0.66, laag: 0.65, klaverblad: 0.69 },
+  '6':  { multi: 0.61, laag: 0.62, klaverblad: 0.67 },
+  '8':  { multi: 0.57, laag: 0.58, klaverblad: 0.64 },
+  '10': { multi: 0.53, laag: 0.56, klaverblad: 0.62 }
+};
+(function () {
+  // extra bundel-keuzes in de grond (5/6/8/10) -- "factor" is enkel een
+  // terugvalwaarde (meeraderig); de echte factor komt per legwijze uit
+  // grondGroepNexans. Ingevoegd vóór de oude "Klaverblad - 1 Driefasige kring"-rij.
+  var extra = [5, 6, 8, 10].map(function (n) {
+    return { label: 'Gebundeld - ' + n + ' kabels/buizen direct naast elkaar', factor: DATATABEL.grondGroepNexans[String(n)].multi, omgeving: 'Onder de grond' };
+  });
+  var idx = DATATABEL.bundel.findIndex(function (r) { return r.label === 'Klaverblad - 1 Driefasige kring'; });
+  if (idx < 0) idx = DATATABEL.bundel.length;
+  Array.prototype.splice.apply(DATATABEL.bundel, [idx, 0].concat(extra));
+})();
+DATATABEL.grondBundelAantal = {
+  'Alleen': 1,
+  'Gebundeld - 2 kabels/buizen direct naast elkaar': 2,
+  'Gebundeld - 3 kabels/buizen direct naast elkaar': 3,
+  'Gebundeld - 4 kabels/buizen direct naast elkaar': 4,
+  'Gebundeld - 5 kabels/buizen direct naast elkaar': 5,
+  'Gebundeld - 6 kabels/buizen direct naast elkaar': 6,
+  'Gebundeld - 8 kabels/buizen direct naast elkaar': 8,
+  'Gebundeld - 10 kabels/buizen direct naast elkaar': 10,
+  // oude keuze (vóór 2026-11-13): de legwijze zit nu in een eigen veld
+  'Klaverblad - 1 Driefasige kring': 1
+};
 
 /* ===================== CALC ENGINE ===================== */
 /* Kabelberekening AREI - calculation engine.
@@ -23432,6 +23521,72 @@ const REF = { normtabel: NORMTABEL, datatabel: DATATABEL };
     return REF.datatabel.mantelmap[mantel];
   }
 
+  /* 2026-11-13 -- grondcorrecties (zie DATATABEL.iecGrondD1D2 e.v.). Enkel
+   * actief bij omgeving "Onder de grond"; elders verandert er niets. */
+  var GROND_BUIS_LABEL = 'In een ondergrondse (wacht)buis';
+  var GROND_RHO_REF = 2.5;
+  function grondBodemweerstand(REF, b) {
+    // -> { kmw: effectief gebruikte tabelkolom, ingegeven: ruwe waarde, bron }
+    var soort = b.grondsoort || '';
+    var ruw, bron;
+    if (soort === 'manueel') {
+      ruw = Number(b.bodemweerstand);
+      bron = 'zelf ingegeven';
+      if (!(ruw > 0)) { ruw = GROND_RHO_REF; bron = 'IEC-referentie'; }
+    } else if (soort) {
+      var gs = (REF.datatabel.grondsoorten || []).find(function (g) { return g.key === soort; });
+      if (gs) {
+        var nat = b.grondToestand === 'nat';
+        ruw = nat ? gs.nat : gs.droog;
+        bron = gs.label + ', ' + (nat ? 'blijvend nat' : 'droog');
+      } else { ruw = GROND_RHO_REF; bron = 'IEC-referentie'; }
+    } else { ruw = GROND_RHO_REF; bron = 'IEC-referentie (grond onbekend)'; }
+    var kol = REF.datatabel.bodemweerstand.map(function (r) { return r.kmw; });
+    // afronden naar boven op de volgende tabelkolom (veilige kant)
+    var kmw = kol[kol.length - 1];
+    for (var i = 0; i < kol.length; i++) { if (kol[i] >= ruw - 1e-9) { kmw = kol[i]; break; } }
+    return { kmw: kmw, ingegeven: ruw, bron: bron, buitenTabel: ruw > kol[kol.length - 1] + 1e-9 };
+  }
+  function grondFactoren(REF, b, isolatie) {
+    var res = { actief: false };
+    if (b.omgeving !== 'Onder de grond') return res;
+    res.actief = true;
+    var inBuis = b.constructie === GROND_BUIS_LABEL;
+    res.inBuis = inBuis;
+    // (1) in buis: IEC D1/D2-verhouding
+    res.buisFactor = null; res.buisBron = null;
+    if (inBuis) {
+      var isoKey = isolatie === 'XLPE / PR' ? 'XLPE' : 'PVC'; // rubber (H07RN-F): PVC-verhouding
+      var perMat = REF.datatabel.iecGrondD1D2 && REF.datatabel.iecGrondD1D2[b.materiaal];
+      var tab = perMat ? perMat[isoKey] : null;
+      var rij = tab ? tab[String(Number(b.sectie))] : null;
+      if (rij && rij[0] > 0 && rij[1] > 0) {
+        res.buisFactor = rij[0] / rij[1]; res.buisBron = 'iec'; res.iecD1 = rij[0]; res.iecD2 = rij[1];
+      } else {
+        res.buisBron = 'tabel'; // geen IEC-waarde voor deze sectie: oude vaste factor blijft
+      }
+    }
+    // (2) bodemweerstand
+    var bw = grondBodemweerstand(REF, b);
+    var brow = REF.datatabel.bodemweerstand.find(function (r) { return Math.abs(r.kmw - bw.kmw) < 1e-9; });
+    res.bodemweerstand = bw.kmw;
+    res.bodemweerstandIngegeven = bw.ingegeven;
+    res.bodemBron = bw.bron;
+    res.bodemBuitenTabel = bw.buitenTabel;
+    res.bodemFactor = brow ? (inBuis ? brow.buis : brow.direct) : 1;
+    // (3) groepering per legwijze
+    var legwijze = b.kabeltype === 'Multi' ? 'multi' : (b.monoLegging === 'laag' ? 'laag' : 'klaverblad');
+    res.legwijze = legwijze;
+    var n = REF.datatabel.grondBundelAantal ? REF.datatabel.grondBundelAantal[b.bundel] : null;
+    res.groepN = n != null ? n : null;
+    if (n === 1) res.groepFactor = 1;
+    else if (n != null) {
+      var g = REF.datatabel.grondGroepNexans[String(n)];
+      res.groepFactor = g ? g[legwijze] : null;
+    } else res.groepFactor = null; // onbekend label: oude bundelfactor blijft
+    return res;
+  }
+
   /* Core cable electrical calc shared by root (ALSB) and child boards.
    * Returns {C18, Iz, Rkabel, Xkabel} for this segment. */
   function cableSegment(REF, b) {
@@ -23451,8 +23606,16 @@ const REF = { normtabel: NORMTABEL, datatabel: DATATABEL };
     var tempCorr = lookupTempCorr(REF, tempLabel, b.omgeving);
     var constructieFactor = lookupConstructieFactor(REF, b.constructie);
     var bundelFactor = lookupBundelFactor(REF, b.bundel);
+    // 2026-11-13: grondcorrecties (in buis = IEC D1/D2, groepering per legwijze,
+    // bodemweerstand) -- zie grondFactoren() hierboven.
+    var grond = grondFactoren(REF, b, isolatie);
+    if (grond.actief) {
+      if (grond.buisFactor != null) constructieFactor = grond.buisFactor;
+      if (grond.groepFactor != null) bundelFactor = grond.groepFactor;
+    }
+    var bodemFactor = grond.actief ? grond.bodemFactor : 1;
     var kCumul = (tempCorr == null || constructieFactor == null || bundelFactor == null)
-      ? null : tempCorr * constructieFactor * bundelFactor;
+      ? null : tempCorr * constructieFactor * bundelFactor * bodemFactor;
     var Iz = (basisstroom == null || kCumul == null)
       ? null
       : basisstroom * b.aantal * kCumul;
@@ -23498,7 +23661,7 @@ const REF = { normtabel: NORMTABEL, datatabel: DATATABEL };
       basisstroom: basisstroom, Iz: Iz, Rkabel: Rkabel, Xkabel: Xkabel,
       RkabelFase: RkabelFase, XkabelFase: XkabelFase, isolatie: isolatie, rho: rho,
       tempLabel: tempLabel, tempCorr: tempCorr, constructieFactor: constructieFactor,
-      bundelFactor: bundelFactor, kCumul: kCumul, neutraalApart: neutraalApart,
+      bundelFactor: bundelFactor, kCumul: kCumul, grond: grond, bodemFactor: bodemFactor, neutraalApart: neutraalApart,
       nAantal: nAantal, nSectie: nSectie
     };
   }
@@ -24041,7 +24204,7 @@ const REF = { normtabel: NORMTABEL, datatabel: DATATABEL };
       Rkabel: buitenScopeActief ? null : seg.Rkabel, Xkabel: buitenScopeActief ? null : seg.Xkabel,
       neutraalApart: seg.neutraalApart, nAantal: seg.nAantal, nSectie: seg.nSectie,
       tempLabel: seg.tempLabel, tempCorr: seg.tempCorr, constructieFactor: seg.constructieFactor,
-      bundelFactor: seg.bundelFactor, kCumul: seg.kCumul,
+      bundelFactor: seg.bundelFactor, kCumul: seg.kCumul, grond: seg.grond, bodemFactor: seg.bodemFactor,
       Ztr: Ztr, Rtr: Rtr, Xtr: Xtr, Ucc: Ucc, uccEff: Ucc, uccBron: uccBron,
       ik3NetEff: Ik3net, ik3NetBron: ik3NetBron,
       Rtotaal: Rtotaal, Xtotaal: Xtotaal, Ztotaal: Ztotaal,
@@ -24102,7 +24265,11 @@ const REF = { normtabel: NORMTABEL, datatabel: DATATABEL };
     var seg = cableSegment(REF, {
       materiaal: eg.materiaal, mantel: eg.mantel, sectie: eg.sectie, kabeltype: eg.kabeltype,
       omgeving: vOmgeving, constructie: vConstructie, bundel: vBundel, aantal: eg.aantal,
-      tempOverride: vTempOverride
+      tempOverride: vTempOverride,
+      // 2026-11-13: zelfde grond als de voedingskabel van dit bord; eindgroepen zijn
+      // meeraderig of volgen hun eigen kabeltype voor de legwijze
+      grondsoort: board.grondsoort, grondToestand: board.grondToestand, bodemweerstand: board.bodemweerstand,
+      monoLegging: board.monoLegging
     });
     var Iz = seg.Iz;
     var iz_ok = Iz != null ? (eg.In <= Iz) : null;
@@ -24215,6 +24382,7 @@ const REF = { normtabel: NORMTABEL, datatabel: DATATABEL };
       IkMinPP: IkMinPP, IkMinEff: IkMinEff, foutType: foutType,
       isolatie: seg.isolatie, tempLabel: seg.tempLabel, tempCorr: seg.tempCorr,
       constructieFactor: seg.constructieFactor, bundelFactor: seg.bundelFactor, kCumul: seg.kCumul,
+      grond: seg.grond, bodemFactor: seg.bodemFactor,
       icuEff: icuEff, icuOk: icuOk, filiatieActief: filiatieActief, cosPhi: cosPhi, gebruiksFactor: gebruiksFactor,
       selectiviteit: selectiviteit,
       spanningsvalV: spanningsvalV, spanningsvalFrac: spanningsvalFrac,
@@ -24253,6 +24421,7 @@ const REF = { normtabel: NORMTABEL, datatabel: DATATABEL };
       spanningsvalV: spanningsvalV, spanningsvalFrac: spanningsvalFrac,
       tempLabel: seg.tempLabel, tempCorr: seg.tempCorr,
       constructieFactor: seg.constructieFactor, bundelFactor: seg.bundelFactor, kCumul: seg.kCumul,
+      grond: seg.grond, bodemFactor: seg.bodemFactor,
     };
   }
 
@@ -24357,6 +24526,8 @@ function defaultNetkabel() {
     kabeltype: 'Multi', lengte: 10, aantal: 1, sectie: 16, mantel: 'XGB', materiaal: 'Koper',
     omgeving: 'Onder de grond', constructie: 'Direct in de grond (in volle aarde)', bundel: 'Alleen',
     tempOverride: '',
+    // 2026-11-13: grond onbekend = IEC-referentie 2,5 K·m/W (zie grondFactoren())
+    grondsoort: '', grondToestand: 'droog', bodemweerstand: 2.5, monoLegging: 'klaverblad',
   };
 }
 
@@ -24375,6 +24546,10 @@ function defaultBoardInputs(isRoot) {
     // tempForOmgeving()) -- enkel invullen om een afwijkende effectieve
     // omgevingstemperatuur te forceren (stookruimte, koelcel, zolder...).
     tempOverride: '',
+    // 2026-11-13: enkel gebruikt bij omgeving "Onder de grond" -- grond onbekend =
+    // IEC-referentie 2,5 K·m/W; legging enkeladerige kabels standaard in klaverblad
+    // (Nexans-referentie). Zie grondFactoren() in de rekenkern.
+    grondsoort: '', grondToestand: 'droog', bodemweerstand: 2.5, monoLegging: 'klaverblad',
     // Vertrekkende kabels (eindgroepen) -- Peter: "Dat is zo voor mijn
     // voedingskabel, maar niet voor de vertrekken" (na een bord met zware
     // bundeling op de inkomende kabel, die zo ook op elke eindgroep werd
@@ -24893,7 +25068,7 @@ function renderBoardDetail() {
       .map(function (o) { return '<option value="' + o.id + '"' + (b.voedend === o.id ? ' selected' : '') + '>' + escapeHtml(o.naam) + '</option>'; }).join('');
 
   var constructieList = DATATABEL.constructie.filter(function (c) { return c.omgeving === b.omgeving; });
-  var bundelList = DATATABEL.bundel.filter(function (c) { return c.omgeving === b.omgeving; });
+  var bundelList = DATATABEL.bundel.filter(function (c) { return c.omgeving === b.omgeving && (c.label !== 'Klaverblad - 1 Driefasige kring' || b.bundel === c.label); });
   var tempLabel = CalcEngine.tempForOmgeving(b.omgeving);
 
   var html = '';
@@ -24974,7 +25149,9 @@ function renderBoardDetail() {
       '<option value="">— automatisch (' + tempLabel + ')</option>' +
       opts(DATATABEL.tempcorr.map(function (t) { return t.label; }), b.tempOverride) +
       '</select>');
+    if (b.omgeving === 'Onder de grond') html += grondVeldenHtml(b, 'data-f');
     html += '</div>';
+    html += grondHintHtml(r);
     html += '<p class="hint">N = aantal parallelle geleiders <strong>per fase</strong>, gebruikt voor de Iz-, weerstands- en thermische berekening van dit bord (kabelnorm-tabel bepaalt de stroom van 1 geleider, N is daarna een vermenigvuldiger). Standaard wordt de neutrale geleider verondersteld met dezelfde N/sectie mee te lopen (hieronder uit te schakelen via "Neutraal apart"). Let op het praktijkverschil: bij <strong>Mono</strong> (eendradige) kabels ligt elke parallelle geleider fysiek apart, dus N&nbsp;&gt;&nbsp;1 betekent doorgaans ook N aparte neutrale aders naast N per fase &mdash; bij <strong>Multi/XGB</strong> (alle aders samen in één mantel) is meerdere kabels parallel leggen minder gebruikelijk (meestal N=1, een grotere sectie kiezen ligt meer voor de hand); gebeurt het toch, dan zit de neutrale ader automatisch mee in elke parallelle kabel.</p>';
 
     // Ronde 64 (op vraag van Peter, n.a.v. een screenshot: "Bovenaan zou alles van de 'inkomende
@@ -25934,6 +26111,65 @@ function onDiffFieldChange(b, el) {
 function field(label, inner) {
   return '<div class="field"><label>' + escapeHtml(label) + '</label>' + inner + '</div>';
 }
+// 2026-11-13: grondvelden (omgeving "Onder de grond") -- gedeeld door het bordpaneel
+// ([data-f]) en het netkabelpaneel ([data-nk-f]).
+function grondVeldenHtml(obj, attr) {
+  var h = '';
+  var soort = obj.grondsoort || '';
+  var o = '<option value=""' + (soort === '' ? ' selected' : '') + '>— onbekend (IEC-referentie 2,5 K·m/W)</option>';
+  (DATATABEL.grondsoorten || []).forEach(function (g) {
+    o += '<option value="' + escapeAttr(g.key) + '"' + (soort === g.key ? ' selected' : '') + '>' + escapeHtml(g.label) + '</option>';
+  });
+  o += '<option value="manueel"' + (soort === 'manueel' ? ' selected' : '') + '>Zelf ingeven (K·m/W)</option>';
+  h += field('Grond rond de kabel', '<select ' + attr + '="grondsoort">' + o + '</select>');
+  if (soort === 'manueel') {
+    var cur = Number(obj.bodemweerstand) > 0 ? Number(obj.bodemweerstand) : 2.5;
+    h += field('Thermische weerstand grond (K·m/W)', '<select ' + attr + '="bodemweerstand">' +
+      DATATABEL.bodemweerstand.map(function (r) {
+        return '<option value="' + r.kmw + '"' + (Math.abs(r.kmw - cur) < 1e-9 ? ' selected' : '') + '>' +
+          String(r.kmw).replace('.', ',') + (r.kmw === 2.5 ? ' (IEC-referentie)' : '') + '</option>';
+      }).join('') + '</select>');
+  } else if (soort) {
+    var gs = DATATABEL.grondsoorten.find(function (g) { return g.key === soort; });
+    var t = obj.grondToestand === 'nat' ? 'nat' : 'droog';
+    h += field('Toestand van de grond', '<select ' + attr + '="grondToestand">' +
+      '<option value="droog"' + (t === 'droog' ? ' selected' : '') + '>Droog / droogt uit' + (gs ? ' (' + String(gs.droog).replace('.', ',') + ' K·m/W)' : '') + '</option>' +
+      '<option value="nat"' + (t === 'nat' ? ' selected' : '') + '>Blijvend nat' + (gs ? ' (' + String(gs.nat).replace('.', ',') + ' K·m/W)' : '') + '</option>' +
+      '</select>');
+  }
+  if (obj.kabeltype === 'Mono') {
+    var lw = obj.monoLegging === 'laag' ? 'laag' : 'klaverblad';
+    h += field('Legging enkeladerige kabels', '<select ' + attr + '="monoLegging">' +
+      '<option value="klaverblad"' + (lw === 'klaverblad' ? ' selected' : '') + '>In klaverblad</option>' +
+      '<option value="laag"' + (lw === 'laag' ? ' selected' : '') + '>In laag (naast elkaar)</option>' +
+      '</select>');
+  }
+  return h;
+}
+function fmtFactor(x) { return x == null ? '—' : Number(x).toFixed(2).replace('.', ','); }
+// Uitleg van de toegepaste grondcorrecties onder de kabelvelden.
+function grondHintHtml(r) {
+  if (!r || !r.grond || !r.grond.actief) return '';
+  var g = r.grond;
+  var lwTxt = { multi: 'meeraderig', laag: 'enkeladerig in laag', klaverblad: 'enkeladerig in klaverblad' }[g.legwijze] || '';
+  var delen = [];
+  if (g.inBuis) {
+    delen.push(g.buisBron === 'iec'
+      ? 'in buis ×' + fmtFactor(g.buisFactor) + ' (IEC 60364-5-52: D1 ' + g.iecD1 + ' A in buis / D2 ' + g.iecD2 + ' A direct)'
+      : 'in buis ×' + fmtFactor(r.constructieFactor) + ' (geen IEC-waarde voor deze sectie, vaste factor)');
+  } else {
+    delen.push('direct in de grond ×1,00');
+  }
+  delen.push('groepering ×' + fmtFactor(r.bundelFactor) + (g.groepN != null ? ' (Nexans, ' + lwTxt + (g.groepN > 1 ? ', ' + g.groepN + ' kabels/systemen' : ', alleen') + ')' : ''));
+  var bwTxt = String(g.bodemweerstand).replace('.', ',') + ' K·m/W';
+  if (Math.abs(g.bodemweerstandIngegeven - g.bodemweerstand) > 1e-9) bwTxt = String(g.bodemweerstandIngegeven).replace('.', ',') + ' → tabelkolom ' + bwTxt;
+  delen.push('grond ×' + fmtFactor(g.bodemFactor) + ' (' + escapeHtml(g.bodemBron) + ', ' + bwTxt + ', IEC tabel B.52.16 ' + (g.inBuis ? 'in buis' : 'direct') + ')');
+  delen.push('temperatuur ×' + fmtFactor(r.tempCorr));
+  var h = '<p class="hint"><strong>Grondcorrecties:</strong> ' + delen.join(' · ') + ' → totaal ×' + fmtFactor(r.kCumul) + '.';
+  if (g.bodemBuitenTabel) h += ' <strong>Let op:</strong> deze grond is droger dan de IEC-tabel (max. 3 K·m/W) — de factor van 3 K·m/W wordt gebruikt, reken met extra marge.';
+  h += ' Een zwaar belaste kabel droogt de grond rond zich zelf uit: kies "Blijvend nat" enkel als de grond aantoonbaar nat blijft (bv. onder het grondwaterpeil).</p>';
+  return h;
+}
 function input(fname, val, type) {
   return '<input data-f="' + fname + '" type="' + type + '" value="' + escapeAttr(val) + '"' + (type === 'number' ? ' step="any"' : '') + '>';
 }
@@ -25960,7 +26196,7 @@ function onFieldChange(b, el) {
     'hoofdschakelaarIn', 'hoofdschakelaarIcu', 'aantalAders',
     'cosPhi', 'gebruiksFactor', 'icm', 'ip', 'eenpoligeIcu', 'buitenScopeIcc',
     'neutraalAantal', 'neutraalSectie', 'peAantal', 'peSectie',
-    'hoofdschakelaarFiliatieIcu'].indexOf(f) !== -1) { b[f] = val === '' ? '' : Number(val); }
+    'hoofdschakelaarFiliatieIcu', 'bodemweerstand'].indexOf(f) !== -1) { b[f] = val === '' ? '' : Number(val); }
   else { b[f] = val; }
   // reset dependent dropdowns when omgeving changes (mirrors old macro's clear-on-change)
   if (f === 'omgeving') {
@@ -26467,6 +26703,10 @@ function renderBoardBlad(b, r, parent, project) {
         bf('K t° (' + escapeHtml(r.tempLabel) + ')', fmt(r.tempCorr, 2)) +
         bf('K groep (constructie)', fmt(r.constructieFactor, 2)) +
         bf('K aanvul (bundel)', fmt(r.bundelFactor, 2)) +
+        (r.grond && r.grond.actief
+          ? bf('K grond (' + r.grond.bodemBron + ', ' + String(r.grond.bodemweerstand).replace('.', ',') + ' K·m/W)', fmt(r.bodemFactor, 2), true) +
+            (b.kabeltype === 'Mono' ? bf('Legging', r.grond.legwijze === 'laag' ? 'in laag' : 'in klaverblad') : '')
+          : '') +
         bf('K cumul', fmt(r.kCumul, 2)));
 
   html += bladSection('Beveiliging',
@@ -26552,6 +26792,8 @@ function renderEindgroepBlad(eg, egr, b, r, project, diff, diffIdx) {
     bf('K t° (' + escapeHtml(egr.tempLabel) + ')', fmt(egr.tempCorr, 2)) +
     bf('K groep (constructie)', fmt(egr.constructieFactor, 2)) +
     bf('K aanvul (bundel)', fmt(egr.bundelFactor, 2)) +
+    (egr.grond && egr.grond.actief
+      ? bf('K grond (' + String(egr.grond.bodemweerstand).replace('.', ',') + ' K·m/W)', fmt(egr.bodemFactor, 2)) : '') +
     bf('K cumul', fmt(egr.kCumul, 2)));
 
   html += bladSection('Beveiliging',
@@ -27350,7 +27592,7 @@ function renderNetkabelPanel() {
   if (!state.project.netkabel) state.project.netkabel = defaultNetkabel();
   var nk = state.project.netkabel;
   var constructieList = DATATABEL.constructie.filter(function (c) { return c.omgeving === nk.omgeving; });
-  var bundelList = DATATABEL.bundel.filter(function (c) { return c.omgeving === nk.omgeving; });
+  var bundelList = DATATABEL.bundel.filter(function (c) { return c.omgeving === nk.omgeving && (c.label !== 'Klaverblad - 1 Driefasige kring' || nk.bundel === c.label); });
   var tempLabel = CalcEngine.tempForOmgeving(nk.omgeving);
   var calc = recompute();
   var r = calc.ok ? CalcEngine.calcNetkabel(REF, calc.project) : null;
@@ -27371,7 +27613,9 @@ function renderNetkabelPanel() {
     '<option value="">— automatisch (' + tempLabel + ')</option>' +
     opts(DATATABEL.tempcorr.map(function (t) { return t.label; }), nk.tempOverride) +
     '</select>');
+  if (nk.omgeving === 'Onder de grond') html += grondVeldenHtml(nk, 'data-nk-f');
   html += '</div>';
+  html += grondHintHtml(r);
   html += '<div class="pill-row">' +
     (r ? badge(r.iz_ok, 'Iz ' + fmtA(r.Iz) + ' ≥ Ib ' + fmtA(r.Ib), 'Iz ' + fmtA(r.Iz) + ' < Ib ' + fmtA(r.Ib)) : '<span class="badge warn">Vul aansluitvermogen + kabelgegevens in</span>') +
     (r ? '<span class="badge warn">Spanningsval (informatief): ' + fmtPct(r.spanningsvalFrac) + '</span>' : '') +
@@ -27381,7 +27625,7 @@ function renderNetkabelPanel() {
   holder.querySelectorAll('[data-nk-f]').forEach(function (el) {
     el.addEventListener('change', function () {
       var f = el.getAttribute('data-nk-f');
-      nk[f] = (['lengte', 'aantal', 'sectie'].indexOf(f) !== -1) ? Number(el.value) : el.value;
+      nk[f] = (['lengte', 'aantal', 'sectie', 'bodemweerstand'].indexOf(f) !== -1) ? Number(el.value) : el.value;
       if (f === 'omgeving') {
         var cList = DATATABEL.constructie.filter(function (c) { return c.omgeving === nk.omgeving; });
         var bList = DATATABEL.bundel.filter(function (c) { return c.omgeving === nk.omgeving; });
@@ -33344,7 +33588,10 @@ window.CaCalcApp = {
     const opstart = !opts || opts.opstart !== false;
     const allowed = allowedTabs();
     document.querySelectorAll('.tab-btn').forEach(b => {
-      b.style.display = allowed.includes(b.dataset.tab) ? '' : 'none';
+      // data-only-app: knop hoort enkel in die ene app-variant (bv. de "Rooster"-knop in het
+      // onderbalkje, die enkel in planning.html zin heeft) -- 2026-10-26.
+      const appOk = !b.dataset.onlyApp || b.dataset.onlyApp === APP_MODE;
+      b.style.display = (appOk && allowed.includes(b.dataset.tab)) ? '' : 'none';
     });
     // Ronde 61: deze forEach hierboven zou de knoppen Dossier/Kabelberekening altijd weer tonen
     // (zodra de persoon er sowieso toegang toe heeft), ongeacht of er een project gekozen is of dat
@@ -35010,7 +35257,9 @@ window.CaCalcApp = {
     // zit -- op alle andere tabbladen (Planning/Dossier/Projecten/Bedrijfsgegevens) staat er niets
     // in dat balkje dat relevant is, dus dan weg (2026-09-23).
     const werfSubbar = el('werf-subbar');
-    if(werfSubbar) werfSubbar.style.display = WERF_GROUP_TABS.includes(tab) ? '' : 'none';
+    // 2026-10-26: in de losse Planning-app dient dit balkje als wisselaar tussen Rooster en Uren.
+    const subbarInPlanning = (APP_MODE === 'planning' && (tab === 'inzet' || tab === 'uren'));
+    if(werfSubbar) werfSubbar.style.display = (WERF_GROUP_TABS.includes(tab) || subbarInPlanning) ? '' : 'none';
     // Alle tabbladen krijgen voortaan dezelfde volle-breedte-behandeling (2026-09-23, op vraag van
     // Peter: "Bij werfverslag, Projecten en bedrijfsgegevens is het scherm veel smaller dan bij
     // planning en dossier. Kun je dit allemaal gelijk maken? Maar dat dit op GSM scherm smal
@@ -40107,8 +40356,6 @@ window.CaCalcApp = {
       if(ta) setTimeout(() => { try{ ta.focus({ preventScroll: true }); }catch(e){} }, 250);
     }
   }
-  el('add-actiepunt').addEventListener('click', () => nieuwPuntInBeeld({ category: 'Actiepunt' }));
-  el('btn-plus-punt').addEventListener('click', () => nieuwPuntInBeeld());
   // Projectgegevens dichtklappen tot 1 regel zodra ze ingevuld zijn (enkel zichtbaar op gsm, zie CSS).
   function updateVfSamenvatting(){
     const card = document.querySelector('.vf-card');
@@ -40698,11 +40945,10 @@ window.CaCalcApp = {
     state.items = [];
     state.aanwezigen = [];
     state.standVanZaken = [];
-    // De opsteller van een NIEUW verslag (de ingelogde gebruiker) automatisch als aanwezige
-    // toevoegen, op vraag van Peter -- enkel als die gekoppeld kan worden aan een Team lid (zie
-    // getCurrentUserNaam()); blijft nadien gewoon aanpasbaar/verwijderbaar zoals elke aanwezige.
-    const myNaam = getCurrentUserNaam();
-    if(myNaam) state.aanwezigen.push(myNaam);
+    // 2026-11-11, op vraag van Peter ("deze automatische invulling mag je weg werken -- enkel de
+    // namen die bij het project staan moeten geselecteerd kunnen worden"): de ingelogde gebruiker
+    // wordt NIET meer automatisch als aanwezige toegevoegd. De aanwezigenlijst vertrekt leeg; je
+    // vinkt zelf aan wie er was uit de contactpersonen van het project.
     state.nextItemId = 1;
     state.signatures = { bouwheer: { url: null, dataUrl: null }, aannemer: { url: null, dataUrl: null } };
     state.kladbladen = []; // kladversie

@@ -232,7 +232,9 @@
 // nieuwe basis-regressiesuite (test-basis.js, 28 controles) + test-fototekenen.js (21 controles),
 // als vervanging voor de verloren suite van 924 controles.
 // 2026-11-13: tabblad Materialen (materialen- en prijsdatabank) + Chrome-extensie CaSuite Mand.
-const CACHE_VERSION = 'casnap-v2026-11-13-materialen';
+// 2026-11-13 (b): samengevoegd met werfverslagformulier 11/11, Rooster-knop Planning-app 26/10 en
+// CaCalc-grondcorrecties (grondsoort, legging, IEC-buisfactor).
+const CACHE_VERSION = 'casnap-v2026-11-13-samengevoegd';
 const NETWORK_TIMEOUT_MS = 4000;
 
 self.addEventListener('install', () => {
