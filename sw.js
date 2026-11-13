@@ -231,7 +231,8 @@
 // geleverde index.html, app-iconen teruggehaald uit werf/planning/cados/cacalc.html) en is er een
 // nieuwe basis-regressiesuite (test-basis.js, 28 controles) + test-fototekenen.js (21 controles),
 // als vervanging voor de verloren suite van 924 controles.
-const CACHE_VERSION = 'casnap-v2026-11-10-kabelrapport2';
+// 2026-11-13: tabblad Materialen (materialen- en prijsdatabank) + Chrome-extensie CaSuite Mand.
+const CACHE_VERSION = 'casnap-v2026-11-13-materialen';
 const NETWORK_TIMEOUT_MS = 4000;
 
 self.addEventListener('install', () => {

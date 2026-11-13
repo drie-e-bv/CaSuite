@@ -75,6 +75,7 @@
     /* CaFin (Financiële module, fase 1, 2026-10-09, op vraag van Peter) -- eigen paars, nog niet
        eerder gebruikte kleur in deze reeks, zodat het meteen visueel onderscheiden is van de 4
        bestaande hoofdapps. */
+    --app-mat:#8b5a2b;       --app-mat-soft:#f6eee4;     --app-mat-ink:#7a4c22;
     --app-cafin:#7a4fc9;     --app-cafin-soft:#f1ecfa;
     /* Neutraal "info"-blauw voor badges/tags die niet bij een specifieke app horen (beheerder-badge,
        protocol-/vaardigheden-tags in de planning) -- was voorheen via --app-werf. */
@@ -113,6 +114,7 @@
   body[data-app="dossier"]{--app:var(--app-dossier);--app-ink:var(--app-dossier-ink);--app-soft:var(--app-dossier-soft);}
   body[data-app="calc"]{--app:var(--app-calc);--app-ink:var(--app-calc-ink);--app-soft:var(--app-calc-soft);}
   body[data-app="cafin"]{--app:var(--app-cafin);--app-ink:var(--app-cafin-ink);--app-soft:var(--app-cafin-soft);}
+  body[data-app="mat"]{--app:var(--app-mat);--app-ink:var(--app-mat-ink);--app-soft:var(--app-mat-soft);}
   *{box-sizing:border-box;}
   /* Basis 15px (desktop) / 16px (gsm, voorkomt iOS-zoom in invoervelden) -- ronde 48. Op html gezet
      zodat ook de vele bestaande rem-maten mee schalen. overflow-x:clip = enkel vangnet, de echte
@@ -224,6 +226,7 @@
     /* CaFin (fase 1) -- eenvoudig factuur/document-icoon met een "€"-achtig streepje, om het
        visueel te onderscheiden van het CaDos-documenticoon hierboven. */
     --tile-cafin:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.1' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 3.5h12v17l-2.5-1.6-2.5 1.6-2.5-1.6-2.5 1.6-2-1.3z'/%3E%3Cpath d='M9 8.5h6M9 12h6M9 15.5h3.5'/%3E%3C/svg%3E");
+    --tile-mat:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.1' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3.5l8 4.2v8.6l-8 4.2-8-4.2V7.7z'/%3E%3Cpath d='M4 7.7l8 4.2 8-4.2M12 11.9v8.6'/%3E%3C/svg%3E");
   }
   header.top{
     position:sticky;top:0;z-index:60;
@@ -521,6 +524,7 @@
   #main-nav [data-tab="cados"]{--tile-ink:var(--app-dossier-ink);--tile:var(--app-dossier);--tile-soft:var(--app-dossier-soft);--tile-glyph:var(--tile-dossier);}
   #main-nav [data-tab="cacalc"]{--tile-ink:var(--app-calc-ink);--tile:var(--app-calc);--tile-soft:var(--app-calc-soft);--tile-glyph:var(--tile-calc);}
   #main-nav [data-tab="cafin"]{--tile-ink:var(--app-cafin-ink);--tile:var(--app-cafin);--tile-soft:var(--app-cafin-soft);--tile-glyph:var(--tile-cafin);}
+  #main-nav [data-tab="materialen"]{--tile-ink:var(--app-mat-ink);--tile:var(--app-mat);--tile-soft:var(--app-mat-soft);--tile-glyph:var(--tile-mat);}
   body.single-app #main-nav{display:none;}
   #main-nav .tab-btn .nav-kort{display:none;}
   body.single-app header.top{margin-bottom:20px;}
@@ -1105,6 +1109,98 @@
   .cafin-badge-goedgekeurd{background:var(--app-dossier-soft);color:var(--app-dossier);}
   .cafin-badge-afgekeurd{background:var(--danger-soft);color:var(--danger);}
   .cafin-badge-betaald{background:var(--app-dossier-soft);color:var(--app-dossier);}
+  /* ===== Materialen (materialen- en prijsdatabank, 2026-11-13) ===== */
+  .mat-kop{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start;justify-content:space-between;}
+  .mat-kop h2{margin-bottom:4px;}
+  .mat-kop-acties{display:flex;flex-wrap:wrap;gap:8px;}
+  .mat-subtabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:6px 0 14px;overflow-x:auto;}
+  .mat-subtab{border:0;background:none;padding:9px 12px;font:inherit;font-weight:600;color:var(--ink-soft);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;}
+  .mat-subtab[aria-selected="true"]{color:var(--app-mat-ink);border-bottom-color:var(--app-mat);}
+  .mat-tel{font-size:.75rem;background:var(--sunken);color:var(--ink-soft);border-radius:10px;padding:0 7px;margin-left:3px;}
+  .mat-tel:empty{display:none;}
+  .mat-tel-wacht{background:var(--info-soft);color:var(--info);}
+  .mat-toolbar select{max-width:180px;margin-bottom:0;}
+  .mat-tabel{width:100%;border-collapse:collapse;font-size:.88rem;}
+  .mat-tabel th{text-align:left;font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-faint);font-weight:600;padding:8px;border-bottom:1px solid var(--line);white-space:nowrap;}
+  .mat-tabel td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top;}
+  .mat-tabel tr.mat-klik{cursor:pointer;}
+  .mat-tabel tr.mat-klik:hover td{background:var(--sunken);}
+  .mat-tabel .num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}
+  .mat-oms{font-weight:600;}
+  .mat-sub{font-size:.8rem;color:var(--ink-faint);}
+  .mat-mono{font-family:var(--font-mono, ui-monospace, Consolas, monospace);font-size:.82em;}
+  .mat-ster{border:0;background:none;cursor:pointer;font-size:1.1rem;line-height:1;color:var(--line-strong);padding:0 2px;}
+  .mat-ster.aan{color:#d29a1c;}
+  .mat-chip{display:inline-flex;gap:4px;align-items:baseline;font-size:.78rem;border:1px solid var(--line);border-radius:12px;padding:1px 8px;margin:0 4px 3px 0;white-space:nowrap;}
+  .mat-chip.best{border-color:var(--app-mat);background:var(--app-mat-soft);color:var(--app-mat-ink);font-weight:600;}
+  .mat-badge{display:inline-block;font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:12px;background:var(--sunken);color:var(--ink-soft);white-space:nowrap;}
+  .mat-badge.nieuw{background:var(--brand-soft);color:var(--brand-strong);}
+  .mat-badge.bestaand{background:var(--sunken);color:var(--ink-soft);}
+  .mat-badge.wijz{background:var(--warn-soft);color:var(--warn);}
+  .mat-badge.bevestig{background:var(--info-soft);color:var(--info);}
+  .mat-badge.overslaan{background:var(--sunken);color:var(--ink-faint);text-decoration:line-through;}
+  .mat-badge.fout{background:var(--danger-soft);color:var(--danger);}
+  .mat-op{color:var(--danger);} .mat-neer{color:var(--brand);}
+  .mat-leeg{padding:28px 12px;text-align:center;color:var(--ink-soft);}
+  .mat-leeg strong{display:block;color:var(--ink);margin-bottom:4px;}
+  .mat-meer{display:flex;justify-content:center;margin-top:12px;}
+  .mat-sp{flex:1;}
+  .mat-modal-breed{max-width:820px;}
+  .mat-modal-mid{max-width:620px;}
+  .mat-modal-vol{max-width:min(1400px, calc(100vw - 32px));}
+  .mat-velden{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:4px 12px;}
+  .mat-velden .field{margin-bottom:6px;}
+  .mat-blok-titel{font-size:.95rem;font-weight:700;margin:16px 0 8px;}
+  .mat-grafiek{width:100%;height:auto;display:block;margin:6px 0 4px;}
+  .mat-legende{display:flex;flex-wrap:wrap;gap:10px;font-size:.78rem;color:var(--ink-soft);}
+  .mat-legende i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px;}
+  .mat-shops{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin:8px 0 14px;}
+  .mat-shop{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:10px 12px;border:1px solid var(--line-strong);border-radius:var(--r-md, 10px);background:var(--card);cursor:pointer;font:inherit;}
+  .mat-shop:hover{border-color:var(--app-mat);}
+  .mat-shop b{font-weight:700;}
+  .mat-shop small{color:var(--ink-faint);font-size:.75rem;}
+  .mat-ext{border-radius:10px;padding:10px 12px;font-size:.86rem;margin-bottom:12px;}
+  .mat-ext.ok{background:var(--brand-soft);color:var(--brand-strong);}
+  .mat-ext.nee{background:var(--warn-soft);color:#7a5210;}
+  .mat-wacht{border:1px solid var(--app-mat);background:var(--app-mat-soft);border-radius:12px;padding:12px 14px;margin-bottom:14px;}
+  .mat-wacht ol{margin:6px 0;padding-left:20px;color:var(--ink-soft);font-size:.88rem;}
+  .mat-wacht .mat-wacht-acties{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  .mat-review-samen{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px;}
+  .mat-review-wrap{overflow:auto;border:1px solid var(--line);border-radius:10px;}
+  .mat-review{border-collapse:collapse;font-size:.82rem;min-width:1100px;width:100%;}
+  .mat-review th{position:sticky;top:0;background:var(--card);z-index:1;text-align:left;font-size:.7rem;text-transform:uppercase;letter-spacing:.03em;color:var(--ink-faint);padding:6px;border-bottom:1px solid var(--line);white-space:nowrap;}
+  .mat-review td{padding:4px;border-bottom:1px solid var(--line);vertical-align:top;}
+  .mat-review tr.rij-overslaan td{opacity:.5;}
+  .mat-review input{width:100%;min-width:60px;padding:4px 6px;border:1px solid transparent;border-radius:6px;background:transparent;font:inherit;margin:0;min-height:0;}
+  .mat-review input:hover{border-color:var(--line);}
+  .mat-review input:focus{border-color:var(--app-mat);background:var(--card);outline:none;}
+  .mat-review input.n{text-align:right;width:76px;min-width:0;}
+  .mat-review input.oms{min-width:220px;}
+  .mat-review select{font:inherit;font-size:.8rem;padding:3px 4px;margin:0;min-height:0;max-width:150px;}
+  .mat-koppel{min-width:210px;}
+  .mat-koppel .mat-sub{display:block;margin-top:2px;}
+  .mat-koppel button{font-size:.75rem;}
+  .mat-kies-lijst{margin-top:10px;max-height:50vh;overflow:auto;}
+  .mat-kies-lijst button{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);background:none;padding:8px;cursor:pointer;font:inherit;}
+  .mat-kies-lijst button:hover{background:var(--sunken);}
+  .mat-param-rij{display:grid;grid-template-columns:1fr 1.4fr auto;gap:6px;margin-bottom:6px;}
+  .mat-param-rij input{margin:0;}
+  .mat-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:10px;z-index:400;font-size:.9rem;max-width:calc(100% - 32px);box-shadow:0 6px 20px rgba(0,0,0,.2);}
+  .mat-toast.fout{background:var(--danger);}
+  body:not(.mat-mag-beheren) .mat-beheer{display:none !important;}
+  @media (max-width:760px){
+    .mat-tabel.resp thead{display:none;}
+    .mat-tabel.resp, .mat-tabel.resp tbody, .mat-tabel.resp tr, .mat-tabel.resp td{display:block;width:100%;}
+    .mat-tabel.resp tr{border-bottom:1px solid var(--line);padding:6px 0;position:relative;}
+    .mat-tabel.resp td{border:0;padding:2px 6px;}
+    .mat-tabel.resp td.num{text-align:left;}
+    .mat-tabel.resp td[data-l]::before{content:attr(data-l) ": ";color:var(--ink-faint);font-size:.78rem;}
+    .mat-tabel.resp td.mat-c-ster{position:absolute;right:4px;top:6px;width:auto;}
+    .mat-toolbar select{max-width:none;flex:1 1 40%;}
+    .mat-param-rij{grid-template-columns:1fr 1fr auto;}
+  }
+  .mat-review input[data-veld="ean"]{min-width:118px;}
+  .mat-review input[data-veld="fabrikant_artnr"], .mat-review input[data-veld="artikelnr"]{min-width:96px;}
   .cafin-totaal-row{
     display:flex;justify-content:space-between;align-items:center;gap:10px;
     padding:8px 2px;border-bottom:1px solid var(--line);
@@ -4097,6 +4193,8 @@
          project-afhankelijke "aanmaken"-stand zoals Dossier/Kabelberekening hierboven, zie
          tabsForPersonAccess()/kan_facturen_zien in het script). -->
     <button class="tab-btn" id="main-nav-btn-cafin" data-tab="cafin" type="button">Facturen</button>
+    <!-- Materialen (2026-11-13): materialen- en prijsdatabank, zie #tab-materialen. -->
+    <button class="tab-btn" id="main-nav-btn-materialen" data-tab="materialen" type="button">Materialen</button>
   </nav>
 
   <div class="offline-banner" id="offline-banner" style="display:none;">
@@ -5506,6 +5604,117 @@
       </div>
     </div>
   </div>
+
+  <!-- ===================== TAB: MATERIALEN (materialen- en prijsdatabank) =====================
+       2026-11-13, op vraag van Peter ("NIEUWE MODULE: MATERIALENDATABASE & UNIVERSELE PRIJSIMPORT").
+       Centrale artikels (artikelen) met per leverancier een eigen code (leverancier_artikelen) en
+       historische prijzen (prijsregistraties, nooit overschreven). Artikels komen binnen via een
+       tijdelijke importlijst (imports/import_regels) die de gebruiker eerst controleert: vanuit de
+       Chrome-extensie "CaSuite Mand" (knop "Mand ophalen" op de webshop), een Excel/CSV-bestand of
+       OCI. Zichtbaarheid: kan_materialen_zien / kan_materialen_beheren (zie tabsForPersonAccess()).
+       Script: blok "Materialen" (functies mat*). Plan: claude/materialen-module-implementatieplan.md. -->
+  <section class="tab-section" id="tab-materialen">
+    <section class="card mat-card">
+      <div class="mat-kop">
+        <div>
+          <h2>Materialen</h2>
+          <p class="hint">Centrale materialen- en prijsdatabank. Artikels komen binnen door het winkelmandje van een webshop op te halen, of uit een Excel-lijst.</p>
+        </div>
+        <div class="mat-kop-acties">
+          <button class="btn btn-primary mat-beheer" id="mat-btn-importeren" type="button">Artikels importeren</button>
+          <button class="btn btn-secondary mat-beheer" id="mat-btn-nieuw" type="button">+ Artikel</button>
+          <button class="btn btn-secondary" id="mat-btn-export" type="button">Excel ↓</button>
+        </div>
+      </div>
+      <div class="mat-subtabs" role="tablist">
+        <button type="button" class="mat-subtab" data-mat-sub="artikels" aria-selected="true">Artikels <span class="mat-tel" id="mat-tel-artikels"></span></button>
+        <button type="button" class="mat-subtab" data-mat-sub="imports" aria-selected="false">Imports <span class="mat-tel mat-tel-wacht" id="mat-tel-imports"></span></button>
+        <button type="button" class="mat-subtab" data-mat-sub="leveranciers" aria-selected="false">Leveranciers</button>
+      </div>
+      <div id="mat-wacht-plek"></div>
+      <div data-mat-paneel="artikels">
+        <div class="projects-toolbar mat-toolbar">
+          <input type="search" id="mat-zoek" placeholder="Zoek op omschrijving, artikelnummer, EAN, merk…" autocomplete="off">
+          <select id="mat-f-lev" aria-label="Leverancier"></select>
+          <select id="mat-f-merk" aria-label="Merk"></select>
+          <select id="mat-f-cat" aria-label="Categorie"></select>
+          <label class="chk"><input type="checkbox" id="mat-f-fav"> Favorieten</label>
+          <label class="chk"><input type="checkbox" id="mat-f-wijz"> Prijs gewijzigd</label>
+        </div>
+        <div id="mat-lijst"></div>
+        <div class="mat-meer" id="mat-meer-wrap" style="display:none;"><button class="btn btn-secondary btn-sm" id="mat-btn-meer" type="button">Meer tonen</button></div>
+      </div>
+      <div data-mat-paneel="imports" style="display:none;"><div id="mat-imports-lijst"></div></div>
+      <div data-mat-paneel="leveranciers" style="display:none;">
+        <div id="mat-lev-lijst"></div>
+        <button class="add-item-btn mat-beheer" id="mat-btn-lev-nieuw" type="button">+ Leverancier toevoegen</button>
+      </div>
+    </section>
+  </section>
+
+  <!-- Materialen: artikel bekijken/bewerken -->
+  <div class="modal-overlay" id="mat-artikel-modal" style="display:none;">
+    <div class="modal-box mat-modal-breed">
+      <h2 id="mat-art-titel">Artikel</h2>
+      <div class="modal-body" id="mat-art-body"></div>
+      <div class="modal-actions">
+        <button class="btn btn-primary mat-beheer" id="mat-art-opslaan" type="button">Opslaan</button>
+        <button class="btn btn-ghost" id="mat-art-sluit" type="button">Sluiten</button>
+        <span class="mat-sp"></span>
+        <button class="btn btn-danger mat-beheer" id="mat-art-verwijder" type="button">Verwijderen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Materialen: import starten -->
+  <div class="modal-overlay" id="mat-import-modal" style="display:none;">
+    <div class="modal-box mat-modal-mid">
+      <h2>Artikels importeren</h2>
+      <div class="modal-body" id="mat-import-body"></div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="mat-import-sluit" type="button">Sluiten</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Materialen: tijdelijke importlijst controleren -->
+  <div class="modal-overlay" id="mat-review-modal" style="display:none;">
+    <div class="modal-box mat-modal-vol">
+      <h2 id="mat-review-titel">Importlijst controleren</h2>
+      <div class="modal-body" id="mat-review-body"></div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" id="mat-review-importeer" type="button">Importeren</button>
+        <button class="btn btn-ghost" id="mat-review-later" type="button">Later verder</button>
+        <span class="mat-sp"></span>
+        <button class="btn btn-danger" id="mat-review-annuleer" type="button">Import annuleren</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Materialen: leverancier bewerken -->
+  <div class="modal-overlay" id="mat-lev-modal" style="display:none;">
+    <div class="modal-box mat-modal-mid">
+      <h2 id="mat-lev-titel">Leverancier</h2>
+      <div class="modal-body" id="mat-lev-body"></div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" id="mat-lev-opslaan" type="button">Opslaan</button>
+        <button class="btn btn-ghost" id="mat-lev-sluit" type="button">Annuleren</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Materialen: ander artikel kiezen om aan te koppelen -->
+  <div class="modal-overlay" id="mat-kies-modal" style="display:none;z-index:260;">
+    <div class="modal-box mat-modal-mid">
+      <h2>Koppelen aan bestaand artikel</h2>
+      <div class="modal-body">
+        <input type="search" id="mat-kies-zoek" placeholder="Zoek op omschrijving, merk, EAN of nummer…" autocomplete="off">
+        <div id="mat-kies-lijst" class="mat-kies-lijst"></div>
+      </div>
+      <div class="modal-actions"><button class="btn btn-ghost" id="mat-kies-sluit" type="button">Annuleren</button></div>
+    </div>
+  </div>
+  <div class="mat-toast" id="mat-toast" style="display:none;"></div>
 
   <!-- ===================== TAB: CADOS (Elektro/Domotica) ===================== -->
   <!-- Samengevoegd op vraag van Peter (2026-09-22) uit zijn losse, kant-en-klare CaDos-tool
@@ -28634,6 +28843,8 @@ window.CaCalcApp = {
             <th title="Ziet werfverslagen/actiepunten/planning van ALLE projecten, ook zonder vaste werfleider/projectleider-koppeling of planningsafspraak (bv. een zaakvoerder/projectleider die ook als gewoon teamlid meewerkt)">Ziet alle projecten</th>
             <th title="Ziet het Facturen-tabblad (CaFin)">Facturen zien</th>
             <th title="Mag facturen goedkeuren/afkeuren">Facturen goedkeuren</th>
+            <th title="Ziet het tabblad Materialen">Materialen zien</th>
+            <th title="Mag winkelmandjes/Excel importeren en artikels aanpassen">Materialen importeren</th>
             <th title="Mag deze Beheer-pagina openen en ieders rechten aanpassen">Beheerder</th>
           </tr></thead>
           <tbody id="beheer-body"></tbody>
@@ -28765,7 +28976,7 @@ window.CaCalcApp = {
   // installatie), want een onderaannemer kan in principe overal inloggen (zie de opdracht: "Werkt
   // in alle app-varianten waar Onderaannemers kunnen inloggen").
   // 'cafin' toegevoegd (2026-10-09, CaFin-fase 1) -- zie tabsForPersonAccess()/CAFIN_TABS hieronder.
-  const ALL_TABS = ['verslag', 'verslagen', 'actiepunten', 'planning', 'uren', 'inzet', 'projecten', 'bedrijf', 'cados', 'cacalc', 'cafin', 'mijn-planning'];
+  const ALL_TABS = ['verslag', 'verslagen', 'actiepunten', 'planning', 'uren', 'inzet', 'projecten', 'bedrijf', 'cados', 'cacalc', 'cafin', 'materialen', 'mijn-planning'];
   // Op vraag van Peter (2026-09-22): "op de site van planning zou ook Projecten & sharepoint en
   // Bedrijfsgegevens moeten zichtbaar worden" -- 'bedrijf' stond hier al, 'projecten' toegevoegd.
   // 'uren' toegevoegd (ronde 52, punt 2): kan_planning_zien geeft ook toegang tot Urenregistratie
@@ -28777,7 +28988,7 @@ window.CaCalcApp = {
   // hebben intussen elk hun eigen cados.html/cacalc.html, dus die knop hoort hier niet meer thuis).
   // 'cafin' bewust ook hier uitgesloten (zelfde redenering als cados/cacalc) -- fase 1 toont CaFin
   // enkel in de volledige site (index.html), nog geen eigen losse app zoals cados.html/cacalc.html.
-  const WERF_TABS = ALL_TABS.filter(t => t !== 'inzet' && t !== 'cados' && t !== 'cacalc' && t !== 'cafin');
+  const WERF_TABS = ALL_TABS.filter(t => t !== 'inzet' && t !== 'cados' && t !== 'cacalc' && t !== 'cafin' && t !== 'materialen');
   // Eigen installeerbare "CaDos"-app (2026-09-23, op vraag van Peter: "Is er geen html voor
   // cados?"), naast de al bestaande Werf-/Planning-apps -- cados.html (zie build-apps.js) toont
   // enkel het CaDos-tabblad, met zijn eigen naam/icoon/favicon voor een eigen homescherm-
@@ -28857,6 +29068,9 @@ window.CaCalcApp = {
     // planning mag zien. "Goedkeuren" impliceert altijd ook "zien" (zie buildPermCheckbox()
     // hieronder, waar dat vinkje enkel zichtbaar is zodra "zien" al aanstaat).
     if(p.kan_facturen_zien || p.kan_facturen_goedkeuren) tabs.add('cafin');
+    // Materialen (2026-11-13): eigen vinkjespaar; nog nooit ingesteld = standaardrecht van de rol
+    // (bureau: Management/Projectleider/Administratie), zie matRecht().
+    if(matMagZien()) tabs.add('materialen');
     // "Projecten"/"Bedrijfsgegevens" blijven, zoals voorheen bij beide oude toegangsniveaus,
     // gewoon zichtbaar zodra er sowieso ergens toegang is (puur "geen enkel vinkje aan" -- bv.
     // een Onderaannemer -- blijft volledig buitengesloten, zie #no-access-screen).
@@ -28878,19 +29092,22 @@ window.CaCalcApp = {
     ['kan_voorstellen_maken', 'Voorstellen maken'],
     ['ziet_alle_projecten', 'Ziet alle projecten'],
     ['kan_facturen_zien', 'Facturen zien'],
-    ['kan_facturen_goedkeuren', 'Facturen goedkeuren']
+    ['kan_facturen_goedkeuren', 'Facturen goedkeuren'],
+    ['kan_materialen_zien', 'Materialen zien'],
+    ['kan_materialen_beheren', 'Materialen importeren']
   ];
-  function rolSjabloonVan(vz, vm, pz, pl, vsm, zap, fz, fg){
+  function rolSjabloonVan(vz, vm, pz, pl, vsm, zap, fz, fg, mz, mb){
     return { kan_verslagen_zien: vz, kan_verslagen_maken: vm, kan_planning_zien: pz, is_planner: pl,
-      kan_voorstellen_maken: vsm, ziet_alle_projecten: zap, kan_facturen_zien: fz, kan_facturen_goedkeuren: fg };
+      kan_voorstellen_maken: vsm, ziet_alle_projecten: zap, kan_facturen_zien: fz, kan_facturen_goedkeuren: fg,
+      kan_materialen_zien: !!mz, kan_materialen_beheren: !!mb };
   }
   const ROL_SJABLONEN_STANDAARD = {
     'Technieker':         rolSjabloonVan(true,  true,  true,  false, true,  false, false, false),
     'Programmeur':        rolSjabloonVan(true,  true,  true,  false, true,  false, false, false),
     'Service technieker': rolSjabloonVan(true,  true,  true,  false, true,  false, false, false),
-    'Management':         rolSjabloonVan(true,  true,  true,  true,  true,  true,  true,  true),
-    'Projectleider':      rolSjabloonVan(true,  true,  true,  true,  true,  true,  true,  true),
-    'Administratie':      rolSjabloonVan(true,  false, true,  false, false, false, true,  false),
+    'Management':         rolSjabloonVan(true,  true,  true,  true,  true,  true,  true,  true,  true,  true),
+    'Projectleider':      rolSjabloonVan(true,  true,  true,  true,  true,  true,  true,  true,  true,  true),
+    'Administratie':      rolSjabloonVan(true,  false, true,  false, false, false, true,  false, true,  true),
     'Flexi':              rolSjabloonVan(false, false, false, false, false, false, false, false),
     'Onderaannemer':      rolSjabloonVan(false, false, false, false, false, false, false, false)
   };
@@ -34819,8 +35036,8 @@ window.CaCalcApp = {
     // (data-short); updateAppTitleForWidth() hieronder kiest welke van de twee getoond wordt en
     // wordt bij elk resize/rotatie opnieuw uitgevoerd (zie fitAppBar()).
     (function(){
-      const appTitleFull = (tab === 'inzet') ? 'Planning opmaken' : (tab === 'cados') ? 'CaDos — Elektro & Domotica' : (tab === 'cacalc') ? 'CaCalc — Kabelberekening' : (tab === 'cafin') ? 'CaFin — Facturen' : (tab === 'projecten') ? 'Projecten' : (tab === 'bedrijf') ? 'Bedrijfsgegevens' : (tab === 'verslagen') ? 'Verslagen' : (tab === 'actiepunten') ? 'Actiepunten' : (tab === 'planning') ? 'Planningspunten' : (tab === 'uren') ? 'Uren' : (tab === 'mijn-planning') ? 'Mijn planning' : 'Werfverslag maken';
-      const appTitleShort = { inzet: 'Planning', cados: 'CaDos', cacalc: 'CaCalc', cafin: 'CaFin', bedrijf: 'Bedrijf', planning: 'Planning', uren: 'Uren', 'mijn-planning': 'Mijn planning' }[tab] || appTitleFull;
+      const appTitleFull = (tab === 'inzet') ? 'Planning opmaken' : (tab === 'cados') ? 'CaDos — Elektro & Domotica' : (tab === 'cacalc') ? 'CaCalc — Kabelberekening' : (tab === 'cafin') ? 'CaFin — Facturen' : (tab === 'materialen') ? 'Materialen' : (tab === 'projecten') ? 'Projecten' : (tab === 'bedrijf') ? 'Bedrijfsgegevens' : (tab === 'verslagen') ? 'Verslagen' : (tab === 'actiepunten') ? 'Actiepunten' : (tab === 'planning') ? 'Planningspunten' : (tab === 'uren') ? 'Uren' : (tab === 'mijn-planning') ? 'Mijn planning' : 'Werfverslag maken';
+      const appTitleShort = { inzet: 'Planning', cados: 'CaDos', cacalc: 'CaCalc', cafin: 'CaFin', materialen: 'Materialen', bedrijf: 'Bedrijf', planning: 'Planning', uren: 'Uren', 'mijn-planning': 'Mijn planning' }[tab] || appTitleFull;
       const h1El = el('app-title');
       h1El.dataset.full = appTitleFull;
       h1El.dataset.short = appTitleShort;
@@ -34830,7 +35047,7 @@ window.CaCalcApp = {
     // Ronde 48: actieve hoofdapp op <body> zetten -> --app/--app-soft (herkenningskleur, zie :root/
     // DESIGN-ronde48.md §2). Projecten/Bedrijfsgegevens horen bij geen enkele app en laten de vorige
     // waarde gewoon staan. data-tab wordt enkel door CSS gebruikt (bv. de terug-chevron in de app-bar).
-    const appForTab = { verslag: 'werf', verslagen: 'werf', actiepunten: 'werf', planning: 'werf', uren: 'werf', inzet: 'planning', cados: 'dossier', cacalc: 'calc', cafin: 'cafin' }[tab];
+    const appForTab = { verslag: 'werf', verslagen: 'werf', actiepunten: 'werf', planning: 'werf', uren: 'werf', inzet: 'planning', cados: 'dossier', cacalc: 'calc', cafin: 'cafin', materialen: 'mat' }[tab];
     if(appForTab) document.body.dataset.app = appForTab;
     document.body.dataset.tab = tab;
     // Ronde 71 (2026-10-07): de header-projectkiezer blijft bestaan (nodig voor Dossier/
@@ -34852,6 +35069,7 @@ window.CaCalcApp = {
     if(tab === 'cados') refreshCadosTab();
     if(tab === 'cacalc') refreshCacalcTab();
     if(tab === 'cafin') refreshCafinTab();
+    if(tab === 'materialen') refreshMaterialenTab();
     // Ronde 71 (herontwerp start Werfverslag): toont gewoon het scherm dat state.verslagScreen al
     // aangeeft (keuze/kiesProject/form) -- GEEN automatische overname meer van het bovenaan gekozen
     // project in een leeg concept (dat was verslagTabBinnengekomen()'s taak t/m ronde 70) en geen
@@ -34861,6 +35079,904 @@ window.CaCalcApp = {
     if(tab === 'mijn-planning') renderMijnPlanningTab();
     pushHistoryState(); // ronde 59: terugknop toont voortaan de vorige tab i.p.v. de app te sluiten
   }
+
+  // ===================== Materialen (materialen- en prijsdatabank, 2026-11-13) =====================
+  // Zie <section id="tab-materialen"> en claude/materialen-module-implementatieplan.md.
+  // Databank: artikelen (centraal), leverancier_artikelen (code per leverancier), prijsregistraties
+  // (historiek, nooit overschreven), view artikel_prijzen_actueel (laatste prijs per artikel per
+  // leverancier), imports + import_regels (tijdelijke importlijst), functies import_voorstellen()
+  // (herkenning: leverancierscode -> EAN -> merk+fabrikantnr -> merk+type) en import_bevestigen()
+  // (alles-of-niets). Bronnen van een import: de Chrome-extensie "CaSuite Mand" (postMessage
+  // 'casuite-mand'), Excel/CSV, of OCI (Edge Function oci-hook).
+  // De extensie leest enkel uit: deze code stuurt de webshop nooit aan, plaatst niets in een mandje
+  // en bestelt nooit iets.
+  const MAT_PAGINA = 80;
+  const MAT_CONSUMENT_DOMEINEN = ['bol.com', 'coolblue.', 'amazon.', 'hornbach.', 'gamma.', 'brico.', 'praxis.', 'action.com', 'ikea.', 'mediamarkt.', 'krefel.', 'vandenborre.'];
+  const MAT_KLEUREN = ['#8b5a2b', '#2563c9', '#1b6b3e', '#c0392b', '#7a4fc9', '#b7791f', '#0f7480', '#555f6b'];
+  const mat = {
+    geladen: false, laden: null,
+    artikelen: [], prijzen: [], levArt: [], leveranciers: [], levById: {},
+    getoond: MAT_PAGINA, sub: 'artikels', zoekTimer: null,
+    extensie: null,           // versie van de extensie, of null
+    review: null,             // { imp, regels, kandidaten:{}, actueel:{}, shopTabId }
+    ociWacht: null
+  };
+
+  function matRecht(veld){
+    const email = (state.session && state.session.user && state.session.user.email) || '';
+    if(typeof isPeterEmail === 'function' && isPeterEmail(email)) return true;
+    const p = state.currentPerson;
+    if(!p) return false;
+    if(p[veld] != null) return !!p[veld];
+    const sj = rolSjabloon(p.rol); // nog nooit ingesteld: standaardrecht van de rol (bureau = aan)
+    return !!(sj && sj[veld]);
+  }
+  function matMagBeheren(){ return matRecht('kan_materialen_beheren'); }
+  function matMagZien(){ return matRecht('kan_materialen_zien') || matMagBeheren(); }
+
+  function matToast(tekst, fout){
+    const t = el('mat-toast'); if(!t) return;
+    t.textContent = tekst; t.className = 'mat-toast' + (fout ? ' fout' : ''); t.style.display = 'block';
+    clearTimeout(matToast._t); matToast._t = setTimeout(() => { t.style.display = 'none'; }, fout ? 7000 : 3500);
+  }
+  function matGetal(v){
+    if(v == null) return null;
+    if(typeof v === 'number') return isFinite(v) ? v : null;
+    let s = String(v).trim().replace(/[€\s ]/g, '').replace(/^EUR/i, '');
+    if(!s) return null;
+    if(s.includes(',') && s.includes('.')){
+      s = s.lastIndexOf(',') > s.lastIndexOf('.') ? s.replace(/\./g, '').replace(',', '.') : s.replace(/,/g, '');
+    } else if(s.includes(',')) s = s.replace(',', '.');
+    s = s.replace(/[^0-9.\-]/g, '');
+    const n = Number(s); return (s && isFinite(n)) ? n : null;
+  }
+  function matEuro(v, dec){
+    if(v == null || v === '') return '—';
+    return '€ ' + Number(v).toLocaleString('nl-BE', { minimumFractionDigits: 2, maximumFractionDigits: dec == null ? 4 : dec });
+  }
+  function matDatum(v){ return v ? new Date(v).toLocaleDateString('nl-BE', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'; }
+  function matDatumTijd(v){ return v ? new Date(v).toLocaleString('nl-BE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'; }
+  function matNorm(t){ return String(t || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+  function matWie(){ return (state.session && state.session.user && state.session.user.email) || null; }
+  function matHost(url){ try{ return new URL(url).hostname.replace(/^www\./, ''); }catch(e){ return ''; } }
+
+  async function matAlles(tabel, select, volgorde){
+    const uit = [];
+    for(let van = 0; van < 50000; van += 1000){
+      let q = sb.from(tabel).select(select).range(van, van + 999);
+      if(volgorde) q = q.order(volgorde);
+      const { data, error } = await q;
+      if(error) throw error;
+      uit.push(...(data || []));
+      if(!data || data.length < 1000) break;
+    }
+    return uit;
+  }
+
+  async function matLaad(forceer){
+    if(mat.laden && !forceer) return mat.laden;
+    mat.laden = (async () => {
+      const [lev, art, prijs, la] = await Promise.all([
+        sb.from('leveranciers').select('*').order('volgorde').order('naam'),
+        matAlles('artikelen', '*', 'omschrijving'),
+        matAlles('artikel_prijzen_actueel', '*'),
+        matAlles('leverancier_artikelen', 'id,artikel_id,leverancier_id,artikelnr,omschrijving,url,laatst_gezien_op')
+      ]);
+      if(lev.error) throw lev.error;
+      mat.leveranciers = lev.data || [];
+      mat.levById = {}; mat.leveranciers.forEach(l => { mat.levById[l.id] = l; });
+      mat.artikelen = art; mat.prijzen = prijs; mat.levArt = la;
+      const pPer = {}; prijs.forEach(p => { (pPer[p.artikel_id] = pPer[p.artikel_id] || []).push(p); });
+      const lPer = {}; la.forEach(x => { (lPer[x.artikel_id] = lPer[x.artikel_id] || []).push(x); });
+      mat.artikelen.forEach(a => {
+        a._prijzen = (pPer[a.id] || []).slice().sort((x, y) => Number(x.netto) - Number(y.netto));
+        a._codes = lPer[a.id] || [];
+        a._best = a._prijzen[0] || null;
+        a._laatst = a._prijzen.reduce((m, p) => (!m || p.geregistreerd_op > m) ? p.geregistreerd_op : m, null);
+        a._zoek = [a.omschrijving, a.merk, a.fabrikant_artnr, a.ean, a.type_model, a.categorie, ...a._codes.map(c => c.artikelnr + ' ' + (c.omschrijving || ''))].join(' ').toLowerCase();
+      });
+      mat.geladen = true;
+    })();
+    try{ await mat.laden; }catch(err){ mat.laden = null; throw err; }
+    return mat.laden;
+  }
+
+  async function refreshMaterialenTab(){
+    document.body.classList.toggle('mat-mag-beheren', matMagBeheren());
+    matKiesSub(mat.sub, true);
+    el('mat-lijst').innerHTML = '<p class="hint">Laden…</p>';
+    try{
+      await matLaad(true);
+    }catch(err){
+      el('mat-lijst').innerHTML = `<div class="mat-leeg"><strong>Laden mislukt</strong>${escapeHtml(err.message || String(err))}</div>`;
+      return;
+    }
+    matVulFilters();
+    matRenderLijst();
+    matTelImports();
+    if(mat.sub === 'imports') matRenderImports();
+    if(mat.sub === 'leveranciers') matRenderLeveranciers();
+    // Terug van een OCI-webshop (oci-hook stuurt naar ?oci=<sessie>)
+    const ociId = new URLSearchParams(location.search).get('oci');
+    if(ociId){
+      try{ history.replaceState(history.state, '', location.pathname + location.hash); }catch(e){}
+      matOciOntvangen(ociId);
+    }
+  }
+
+  function matKiesSub(naam, stil){
+    mat.sub = naam;
+    document.querySelectorAll('.mat-subtab').forEach(b => b.setAttribute('aria-selected', String(b.dataset.matSub === naam)));
+    document.querySelectorAll('[data-mat-paneel]').forEach(p => { p.style.display = p.dataset.matPaneel === naam ? '' : 'none'; });
+    if(stil) return;
+    if(naam === 'imports') matRenderImports();
+    if(naam === 'leveranciers') matRenderLeveranciers();
+  }
+
+  function matVulFilters(){
+    const keep = (id, html) => { const s = el(id); const v = s.value; s.innerHTML = html; s.value = v; if(s.value !== v) s.value = ''; };
+    keep('mat-f-lev', '<option value="">Alle leveranciers</option>' + mat.leveranciers.map(l => `<option value="${escapeHtml(l.id)}">${escapeHtml(l.naam)}</option>`).join(''));
+    const merken = [...new Set(mat.artikelen.map(a => (a.merk || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'nl'));
+    keep('mat-f-merk', '<option value="">Alle merken</option>' + merken.map(m => `<option>${escapeHtml(m)}</option>`).join(''));
+    const cats = [...new Set(mat.artikelen.map(a => (a.categorie || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'nl'));
+    keep('mat-f-cat', '<option value="">Alle categorieën</option>' + cats.map(m => `<option>${escapeHtml(m)}</option>`).join(''));
+    el('mat-tel-artikels').textContent = mat.artikelen.length ? mat.artikelen.length.toLocaleString('nl-BE') : '';
+  }
+
+  // Prijs gewijzigd = de laatste prijsregistratie van een leverancier verschilt van de vorige.
+  // Daarvoor is de vorige prijs nodig: die halen we op voor de getoonde artikels.
+  mat.vorige = {};
+  async function matLaadVorige(ids){
+    const nodig = ids.filter(id => !(id in mat.vorige));
+    if(!nodig.length) return;
+    nodig.forEach(id => { mat.vorige[id] = {}; });
+    for(let i = 0; i < nodig.length; i += 150){
+      const { data } = await sb.from('prijsregistraties').select('artikel_id,leverancier_id,netto,geregistreerd_op').in('artikel_id', nodig.slice(i, i + 150)).order('geregistreerd_op', { ascending: false }).limit(5000);
+      const tel = {};
+      (data || []).forEach(p => {
+        const k = p.artikel_id + '|' + p.leverancier_id; tel[k] = (tel[k] || 0) + 1;
+        if(tel[k] === 2) mat.vorige[p.artikel_id][p.leverancier_id] = Number(p.netto);
+      });
+    }
+  }
+  function matWijziging(a){
+    const v = mat.vorige[a.id]; if(!v) return null;
+    let beste = null;
+    a._prijzen.forEach(p => {
+      const oud = v[p.leverancier_id];
+      if(oud != null && Number(p.netto) !== oud){
+        const pct = (Number(p.netto) - oud) / oud * 100;
+        if(!beste || Math.abs(pct) > Math.abs(beste.pct)) beste = { pct, oud, nieuw: Number(p.netto), lev: p.leverancier_id };
+      }
+    });
+    return beste;
+  }
+
+  function matGefilterd(){
+    const q = el('mat-zoek').value.trim().toLowerCase();
+    const woorden = q.split(/\s+/).filter(Boolean);
+    const lev = el('mat-f-lev').value, merk = el('mat-f-merk').value, cat = el('mat-f-cat').value;
+    const fav = el('mat-f-fav').checked, wijz = el('mat-f-wijz').checked;
+    return mat.artikelen.filter(a => {
+      if(fav && !a.favoriet) return false;
+      if(merk && (a.merk || '').trim() !== merk) return false;
+      if(cat && (a.categorie || '').trim() !== cat) return false;
+      if(lev && !a._codes.some(c => c.leverancier_id === lev) && !a._prijzen.some(p => p.leverancier_id === lev)) return false;
+      if(wijz && !matWijziging(a)) return false;
+      return woorden.every(w => a._zoek.includes(w));
+    });
+  }
+
+  async function matRenderLijst(){
+    const w = el('mat-lijst');
+    if(el('mat-f-wijz').checked) await matLaadVorige(mat.artikelen.map(a => a.id));
+    const lijst = matGefilterd();
+    if(!mat.artikelen.length){
+      w.innerHTML = `<div class="mat-leeg"><strong>Nog geen materialen</strong>${matMagBeheren() ? 'Klik op <b>Artikels importeren</b> om een winkelmandje van een webshop of een Excel-lijst binnen te halen.' : 'Er zijn nog geen artikels geïmporteerd.'}</div>`;
+      el('mat-meer-wrap').style.display = 'none';
+      return;
+    }
+    if(!lijst.length){
+      w.innerHTML = '<div class="mat-leeg"><strong>Niets gevonden</strong>Probeer een ander woord, nummer of filter.</div>';
+      el('mat-meer-wrap').style.display = 'none';
+      return;
+    }
+    const toon = lijst.slice(0, mat.getoond);
+    await matLaadVorige(toon.map(a => a.id));
+    w.innerHTML = `<table class="mat-tabel resp"><thead><tr><th style="width:26px"></th><th>Artikel</th><th>EAN</th><th>Leveranciers</th><th class="num">Beste prijs</th><th>Laatste prijs</th></tr></thead><tbody>` +
+      toon.map(a => {
+        const chips = a._prijzen.map((p, i) => {
+          const l = mat.levById[p.leverancier_id];
+          return `<span class="mat-chip ${i === 0 && a._prijzen.length > 1 ? 'best' : ''}">${escapeHtml(l ? l.naam : '?')} <b>${matEuro(p.netto, 2)}</b></span>`;
+        }).join('') || '<span class="mat-sub">geen prijs</span>';
+        const wz = matWijziging(a);
+        const wzHtml = wz ? ` <span class="mat-badge wijz" title="${escapeHtml((mat.levById[wz.lev] || {}).naam || '')}: ${matEuro(wz.oud)} → ${matEuro(wz.nieuw)}">${wz.pct > 0 ? '▲' : '▼'} ${Math.abs(wz.pct).toLocaleString('nl-BE', { maximumFractionDigits: 1 })}%</span>` : '';
+        return `<tr class="mat-klik" data-mat-art="${escapeHtml(a.id)}">
+          <td class="mat-c-ster"><button type="button" class="mat-ster ${a.favoriet ? 'aan' : ''}" data-mat-ster="${escapeHtml(a.id)}" title="Favoriet" aria-label="Favoriet">★</button></td>
+          <td><div class="mat-oms">${escapeHtml(a.omschrijving)}</div><div class="mat-sub">${escapeHtml([a.merk, a.fabrikant_artnr, a.type_model].filter(Boolean).join(' · '))}${a._codes.length ? ' · ' + a._codes.map(c => escapeHtml(c.artikelnr || '')).filter(Boolean).join(', ') : ''}</div></td>
+          <td data-l="EAN" class="mat-mono">${escapeHtml(a.ean || '—')}</td>
+          <td data-l="Leveranciers">${chips}</td>
+          <td data-l="Beste prijs" class="num">${a._best ? matEuro(a._best.netto, 2) : '—'}${wzHtml}</td>
+          <td data-l="Laatste prijs" class="mat-sub">${matDatum(a._laatst)}</td>
+        </tr>`;
+      }).join('') + '</tbody></table>';
+    el('mat-meer-wrap').style.display = lijst.length > toon.length ? '' : 'none';
+  }
+
+  // ---------- Artikel-detail ----------
+  let matArtEdit = null;
+  async function matOpenArtikel(a){
+    matArtEdit = a || null;
+    const nieuw = !a; a = a || {};
+    el('mat-art-titel').textContent = nieuw ? 'Nieuw artikel' : a.omschrijving;
+    const mag = matMagBeheren();
+    const veld = (id, lbl, val, extra) => `<div class="field"><label for="${id}">${lbl}</label><input type="text" id="${id}" value="${escapeHtml(val || '')}" ${mag ? '' : 'disabled'} ${extra || ''}></div>`;
+    el('mat-art-body').innerHTML = `
+      <div class="field"><label for="mat-a-oms">Omschrijving</label><input type="text" id="mat-a-oms" value="${escapeHtml(a.omschrijving || '')}" ${mag ? '' : 'disabled'}></div>
+      <div class="mat-velden">
+        ${veld('mat-a-merk', 'Merk', a.merk)}${veld('mat-a-fab', 'Fabrikant-artikelnr.', a.fabrikant_artnr)}${veld('mat-a-type', 'Type / model', a.type_model)}
+        ${veld('mat-a-ean', 'EAN', a.ean, 'inputmode="numeric"')}${veld('mat-a-cat', 'Categorie', a.categorie)}${veld('mat-a-eenh', 'Eenheid', a.eenheid, 'placeholder="st, m, rol, doos…"')}
+      </div>
+      <div class="field"><label for="mat-a-not">Notitie</label><textarea id="mat-a-not" rows="2" ${mag ? '' : 'disabled'}>${escapeHtml(a.notitie || '')}</textarea></div>
+      ${nieuw ? '' : '<div id="mat-a-prijzen"><p class="hint">Prijzen laden…</p></div>'}`;
+    el('mat-art-verwijder').style.display = nieuw ? 'none' : '';
+    el('mat-artikel-modal').style.display = 'flex';
+    if(nieuw){ el('mat-a-oms').focus(); return; }
+    const { data: hist, error } = await sb.from('prijsregistraties').select('*').eq('artikel_id', a.id).order('geregistreerd_op', { ascending: true }).limit(2000);
+    const wrap = el('mat-a-prijzen'); if(!wrap || matArtEdit !== a) return;
+    if(error){ wrap.innerHTML = `<p class="hint">Prijzen laden mislukt: ${escapeHtml(error.message)}</p>`; return; }
+    wrap.innerHTML = matPrijsOverzicht(a, hist || []);
+  }
+
+  function matPrijsOverzicht(a, hist){
+    if(!hist.length && !a._codes.length) return '<p class="hint">Nog geen prijzen of leverancierscodes.</p>';
+    const perLev = {};
+    hist.forEach(p => { (perLev[p.leverancier_id || '-'] = perLev[p.leverancier_id || '-'] || []).push(p); });
+    const levIds = Object.keys(perLev);
+    const laatsten = levIds.map(id => perLev[id][perLev[id].length - 1]);
+    const goedkoopst = laatsten.reduce((m, p) => (!m || Number(p.netto) < Number(m.netto)) ? p : m, null);
+    let html = '<div class="mat-blok-titel">Prijs per leverancier</div><table class="mat-tabel resp"><thead><tr><th>Leverancier</th><th>Code</th><th class="num">Bruto</th><th class="num">Korting</th><th class="num">Netto</th><th class="num">Vorige</th><th>Sinds</th></tr></thead><tbody>';
+    levIds.forEach(id => {
+      const rij = perLev[id], p = rij[rij.length - 1], vorige = rij.length > 1 ? rij[rij.length - 2] : null;
+      const l = mat.levById[id]; const code = a._codes.find(c => c.leverancier_id === id);
+      let verschil = '';
+      if(vorige && Number(vorige.netto) !== Number(p.netto)){
+        const pct = (Number(p.netto) - Number(vorige.netto)) / Number(vorige.netto) * 100;
+        verschil = ` <span class="${pct > 0 ? 'mat-op' : 'mat-neer'}">${pct > 0 ? '▲' : '▼'} ${Math.abs(pct).toLocaleString('nl-BE', { maximumFractionDigits: 1 })}%</span>`;
+      }
+      const korting = p.korting_pct != null ? Number(p.korting_pct).toLocaleString('nl-BE') + '%' : (p.korting_bedrag != null ? matEuro(p.korting_bedrag, 2) : '—');
+      html += `<tr><td data-l="Leverancier"><b>${escapeHtml(l ? l.naam : '—')}</b>${goedkoopst === p && levIds.length > 1 ? ' <span class="mat-badge nieuw">goedkoopst</span>' : ''}</td>
+        <td data-l="Code" class="mat-mono">${code && code.url ? `<a href="${escapeHtml(code.url)}" target="_blank" rel="noopener">${escapeHtml(code.artikelnr || 'link')}</a>` : escapeHtml(code ? (code.artikelnr || '—') : '—')}</td>
+        <td data-l="Bruto" class="num">${matEuro(p.bruto, 2)}</td><td data-l="Korting" class="num">${korting}</td>
+        <td data-l="Netto" class="num"><b>${matEuro(p.netto)}</b>${verschil}</td>
+        <td data-l="Vorige" class="num">${vorige ? matEuro(vorige.netto) : '—'}</td><td data-l="Sinds" class="mat-sub">${matDatum(p.geregistreerd_op)}</td></tr>`;
+    });
+    a._codes.filter(c => !perLev[c.leverancier_id]).forEach(c => {
+      const l = mat.levById[c.leverancier_id];
+      html += `<tr><td><b>${escapeHtml(l ? l.naam : '—')}</b></td><td class="mat-mono">${escapeHtml(c.artikelnr || '—')}</td><td colspan="5" class="mat-sub">nog geen prijs</td></tr>`;
+    });
+    html += '</tbody></table>';
+    if(hist.length > 1) html += '<div class="mat-blok-titel">Prijsevolutie (netto)</div>' + matGrafiek(perLev);
+    html += `<details style="margin-top:10px"><summary class="hint" style="cursor:pointer">Alle ${hist.length} prijsregistraties</summary><table class="mat-tabel"><tbody>` +
+      hist.slice().reverse().map(p => `<tr><td class="mat-sub">${matDatumTijd(p.geregistreerd_op)}</td><td>${escapeHtml((mat.levById[p.leverancier_id] || {}).naam || '—')}</td><td class="num">${matEuro(p.netto)}</td><td class="mat-sub">${escapeHtml(p.bron || '')}</td></tr>`).join('') + '</tbody></table></details>';
+    return html;
+  }
+
+  function matGrafiek(perLev){
+    const B = 640, H = 200, ml = 54, mr = 12, mt = 10, mb = 26;
+    const alle = [].concat(...Object.values(perLev));
+    const t0 = Math.min(...alle.map(p => +new Date(p.geregistreerd_op))), t1 = Math.max(...alle.map(p => +new Date(p.geregistreerd_op)));
+    let y0 = Math.min(...alle.map(p => Number(p.netto))), y1 = Math.max(...alle.map(p => Number(p.netto)));
+    if(y0 === y1){ y0 *= 0.9; y1 *= 1.1; if(y1 === 0) y1 = 1; }
+    const pad = (y1 - y0) * 0.1; y0 = Math.max(0, y0 - pad); y1 += pad;
+    const x = t => t1 === t0 ? (ml + (B - ml - mr) / 2) : ml + (t - t0) / (t1 - t0) * (B - ml - mr);
+    const y = v => mt + (1 - (v - y0) / (y1 - y0)) * (H - mt - mb);
+    let svg = `<svg class="mat-grafiek" viewBox="0 0 ${B} ${H}" role="img" aria-label="Prijsevolutie">`;
+    for(let i = 0; i <= 3; i++){
+      const v = y0 + (y1 - y0) * i / 3, yy = y(v);
+      svg += `<line x1="${ml}" x2="${B - mr}" y1="${yy}" y2="${yy}" stroke="currentColor" stroke-opacity=".12"/><text x="${ml - 6}" y="${yy + 4}" text-anchor="end" font-size="11" fill="currentColor" fill-opacity=".6">${v.toLocaleString('nl-BE', { maximumFractionDigits: 2 })}</text>`;
+    }
+    svg += `<text x="${ml}" y="${H - 6}" font-size="11" fill="currentColor" fill-opacity=".6">${matDatum(t0)}</text><text x="${B - mr}" y="${H - 6}" text-anchor="end" font-size="11" fill="currentColor" fill-opacity=".6">${matDatum(t1)}</text>`;
+    const legende = [];
+    Object.keys(perLev).forEach((id, i) => {
+      const k = MAT_KLEUREN[i % MAT_KLEUREN.length];
+      const pts = perLev[id].map(p => [x(+new Date(p.geregistreerd_op)), y(Number(p.netto))]);
+      // trapfunctie: een prijs geldt tot de volgende registratie
+      let d = '';
+      pts.forEach((pt, j) => { d += j === 0 ? `M${pt[0]},${pt[1]}` : `H${pt[0]}V${pt[1]}`; });
+      svg += `<path d="${d}" fill="none" stroke="${k}" stroke-width="2"/>` + pts.map(pt => `<circle cx="${pt[0]}" cy="${pt[1]}" r="3" fill="${k}"/>`).join('');
+      legende.push(`<span><i style="background:${k}"></i>${escapeHtml((mat.levById[id] || {}).naam || '—')}</span>`);
+    });
+    return svg + '</svg><div class="mat-legende">' + legende.join('') + '</div>';
+  }
+
+  async function matArtikelOpslaan(){
+    if(!matMagBeheren()) return;
+    const oms = el('mat-a-oms').value.trim();
+    if(!oms){ matToast('Geef een omschrijving in.', true); return; }
+    const v = id => (el(id).value || '').trim() || null;
+    const rij = { omschrijving: oms, merk: v('mat-a-merk'), fabrikant_artnr: v('mat-a-fab'), type_model: v('mat-a-type'), ean: v('mat-a-ean'),
+      categorie: v('mat-a-cat'), eenheid: v('mat-a-eenh'), notitie: v('mat-a-not'), updated_at: new Date().toISOString() };
+    const res = matArtEdit
+      ? await sb.from('artikelen').update(rij).eq('id', matArtEdit.id)
+      : await sb.from('artikelen').insert(Object.assign(rij, { aangemaakt_door: matWie() }));
+    if(res.error){ matToast('Opslaan mislukt: ' + res.error.message, true); return; }
+    el('mat-artikel-modal').style.display = 'none';
+    matToast('Opgeslagen.');
+    await matLaad(true); matVulFilters(); matRenderLijst();
+  }
+  async function matArtikelVerwijder(){
+    if(!matArtEdit || !matMagBeheren()) return;
+    if(!confirm(`"${matArtEdit.omschrijving}" verwijderen? Ook de leverancierscodes en de volledige prijshistoriek van dit artikel verdwijnen. Dit kan niet ongedaan gemaakt worden.`)) return;
+    const { error } = await sb.from('artikelen').delete().eq('id', matArtEdit.id);
+    if(error){ matToast('Verwijderen mislukt: ' + error.message, true); return; }
+    el('mat-artikel-modal').style.display = 'none';
+    matToast('Verwijderd.');
+    await matLaad(true); matVulFilters(); matRenderLijst();
+  }
+
+  // ---------- Excel-export ----------
+  function matExport(){
+    const lijst = matGefilterd();
+    if(!lijst.length){ matToast('Geen artikels om te exporteren.', true); return; }
+    if(!window.XLSX){ matToast('Excel-bibliotheek niet geladen.', true); return; }
+    const levs = mat.leveranciers.filter(l => lijst.some(a => a._prijzen.some(p => p.leverancier_id === l.id)));
+    const rijen = lijst.map(a => {
+      const r = { 'Omschrijving': a.omschrijving, 'Merk': a.merk || '', 'Fabrikant-artikelnr.': a.fabrikant_artnr || '', 'Type/model': a.type_model || '',
+        'EAN': a.ean || '', 'Categorie': a.categorie || '', 'Eenheid': a.eenheid || '',
+        'Beste prijs': a._best ? Number(a._best.netto) : '', 'Goedkoopste leverancier': a._best ? ((mat.levById[a._best.leverancier_id] || {}).naam || '') : '' };
+      levs.forEach(l => {
+        const p = a._prijzen.find(x => x.leverancier_id === l.id); const c = a._codes.find(x => x.leverancier_id === l.id);
+        r[l.naam + ' code'] = c ? (c.artikelnr || '') : '';
+        r[l.naam + ' netto'] = p ? Number(p.netto) : '';
+        r[l.naam + ' datum'] = p ? new Date(p.geregistreerd_op).toLocaleDateString('nl-BE') : '';
+      });
+      r['Favoriet'] = a.favoriet ? 'ja' : '';
+      return r;
+    });
+    const ws = window.XLSX.utils.json_to_sheet(rijen);
+    ws['!cols'] = Object.keys(rijen[0]).map(k => ({ wch: k === 'Omschrijving' ? 50 : Math.max(10, k.length + 2) }));
+    const wb = window.XLSX.utils.book_new();
+    window.XLSX.utils.book_append_sheet(wb, ws, 'Materialen');
+    window.XLSX.writeFile(wb, `CaSuite-materialen-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  }
+
+  // ---------- Import starten ----------
+  function matLevVoorHost(host){
+    host = (host || '').toLowerCase().replace(/^www\./, '');
+    return mat.leveranciers.find(l => (l.domeinen || []).some(d => d && (host === d.toLowerCase() || host.endsWith('.' + d.toLowerCase()))))
+      || mat.leveranciers.find(l => l.webshop_url && matHost(l.webshop_url) === host) || null;
+  }
+  function matExtVersie(){
+    try{ if(!mat.extensie && document.documentElement.dataset.casuiteMand) mat.extensie = document.documentElement.dataset.casuiteMand; }catch(e){}
+    return mat.extensie;
+  }
+  function matOpenImport(){
+    matExtVersie();
+    if(!matMagBeheren()){ matToast('Je hebt geen recht om te importeren.', true); return; }
+    const ext = mat.extensie
+      ? `<div class="mat-ext ok">✓ De Chrome-extensie <b>CaSuite Mand</b> is actief (versie ${escapeHtml(mat.extensie)}). Open hieronder een webshop, vul je mandje en klik op de webshop op <b>Mand ophalen</b>.</div>`
+      : `<div class="mat-ext nee"><b>De Chrome-extensie CaSuite Mand is niet gevonden in deze browser.</b> Zonder extensie kan CaSuite het mandje van een webshop niet uitlezen. Installeer ze eenmalig (zie de handleiding bij Leveranciers), of importeer hieronder een Excel-lijst.</div>`;
+    const shops = mat.leveranciers.filter(l => l.actief && l.webshop_url);
+    el('mat-import-body').innerHTML = ext +
+      `<div class="mat-blok-titel">1. Mandje uit een webshop</div>
+       <div class="mat-shops">${shops.map(l => `<button type="button" class="mat-shop" data-mat-shop="${escapeHtml(l.id)}"><b>${escapeHtml(l.naam)}</b><small>${escapeHtml(matHost(l.webshop_url))}</small></button>`).join('')}
+         <button type="button" class="mat-shop" data-mat-shop="__ander"><b>Andere webshop…</b><small>adres zelf ingeven</small></button></div>
+       <p class="hint" style="margin:-4px 0 0">De webshop opent in een nieuw tabblad. Meld je aan met je eigen account. CaSuite bestelt niets en verandert niets aan je mandje: het leest enkel uit, nadat jij op <b>Mand ophalen</b> klikt.</p>
+       <div class="mat-blok-titel">2. Excel- of CSV-lijst</div>
+       <div class="mat-velden"><div class="field"><label for="mat-xl-lev">Leverancier</label><select id="mat-xl-lev">${mat.leveranciers.map(l => `<option value="${escapeHtml(l.id)}">${escapeHtml(l.naam)}</option>`).join('')}</select></div>
+         <div class="field"><label for="mat-xl-bestand">Bestand</label><input type="file" id="mat-xl-bestand" accept=".xlsx,.xls,.csv,.txt"></div></div>
+       <div id="mat-xl-map"></div>
+       ${shops.some(l => l.oci_url) ? `<div class="mat-blok-titel">3. Via OCI-koppeling</div><div class="mat-shops">${shops.filter(l => l.oci_url).map(l => `<button type="button" class="mat-shop" data-mat-oci="${escapeHtml(l.id)}"><b>${escapeHtml(l.naam)}</b><small>OCI-punchout</small></button>`).join('')}</div>` : ''}`;
+    el('mat-import-modal').style.display = 'flex';
+  }
+  function matOpenShop(l){
+    let url = l ? l.webshop_url : prompt('Adres van de webshop (bv. https://www.bol.com):', 'https://');
+    if(!url) return;
+    if(!/^https?:\/\//i.test(url)) url = 'https://' + url;
+    window.open(url, '_blank', 'noopener');
+    el('mat-import-modal').style.display = 'none';
+    matToonWacht(`<b>${escapeHtml(l ? l.naam : matHost(url))}</b> is geopend in een nieuw tabblad.`,
+      ['Meld je aan en vul je winkelmandje zoals altijd.', 'Ga naar het winkelmandje en klik rechtsonder op <b>Mand ophalen</b>.', 'De gevonden artikels verschijnen hier om te controleren.']);
+  }
+  function matToonWacht(kop, stappen, extra){
+    el('mat-wacht-plek').innerHTML = `<div class="mat-wacht"><div class="mat-wacht-acties"><span>${kop}</span><span class="mat-sp"></span><button type="button" class="btn btn-ghost btn-sm" data-mat-wacht-weg>✕</button></div>
+      <ol>${stappen.map(s => `<li>${s}</li>`).join('')}</ol>${extra || ''}</div>`;
+  }
+  function matWachtWeg(){ el('mat-wacht-plek').innerHTML = ''; if(mat.ociWacht){ clearInterval(mat.ociWacht); mat.ociWacht = null; } }
+
+  // ---------- Excel/CSV inlezen ----------
+  const MAT_XL_VELDEN = [
+    ['artikelnr', 'Artikelnr. leverancier', /^(?!.*(fabrikant|merk|manufact|ean|gtin|barcode|prijs|price)).*(artikel|art\.?\s*nr|referentie|\bref\b|code|item|artnr|sku|vendormat)/i],
+    ['omschrijving', 'Omschrijving', /(omschrijving|beschrijving|description|desc|benaming|naam|product)/i],
+    ['merk', 'Merk', /(merk|brand|fabrikant$|manufacturer$)/i],
+    ['fabrikant_artnr', 'Fabrikant-artikelnr.', /(fabrikant.*(nr|nummer|ref|code)|manufact.*(nr|number|code|mat)|typenr)/i],
+    ['type_model', 'Type/model', /^(type|model)/i],
+    ['ean', 'EAN', /(ean|gtin|barcode)/i],
+    ['categorie', 'Categorie', /(categorie|groep|group|familie)/i],
+    ['eenheid', 'Eenheid', /^(eenheid|eenh|unit|uom|me)\b/i],
+    ['aantal', 'Aantal', /^(aantal|qty|quantity|hoeveelheid|aant)/i],
+    ['bruto', 'Brutoprijs', /(bruto|catalogus|lijstprijs|list price|adviesprijs)/i],
+    ['korting_pct', 'Korting %', /(korting|discount|rabat)/i],
+    ['netto', 'Nettoprijs', /(netto|nettoprijs|net price|uw prijs|prijs|price|eenheidsprijs)/i],
+    ['prijs_per', 'Prijs per (aantal)', /(prijs per|prijseenheid|price ?unit|per)$/i],
+    ['btw_pct', 'Btw %', /(btw|vat|tva)/i]
+  ];
+  const matXl = { kop: [], rijen: [], map: {} };
+  async function matLeesBestand(f){
+    try{
+      let rijen;
+      if(/\.(xlsx|xls)$/i.test(f.name)){
+        if(!window.XLSX) throw new Error('Excel-bibliotheek niet geladen');
+        const wb = window.XLSX.read(await f.arrayBuffer(), { type: 'array' });
+        rijen = window.XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: '' });
+      } else {
+        const buf = await f.arrayBuffer();
+        let tekst; try{ tekst = new TextDecoder('utf-8', { fatal: true }).decode(buf); }catch(e){ tekst = new TextDecoder('windows-1252').decode(buf); }
+        rijen = matCsv(tekst);
+      }
+      rijen = rijen.filter(r => r.some(c => String(c).trim() !== ''));
+      let kop = 0;
+      for(let i = 0; i < Math.min(10, rijen.length); i++){
+        if(rijen[i].filter(c => String(c).trim() && matGetal(c) == null).length >= 2 && rijen[i].some(c => MAT_XL_VELDEN.some(v => v[2].test(String(c).trim())))){ kop = i; break; }
+      }
+      matXl.kop = (rijen[kop] || []).map((c, i) => String(c).trim() || ('Kolom ' + (i + 1)));
+      matXl.rijen = rijen.slice(kop + 1); matXl.map = {};
+      const gebruikt = new Set();
+      MAT_XL_VELDEN.forEach(([veld, , re]) => {
+        const i = matXl.kop.findIndex((k, idx) => !gebruikt.has(idx) && re.test(k));
+        if(i >= 0){ matXl.map[veld] = i; gebruikt.add(i); }
+      });
+      matRenderXlMap();
+    }catch(err){ matToast('Bestand lezen mislukt: ' + err.message, true); }
+  }
+  function matCsv(tekst){
+    tekst = tekst.replace(/^﻿/, '');
+    const eerste = tekst.split(/\r?\n/)[0] || '';
+    const sep = [';', '\t', ','].sort((a, b) => eerste.split(b).length - eerste.split(a).length)[0];
+    const rijen = []; let rij = [], v = '', q = false;
+    for(let i = 0; i < tekst.length; i++){
+      const c = tekst[i];
+      if(q){ if(c === '"'){ if(tekst[i + 1] === '"'){ v += '"'; i++; } else q = false; } else v += c; continue; }
+      if(c === '"') q = true;
+      else if(c === sep){ rij.push(v); v = ''; }
+      else if(c === '\n' || c === '\r'){ if(c === '\r' && tekst[i + 1] === '\n') i++; rij.push(v); rijen.push(rij); rij = []; v = ''; }
+      else v += c;
+    }
+    if(v !== '' || rij.length){ rij.push(v); rijen.push(rij); }
+    return rijen;
+  }
+  function matXlRegels(){
+    const m = matXl.map; const cel = (r, k) => m[k] == null ? '' : r[m[k]];
+    const tekst = (r, k) => String(cel(r, k) == null ? '' : cel(r, k)).trim();
+    return matXl.rijen.map(r => {
+      const per = matGetal(cel(r, 'prijs_per'));
+      const deel = v => (v != null && per && per > 0) ? Math.round(v / per * 10000) / 10000 : v;
+      let ean = tekst(r, 'ean'); if(/^\d+(\.0+)?e\+?\d+$/i.test(ean)) ean = String(Math.round(Number(ean)));
+      return { artikelnr: tekst(r, 'artikelnr'), omschrijving: tekst(r, 'omschrijving'), merk: tekst(r, 'merk'), fabrikant_artnr: tekst(r, 'fabrikant_artnr'),
+        type_model: tekst(r, 'type_model'), ean, categorie: tekst(r, 'categorie'), eenheid: tekst(r, 'eenheid'), aantal: matGetal(cel(r, 'aantal')),
+        bruto: deel(matGetal(cel(r, 'bruto'))), korting_pct: matGetal(cel(r, 'korting_pct')), netto: deel(matGetal(cel(r, 'netto'))), btw_pct: matGetal(cel(r, 'btw_pct')) };
+    }).filter(g => g.artikelnr || g.omschrijving);
+  }
+  function matRenderXlMap(){
+    const opts = '<option value="">— niet gebruiken —</option>' + matXl.kop.map((k, i) => `<option value="${i}">${escapeHtml(k)}</option>`).join('');
+    const regels = matXlRegels();
+    el('mat-xl-map').innerHTML = `<p class="hint">Kolommen automatisch herkend, pas aan waar nodig. <b>${regels.length}</b> artikels gevonden.</p>
+      <div class="mat-velden">${MAT_XL_VELDEN.map(([v, lbl]) => `<div class="field"><label>${escapeHtml(lbl)}</label><select data-mat-xl="${v}">${opts}</select></div>`).join('')}</div>
+      <button type="button" class="btn btn-primary" id="mat-xl-start" ${regels.length ? '' : 'disabled'}>Naar de importlijst (${regels.length})</button>`;
+    document.querySelectorAll('[data-mat-xl]').forEach(s => { const v = matXl.map[s.dataset.matXl]; s.value = v == null ? '' : String(v); });
+  }
+
+  // ---------- Tijdelijke importlijst aanmaken ----------
+  function matNetto(g){
+    // Netto excl. btw per eenheid afleiden uit wat de bron gaf.
+    if(g.netto == null && g.prijs_incl != null) g.netto = Math.round(g.prijs_incl / (1 + (g.btw_pct == null ? 21 : g.btw_pct) / 100) * 10000) / 10000;
+    if(g.netto == null && g.bruto != null && g.korting_pct != null) g.netto = Math.round(g.bruto * (1 - g.korting_pct / 100) * 10000) / 10000;
+    if(g.netto == null && g.bruto != null && g.korting_bedrag != null) g.netto = Math.round((g.bruto - g.korting_bedrag) * 10000) / 10000;
+    if(g.netto == null && g.bruto != null && g.korting_pct == null && g.korting_bedrag == null) g.netto = g.bruto;
+    if(g.korting_pct == null && g.bruto != null && g.netto != null && g.bruto > 0 && g.netto < g.bruto) g.korting_pct = Math.round((1 - g.netto / g.bruto) * 100000) / 1000;
+    if(g.prijs_incl == null && g.netto != null && g.btw_pct != null) g.prijs_incl = Math.round(g.netto * (1 + g.btw_pct / 100) * 10000) / 10000;
+    return g;
+  }
+  async function matMaakImport(levId, bron, webshop, regels, ruwe){
+    const { data: imp, error } = await sb.from('imports').insert({ leverancier_id: levId, bron, status: 'te_controleren', webshop: webshop || null, aangemaakt_door: matWie(), aantal_gevonden: regels.length, ruwe_data: ruwe || null }).select().single();
+    if(error) throw error;
+    const velden = ['artikelnr', 'omschrijving', 'merk', 'fabrikant_artnr', 'ean', 'type_model', 'categorie', 'eenheid', 'aantal', 'verpakkingseenheid', 'minimumafname', 'bruto', 'korting_pct', 'korting_bedrag', 'netto', 'btw_pct', 'prijs_incl', 'valuta', 'url'];
+    const rijen = regels.map((g, i) => {
+      g = matNetto(Object.assign({}, g));
+      const r = { import_id: imp.id, volgnr: i + 1, ruw: g.ruw || null };
+      velden.forEach(v => { const w = g[v]; r[v] = (w === '' || w === undefined) ? null : w; });
+      if(r.ean) r.ean = String(r.ean).replace(/\D/g, '') || null;
+      return r;
+    });
+    for(let i = 0; i < rijen.length; i += 500){
+      const { error: e2 } = await sb.from('import_regels').insert(rijen.slice(i, i + 500));
+      if(e2) throw e2;
+    }
+    const { error: e3 } = await sb.rpc('import_voorstellen', { p_import_id: imp.id });
+    if(e3) throw e3;
+    return imp;
+  }
+
+  // ---------- Mandje van de extensie ontvangen ----------
+  // De content-script van de extensie op deze pagina stuurt:
+  //   { type:'casuite-mand-hallo', versie }                         bij het laden
+  //   { type:'casuite-mand', versie:1, shopTabId, bron:{url,host,titel,adapter,prijzenInclBtw}, regels:[…] }
+  // en luistert naar { type:'casuite-mand-sluit', shopTabId } om het webshop-tabblad te sluiten.
+  window.addEventListener('message', ev => {
+    if(ev.source !== window || !ev.data || typeof ev.data !== 'object') return;
+    if(ev.data.type === 'casuite-mand-hallo'){ mat.extensie = String(ev.data.versie || '?'); return; }
+    if(ev.data.type === 'casuite-mand') matMandOntvangen(ev.data);
+  });
+  try{ if(document.documentElement.dataset.casuiteMand) mat.extensie = document.documentElement.dataset.casuiteMand; }catch(e){}
+
+  async function matMandOntvangen(bericht){
+    if(!state.session){ return; }
+    if(!matMagBeheren()){ alert('Je hebt geen recht om materialen te importeren (vinkje "Mag materialen importeren").'); return; }
+    if(!allowedTabs().includes('materialen')) return;
+    if(document.body.dataset.tab !== 'materialen') switchTab('materialen');
+    await matLaad(!mat.geladen).catch(() => {});
+    const bron = bericht.bron || {};
+    const host = (bron.host || matHost(bron.url || '')).replace(/^www\./, '');
+    const regels = Array.isArray(bericht.regels) ? bericht.regels : [];
+    if(!regels.length){
+      matToast(`Geen artikels gevonden op ${host || 'deze pagina'}. Open het winkelmandje zelf en probeer opnieuw.`, true);
+      return;
+    }
+    let lev = matLevVoorHost(host);
+    if(!lev){
+      const naam = prompt(`De webshop ${host} is nog geen leverancier in CaSuite. Onder welke naam wil je hem toevoegen?`, host);
+      if(!naam) return;
+      const { data, error } = await sb.from('leveranciers').insert({ code: matNorm(host).toLowerCase().slice(0, 40) + '-' + Date.now().toString(36), naam: naam.trim(), webshop_url: bron.url ? new URL(bron.url).origin + '/' : null, domeinen: [host], adapter: bron.adapter || 'algemeen', volgorde: 50 }).select().single();
+      if(error){ matToast('Leverancier aanmaken mislukt: ' + error.message, true); return; }
+      lev = data; await matLaad(true); matVulFilters();
+    }
+    const inclBtw = !!bron.prijzenInclBtw || MAT_CONSUMENT_DOMEINEN.some(d => host.includes(d));
+    const omgezet = regels.map(g => {
+      g = Object.assign({}, g);
+      ['aantal', 'bruto', 'korting_pct', 'korting_bedrag', 'netto', 'btw_pct', 'prijs_incl', 'verpakkingseenheid', 'minimumafname'].forEach(k => { g[k] = matGetal(g[k]); });
+      if(inclBtw && g.netto != null && g.prijs_incl == null){ g.prijs_incl = g.netto; g.netto = null; if(g.btw_pct == null) g.btw_pct = 21; if(g.bruto != null) g.bruto = Math.round(g.bruto / (1 + g.btw_pct / 100) * 10000) / 10000; }
+      return g;
+    });
+    matWachtWeg();
+    try{
+      const imp = await matMaakImport(lev.id, 'extensie', host, omgezet, { url: bron.url, titel: bron.titel, adapter: bron.adapter, prijzenInclBtw: inclBtw });
+      await matOpenReview(imp.id, bericht.shopTabId);
+    }catch(err){ matToast('Import aanmaken mislukt: ' + (err.message || err), true); }
+  }
+
+  // ---------- Review: de tijdelijke importlijst ----------
+  async function matOpenReview(importId, shopTabId){
+    const [{ data: imp, error }, { data: regels, error: e2 }] = await Promise.all([
+      sb.from('imports').select('*').eq('id', importId).single(),
+      sb.from('import_regels').select('*').eq('import_id', importId).order('volgnr')
+    ]);
+    if(error || e2){ matToast('Importlijst laden mislukt: ' + (error || e2).message, true); return; }
+    await matLaad(!mat.geladen).catch(() => {});
+    const actueel = {};
+    mat.prijzen.filter(p => p.leverancier_id === imp.leverancier_id).forEach(p => { actueel[p.artikel_id] = Number(p.netto); });
+    mat.review = { imp, regels: regels || [], actueel, shopTabId: shopTabId == null ? (mat.review && mat.review.imp.id === importId ? mat.review.shopTabId : null) : shopTabId };
+    matRenderReview();
+    el('mat-review-modal').style.display = 'flex';
+  }
+  function matArtNaam(id){ const a = mat.artikelen.find(x => x.id === id); return a ? a.omschrijving + (a.merk ? ' · ' + a.merk : '') : '(artikel)'; }
+  function matRegelStatus(r){
+    if(r.keuze === 'overslaan') return ['overslaan', 'Overslaan'];
+    if(r.keuze == null || (r.keuze === 'koppelen' && !r.gekozen_artikel_id)) return ['bevestig', 'Te bevestigen'];
+    if(r.keuze === 'nieuw') return ['nieuw', 'Nieuw'];
+    const oud = mat.review.actueel[r.gekozen_artikel_id];
+    if(oud != null && r.netto != null && Math.round(oud * 10000) !== Math.round(Number(r.netto) * 10000)) return ['wijz', 'Prijs gewijzigd'];
+    return ['bestaand', 'Bestaand'];
+  }
+  function matRenderReview(){
+    const R = mat.review, imp = R.imp, lev = mat.levById[imp.leverancier_id];
+    const alleen = imp.status !== 'te_controleren';
+    el('mat-review-titel').textContent = `Importlijst · ${lev ? lev.naam : (imp.webshop || 'onbekend')} · ${R.regels.length} artikel${R.regels.length === 1 ? '' : 's'}`;
+    const tel = {}; R.regels.forEach(r => { const s = matRegelStatus(r)[0]; tel[s] = (tel[s] || 0) + 1; });
+    const lbl = { nieuw: 'nieuw', bestaand: 'bestaand', wijz: 'prijs gewijzigd', bevestig: 'te bevestigen', overslaan: 'overslaan' };
+    const n = (v, cls) => `<input class="n ${cls || ''}" inputmode="decimal" value="${v == null ? '' : escapeHtml(String(Number(v)).replace('.', ','))}" ${alleen ? 'disabled' : ''}>`;
+    const t = (v, cls) => `<input class="${cls || ''}" value="${escapeHtml(v || '')}" ${alleen ? 'disabled' : ''}>`;
+    const rijen = R.regels.map(r => {
+      const [st, stl] = matRegelStatus(r);
+      let prijsInfo = '';
+      if(st === 'wijz'){ const oud = R.actueel[r.gekozen_artikel_id]; const pct = (Number(r.netto) - oud) / oud * 100; prijsInfo = `<div class="mat-sub">was ${matEuro(oud)} <span class="${pct > 0 ? 'mat-op' : 'mat-neer'}">${pct > 0 ? '▲' : '▼'}${Math.abs(pct).toLocaleString('nl-BE', { maximumFractionDigits: 1 })}%</span></div>`; }
+      const doel = r.gekozen_artikel_id || r.voorstel_artikel_id;
+      const koppel = alleen ? `<span class="mat-sub">${escapeHtml(r.resultaat || r.keuze || '')}</span>` : `
+        <select data-veld="keuze">
+          <option value="" ${r.keuze == null ? 'selected' : ''}>— kies —</option>
+          ${doel ? `<option value="koppelen" ${r.keuze === 'koppelen' ? 'selected' : ''}>Koppelen</option>` : ''}
+          <option value="nieuw" ${r.keuze === 'nieuw' ? 'selected' : ''}>Nieuw artikel</option>
+          <option value="overslaan" ${r.keuze === 'overslaan' ? 'selected' : ''}>Overslaan</option>
+        </select> <button type="button" class="btn btn-ghost btn-sm" data-mat-kies title="Aan een ander bestaand artikel koppelen">Ander…</button>
+        ${doel ? `<span class="mat-sub">${r.keuze === 'koppelen' || !r.keuze ? '→ ' : ''}${escapeHtml(matArtNaam(doel))}${r.voorstel_reden && doel === r.voorstel_artikel_id ? ' (' + escapeHtml(r.voorstel_reden) + ')' : ''}</span>` : ''}`;
+      return `<tr data-regel="${escapeHtml(r.id)}" class="${r.keuze === 'overslaan' ? 'rij-overslaan' : ''}">
+        <td><span class="mat-badge ${st}">${stl}</span></td>
+        <td>${t(r.omschrijving, 'oms" data-veld="omschrijving')}</td>
+        <td>${t(r.artikelnr, '" data-veld="artikelnr')}</td>
+        <td>${t(r.merk, '" data-veld="merk')}</td>
+        <td>${t(r.fabrikant_artnr, '" data-veld="fabrikant_artnr')}</td>
+        <td>${t(r.ean, '" data-veld="ean')}</td>
+        <td>${t(r.eenheid, 'n" data-veld="eenheid')}</td>
+        <td>${n(r.aantal, '" data-veld="aantal')}</td>
+        <td>${n(r.bruto, '" data-veld="bruto')}</td>
+        <td>${n(r.korting_pct, '" data-veld="korting_pct')}</td>
+        <td>${n(r.netto, '" data-veld="netto')}${prijsInfo}</td>
+        <td>${n(r.btw_pct, '" data-veld="btw_pct')}</td>
+        <td class="mat-koppel">${koppel}</td>
+      </tr>`;
+    }).join('');
+    const ruw = imp.ruwe_data || {};
+    el('mat-review-body').innerHTML = `
+      <div class="mat-review-samen">${Object.keys(tel).map(k => `<span class="mat-badge ${k}">${tel[k]} ${lbl[k]}</span>`).join('')}
+        <span class="mat-sub">${escapeHtml({ extensie: 'Uit webshop', excel: 'Uit Excel', oci: 'Via OCI', manueel: 'Manueel' }[imp.bron] || imp.bron)} · ${matDatumTijd(imp.created_at)}${ruw.prijzenInclBtw ? ' · prijzen op de webshop incl. btw, netto = excl. btw' : ''}</span></div>
+      ${alleen ? `<p class="hint">Deze import is ${imp.status === 'geimporteerd' ? 'geïmporteerd op ' + matDatumTijd(imp.geimporteerd_op) + ': ' + imp.aantal_nieuw + ' nieuw, ' + imp.aantal_bestaand + ' bestaand, ' + imp.aantal_prijswijzigingen + ' prijswijzigingen' : 'geannuleerd'}.</p>`
+        : '<p class="hint">Controleer de gegevens en pas aan waar nodig. Netto = prijs per eenheid excl. btw. Blauwe regels moet je zelf bevestigen: koppelen aan het voorgestelde artikel, een nieuw artikel maken of overslaan.</p>'}
+      <div class="mat-review-wrap"><table class="mat-review"><thead><tr><th>Status</th><th>Omschrijving</th><th>Art.nr. lev.</th><th>Merk</th><th>Fabr.-nr.</th><th>EAN</th><th>Eenh.</th><th>Aantal</th><th>Bruto</th><th>Korting %</th><th>Netto</th><th>Btw %</th><th>Koppeling</th></tr></thead><tbody>${rijen}</tbody></table></div>`;
+    const kanImporteren = !alleen && !R.regels.some(r => r.keuze == null || (r.keuze === 'koppelen' && !r.gekozen_artikel_id));
+    el('mat-review-importeer').style.display = alleen ? 'none' : '';
+    el('mat-review-annuleer').style.display = alleen ? 'none' : '';
+    el('mat-review-later').textContent = alleen ? 'Sluiten' : 'Later verder';
+    el('mat-review-importeer').disabled = !kanImporteren;
+    el('mat-review-importeer').title = kanImporteren ? '' : 'Bevestig eerst alle blauwe regels';
+  }
+  const MAT_ID_VELDEN = ['artikelnr', 'merk', 'fabrikant_artnr', 'ean'];
+  async function matRegelWijzig(regelId, veld, waarde){
+    const R = mat.review; const r = R.regels.find(x => x.id === regelId); if(!r) return;
+    const patch = {};
+    if(['aantal', 'bruto', 'korting_pct', 'netto', 'btw_pct'].includes(veld)) patch[veld] = matGetal(waarde);
+    else if(veld === 'keuze'){
+      patch.keuze = waarde || null;
+      if(waarde === 'koppelen') patch.gekozen_artikel_id = r.gekozen_artikel_id || r.voorstel_artikel_id;
+      if(waarde === 'nieuw' || waarde === 'overslaan' || !waarde) patch.gekozen_artikel_id = null;
+    }
+    else patch[veld] = (waarde || '').trim() || null;
+    if(veld === 'ean' && patch.ean) patch.ean = patch.ean.replace(/\D/g, '') || null;
+    // netto opnieuw afleiden als bruto/korting wijzigt
+    if(veld === 'bruto' || veld === 'korting_pct'){
+      const b = veld === 'bruto' ? patch.bruto : r.bruto, k = veld === 'korting_pct' ? patch.korting_pct : r.korting_pct;
+      if(b != null && k != null) patch.netto = Math.round(b * (1 - k / 100) * 10000) / 10000;
+    }
+    const herken = MAT_ID_VELDEN.includes(veld);
+    if(herken){ patch.keuze = null; patch.gekozen_artikel_id = null; }
+    const { error } = await sb.from('import_regels').update(patch).eq('id', regelId);
+    if(error){ matToast('Opslaan mislukt: ' + error.message, true); return; }
+    Object.assign(r, patch);
+    if(herken){
+      await sb.rpc('import_voorstellen', { p_import_id: R.imp.id });
+      const { data } = await sb.from('import_regels').select('*').eq('id', regelId).single();
+      if(data) Object.assign(r, data);
+    }
+    matRenderReview();
+  }
+  let matKiesRegel = null;
+  function matOpenKies(regelId){
+    matKiesRegel = regelId;
+    const r = mat.review.regels.find(x => x.id === regelId);
+    el('mat-kies-zoek').value = r ? (r.merk ? r.merk + ' ' : '') + (r.fabrikant_artnr || (r.omschrijving || '').split(/\s+/).slice(0, 2).join(' ')) : '';
+    matRenderKies();
+    el('mat-kies-modal').style.display = 'flex';
+    el('mat-kies-zoek').focus();
+  }
+  function matRenderKies(){
+    const w = el('mat-kies-zoek').value.toLowerCase().split(/\s+/).filter(Boolean);
+    const lijst = mat.artikelen.filter(a => w.every(x => a._zoek.includes(x))).slice(0, 60);
+    el('mat-kies-lijst').innerHTML = lijst.length ? lijst.map(a => `<button type="button" data-mat-kies-art="${escapeHtml(a.id)}"><div class="mat-oms">${escapeHtml(a.omschrijving)}</div><div class="mat-sub">${escapeHtml([a.merk, a.fabrikant_artnr, a.ean].filter(Boolean).join(' · '))}${a._best ? ' · ' + matEuro(a._best.netto, 2) : ''}</div></button>`).join('')
+      : '<p class="hint">Geen artikels gevonden.</p>';
+  }
+  async function matKiesGekozen(artId){
+    const id = matKiesRegel; el('mat-kies-modal').style.display = 'none';
+    const R = mat.review; const r = R.regels.find(x => x.id === id); if(!r) return;
+    const { error } = await sb.from('import_regels').update({ keuze: 'koppelen', gekozen_artikel_id: artId }).eq('id', id);
+    if(error){ matToast('Opslaan mislukt: ' + error.message, true); return; }
+    r.keuze = 'koppelen'; r.gekozen_artikel_id = artId;
+    matRenderReview();
+  }
+  async function matReviewImporteer(){
+    const R = mat.review; const knop = el('mat-review-importeer');
+    knop.disabled = true; knop.textContent = 'Bezig…';
+    const { data, error } = await sb.rpc('import_bevestigen', { p_import_id: R.imp.id });
+    knop.textContent = 'Importeren';
+    if(error){ knop.disabled = false; matToast('Importeren mislukt: ' + error.message, true); return; }
+    el('mat-review-modal').style.display = 'none';
+    matToast(`Geïmporteerd: ${data.nieuw} nieuw, ${data.bestaand} bestaand, ${data.prijswijzigingen} prijswijziging${data.prijswijzigingen === 1 ? '' : 'en'}.`);
+    if(R.shopTabId != null) window.postMessage({ type: 'casuite-mand-sluit', shopTabId: R.shopTabId }, location.origin);
+    mat.review = null; mat.vorige = {};
+    await matLaad(true); matVulFilters(); matRenderLijst(); matTelImports();
+    if(mat.sub === 'imports') matRenderImports();
+  }
+  async function matReviewAnnuleer(){
+    const R = mat.review;
+    if(!confirm('Deze import annuleren? Er wordt niets in de databank opgeslagen.')) return;
+    await sb.from('imports').update({ status: 'geannuleerd' }).eq('id', R.imp.id);
+    el('mat-review-modal').style.display = 'none'; mat.review = null;
+    matTelImports(); if(mat.sub === 'imports') matRenderImports();
+  }
+
+  // ---------- Imports (historiek) ----------
+  async function matTelImports(){
+    const { count } = await sb.from('imports').select('id', { count: 'exact', head: true }).eq('status', 'te_controleren');
+    el('mat-tel-imports').textContent = count ? String(count) : '';
+  }
+  async function matRenderImports(){
+    const w = el('mat-imports-lijst'); w.innerHTML = '<p class="hint">Laden…</p>';
+    const { data, error } = await sb.from('imports').select('*').order('created_at', { ascending: false }).limit(100);
+    if(error){ w.innerHTML = `<div class="mat-leeg">Laden mislukt: ${escapeHtml(error.message)}</div>`; return; }
+    if(!data.length){ w.innerHTML = '<div class="mat-leeg"><strong>Nog geen imports</strong>Elke import (webshop, Excel of OCI) komt hier in de historiek.</div>'; return; }
+    const st = { te_controleren: ['bevestig', 'Te controleren'], geimporteerd: ['nieuw', 'Geïmporteerd'], geannuleerd: ['overslaan', 'Geannuleerd'] };
+    w.innerHTML = `<table class="mat-tabel resp"><thead><tr><th>Wanneer</th><th>Leverancier</th><th>Bron</th><th>Door</th><th class="num">Gevonden</th><th class="num">Nieuw</th><th class="num">Bestaand</th><th class="num">Prijswijz.</th><th>Status</th></tr></thead><tbody>` +
+      data.map(i => `<tr class="mat-klik" data-mat-import="${escapeHtml(i.id)}"><td>${matDatumTijd(i.created_at)}</td><td data-l="Leverancier">${escapeHtml((mat.levById[i.leverancier_id] || {}).naam || i.webshop || '—')}</td>
+        <td data-l="Bron">${escapeHtml({ extensie: 'Webshop', excel: 'Excel', oci: 'OCI', manueel: 'Manueel' }[i.bron] || i.bron)}</td><td data-l="Door" class="mat-sub">${escapeHtml(i.aangemaakt_door || '')}</td>
+        <td data-l="Gevonden" class="num">${i.aantal_gevonden}</td><td data-l="Nieuw" class="num">${i.status === 'geimporteerd' ? i.aantal_nieuw : '—'}</td><td data-l="Bestaand" class="num">${i.status === 'geimporteerd' ? i.aantal_bestaand : '—'}</td><td data-l="Prijswijz." class="num">${i.status === 'geimporteerd' ? i.aantal_prijswijzigingen : '—'}</td>
+        <td><span class="mat-badge ${st[i.status][0]}">${st[i.status][1]}</span></td></tr>`).join('') + '</tbody></table>';
+  }
+
+  // ---------- Leveranciers ----------
+  function matRenderLeveranciers(){
+    matExtVersie();
+    const w = el('mat-lev-lijst');
+    const telA = {}; mat.levArt.forEach(x => { telA[x.leverancier_id] = (telA[x.leverancier_id] || 0) + 1; });
+    w.innerHTML = `<div class="mat-ext ${mat.extensie ? 'ok' : 'nee'}">${mat.extensie ? `✓ Chrome-extensie CaSuite Mand actief (versie ${escapeHtml(mat.extensie)}).` : '<b>Chrome-extensie CaSuite Mand niet gevonden.</b> Installatie: <a href="./extensie/casuite-mand.zip" download>download casuite-mand.zip</a>, pak het uit, open <code>chrome://extensions</code>, zet rechtsboven <b>Ontwikkelaarsmodus</b> aan, klik <b>Uitgepakte extensie laden</b> en kies de uitgepakte map. Herlaad daarna CaSuite.'}</div>
+      <table class="mat-tabel resp"><thead><tr><th>Leverancier</th><th>Webshop</th><th>Domeinen</th><th>Leveranciersnr.</th><th class="num">Artikels</th><th>OCI</th><th></th></tr></thead><tbody>` +
+      mat.leveranciers.map(l => `<tr class="mat-klik" data-mat-lev="${escapeHtml(l.id)}"><td><b>${escapeHtml(l.naam)}</b>${l.actief ? '' : ' <span class="mat-badge overslaan">inactief</span>'}</td>
+        <td data-l="Webshop">${l.webshop_url ? `<a href="${escapeHtml(l.webshop_url)}" target="_blank" rel="noopener" data-stop>${escapeHtml(matHost(l.webshop_url))}</a>` : '—'}</td>
+        <td data-l="Domeinen" class="mat-sub">${escapeHtml((l.domeinen || []).join(', ') || '—')}</td><td data-l="Leveranciersnr." class="mat-mono">${escapeHtml(l.leveranciersnummer || '—')}</td>
+        <td data-l="Artikels" class="num">${telA[l.id] || 0}</td><td data-l="OCI">${l.oci_url ? '<span class="mat-badge nieuw">ingesteld</span>' : '—'}</td>
+        <td><button type="button" class="btn btn-ghost btn-sm mat-beheer">Bewerken</button></td></tr>`).join('') + '</tbody></table>';
+  }
+  let matLevEdit = null;
+  function matOpenLev(l){
+    if(!matMagBeheren()) return;
+    matLevEdit = l || null; l = l || { actief: true, oci_methode: 'POST', oci_parameters: [] };
+    el('mat-lev-titel').textContent = matLevEdit ? l.naam : 'Nieuwe leverancier';
+    const params = Array.isArray(l.oci_parameters) ? l.oci_parameters : [];
+    const pr = p => `<div class="mat-param-rij"><input class="mat-p-naam" value="${escapeHtml(p.naam || '')}" placeholder="naam"><input class="mat-p-waarde" type="${/PASS/i.test(p.naam || '') ? 'password' : 'text'}" value="${escapeHtml(p.waarde || '')}" placeholder="waarde" autocomplete="new-password"><button type="button" class="btn btn-ghost btn-sm" data-mat-p-weg>✕</button></div>`;
+    el('mat-lev-body').innerHTML = `
+      <div class="mat-velden">
+        <div class="field"><label for="mat-l-naam">Naam</label><input id="mat-l-naam" value="${escapeHtml(l.naam || '')}"></div>
+        <div class="field"><label for="mat-l-nr">Leveranciersnummer</label><input id="mat-l-nr" value="${escapeHtml(l.leveranciersnummer || '')}"></div>
+      </div>
+      <div class="field"><label for="mat-l-url">Webshopadres</label><input id="mat-l-url" value="${escapeHtml(l.webshop_url || '')}" placeholder="https://…"></div>
+      <div class="field"><label for="mat-l-dom">Domeinen (komma-gescheiden, voor automatische herkenning)</label><input id="mat-l-dom" value="${escapeHtml((l.domeinen || []).join(', '))}" placeholder="bv. rexel.be"></div>
+      <label class="chk"><input type="checkbox" id="mat-l-actief" ${l.actief ? 'checked' : ''}> Actief (knop tonen bij importeren)</label>
+      <details style="margin-top:12px" ${l.oci_url ? 'open' : ''}><summary style="cursor:pointer;font-weight:600">OCI-koppeling (optioneel)</summary>
+        <p class="hint">Enkel als de groothandel OCI-punchout aanbiedt. Terugkeeradres (HOOK_URL): <code>${escapeHtml(SUPABASE_URL)}/functions/v1/oci-hook</code></p>
+        <div class="mat-velden" style="grid-template-columns:3fr 1fr"><div class="field"><label for="mat-l-oci">OCI-URL</label><input id="mat-l-oci" value="${escapeHtml(l.oci_url || '')}" placeholder="https://…"></div>
+        <div class="field"><label for="mat-l-meth">Methode</label><select id="mat-l-meth"><option ${l.oci_methode !== 'GET' ? 'selected' : ''}>POST</option><option ${l.oci_methode === 'GET' ? 'selected' : ''}>GET</option></select></div></div>
+        <div id="mat-l-params">${(params.length ? params : [{ naam: 'USERNAME' }, { naam: 'PASSWORD' }]).map(pr).join('')}</div>
+        <button type="button" class="btn btn-ghost btn-sm" id="mat-l-param-plus">+ parameter</button>
+      </details>`;
+    el('mat-l-param-plus').addEventListener('click', () => el('mat-l-params').insertAdjacentHTML('beforeend', pr({})));
+    el('mat-l-params').addEventListener('click', e => { if(e.target.closest('[data-mat-p-weg]')) e.target.closest('.mat-param-rij').remove(); });
+    el('mat-lev-modal').style.display = 'flex';
+  }
+  async function matLevOpslaan(){
+    const naam = el('mat-l-naam').value.trim();
+    if(!naam){ matToast('Geef een naam in.', true); return; }
+    let url = el('mat-l-url').value.trim(); if(url && !/^https?:\/\//i.test(url)) url = 'https://' + url;
+    const oci = el('mat-l-oci').value.trim();
+    if(oci && !/^https:\/\//i.test(oci)){ matToast('De OCI-URL moet met https:// beginnen.', true); return; }
+    const dom = el('mat-l-dom').value.split(/[,\s]+/).map(d => d.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, '')).filter(Boolean);
+    if(!dom.length && url) dom.push(matHost(url));
+    const rij = { naam, leveranciersnummer: el('mat-l-nr').value.trim() || null, webshop_url: url || null, domeinen: dom, actief: el('mat-l-actief').checked,
+      oci_url: oci || null, oci_methode: el('mat-l-meth').value, updated_at: new Date().toISOString(),
+      oci_parameters: Array.from(document.querySelectorAll('#mat-l-params .mat-param-rij')).map(r => ({ naam: r.querySelector('.mat-p-naam').value.trim(), waarde: r.querySelector('.mat-p-waarde').value })).filter(p => p.naam) };
+    const res = matLevEdit ? await sb.from('leveranciers').update(rij).eq('id', matLevEdit.id)
+      : await sb.from('leveranciers').insert(Object.assign(rij, { code: matNorm(naam).toLowerCase().slice(0, 40) + '-' + Date.now().toString(36), adapter: 'algemeen', volgorde: 50 }));
+    if(res.error){ matToast('Opslaan mislukt: ' + res.error.message, true); return; }
+    el('mat-lev-modal').style.display = 'none';
+    await matLaad(true); matVulFilters(); matRenderLeveranciers();
+  }
+
+  // ---------- OCI ----------
+  function matRandomToken(){ const a = new Uint8Array(32); crypto.getRandomValues(a); return Array.from(a, b => b.toString(16).padStart(2, '0')).join(''); }
+  async function matOciStart(l){
+    const tab = window.open('about:blank', 'casuite_webshop');
+    const token = matRandomToken();
+    const terug = location.origin + location.pathname;
+    const { data: sessie, error } = await sb.from('oci_sessies').insert({ token, leverancier_id: l.id, terug_url: terug, aangemaakt_door: matWie() }).select('id').single();
+    if(error){ if(tab) tab.close(); matToast('Kon de webshop niet openen: ' + error.message, true); return; }
+    const hook = SUPABASE_URL + '/functions/v1/oci-hook?t=' + token;
+    let hookGebruikt = false;
+    const velden = (l.oci_parameters || []).filter(p => p && p.naam).map(p => {
+      let w = String(p.waarde == null ? '' : p.waarde);
+      if(w.includes('{HOOK_URL}')){ hookGebruikt = true; w = w.split('{HOOK_URL}').join(hook); }
+      return [p.naam, w];
+    });
+    let actie = l.oci_url.trim();
+    if(actie.includes('{HOOK_URL}')){ hookGebruikt = true; actie = actie.split('{HOOK_URL}').join(encodeURIComponent(hook)); }
+    if(!hookGebruikt) velden.push(['HOOK_URL', hook]);
+    if(!velden.some(([n]) => n.toUpperCase() === '~TARGET')) velden.push(['~TARGET', '_top']);
+    const form = document.createElement('form');
+    form.method = l.oci_methode === 'GET' ? 'GET' : 'POST'; form.action = actie; form.acceptCharset = 'UTF-8';
+    if(tab && !tab.closed) form.target = 'casuite_webshop';
+    velden.forEach(([n, w]) => { const i = document.createElement('input'); i.type = 'hidden'; i.name = n; i.value = w; form.appendChild(i); });
+    document.body.appendChild(form); form.submit(); form.remove();
+    el('mat-import-modal').style.display = 'none';
+    matToonWacht(`OCI-webshop van <b>${escapeHtml(l.naam)}</b> is geopend.`,
+      ['Vul je mandje in het tabblad van de webshop.', 'Klik daar op de knop om het mandje <b>over te nemen</b> (niet op bestellen).', 'Kom terug: de importlijst opent vanzelf.'],
+      '<div class="mat-wacht-acties"><button type="button" class="btn btn-primary btn-sm" data-mat-oci-check>🛒 Haal mandje op</button><span class="mat-sub" id="mat-oci-status">Wachten op het mandje…</span></div>');
+    const check = async (hand) => {
+      const { data: s } = await sb.from('oci_sessies').select('id,ontvangen_op,import_id,fout').eq('id', sessie.id).maybeSingle();
+      if(s && s.ontvangen_op){ matWachtWeg(); matOciOntvangen(s.id); return; }
+      if(hand && el('mat-oci-status')) el('mat-oci-status').textContent = 'Nog niets ontvangen. Klikte je in de webshop al op overnemen?';
+    };
+    mat.ociCheck = check;
+    mat.ociWacht = setInterval(() => check(false), 3000);
+  }
+  async function matOciOntvangen(sessieId){
+    const { data: s } = await sb.from('oci_sessies').select('*').eq('id', sessieId).maybeSingle();
+    if(!s){ matToast('OCI-sessie niet gevonden.', true); return; }
+    if(s.import_id){ matOpenReview(s.import_id); return; }
+    matToast(s.fout === 'leeg' ? 'De webshop stuurde een leeg mandje terug.' : s.fout === 'verlopen' ? 'De OCI-sessie was verlopen. Start opnieuw.' : 'Mandje niet verwerkt: ' + (s.fout || 'onbekende fout'), true);
+  }
+
+  // ---------- Events ----------
+  (function matKoppelEvents(){
+    if(!el('tab-materialen')) return;
+    document.querySelectorAll('.mat-subtab').forEach(b => b.addEventListener('click', () => matKiesSub(b.dataset.matSub)));
+    el('mat-zoek').addEventListener('input', () => { clearTimeout(mat.zoekTimer); mat.zoekTimer = setTimeout(() => { mat.getoond = MAT_PAGINA; matRenderLijst(); }, 200); });
+    ['mat-f-lev', 'mat-f-merk', 'mat-f-cat', 'mat-f-fav', 'mat-f-wijz'].forEach(id => el(id).addEventListener('change', () => { mat.getoond = MAT_PAGINA; matRenderLijst(); }));
+    el('mat-btn-meer').addEventListener('click', () => { mat.getoond += MAT_PAGINA; matRenderLijst(); });
+    el('mat-lijst').addEventListener('click', async e => {
+      const st = e.target.closest('[data-mat-ster]');
+      if(st){
+        e.stopPropagation();
+        const a = mat.artikelen.find(x => x.id === st.dataset.matSter); if(!a || !matMagBeheren()) return;
+        a.favoriet = !a.favoriet; st.classList.toggle('aan', a.favoriet);
+        const { error } = await sb.from('artikelen').update({ favoriet: a.favoriet }).eq('id', a.id);
+        if(error){ a.favoriet = !a.favoriet; st.classList.toggle('aan', a.favoriet); matToast('Opslaan mislukt: ' + error.message, true); }
+        return;
+      }
+      const tr = e.target.closest('[data-mat-art]'); if(tr) matOpenArtikel(mat.artikelen.find(x => x.id === tr.dataset.matArt));
+    });
+    el('mat-btn-nieuw').addEventListener('click', () => matOpenArtikel(null));
+    el('mat-btn-export').addEventListener('click', matExport);
+    el('mat-btn-importeren').addEventListener('click', matOpenImport);
+    el('mat-art-opslaan').addEventListener('click', matArtikelOpslaan);
+    el('mat-art-verwijder').addEventListener('click', matArtikelVerwijder);
+    el('mat-art-sluit').addEventListener('click', () => { el('mat-artikel-modal').style.display = 'none'; });
+    el('mat-import-sluit').addEventListener('click', () => { el('mat-import-modal').style.display = 'none'; });
+    el('mat-import-body').addEventListener('click', e => {
+      const s = e.target.closest('[data-mat-shop]');
+      if(s){ matOpenShop(s.dataset.matShop === '__ander' ? null : mat.levById[s.dataset.matShop]); return; }
+      const o = e.target.closest('[data-mat-oci]'); if(o){ matOciStart(mat.levById[o.dataset.matOci]); return; }
+      if(e.target.id === 'mat-xl-start'){
+        const regels = matXlRegels(); const levId = el('mat-xl-lev').value;
+        e.target.disabled = true; e.target.textContent = 'Bezig…';
+        matMaakImport(levId, 'excel', null, regels, { bestand: (el('mat-xl-bestand').files[0] || {}).name })
+          .then(imp => { el('mat-import-modal').style.display = 'none'; matTelImports(); return matOpenReview(imp.id); })
+          .catch(err => { e.target.disabled = false; e.target.textContent = 'Naar de importlijst'; matToast('Import aanmaken mislukt: ' + (err.message || err), true); });
+      }
+    });
+    el('mat-import-body').addEventListener('change', e => {
+      if(e.target.id === 'mat-xl-bestand' && e.target.files[0]) matLeesBestand(e.target.files[0]);
+      const s = e.target.closest('[data-mat-xl]'); if(s){ matXl.map[s.dataset.matXl] = s.value === '' ? null : Number(s.value); matRenderXlMap(); }
+    });
+    el('mat-wacht-plek').addEventListener('click', e => {
+      if(e.target.closest('[data-mat-wacht-weg]')) matWachtWeg();
+      if(e.target.closest('[data-mat-oci-check]') && mat.ociCheck) mat.ociCheck(true);
+    });
+    el('mat-review-body').addEventListener('change', e => {
+      const inp = e.target.closest('[data-veld]'); const tr = e.target.closest('[data-regel]');
+      if(inp && tr) matRegelWijzig(tr.dataset.regel, inp.dataset.veld, inp.value);
+    });
+    el('mat-review-body').addEventListener('click', e => { const b = e.target.closest('[data-mat-kies]'); if(b) matOpenKies(b.closest('[data-regel]').dataset.regel); });
+    el('mat-review-importeer').addEventListener('click', matReviewImporteer);
+    el('mat-review-annuleer').addEventListener('click', matReviewAnnuleer);
+    el('mat-review-later').addEventListener('click', () => { el('mat-review-modal').style.display = 'none'; matTelImports(); });
+    el('mat-kies-zoek').addEventListener('input', matRenderKies);
+    el('mat-kies-lijst').addEventListener('click', e => { const b = e.target.closest('[data-mat-kies-art]'); if(b) matKiesGekozen(b.dataset.matKiesArt); });
+    el('mat-kies-sluit').addEventListener('click', () => { el('mat-kies-modal').style.display = 'none'; });
+    el('mat-imports-lijst').addEventListener('click', e => { const tr = e.target.closest('[data-mat-import]'); if(tr) matOpenReview(tr.dataset.matImport); });
+    el('mat-lev-lijst').addEventListener('click', e => { if(e.target.closest('[data-stop]')) return; const tr = e.target.closest('[data-mat-lev]'); if(tr && matMagBeheren()) matOpenLev(mat.levById[tr.dataset.matLev]); });
+    el('mat-btn-lev-nieuw').addEventListener('click', () => matOpenLev(null));
+    el('mat-lev-opslaan').addEventListener('click', matLevOpslaan);
+    el('mat-lev-sluit').addEventListener('click', () => { el('mat-lev-modal').style.display = 'none'; });
+    document.addEventListener('visibilitychange', () => { if(!document.hidden && mat.ociWacht && mat.ociCheck) mat.ociCheck(false); });
+  })();
+  // Voor de testen en de extensie: enkel lezen/aanroepen, geen eigen state.
+  window.__casuiteMat = { mat, refreshMaterialenTab, matMandOntvangen, matOpenReview };
+
 
   // ---------- CaFin (Financiële module, fase 1, 2026-10-09) ----------
   // Zie de toelichting bij <section id="tab-cafin"> hierboven voor de volledige achtergrond.
@@ -35515,6 +36631,8 @@ window.CaCalcApp = {
     // hierboven; geen afleiding uit oude velden nodig, dit is een volledig nieuw vinkjespaar.
     if(person.kan_facturen_zien == null) person.kan_facturen_zien = false;
     if(person.kan_facturen_goedkeuren == null) person.kan_facturen_goedkeuren = false;
+    // Materialen (2026-11-13): nog nooit ingesteld -> standaardrecht van de rol (bureau aan).
+    ['kan_materialen_zien', 'kan_materialen_beheren'].forEach(f => { if(person[f] == null){ const sj = rolSjabloon(person.rol); person[f] = !!(sj && sj[f]); } });
     // Onderaannemers krijgen nooit app-/planningtoegang (2026-09-23, op vraag van Peter: "Hier ook
     // keuze Personeel of onderaannemer: Die hebben geen rechten in de planning") -- afgedwongen bij
     // elke render, ook voor al langer bestaande rijen waar de rol pas achteraf op Onderaannemer werd
@@ -35679,6 +36797,10 @@ window.CaCalcApp = {
       'Ziet het Facturen-tabblad (CaFin): binnenkomende facturen, koppelen aan een werf, status opvolgen.'));
     accessRow.appendChild(buildPermCheckbox('ip-p-facturen-goedkeuren', 'kan_facturen_goedkeuren', 'Mag facturen goedkeuren',
       'Mag een factuur goedkeuren of afkeuren (bv. de projectleider van de betreffende werf). Vereist ook "Ziet CaFin" om er effectief iets mee te kunnen doen.'));
+    accessRow.appendChild(buildPermCheckbox('ip-p-materialen-zien', 'kan_materialen_zien', 'Ziet Materialen',
+      'Ziet het tabblad Materialen: artikels, leveranciersprijzen en prijshistoriek.'));
+    accessRow.appendChild(buildPermCheckbox('ip-p-materialen-beheren', 'kan_materialen_beheren', 'Mag materialen importeren',
+      'Mag winkelmandjes en Excel-lijsten importeren, koppelingen bevestigen en artikels/leveranciers aanpassen.'));
     // "Beheerder" zelf staat hier BEWUST niet als vinkje bij de rest (2026-09-25) -- enkel
     // aanpasbaar via de nieuwe, gebruikers-/rechtenbeheer-gate #beheer-modal (zie #btn-beheer),
     // anders zou iedereen met toegang tot dit Bedrijfsgegevens-tabblad zichzelf beheerder kunnen
@@ -35914,6 +37036,8 @@ window.CaCalcApp = {
     // vinkjespaar.
     person.kan_facturen_zien = true;
     person.kan_facturen_goedkeuren = true;
+    person.kan_materialen_zien = true;
+    person.kan_materialen_beheren = true;
   }
   // "Ensure admin floor": toegepast op de VOLLEDIGE net-geladen team_leden/bureau-lijst (zie
   // bootstrapAfterLogin() verderop), vóór er ook maar iets mee gerenderd/gebruikt wordt. Dit is
@@ -37607,6 +38731,8 @@ window.CaCalcApp = {
     ['ziet_alle_projecten', 'beheer-cb-zap'],
     ['kan_facturen_zien', 'beheer-cb-fz'],
     ['kan_facturen_goedkeuren', 'beheer-cb-fg'],
+    ['kan_materialen_zien', 'beheer-cb-mz'],
+    ['kan_materialen_beheren', 'beheer-cb-mb'],
     ['beheerder', 'beheer-cb-bh']
   ];
   // Ronde "rollen-sjabloon": tabel met de standaardrechten per rol (bewerkt een kopie; pas bij

@@ -7,8 +7,10 @@
 //  2. Na "Overnemen / Terug naar systeem" in de webshop stuurt de browser het mandje als
 //     formulier (POST of GET) naar deze functie.
 //  3. Deze functie controleert het token (bestaat, nog niet gebruikt, < 4 uur oud), leest de
-//     OCI-velden, zet ze via materialen_verwerk() in de databank en stuurt de browser terug naar
-//     materialen.html?oci=<sessie-id>, waar het resultaat getoond wordt.
+//     OCI-velden en zet ze als tijdelijke importlijst klaar (imports + import_regels, met
+//     herkenningsvoorstellen via import_voorstellen()). Niets komt in de materialendatabank
+//     voor de gebruiker de lijst in CaSuite → Materialen controleert en op "Importeren" klikt.
+//     (2026-11-13: vroeger rechtstreeks via materialen_verwerk(), die bestaat niet meer.)
 //
 // Geen JWT-controle (verify_jwt = false): de webshop kan geen Supabase-login meesturen. De poort
 // is het eenmalige token. Draait met de service-role-sleutel (automatisch beschikbaar).
@@ -176,16 +178,35 @@ Deno.serve(async (req) => {
 
   let resultaat: unknown = null;
   let fout: string | null = null;
+  let importId: string | null = null;
   if (regels.length) {
-    const r = await sb.rpc("materialen_verwerk", { p_leverancier_id: sessie.leverancier_id, p_regels: regels, p_bron: "oci", p_besteld: true });
-    if (r.error) fout = r.error.message;
-    else resultaat = r.data;
+    const { data: imp, error: e1 } = await sb.from("imports").insert({
+      leverancier_id: sessie.leverancier_id, bron: "oci", status: "te_controleren",
+      aangemaakt_door: sessie.aangemaakt_door, aantal_gevonden: regels.length, ruwe_data: ruw,
+    }).select("id").single();
+    if (e1 || !imp) fout = (e1 && e1.message) || "import aanmaken mislukt";
+    else {
+      importId = imp.id;
+      const rijen = regels.map((r, i) => ({
+        import_id: imp.id, volgnr: i + 1, ruw: r,
+        artikelnr: r.artikelnr || null, omschrijving: r.omschrijving || null, fabrikant_artnr: r.fabrikant_artnr || null,
+        merk: r.fabrikant || null, ean: r.ean || null, categorie: r.categorie || null, eenheid: r.eenheid || null,
+        aantal: r.aantal, netto: r.prijs, valuta: r.valuta || "EUR",
+      }));
+      const { error: e2 } = await sb.from("import_regels").insert(rijen);
+      if (e2) fout = e2.message;
+      else {
+        const { error: e3 } = await sb.rpc("import_voorstellen", { p_import_id: imp.id });
+        if (e3) fout = e3.message;
+        resultaat = { import_id: imp.id, regels: regels.length };
+      }
+    }
   } else {
     fout = "leeg";
   }
-  await sb.from("oci_sessies").update({ ontvangen_op: new Date().toISOString(), ruwe_data: ruw, regels, resultaat, fout }).eq("id", sessie.id);
+  await sb.from("oci_sessies").update({ ontvangen_op: new Date().toISOString(), ruwe_data: ruw, regels, resultaat, fout, import_id: importId }).eq("id", sessie.id);
   const n = regels.length;
   return fout && !resultaat
     ? klaarPagina(terug.toString(), fout === "leeg" ? "Leeg mandje ontvangen" : "Mandje niet verwerkt", fout === "leeg" ? "De webshop stuurde geen artikels mee." : "Er liep iets mis. Bekijk de details in CaSuite.")
-    : klaarPagina(terug.toString(), "Mandje overgenomen", `${n} artikel${n === 1 ? "" : "s"} staan nu in CaSuite.`);
+    : klaarPagina(terug.toString(), "Mandje overgenomen", `${n} artikel${n === 1 ? "" : "s"} staan klaar in CaSuite om te controleren.`);
 });

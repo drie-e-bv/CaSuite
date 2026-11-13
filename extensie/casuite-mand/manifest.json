@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "CaSuite Mand",
+  "short_name": "CaSuite Mand",
+  "version": "1.0.0",
+  "description": "Leest het winkelmandje van een webshop uit en stuurt het naar CaSuite → Materialen. Leest enkel; plaatst nooit bestellingen.",
+  "icons": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png" },
+  "action": { "default_title": "CaSuite: mand ophalen op deze pagina", "default_icon": { "16": "icons/icon16.png", "32": "icons/icon32.png" } },
+  "background": { "service_worker": "background.js" },
+  "permissions": ["activeTab", "scripting", "storage", "tabs"],
+  "host_permissions": [
+    "https://drie-e-bv.github.io/CaSuite/*",
+    "https://*.rexel.be/*",
+    "https://*.cebeo.be/*",
+    "https://*.bol.com/*",
+    "https://*.desco.be/*",
+    "https://*.facq.be/*",
+    "https://*.districompany.com/*",
+    "https://*.districompany.be/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://drie-e-bv.github.io/CaSuite/*"],
+      "js": ["brug.js"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://*.rexel.be/*", "https://*.cebeo.be/*", "https://*.bol.com/*", "https://*.desco.be/*",
+        "https://*.facq.be/*", "https://*.districompany.com/*", "https://*.districompany.be/*"
+      ],
+      "js": ["lezer.js", "knop.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
