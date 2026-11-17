@@ -94,6 +94,8 @@ details.k .in{padding:2px 10px 10px}
 .pcols{display:grid;grid-template-columns:62px minmax(0,1fr);gap:6px;min-height:0;flex:1}
 .plet{overflow:auto;max-height:calc(100vh - 190px);display:flex;flex-direction:column;gap:3px;padding-right:2px}
 .plh{flex:none;font-size:10px;text-transform:uppercase;letter-spacing:.3px;color:var(--mut);margin:5px 0 1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.plg{margin-bottom:8px}.plg button{font-size:12.5px;padding:6px 2px}
+#plan .pi.dim{opacity:.35;pointer-events:none}
 .plk{flex:none;position:relative;padding:5px 2px;font-weight:700;font-size:14px;background:#eef0f3;border-color:#d0d5dc}
 .plk i{position:absolute;top:-4px;right:-3px;font-style:normal;font-size:10px;line-height:15px;min-width:15px;border-radius:8px;background:var(--warn);color:#fff;font-weight:600}
 .plk.klaar{color:#98a2b3;background:#f6f7f9}.plk.on{background:#fff;color:var(--ink);border-color:var(--acc);box-shadow:inset 3px 0 0 var(--acc)}
@@ -194,6 +196,13 @@ const TYPES={
  dom:{l:'Module / klein toestel (tekst)',c:'div',g:'Overige'}
 };
 const NETTEN=['3 x 400V + N ~ 50Hz','3 x 230V ~ 50Hz','1 x 230V + N ~ 50Hz'];
+/* symbolen van de extra lagen op het situatieplan (niet in het eendraadschema) */
+const LTYPES={
+ ls:{l:'Luidspreker (wand)',laag:'muziek'},ls_p:{l:'Luidspreker (inbouw plafond)',laag:'muziek'},sub:{l:'Subwoofer',laag:'muziek'},mz_kp:{l:'Bediening muziek',laag:'muziek'},mz_bron:{l:'Bron / streamer',laag:'muziek'},
+ al_cen:{l:'Alarmcentrale',laag:'alarm'},al_pir:{l:'Bewegingsdetector (PIR)',laag:'alarm'},al_mc:{l:'Magneetcontact',laag:'alarm'},al_sir:{l:'Sirene',laag:'alarm'},al_rook:{l:'Brand-/rookmelder',laag:'alarm'},al_sens:{l:'Sensor',laag:'alarm'},al_bus:{l:'Bustoestel / bediening',laag:'alarm'},al_gen:{l:'Alarmtoestel',laag:'alarm'},
+ nw_rj:{l:'Datapunt (RJ45)',laag:'netwerk'},nw_ap:{l:'WiFi access point',laag:'netwerk'},nw_cam:{l:'Camera',laag:'netwerk'},nw_tst:{l:'Netwerktoestel',laag:'netwerk'}};
+const LAGEN=[['elektro','Elektro'],['muziek','Muziek'],['alarm','Alarm'],['netwerk','Netwerk']];
+const ALARM_TYPE={PIR:['al_pir','PIR'],Magneet:['al_mc','MC'],Sirene:['al_sir','SIR'],Brand:['al_rook','BR'],Sensor:['al_sens','S'],Bus:['al_bus','BUS']};
 const AMP=[2,4,6,10,13,16,20,25,32,40,50,63,80,100,125],POL=['1P','2P','3P','4P'];
 
 /* ================= model ================= */
@@ -361,6 +370,12 @@ function sample(){
    {items:[D(10),A('Handdoekradiator badkamer 1',20,'3g2,5'),A('Handdoekradiator badkamer 2',20,'3g2.5')]}
   ]}]}};
  dos.zekeringen.kasten[0].rijen.forEach((r,i)=>r.id='r'+(i+1));
+ dos.muziek={items:[{id:'mz1',naam:'Leefruimte',kamer:'Leefruimte',info:'',leeg:false,manueelNummer:''},{id:'mz2',naam:'Keuken',kamer:'Keuken',info:'',leeg:false,manueelNummer:''},{id:'mz3',naam:'Terras',kamer:'Terras',info:'',leeg:false,manueelNummer:''}]};
+ dos.alarmCentrale={merk:'Ajax',type:'Hub 2 Plus',zekeringModuleId:''};
+ dos.alarm=[{omschrijving:'Inkomhal',toestelType:'PIR'},{omschrijving:'Leefruimte',toestelType:'PIR'},{omschrijving:'Voordeur',toestelType:'Magneet'},{omschrijving:'Achterdeur',toestelType:'Magneet'},{omschrijving:'Nachthal',toestelType:'Brand'},{omschrijving:'Buitensirene',toestelType:'Sirene'},{omschrijving:'Bediening inkom',toestelType:'Bus'}].map(r=>Object.assign({van:'',naar:'',kabeltype:'',aders:[]},r));
+ while(dos.alarm.length<20)dos.alarm.push({omschrijving:'',toestelType:'',van:'',naar:'',kabeltype:'',aders:[]});
+ dos.patchkast={kasten:[{id:'pk1',maxU:12,items:[{id:'pp1',categorie:'Patchpaneel',naam:'Patchpaneel 1',hoogte:1,poorten:[{id:'po1',omschrijving:'TV leefruimte'},{id:'po2',omschrijving:'TV leefruimte'},{id:'po3',omschrijving:'Bureau'},{id:'po4',omschrijving:'AP nachthal'},{id:'po5',omschrijving:'AP leefruimte'},{id:'po6',omschrijving:'Camera oprit'},{id:'po7',omschrijving:''},{id:'po8',omschrijving:''}]}]}],internetProvider:{}};
+ dos.camerabewaking={items:[{id:'cam1',naam:'Oprit',kamer:'Buiten',leeg:false,manueelNummer:'',patchpaneelPoortId:'po6'},{id:'cam2',naam:'Tuin',kamer:'Buiten',leeg:false,manueelNummer:'',patchpaneelPoortId:''}]};
  const st=fromCaDos(dos);st.cadosLokaal=dos;
  const P=(t,o)=>newPunt(t,o),set=(naam,pts)=>st.borden[0].groepen.forEach(g=>g.kringen.forEach(k=>{if(k.naam===naam)k.punten=pts()}));
  set('KNX voeding',()=>[P('dom',{tekst:'KNX'})]);
@@ -418,16 +433,16 @@ const presetUitKring=(k,naam)=>({naam,polen:k.polen,curve:k.curve,A:k.A,kA:k.kA,
 /* ================= toestand ================= */
 let S=CLOUD?blank():loadLocal(),tab='schema',zoom=1,undoStack=[],bi=0;const open=new Set();
 const E={mode:'teken',sym:'sc_ak',sel:null,q:'',recent:[]};
-const P={rot:0,last:null,mode:'teken',wat:'punt',sel:null,kring:'',punt:'',zoom:1,pi:0,draw:null,drag:null,grid:true,snapGrid:true,snapMuur:true,transp:false};
+const P={laag:'elektro',toon:{elektro:true,muziek:true,alarm:true,netwerk:true},rot:0,last:null,mode:'teken',wat:'punt',sel:null,kring:'',punt:'',zoom:1,pi:0,draw:null,drag:null,grid:true,snapGrid:true,snapMuur:true,transp:false};
 const ptool=()=>P.mode==='sel'?'hand':P.mode==='gom'?'gom':P.wat;
 const geplaatst=()=>new Set(S.plannen.flatMap(p=>p.items.map(i=>i.pid)));
 /* zoals Trikker: het volgende nog niet geplaatste component staat meteen klaar (eerst in de huidige kring, dan de volgende letters) */
-function autoPunt(vanaf){const pls=geplaatst(),ks=allKringen();if(!ks.length){P.punt='';return null}
- let st=ks.findIndex(x=>x.k.id===(vanaf||P.kring));if(st<0)st=0;
- for(let i=0;i<ks.length;i++){const x=ks[(st+i)%ks.length],n=x.k.punten.find(p=>!pls.has(p.id));if(n){P.kring=x.k.id;P.punt='pid:'+n.id;return x}}
- P.punt='';return null}
-function ghostHtml(pl){if(!P.punt||ptool()!=='punt')return'';const cd=codes(S),kr=allKringen().find(x=>x.k.id===P.kring);if(!kr)return'';
- let ix,pid;if(P.punt.startsWith('pid:')){ix=pindex(S);pid=P.punt.slice(4)}else{pid='__nieuw';ix={__nieuw:{p:{type:P.punt.slice(4),aantal:1,tekst:''},k:kr.k,nr:kr.k.punten.length+1,code:cd.k[kr.k.id]}}}
+function autoPunt(vanaf){const pls=geplaatst(),gs=laagGroepen(P.laag);if(!gs.length){P.punt='';return null}
+ let st=gs.findIndex(g=>g.id===(vanaf||P.kring));if(st<0)st=0;
+ for(let i=0;i<gs.length;i++){const g=gs[(st+i)%gs.length],n=g.comps.find(c=>!pls.has(c.id));if(n){P.kring=g.id;P.punt='pid:'+n.id;return g}}
+ const g0=gs.find(g=>g.id===P.kring)||gs[0];P.kring=g0.id;P.punt=(g0.nieuw==='muziek'&&!g0.comps.length)?'new:ls':'';return null}
+function ghostHtml(pl){if(!P.punt||ptool()!=='punt')return'';const g=laagGroepen(P.laag).find(x=>x.id===P.kring);if(!g)return'';
+ let ix,pid;if(P.punt.startsWith('pid:')){ix=pindex(S);pid=P.punt.slice(4)}else{pid='__nieuw';ix={__nieuw:{p:{type:P.punt.slice(4),aantal:1,tekst:''},k:{id:g.id},nr:P.laag==='elektro'?g.comps.length+1:'',code:g.code}}}
  const r=itemOps(pl,{pid,x:0,y:0,rot:P.rot},ix);return r?opsSVG(r.ops):''}
 function migrate(j){if(!j.borden&&j.groepen){j.borden=[newBord({hoofd:j.hoofd,groepen:j.groepen})];delete j.groepen;delete j.hoofd}
  if(!j.plannen||!j.plannen.length)j.plannen=[newPlan()];if(!j.print)j.print={schema:true,plan:true,kringen:true,mat:false};if(!j.kamers)j.kamers=[];j.borden.forEach(b=>{if(!b.groepen.some(g=>!g.sub))b.groepen.unshift({id:uid(),sub:false,kringen:[]})});return j}
@@ -439,7 +454,9 @@ function persist(){gc();
 function snap(){undoStack.push(JSON.stringify(S));if(undoStack.length>25)undoStack.shift()}
 const B=()=>S.borden[bi=clamp(bi,0,S.borden.length-1)];
 const allKringen=()=>S.borden.flatMap((b,bx)=>b.groepen.flatMap((g,gi)=>g.kringen.map((k,ki)=>({b,bx,g,gi,k,ki}))));
-function gc(){const ids=new Set();S.borden.forEach(b=>b.groepen.forEach(g=>g.kringen.forEach(k=>k.punten.forEach(p=>ids.add(p.id)))));S.plannen.forEach(p=>{p.items=p.items.filter(i=>ids.has(i.pid))})}
+function gc(){const ids=new Set(),heeftDos=!!dosData();S.borden.forEach(b=>b.groepen.forEach(g=>g.kringen.forEach(k=>k.punten.forEach(p=>ids.add(p.id)))));
+ if(heeftDos)['muziek','alarm','netwerk'].forEach(l=>laagGroepen(l).forEach(g=>g.comps.forEach(c=>ids.add(c.id))));
+ S.plannen.forEach(p=>{p.items=p.items.filter(i=>laagVan(i)!=='elektro'&&!heeftDos?true:ids.has(i.pid))})}
 
 /* codes: CaDos-codes waar ze bestaan, anders aanvullen in dezelfde stijl */
 function codes(st){const km={},gm={};
@@ -454,7 +471,9 @@ const sect=s=>{const m=/[Gx]\s*(\d+(?:[.,]\d+)?)/i.exec(String(s||''));return m?
 const gLabel=(b,g)=>g.sub?`Δ${g.mA}mA ${g.polen} ${g.A}A`:`hoofddifferentieel Δ${b.hoofd.mA}mA`;
 
 /* ================= tekenen: display list (mm) ================= */
-const PW=297,PH=210,M=7,R0=164,R1=134,TOP=13,CW=26,TBH=24;
+let PW=297,PH=210,R0=164,R1=134;const M=7,TOP=13,CW=26,TBH=24;
+const FORMATEN={A4:[297,210],A3:[420,297],A2:[594,420]};
+function setFormaat(st){const f=FORMATEN[(st&&st.print&&st.print.formaat)||'A4']||FORMATEN.A4;PW=f[0];PH=f[1];R0=PH-M-TBH-15;R1=R0-30}
 function mk(){const o=[];return{o,
  L:(x1,y1,x2,y2,w=.25,d=0)=>o.push(['L',x1,y1,x2,y2,w,d]),
  C:(x,y,r,f='w',w=.25)=>o.push(['C',x,y,r,f,w]),
@@ -495,6 +514,15 @@ function sym(d,t,x,y,s,txt,aantal){
   else if(t==='swk'){lev(60,1);lev(120,1,-1);lev(240,1);lev(300,1,-1)}
   else if(t==='dim'){lev(60,1);L(4.7,-3.9,4.7,-2.2,.22);L(4.7,-2.2,7.6,-2.2,.22);L(7.6,-2.2,4.7,-3.9,.22)}}
  else if(t==='af'){L(0,0,2.5,0);C(5.1,0,2.6);C(5.1,0,1.3,'b')}
+ else if(t==='ls'||t==='sub'){L(0,0,3,0);d.R(X(3),Y(-1.7),2.4*s,3.4*s,'w',.3*Math.max(.7,s));L(5.4,-1.7,8.6,-3.6,.3);L(8.6,-3.6,8.6,3.6,.3);L(8.6,3.6,5.4,1.7,.3);if(t==='sub')tx(7,-4.6,'SUB',1.7,1)}
+ else if(t==='ls_p'){L(0,0,2.4,0);C(6,0,3.6);d.R(X(4.2),Y(-1),1.4*s,2*s,'w',.25);L(5.6,-1,7.4,-2.2,.25);L(7.4,-2.2,7.4,2.2,.25);L(7.4,2.2,5.6,1,.25)}
+ else if(t==='mz_kp'||t==='mz_bron'||t==='al_cen'||t==='al_bus'||t==='al_gen'||t==='nw_tst'){box();tx(cx,.8,{mz_kp:'BED',mz_bron:'BRON',al_cen:'CEN',al_bus:'BUS',al_gen:'AL',nw_tst:'NW'}[t],1.9,1)}
+ else if(t==='al_pir'||t==='al_rook'||t==='al_sens'){L(0,0,3.3,0);C(6.3,0,3);tx(6.3,.8,{al_pir:'PIR',al_rook:'BR',al_sens:'S'}[t],t==='al_pir'?1.9:2.3,1)}
+ else if(t==='al_mc'){L(0,0,3,0);d.R(X(3),Y(-2),2.6*s,4*s,'w',.3);d.R(X(6.4),Y(-2),2.6*s,4*s,'w',.3);tx(7.8,-3,'MC',1.7,1)}
+ else if(t==='al_sir'){L(0,0,3,0);d.R(X(3),Y(-1.6),2.2*s,3.2*s,'w',.3);L(5.2,-1.6,8.8,-3.6,.3);L(8.8,-3.6,8.8,3.6,.3);L(8.8,3.6,5.2,1.6,.3);L(9.8,-2.4,10.8,-3.2,.25);L(9.8,0,11,0,.25);L(9.8,2.4,10.8,3.2,.25)}
+ else if(t==='nw_rj'){L(0,0,3,0);L(3,-3.2,3,3.2,.35);L(3,-3.2,8.6,0,.35);L(8.6,0,3,3.2,.35);tx(4.8,.75,'D',1.9,1)}
+ else if(t==='nw_ap'){L(0,0,3,0);C(6,0,3);tx(6,.75,'AP',1.9,1);A(6,0,4.3,30,150,.22);A(6,0,5.4,40,140,.22)}
+ else if(t==='nw_cam'){L(0,0,3,0);d.R(X(3),Y(-2),5.2*s,4*s,'w',.3);L(8.2,-1,10.6,-2.4,.3);L(10.6,-2.4,10.6,2.4,.3);L(10.6,2.4,8.2,1,.3)}
  else if(t==='ap'){L(0,0,3,0);C(4,0,1)}
  else if(t==='dom'){L(0,0,BX,0);d.R(X(BX),Y(-1.7),7.4*s,3.4*s,'w',.3*Math.max(.7,s));tx(BX+3.7,.75,String(txt||'').slice(0,5),1.9)}
  else if(t==='t_boiler'){L(0,0,3.5,0);C(6.5,0,3);for(const q of[-2,-1,0,1,2]){const h=Math.sqrt(9-q*q);L(6.5+q,-h,6.5+q,h,.2)}}
@@ -516,7 +544,7 @@ function sym(d,t,x,y,s,txt,aantal){
   else if(t==='t_ev')tx(cx,.9,'EV',2.4,1);
   else tx(cx,.8,String(txt||'').slice(0,4),2);}
 }
-const symW=(t,a)=>t&&TYPES[t]&&TYPES[t].c==='sc'?8.2+3.5*(clamp(+a||1,1,5)-1):11;
+const symW=(t,a)=>t&&TYPES[t]&&TYPES[t].c==='sc'?8.2+3.5*(clamp(+a||1,1,5)-1):t==='nw_cam'||t==='al_sir'?11.5:11;
 const wrap=(s,n,max)=>{const out=[];let cur='';String(s||'').split(/\s+/).forEach(w=>{while(w.length>n){if(cur){out.push(cur);cur=''}out.push(w.slice(0,n-1)+'-');w=w.slice(n-1)}
  if((cur+' '+w).trim().length>n){out.push(cur);cur=w}else cur=(cur+' '+w).trim()});if(cur)out.push(cur);
  if(out.length>max){out.length=max;out[max-1]=out[max-1].slice(0,n-2)+'..'}return out};
@@ -567,7 +595,7 @@ function titleBlock(d,st,pi,n,soort,sub){const ty=PH-M-TBH,p=st.project;
 function bordPages(st,b){
  const cd=codes(st),slots=[];
  b.groepen.forEach((g,gi)=>{if(!g.kringen.length){if(g.sub)slots.push({g,gi,k:null,first:true})}else g.kringen.forEach((k,ki)=>slots.push({g,gi,k,first:ki===0}))});
- const pages=[];let i=0;do{const cap=pages.length?10:8;pages.push(slots.slice(i,i+cap));i+=cap}while(i<slots.length);
+ const capF=x0=>Math.max(1,Math.floor((PW-M-20-x0-8)/CW)+1),pages=[];let i=0;do{const cap=pages.length?capF(M+10):capF(M+52);pages.push(slots.slice(i,i+cap));i+=cap}while(i<slots.length);
  return pages.map((sl,pi)=>draw=>{const d=draw.d,n=pages.length;
   const x0=pi?M+10:M+52,xs=j=>x0+j*CW+8,more=pi<n-1;
   const prev=pi?pages[pi-1][pages[pi-1].length-1]:null,next=more?pages[pi+1][0]:null;
@@ -589,7 +617,32 @@ function bordPages(st,b){
    if(s.k){const yb=g.sub?R1:R0;column(d,x,yb,s.k,cd.k[s.k.id]);if(s.first)d.A(x-6,yb-4,'i:'+s.k.id);else d.A(x-13,yb+3.4,'i:'+s.k.id)}});});
 }
 /* ---- situatieplan ---- */
-function pindex(st){const cd=codes(st),m={};st.borden.forEach(b=>b.groepen.forEach(g=>g.kringen.forEach(k=>k.punten.forEach((p,i)=>{m[p.id]={p,k,nr:i+1,code:cd.k[k.id]}}))));return m}
+function pindex(st){const cd=codes(st),m={};st.borden.forEach(b=>b.groepen.forEach(g=>g.kringen.forEach(k=>k.punten.forEach((p,i)=>{m[p.id]={p,k,nr:i+1,code:cd.k[k.id],laag:'elektro'}}))));
+ ['muziek','alarm','netwerk'].forEach(l=>laagGroepen(l,st).forEach(g=>g.comps.forEach(c=>{m[c.id]={p:{type:c.type,aantal:1,tekst:c.tekst},k:{id:g.id},nr:'',code:c.label,laag:l}})));return m}
+/* gegevens uit CaDos voor muziek/alarm/netwerk: online het geladen dossier, lokaal het voorbeelddossier */
+const dosData=()=>CLOUD?(cloud.dos||null):(S.cadosLokaal||null);
+const nrCodes=(items,pre)=>{const c={};let h=0;(items||[]).forEach(z=>{const o=parseInt(z.manueelNummer);const n=(z.manueelNummer!==''&&z.manueelNummer!=null&&!Number.isNaN(o))?o:h+1;h=n;c[z.id]=pre+n});return c};
+/* één lijst per laag: groepen (letters links) met componenten (te plaatsen symbolen) */
+function laagGroepen(laag,st){st=st||S;
+ if(laag==='elektro'){const cd=codes(st),out=[];st.borden.forEach(b=>b.groepen.forEach(g=>g.kringen.forEach(k=>out.push({id:k.id,code:cd.k[k.id],naam:k.naam,kop:(st.borden.length>1?b.naam+' - ':'')+(g.sub?'Diff ':'Hoofd ')+(cd.g[g.id]||''),k,
+  comps:k.punten.map((p,i)=>({id:p.id,type:p.type,tekst:p.tekst,aantal:p.aantal,hw:p.hw,label:cd.k[k.id]+(i+1)}))}))));return out}
+ const d=st===S?dosData():null;if(!d)return[];const out=[];
+ if(laag==='muziek'){const items=((d.muziek&&d.muziek.items)||[]).filter(z=>!z.leeg),c=nrCodes((d.muziek&&d.muziek.items)||[],'M'),mp=st.muziekPunten||{};
+  items.forEach(z=>out.push({id:'mz:'+z.id,ref:z.id,code:c[z.id],naam:[z.naam,z.kamer].filter(Boolean).join(' - '),kop:'Muziekzones',nieuw:'muziek',
+   comps:(mp[z.id]||[]).map(x=>({id:x.id,type:x.type,tekst:x.tekst||z.kamer||z.naam||'',label:c[z.id]}))}))}
+ if(laag==='alarm'){const ac=d.alarmCentrale||{},rows=Array.isArray(d.alarm)?d.alarm:[],per={};
+  out.push({id:'al:centrale',code:'CEN',naam:[ac.merk,ac.type].filter(Boolean).join(' ')||'Alarmcentrale',kop:'Centrale',comps:[{id:'al:centrale',type:'al_cen',tekst:[ac.merk,ac.type].filter(Boolean).join(' '),label:'CEN'}]});
+  rows.forEach((r,i)=>{if(!r||!(r.omschrijving||r.toestelType))return;const tt=ALARM_TYPE[r.toestelType]||['al_gen',r.toestelType?r.toestelType.slice(0,3).toUpperCase():'AL'],key=tt[1];
+   (per[key]=per[key]||{id:'alt:'+key,code:key,naam:r.toestelType||'Zonder type',kop:'Toestellen',comps:[]}).comps.push({id:'al:'+(i+1)+'A',type:tt[0],tekst:r.omschrijving||'',label:(i+1)+'A'})});
+  Object.values(per).forEach(g=>out.push(g))}
+ if(laag==='netwerk'){const camPoort=new Set(((d.camerabewaking&&d.camerabewaking.items)||[]).map(c=>c.patchpaneelPoortId).filter(Boolean));let pn=0;
+  ((d.patchkast&&d.patchkast.kasten)||[]).forEach(k=>(k.items||[]).forEach(it=>{if(it.categorie!=='Patchpaneel')return;pn++;const nr=pn;
+   const comps=(it.poorten||[]).map((po,i)=>({po,i})).filter(x=>x.po.omschrijving&&!camPoort.has(x.po.id)).map(x=>({id:'np:'+x.po.id,type:/\b(ap|wifi|wi-fi|access ?point)\b/i.test(x.po.omschrijving)?'nw_ap':'nw_rj',tekst:x.po.omschrijving,label:nr+'.'+String(x.i+1).padStart(2,'0')}));
+   out.push({id:'pp:'+it.id,code:'P'+nr,naam:it.naam||('Patchpaneel '+nr),kop:'Patchpanelen',comps})}));
+  const cams=((d.camerabewaking&&d.camerabewaking.items)||[]).filter(c=>!c.leeg),cc=nrCodes((d.camerabewaking&&d.camerabewaking.items)||[],'C');
+  if(cams.length)out.push({id:'cams',code:'CAM',naam:"Camera's",kop:'Camerabewaking',comps:cams.map(c=>({id:'nc:'+c.id,type:'nw_cam',tekst:c.naam||c.kamer||'',label:cc[c.id]}))})}
+ return out}
+const laagVan=it=>it.laag||'elektro';
 function xform(ops,rot,s,tx,ty){const pt=(x,y)=>{for(let i=0;i<rot;i++){const t=x;x=-y;y=t}return[x*s+tx,y*s+ty]};
  return ops.map(o=>{const t=o[0];
   if(t==='L'){const a=pt(o[1],o[2]),b=pt(o[3],o[4]);return['L',a[0],a[1],b[0],b[1],o[5]*s,o[6],o[7]]}
@@ -605,17 +658,19 @@ function itemOps(pl,it,ix){const e=ix[it.pid];if(!e)return null;const d=mk(),s=p
  ops.push(['T',it.x+lp[0]*s,it.y+lp[1]*s+(rot%2?1*s:0),lb,2.5*s,an,0,1,0]);
  const c=[[w/2,0],[0,w/2],[-w/2,0],[0,-w/2]][rot];
  return{ops,cx:it.x+c[0]*s,cy:it.y+c[1]*s,r:(w/2+2.5)*s,lb}}
-function planFlat(st,pl){const ix=pindex(st),o=[];cadOps(pl,o);pl.muren.forEach(m=>o.push(['L',m[0],m[1],m[2],m[3],pl.mw||3.2,0]));pl.items.forEach(it=>{const r=itemOps(pl,it,ix);if(r)o.push(...r.ops)});(pl.teksten||[]).forEach(t=>o.push(['T',t.x,t.y,t.t,t.z||12,'s',0,0,0]));return o}
+function planFlat(st,pl,laag){const ix=pindex(st),o=[];cadOps(pl,o);pl.muren.forEach(m=>o.push(['L',m[0],m[1],m[2],m[3],pl.mw||3.2,0]));pl.items.forEach(it=>{if(laag&&laagVan(it)!==laag)return;const r=itemOps(pl,it,ix);if(r)o.push(...r.ops)});(pl.teksten||[]).forEach(t=>o.push(['T',t.x,t.y,t.t,t.z||12,'s',0,0,0]));return o}
 
 /* alle pagina's voor PDF/voorbeeld; parts = {schema,plan,kringen,mat} */
-function tablePages(soort,cols,rows){const out=[],per=34;for(let i=0;i<Math.max(1,rows.length);i+=per)out.push({soort,sub:'',f:draw=>{const d=draw.d;let y=M+9;
+function tablePages(soort,cols,rows){const out=[],per=Math.max(10,Math.floor((PH-2*M-TBH-14)/4.4));for(let i=0;i<Math.max(1,rows.length);i+=per)out.push({soort,sub:'',f:draw=>{const d=draw.d;let y=M+9;
   cols.forEach(c=>d.T(M+4+c[1],y,c[0],{z:2.5,b:1,a:c[3]||'s'}));d.L(M+3,y+1.6,PW-M-3,y+1.6,.3);
   rows.slice(i,i+per).forEach(r=>{y+=4.4;r.forEach((v,j)=>{const c=cols[j],t=String(v??'');d.T(M+4+c[1],y,t.length>c[2]?t.slice(0,c[2]-1)+'.':t,{z:2.4,a:c[3]||'s',b:j===0&&cols[0][4]})})})}});return out}
-function allPages(st,parts){parts=parts||{schema:true,plan:true};const out=[],cd=codes(st);
+function allPages(st,parts){parts=parts||{schema:true,plan:true};setFormaat(st);const out=[],cd=codes(st);
  if(parts.schema)st.borden.forEach(b=>bordPages(st,b).forEach(f=>out.push({soort:'Eendraadschema',sub:b.naam,f})));
- if(parts.plan)st.plannen.forEach(pl=>{if(!pl.items.length&&!pl.muren.length&&!(pl.teksten||[]).length&&!(pl.bg&&pl.bg.data)&&!pl.cad)return;
-  out.push({soort:'Situatieplan',sub:pl.naam,pl,f:draw=>{const H=pl.h||707,k=Math.min((PW-2*M-6)/1000,(PH-2*M-TBH-6)/H),ox=M+3+((PW-2*M-6)-1000*k)/2,oy=M+3;
-   draw.bg={data:pl.bg&&pl.bg.data,x:ox,y:oy,w:1000*k,h:H*k};draw.d.o.push(...xform(planFlat(st,pl),0,k,ox,oy))}})});
+ const planKey={elektro:'plan',muziek:'planMuziek',alarm:'planAlarm',netwerk:'planNetwerk'};
+ LAGEN.forEach(([laag,naam])=>{if(!parts[planKey[laag]])return;st.plannen.forEach(pl=>{const heeft=pl.items.some(i=>laagVan(i)===laag);
+  if(laag==='elektro'?(!heeft&&!pl.muren.length&&!(pl.teksten||[]).length&&!(pl.bg&&pl.bg.data)&&!pl.cad):!heeft)return;
+  out.push({soort:'Situatieplan '+naam.toLowerCase(),sub:pl.naam,pl,f:draw=>{const H=pl.h||707,k=Math.min((PW-2*M-6)/1000,(PH-2*M-TBH-6)/H),ox=M+3+((PW-2*M-6)-1000*k)/2,oy=M+3;
+   draw.bg={data:pl.bg&&pl.bg.data,x:ox,y:oy,w:1000*k,h:H*k};draw.d.o.push(...xform(planFlat(st,pl,laag),0,k,ox,oy))}})})});
  if(parts.kringen)out.push(...tablePages('Lijst met kringen',[['Kring',0,8,'s',1],['Benaming',16,46],['Beveiliging',104,18],['Kabel',136,22],['Lengte',178,8],['Differentieel',196,30],['Punten',276,5,'e']],
   st.borden.flatMap(b=>b.groepen.flatMap(g=>g.kringen.map(k=>[cd.k[k.id],(st.borden.length>1?b.naam+' - ':'')+k.naam,`${k.polen} ${k.curve}${k.A}A ${k.kA?k.kA+'kA':''}`,`${k.kabelType} ${k.kabel}`,k.lengte?k.lengte+' m':'',`${g.sub?g.mA:b.hoofd.mA} mA - ${g.sub?g.A:b.hoofd.A}A type ${g.sub?g.type:b.hoofd.type}`,k.punten.length])))));
  if(parts.mat)out.push(...tablePages('Materiaallijst',[['Omschrijving',0,110],['Aantal',276,10,'e']],materials(st)));
@@ -635,8 +690,8 @@ const pageSVG=(p,edit)=>`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${
 /* PDF backend (jsPDF, vectorieel) */
 function buildPdf(st,parts){
  const J=window.jspdf&&window.jspdf.jsPDF;if(!J)throw new Error('PDF-bibliotheek niet geladen');
- const doc=new J({orientation:'landscape',unit:'mm',format:'a4'}),pt=72/25.4;
- allPages(st,parts).forEach((pg,pi)=>{if(pi)doc.addPage('a4','landscape');
+ const fm=((st.print&&st.print.formaat)||'A4').toLowerCase(),doc=new J({orientation:'landscape',unit:'mm',format:fm}),pt=72/25.4;
+ allPages(st,parts).forEach((pg,pi)=>{if(pi)doc.addPage(fm,'landscape');
   if(pg.bg&&pg.bg.data){try{if(doc.GState)doc.setGState(new doc.GState({opacity:.55}));doc.addImage(pg.bg.data,'JPEG',pg.bg.x,pg.bg.y,pg.bg.w,pg.bg.h);if(doc.GState)doc.setGState(new doc.GState({opacity:1}))}catch(e){}}
   for(const o of pg.ops){const t=o[0];
    if(t==='L'){doc.setLineWidth(o[5]);doc.setLineCap(1);doc.setDrawColor(o[7]||'#000000');doc.line(o[1],o[2],o[3],o[4])}
@@ -729,7 +784,7 @@ function symIcon(t){const d=mk();
  if(t.startsWith('pre:')){const q=CFG.presets[+t.slice(4)]||{punten:[]},ss=(q.punten||[]).map(p=>p.type).filter(x=>TYPES[x]).slice(0,3);d.L(0,0,2.5,0,.3);d.L(2.5,0,6.3,-1.9,.4);d.L(5.2,-1.35,6.3,-1.9,1);d.L(7,0,13,0,.3);d.C(10,-1.6,.75,'n',.2);
   ss.forEach((x,i)=>sym(d,x,13+i*9.5,0,.8,'',1));if(ss.length>1)d.L(13,0,13+9.5*(ss.length-1),0,.3);
   return`<svg viewBox="-1 -5.5 ${ss.length>2?43:34} 11" style="width:${ss.length>2?82:64}px">${opsSVG(d.o)}</svg>`}
- if(TYPES[t])sym(d,t,0,0,1,'',1);else breakerV(d,6,5.5);return`<svg viewBox="-1 -6.2 16 12.4">${opsSVG(d.o)}</svg>`}
+ if(TYPES[t]||LTYPES[t])sym(d,t,0,0,1,'',1);else breakerV(d,6,5.5);return`<svg viewBox="-1 -6.2 16 12.4">${opsSVG(d.o)}</svg>`}
 const CATS=[['Voorgevormde kringen','pre:0'],['Bord','kring'],['Stopcontacten','sc_ak'],['Schakelaars','sw1'],['Verlichting','li'],['Toestellen','t_kook'],['Overige','af'],['Laatst gebruikt','★']];
 function libAll(){return[...CFG.presets.map((x,i)=>['pre:'+i,`${x.naam} · ${x.polen} ${x.curve}${x.A}A · ${x.kabelType} ${x.kabel}${(x.punten||[]).length>2?` · ${x.punten.length} symbolen`:''}`,'Voorgevormde kringen']),['kring','Lege kring (automaat + leiding)','Bord'],['diff','Differentieel','Bord'],...Object.entries(TYPES).map(([k,t])=>[k,t.l,t.g])]}
 function libHtml(){const q=norm(E.q),all=libAll(),btn=e=>`<button class="sy${E.sym===e[0]?' on':''}" data-sym="${e[0]}">${symIcon(e[0])}<span>${esc(e[1])}</span></button>`;
@@ -771,14 +826,14 @@ function kringTabel(){const cd=codes(S);
  const rows=S.borden.flatMap(b=>b.groepen.flatMap(g=>g.kringen.map(k=>`<tr data-a="goK" data-kid="${k.id}" style="cursor:pointer"><td><b>${cd.k[k.id]}</b></td><td>${S.borden.length>1?esc(b.naam)+' - ':''}${esc(k.naam)}</td><td>${esc(k.polen)} ${esc(k.curve)}${esc(k.A)}A</td><td>${esc(k.kabelType)} ${esc(k.kabel)}</td><td>Δ${g.sub?g.mA:b.hoofd.mA}mA</td><td class="n">${k.punten.length}</td></tr>`))).join('');
  return`<div class="card"><h2>Lijst met kringen</h2><div class="tw"><table><tr><th>Kring</th><th>Benaming</th><th>Beveiliging</th><th>Kabel</th><th>Differentieel</th><th class="n">Punten</th></tr>${rows}</table></div></div>`}
 function vMat(){return`<div class="card"><h2>Materiaallijst <small>afgeleid uit het schema; kabellengtes uit het veld Lengte per kring</small><span style="flex:1"></span><button class="sm" data-a="csv">Exporteren naar Excel (CSV)</button></h2><div class="tw"><table><tr><th>Omschrijving</th><th class="n">Aantal</th></tr>${materials(S).map(m=>`<tr><td>${esc(m[0])}</td><td class="n">${m[1]}</td></tr>`).join('')}</table></div></div>`}
-function vPrint(){const pr=S.print||(S.print={schema:true,plan:true,kringen:true,mat:false}),pg=allPages(S,pr);
- return`<div class="card"><h2>Dossier samenstellen</h2>${[['schema','Eendraadschema'],['plan','Situatieplan'],['kringen','Lijst met kringen'],['mat','Materiaallijst']].map(x=>`<label class="chkl"><input type="checkbox" data-c="print.${x[0]}" data-r${pr[x[0]]?' checked':''}>${x[1]}</label>`).join('')}
- <div class="row"><button class="pri" data-a="pdf">PDF maken (${pg.length} blad${pg.length===1?'':'en'})</button><button class="sm" data-a="zo">−</button><button class="sm" data-a="zi">+</button><span class="note">A4 liggend. Titelblok: zie tabblad Document.</span></div></div>
+function vPrint(){const pr=S.print||(S.print={schema:true,plan:true,kringen:true,mat:false}),pg=allPages(S,pr);if(!pr.formaat)pr.formaat='A4';
+ return`<div class="card"><h2>Dossier samenstellen</h2>${[['schema','Eendraadschema'],['plan','Situatieplan elektro'],['planMuziek','Situatieplan muziek'],['planAlarm','Situatieplan alarm'],['planNetwerk','Situatieplan netwerk'],['kringen','Lijst met kringen'],['mat','Materiaallijst']].map(x=>`<label class="chkl"><input type="checkbox" data-c="print.${x[0]}" data-r${pr[x[0]]?' checked':''}>${x[1]}</label>`).join('')}
+ <div class="row"><button class="pri" data-a="pdf">PDF maken (${pg.length} blad${pg.length===1?'':'en'})</button><button class="sm" data-a="zo">−</button><button class="sm" data-a="zi">+</button><label class="pck" style="margin-left:6px">Papier <select data-b="print.formaat" data-r style="width:auto">${Object.keys(FORMATEN).map(f=>`<option${pr.formaat===f?' selected':''}>${f}</option>`).join('')}</select> liggend</label><span class="note">Elke laag van het situatieplan komt op een eigen blad. Titelblok: zie tabblad Document.</span></div></div>
  <div class="pages">${pg.map(p=>pageSVG(p,false)).join('')||'<p style="color:#fff;padding:20px">Niets geselecteerd.</p>'}</div>`}
-function vPlan(){P.pi=clamp(P.pi,0,S.plannen.length-1);const pl=S.plannen[P.pi],H=pl.h||707,ix=pindex(S),ks=allKringen(),cd=codes(S);if(!pl.teksten)pl.teksten=[];
- if(!ks.some(x=>x.k.id===P.kring))P.kring=ks[0]?ks[0].k.id:'';
- const placed=new Set(S.plannen.flatMap(p=>p.items.map(i=>i.pid))),kr=ks.find(x=>x.k.id===P.kring),tot=ks.reduce((n,x)=>n+x.k.punten.length,0);
- if(P.punt.startsWith('pid:')&&(!kr||!kr.k.punten.some(p=>'pid:'+p.id===P.punt&&!placed.has(p.id)))){const n=kr&&kr.k.punten.find(p=>!placed.has(p.id));P.punt=n?'pid:'+n.id:''}
+function vPlan(){P.pi=clamp(P.pi,0,S.plannen.length-1);const pl=S.plannen[P.pi],H=pl.h||707,ix=pindex(S),gs=laagGroepen(P.laag),cd=codes(S);if(!pl.teksten)pl.teksten=[];
+ if(!gs.some(g=>g.id===P.kring))P.kring=gs[0]?gs[0].id:'';
+ const placed=new Set(S.plannen.flatMap(p=>p.items.map(i=>i.pid))),kr=gs.find(g=>g.id===P.kring),tot=gs.reduce((n,g)=>n+g.comps.length,0),opLaag=new Set(gs.flatMap(g=>g.comps.map(c=>c.id)));
+ if(P.punt.startsWith('pid:')&&(!kr||!kr.comps.some(c=>'pid:'+c.id===P.punt&&!placed.has(c.id)))){const n=kr&&kr.comps.find(c=>!placed.has(c.id));P.punt=n?'pid:'+n.id:(kr&&kr.nieuw==='muziek'&&!kr.comps.length?'new:ls':'')}
  const sel=pl.items.find(i=>i.id===P.sel),se=sel&&ix[sel.pid],st=pl.teksten.find(t=>t.id===P.sel),tl=ptool();
  /* tekening */
  let svg=`<svg id="plan" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 ${H}" style="width:${Math.round(1000*P.zoom)}px;touch-action:${tl==='hand'?'auto':'none'};cursor:${tl==='hand'?'default':'crosshair'}">
@@ -789,19 +844,22 @@ function vPlan(){P.pi=clamp(P.pi,0,S.plannen.length-1);const pl=S.plannen[P.pi],
  svg+=cadSvg(pl);
  if(P.grid)svg+=`<rect width="1000" height="${H}" fill="url(#g50)" pointer-events="none"/>`;
  pl.muren.forEach((m,i)=>{svg+=`<line x1="${m[0]}" y1="${m[1]}" x2="${m[2]}" y2="${m[3]}" stroke="#000" stroke-width="${pl.mw||3.2}" stroke-linecap="square"/><line class="wl" data-w="${i}" x1="${m[0]}" y1="${m[1]}" x2="${m[2]}" y2="${m[3]}"/>`});
- pl.items.forEach(it=>{const r=itemOps(pl,it,ix);if(!r)return;const e2=ix[it.pid],hl=e2&&e2.k.id===P.kring;svg+=`<g class="pi${it.id===P.sel?' sel':''}" data-it="${it.id}"${hl?' style="filter:drop-shadow(0 0 2px #0b6bcb)"':''}>${opsSVG(r.ops)}<circle class="hb" cx="${r.cx.toFixed(1)}" cy="${r.cy.toFixed(1)}" r="${r.r.toFixed(1)}"/></g>`});
+ pl.items.forEach(it=>{const l=laagVan(it);if(!P.toon[l]&&l!==P.laag)return;const r=itemOps(pl,it,ix);if(!r)return;const e2=ix[it.pid],hl=e2&&e2.k.id===P.kring,dim=l!==P.laag;svg+=`<g class="pi${it.id===P.sel?' sel':''}${dim?' dim':''}" data-it="${it.id}"${hl?' style="filter:drop-shadow(0 0 2px #0b6bcb)"':''}>${opsSVG(r.ops)}<circle class="hb" cx="${r.cx.toFixed(1)}" cy="${r.cy.toFixed(1)}" r="${r.r.toFixed(1)}"/></g>`});
  pl.teksten.forEach(t=>{const z=t.z||12,w=Math.max(20,String(t.t).length*z*.56);svg+=`<g class="pi${t.id===P.sel?' sel':''}" data-tx="${t.id}"><text x="${t.x}" y="${t.y}" font-size="${z}">${esc(t.t)}</text><rect class="hb" x="${t.x-3}" y="${t.y-z}" width="${w+6}" height="${z*1.35}"/></g>`});
  const gh=ghostHtml(pl);svg+=`<g id="ghost" pointer-events="none" opacity=".55" style="filter:drop-shadow(0 0 1.5px #0b6bcb)" visibility="${gh&&P.last?'visible':'hidden'}"${P.last?` transform="translate(${P.last[0]} ${P.last[1]})"`:''}>${gh}</g>`;
  svg+=`<line id="prev" stroke="#0b6bcb" stroke-width="3" stroke-dasharray="6 5" visibility="hidden"/></svg>`;
  /* linkerpaneel: letters + componenten */
- let lets='';S.borden.forEach((b,bx)=>{if(S.borden.length>1)lets+=`<div class="plh">${esc(b.naam)}</div>`;
-  b.groepen.forEach(g=>{lets+=`<div class="plh">${g.sub?'Diff ':'Hoofd '}${esc(cd.g[g.id]||'')}</div>`;
-   g.kringen.forEach(k=>{const n=k.punten.filter(p=>!placed.has(p.id)).length,klaar=k.punten.length&&!n;
-    lets+=`<button class="plk${k.id===P.kring?' on':''}${klaar?' klaar':''}" data-a="pkr" data-kid="${k.id}" title="${esc(k.naam)}${n?` - nog ${n} te plaatsen`:klaar?' - alles geplaatst':' - geen punten'}">${esc(cd.k[k.id])}${n?`<i>${n}</i>`:''}</button>`})})});
- let comp='';if(kr){comp=`<div class="pch"><b class="lb">${esc(cd.k[kr.k.id])}</b> ${esc(kr.k.naam||'')}</div>`+kr.k.punten.map((p,i)=>{const op=placed.has(p.id);
-   return`<button class="pc${op?' gepl':''}${P.punt==='pid:'+p.id?' on':''}" data-a="ppick" data-pp="${p.id}" title="${op?'Geplaatst - tik om te tonen':'Tik en plaats op het plan'}">${symIcon(p.type)}<span><b>${esc(cd.k[kr.k.id])}${i+1}</b> ${esc(p.tekst||(TYPES[p.type]||{}).l||'')}${p.aantal>1?' x'+p.aantal:''}</span>${op?'<em>✓</em>':''}</button>`}).join('')
-  +`<select id="pnew" class="pnew"><option value="">+ nieuw symbool in ${esc(cd.k[kr.k.id])}</option>${typeOpts(P.punt.startsWith('new:')?P.punt:'','new:')}</select>`}
- else comp='<p class="note" style="padding:8px">Nog geen kringen. Teken eerst het eendraadschema.</p>';
+ let lets='',kop0=null;gs.forEach(g=>{if(g.kop!==kop0){kop0=g.kop;lets+=`<div class="plh" title="${esc(g.kop)}">${esc(g.kop)}</div>`}
+  const n=g.comps.filter(c=>!placed.has(c.id)).length,klaar=g.comps.length&&!n;
+  lets+=`<button class="plk${g.id===P.kring?' on':''}${klaar?' klaar':''}" data-a="pkr" data-kid="${esc(g.id)}" title="${esc(g.naam)}${n?` - nog ${n} te plaatsen`:klaar?' - alles geplaatst':' - nog niets'}">${esc(g.code)}${n?`<i>${n}</i>`:''}</button>`});
+ if(!gs.length)lets=`<p class="note" style="font-size:12px;padding:4px">${P.laag==='elektro'?'Nog geen kringen.':dosData()?'Niets in CaDos.':'Geen CaDos-dossier.'}</p>`;
+ const lt=t=>(TYPES[t]||LTYPES[t]||{}).l||'';
+ let comp='';if(kr){comp=`<div class="pch"><b class="lb">${esc(kr.code)}</b> ${esc(kr.naam||'')}</div>`+kr.comps.map(c=>{const op=placed.has(c.id);
+   return`<button class="pc${op?' gepl':''}${P.punt==='pid:'+c.id?' on':''}" data-a="ppick" data-pp="${esc(c.id)}" title="${op?'Geplaatst - tik om te tonen':'Tik en plaats op het plan'}">${symIcon(c.type)}<span><b>${esc(c.label)}</b> ${esc(c.tekst||lt(c.type))}${c.aantal>1?' x'+c.aantal:''}</span>${op?'<em>✓</em>':''}</button>`}).join('')
+  +(P.laag==='elektro'?`<select id="pnew" class="pnew"><option value="">+ nieuw symbool in ${esc(kr.code)}</option>${typeOpts(P.punt.startsWith('new:')?P.punt:'','new:')}</select>`
+   :kr.nieuw==='muziek'?`<select id="pnew" class="pnew"><option value="">+ luidspreker / bediening in ${esc(kr.code)}</option>${Object.entries(LTYPES).filter(([,v])=>v.laag==='muziek').map(([k,v])=>`<option value="new:${k}"${P.punt==='new:'+k?' selected':''}>${v.l}</option>`).join('')}</select>${kr.comps.length?'':`<p class="note" style="padding:0 8px;font-size:12px">Klik op het plan om de eerste luidspreker van ${esc(kr.code)} te plaatsen.</p>`}`
+   :`<p class="note" style="padding:6px 8px;font-size:12px">Komt uit CaDos (${P.laag==='alarm'?'tabblad Alarm':'tabbladen Data en Camerabewaking'}). Toevoegen of wijzigen doe je daar.</p>`)}
+ else comp=`<p class="note" style="padding:8px">${P.laag==='elektro'?'Nog geen kringen. Teken eerst het eendraadschema.':!dosData()?'Dit project heeft geen CaDos-dossier.':P.laag==='muziek'?'Nog geen muziekzones in CaDos (tabblad Muziek).':P.laag==='alarm'?'Nog geen alarmtoestellen in CaDos (tabblad Alarm).':'Nog geen patchpoorten met omschrijving of camera\'s in CaDos.'}</p>`;
  const hint=tl==='muur'?'Sleep om een muur te tekenen; lijnen worden recht getrokken en klikken vast aan hoeken.':tl==='tekst'?'Tik op het plan om een tekst te plaatsen.':tl==='gom'?'Tik op een symbool, muur of tekst om het van het plan te halen.':tl==='hand'?'Tik op een symbool om het te selecteren; sleep om te verplaatsen.':(P.punt?'Klik links om te plaatsen, rechts om 90° te draaien. Het volgende component staat daarna meteen klaar.':'Alle componenten staan op het plan. Kies links een letter of "+ nieuw symbool".');
  const ck=(k,l)=>`<label class="pck"><input type="checkbox" data-a="pck" data-k="${k}"${P[k]?' checked':''}>${l}</label>`;
  const rotKnop=tl==='punt'&&P.punt?` <button class="sm" data-a="prot" title="Rechtermuisknop of R">↻ Draaien (${P.rot*90}°)</button>`:'';
@@ -809,17 +867,19 @@ function vPlan(){P.pi=clamp(P.pi,0,S.plannen.length-1);const pl=S.plannen[P.pi],
   <div class="seg"><button data-a="pmode" data-m="teken" class="${P.mode==='teken'?'on':''}">✎ Tekenen</button><button data-a="pmode" data-m="sel" class="${P.mode==='sel'?'on':''}">↖ Selecteren</button><button data-a="pmode" data-m="gom" class="${P.mode==='gom'?'on':''}">✕ Wissen</button></div>
   <span class="pzoom"><button class="sm" data-a="pzo">−</button><input type="range" id="pzr" min="30" max="400" value="${Math.round(P.zoom*100)}"><button class="sm" data-a="pzi">+</button></span>
   <span class="pzoom"><button class="sm" data-a="ppg" data-d="-1"${P.pi?'':' disabled'}>‹</button><b style="min-width:120px;text-align:center">${esc(pl.naam)} <small style="color:var(--mut);font-weight:400">${P.pi+1}/${S.plannen.length}</small></b><button class="sm" data-a="ppg" data-d="1"${P.pi<S.plannen.length-1?'':' disabled'}>›</button><button class="sm" data-a="addPlan" title="Verdieping toevoegen">+</button></span>
-  <span class="pzoom">${ck('transp','Transparant')}${ck('grid','Toon grid')}${ck('snapGrid','Kleef aan grid')}${ck('snapMuur','Kleef aan muren')}</span></div>
+  <span class="pzoom">${ck('transp','Transparant')}${ck('grid','Toon grid')}${ck('snapGrid','Kleef aan grid')}${ck('snapMuur','Kleef aan muren')}</span>
+  <span class="pzoom"><b style="font-size:13px">Toon:</b>${LAGEN.map(([k,n])=>`<label class="pck"><input type="checkbox" data-a="ptoon" data-k="${k}"${P.toon[k]||P.laag===k?' checked':''}${P.laag===k?' disabled':''}>${n}</label>`).join('')}</span></div>
  <div class="row"><input data-b="plannen.${P.pi}.naam" data-r value="${esc(pl.naam)}" style="width:140px" title="Naam verdieping">
   <label class="sm filel">Achtergrond (AutoCAD, PDF, afbeelding)<input type="file" id="bgFile" accept=".dxf,.dwg,image/*,application/pdf" style="display:none"></label>${pl.cad?`<button class="sm" data-a="cadLagen">Lagen (${pl.cad.lagen.filter(l=>l.aan!==false).length}/${pl.cad.lagen.length})</button>`:''}
   ${CLOUD&&cloud.plannen.length?`<select id="casnap" style="max-width:180px"><option value="">Plan uit CaSnap...</option>${cloud.plannen.map((p,i)=>`<option value="${i}">${esc(p.naam||'Naamloos plan')}</option>`).join('')}</select>`:''}
   ${pl.bg?`<button class="sm" data-a="noBg">Achtergrond weg</button>`:''}
   <select data-b="plannen.${P.pi}.sym" data-n data-r title="Symboolgrootte"><option value="2"${pl.sym==2?' selected':''}>Symbolen klein</option><option value="3"${pl.sym==3?' selected':''}>Symbolen normaal</option><option value="4.2"${pl.sym==4.2?' selected':''}>Symbolen groot</option></select>
   <select data-b="plannen.${P.pi}.mw" data-n data-r title="Muurdikte"><option value="2"${pl.mw==2?' selected':''}>Muur dun</option><option value="3.2"${(pl.mw||3.2)==3.2?' selected':''}>Muur normaal</option><option value="6"${pl.mw==6?' selected':''}>Muur dik</option></select>
-  ${S.plannen.length>1?`<button class="sm danger" data-a="delPlan">Verwijder verdieping</button>`:''}<span style="flex:1"></span><span class="note">${placed.size} van ${tot} punten geplaatst</span></div>
- ${se?`<div class="row"><b class="lb">${se.code}${se.nr}</b><span>${esc((TYPES[se.p.type]||{}).l)}${se.p.tekst?' - '+esc(se.p.tekst):''}</span><button class="sm" data-a="rot">↻ Draaien</button><button class="sm" data-a="goK" data-kid="${se.k.id}">Naar kring</button><button class="sm danger" data-a="delIt">Van plan halen</button></div>`:''}
+  ${S.plannen.length>1?`<button class="sm danger" data-a="delPlan">Verwijder verdieping</button>`:''}<span style="flex:1"></span><span class="note">${LAGEN.find(x=>x[0]===P.laag)[1]}: ${[...opLaag].filter(x=>placed.has(x)).length} van ${tot} geplaatst</span></div>
+ ${se?`<div class="row"><b class="lb">${se.code}${se.nr}</b><span>${esc((TYPES[se.p.type]||LTYPES[se.p.type]||{}).l)}${se.p.tekst?' - '+esc(se.p.tekst):''}</span><button class="sm" data-a="rot">↻ Draaien</button>${se.laag==='elektro'?`<button class="sm" data-a="goK" data-kid="${se.k.id}">Naar kring</button>`:''}${se.laag==='muziek'?`<button class="sm danger" data-a="mzWeg" data-pp="${esc(sel.pid)}">Luidspreker wissen</button>`:''}<button class="sm danger" data-a="delIt">Van plan halen</button></div>`:''}
  ${st?`<div class="row"><b>Tekst</b><input data-b="plannen.${P.pi}.teksten.${pl.teksten.indexOf(st)}.t" data-r value="${esc(st.t)}" style="width:200px"><select data-b="plannen.${P.pi}.teksten.${pl.teksten.indexOf(st)}.z" data-n data-r><option value="9"${st.z==9?' selected':''}>klein</option><option value="12"${(st.z||12)==12?' selected':''}>normaal</option><option value="18"${st.z==18?' selected':''}>groot</option></select><button class="sm danger" data-a="delTx">Wissen</button></div>`:''}</div>
  <div class="pws"><div class="pside card">
+  <div class="seg plg">${LAGEN.map(([k,n])=>`<button data-a="plaag" data-l="${k}" class="${P.laag===k?'on':''}">${n}</button>`).join('')}</div>
   <div class="ptools"><button class="${P.mode==='teken'&&P.wat==='muur'?'on':''}" data-a="pwat" data-w="muur" title="Muren tekenen">⌂<small>Muren</small></button><button class="${P.mode==='teken'&&P.wat==='tekst'?'on':''}" data-a="pwat" data-w="tekst" title="Tekst plaatsen"><i style="font-family:serif">abc</i><small>Tekst</small></button></div>
   <div class="pcols"><div class="plet">${lets}</div><div class="pcomp">${comp}</div></div></div>
  <div><p class="note" style="margin:0 0 6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span>${hint}</span>${rotKnop}</p><div class="pages">${svg}</div></div></div>`}
@@ -1052,7 +1112,10 @@ document.addEventListener('click',async e=>{
  else if(a==='pwat'){const w=b.dataset.w;if(P.mode==='teken'&&P.wat===w)P.wat='punt';else{P.mode='teken';P.wat=w}P.sel=null;render()}
  else if(a==='pck'){P[b.dataset.k]=b.checked;render()}
  else if(a==='ppg'){P.pi=clamp(P.pi+(+b.dataset.d),0,S.plannen.length-1);P.sel=null;render()}
- else if(a==='pkr'){P.kring=b.dataset.kid;const pls=new Set(S.plannen.flatMap(p=>p.items.map(i=>i.pid))),k=(allKringen().find(x=>x.k.id===P.kring)||{}).k,n=k&&k.punten.find(p=>!pls.has(p.id));P.punt=n?'pid:'+n.id:'';P.mode='teken';P.wat='punt';P.sel=null;render()}
+ else if(a==='pkr'){P.kring=b.dataset.kid;const pls=geplaatst(),g=laagGroepen(P.laag).find(x=>x.id===P.kring),n=g&&g.comps.find(c=>!pls.has(c.id));P.punt=n?'pid:'+n.id:(g&&g.nieuw==='muziek'&&!g.comps.length?'new:ls':'');P.mode='teken';P.wat='punt';P.sel=null;render()}
+ else if(a==='plaag'){P.laag=b.dataset.l;P.kring='';P.punt='';P.sel=null;P.mode='teken';P.wat='punt';autoPunt();render()}
+ else if(a==='ptoon'){P.toon[b.dataset.k]=b.checked;render()}
+ else if(a==='mzWeg'){const id=b.dataset.pp;mut('Luidspreker gewist',()=>{Object.values(S.muziekPunten||{}).forEach(l=>{const i=l.findIndex(x=>x.id===id);if(i>=0)l.splice(i,1)});S.plannen.forEach(p=>{p.items=p.items.filter(x=>x.pid!==id)});P.sel=null})}
  else if(a==='ppick'){const pid=b.dataset.pp,pi2=S.plannen.findIndex(p=>p.items.some(i=>i.pid===pid));
   if(pi2>=0){P.pi=pi2;P.sel=S.plannen[pi2].items.find(i=>i.pid===pid).id;P.mode='sel';render();const g=document.querySelector(`[data-it="${P.sel}"]`);if(g)g.scrollIntoView({block:'center',inline:'center'})}
   else{P.punt='pid:'+pid;P.mode='teken';P.wat='punt';P.sel=null;render()}}
@@ -1093,13 +1156,15 @@ document.addEventListener('pointerup',async e=>{if(e.button===2)return;const pl=
  if(tl==='gom'){const w=e.target.closest('[data-w]'),g=e.target.closest('[data-it]'),t=e.target.closest('[data-tx]');
   if(g)mut('Van het plan gehaald',()=>{pl.items=pl.items.filter(i=>i.id!==g.dataset.it)});else if(t)mut('Tekst gewist',()=>{pl.teksten=pl.teksten.filter(x=>x.id!==t.dataset.tx)});else if(w)mut('Muur gewist',()=>pl.muren.splice(+w.dataset.w,1))}
  else if(tl==='tekst'){const[x,y]=svgPt(e);const t=await ask('Tekst op het plan','');if(t&&t.trim())mut('',()=>{if(!pl.teksten)pl.teksten=[];const o={id:uid(),x:gridR(x,5),y:gridR(y,5),t:t.trim(),z:12};pl.teksten.push(o)})}
- else if(tl==='punt'){const kr=allKringen().find(x=>x.k.id===P.kring);if(!kr){toast('Teken eerst een kring in het eendraadschema.');return}
-  if(!P.punt){toast(`Alle componenten van ${codes(S).k[kr.k.id]} staan op het plan. Kies links een andere letter of "+ nieuw symbool".`);return}
-  const[x0,y0]=svgPt(e),[x,y]=plaatsPunt(pl,x0,y0);
-  mut('',()=>{let pid;if(P.punt.startsWith('pid:'))pid=P.punt.slice(4);else{const t=P.punt.slice(4),p=newPunt(t,{tekst:''});kr.k.punten.push(p);pid=p.id}
-   pl.items.push({id:uid(),pid,x,y,rot:P.rot});P.sel=null;P.last=[x,y];
-   if(P.punt.startsWith('pid:')){const pls=geplaatst(),n=kr.k.punten.find(p=>!pls.has(p.id));
-    if(n)P.punt='pid:'+n.id;else{const cd=codes(S),van=cd.k[kr.k.id],nx=autoPunt(kr.k.id);setTimeout(()=>toast(nx?`${van} volledig geplaatst - verder met ${cd.k[nx.k.id]}`:`${van} geplaatst - alle componenten staan op het plan`))}}})}});
+ else if(tl==='punt'){const g=laagGroepen(P.laag).find(x=>x.id===P.kring);if(!g){toast(P.laag==='elektro'?'Teken eerst een kring in het eendraadschema.':'Niets te plaatsen in deze laag.');return}
+  if(!P.punt){toast(`Alles van ${g.code} staat op het plan. Kies links een andere letter${g.nieuw||P.laag==='elektro'?' of "+ nieuw"':''}.`);return}
+  const[x0,y0]=svgPt(e),[x,y]=plaatsPunt(pl,x0,y0),laag=P.laag;
+  mut('',()=>{let pid;if(P.punt.startsWith('pid:'))pid=P.punt.slice(4);
+   else if(laag==='elektro'){const p=newPunt(P.punt.slice(4),{tekst:''});g.k.punten.push(p);pid=p.id}
+   else{const mp=S.muziekPunten||(S.muziekPunten={}),l=mp[g.ref]||(mp[g.ref]=[]),c={id:'mzp_'+uid(),type:P.punt.slice(4),tekst:''};l.push(c);pid=c.id}
+   const it={id:uid(),pid,x,y,rot:P.rot};if(laag!=='elektro')it.laag=laag;pl.items.push(it);P.sel=null;P.last=[x,y];
+   if(P.punt.startsWith('pid:')){const pls=geplaatst(),g2=laagGroepen(laag).find(z=>z.id===g.id),n=g2&&g2.comps.find(c=>!pls.has(c.id));
+    if(n)P.punt='pid:'+n.id;else{const van=g.code,nx=autoPunt(g.id);setTimeout(()=>toast(nx?`${van} volledig geplaatst - verder met ${nx.code}`:`${van} geplaatst - alles van deze laag staat op het plan`))}}})}});
 document.addEventListener('contextmenu',e=>{const s=e.target.closest&&e.target.closest('#plan');if(!s)return;e.preventDefault();const pl=S.plannen[P.pi],tl=ptool();
  if(tl==='punt'&&P.punt){P.rot=(P.rot+1)%4;const g=$('#ghost');if(g)g.innerHTML=ghostHtml(pl);const kb=$('[data-a=prot]');if(kb)kb.textContent=`↻ Draaien (${P.rot*90}°)`;return}
  const g=e.target.closest('[data-it]');if(g){const it=pl.items.find(i=>i.id===g.dataset.it);if(it)mut('',()=>{it.rot=((it.rot||0)+1)%4;P.sel=it.id})}});
