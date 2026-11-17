@@ -69,6 +69,13 @@ details.k .in{padding:2px 10px 10px}
 .ws .side{position:sticky;top:52px;max-height:calc(100vh - 64px);overflow:auto}
 .lib{overflow:auto;max-height:46vh;border:1px solid var(--line);border-radius:8px;margin-top:8px}
 @media(max-width:860px){.ws{grid-template-columns:minmax(0,1fr)}.ws .side{position:static;max-height:none}.lib{max-height:200px}}
+.libw{display:grid;grid-template-columns:50px minmax(0,1fr);gap:6px;margin-top:8px}
+.libw .lib{margin-top:0}
+.cats{display:flex;flex-direction:column;gap:4px}
+.ct{padding:3px;height:38px;display:flex;align-items:center;justify-content:center;background:#eef0f3;border-color:#d0d5dc}
+.ct svg{width:38px;height:28px}
+.ct.on{background:#fff;border-color:var(--acc);box-shadow:inset 3px 0 0 var(--acc)}
+@media(max-width:860px){.libw{grid-template-columns:minmax(0,1fr)}.cats{flex-direction:row;overflow-x:auto}.ct{flex:none;width:50px}}
 .lib h4{margin:0;padding:5px 8px;font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--mut);background:#f4f5f7;position:sticky;top:0}
 .sy{display:flex;align-items:center;gap:8px;width:100%;border:0;border-radius:0;border-bottom:1px solid #eef0f3;padding:5px 8px;text-align:left;font-size:13.5px}
 .sy svg{flex:none;width:44px;height:30px}
@@ -338,11 +345,11 @@ function gc(){const ids=new Set();S.borden.forEach(b=>b.groepen.forEach(g=>g.kri
 /* codes: CaDos-codes waar ze bestaan, anders aanvullen in dezelfde stijl */
 function codes(st){const km={},gm={};
  st.borden.forEach(b=>{
-  if(st.codering!=='cados'){let n=0;b.groepen.forEach(g=>{gm[g.id]='';g.kringen.forEach(k=>{km[k.id]=letters(n++)})});return}
-  const usedG=new Set(b.groepen.map(g=>g.letter).filter(Boolean));let gi=0;
-  b.groepen.forEach(g=>{let L=g.letter;if(!L){while(usedG.has(letters(gi)))gi++;L=letters(gi);usedG.add(L)}gm[g.id]=L;
-   const used=new Set(g.kringen.map(k=>k.code).filter(Boolean));let ki=0;
-   g.kringen.forEach(k=>{if(k.code){km[k.id]=k.code;return}while(used.has(L+letters(ki)))ki++;km[k.id]=L+letters(ki);used.add(L+letters(ki))})})});
+  if(st.codering!=='cados'){let n=0;b.groepen.forEach(g=>{gm[g.id]='';g.kringen.forEach(k=>{km[k.id]=k.vast||letters(n++)})});return}
+  const link=!!b.kastId,usedG=new Set(link?b.groepen.map(g=>g.letter).filter(Boolean):[]);let gi=0;
+  b.groepen.forEach(g=>{let L=link&&g.letter;if(!L){while(usedG.has(letters(gi)))gi++;L=letters(gi);usedG.add(L)}gm[g.id]=L;
+   const used=new Set(g.kringen.map(k=>k.vast||(link&&k.code)).filter(Boolean));let ki=0;
+   g.kringen.forEach(k=>{const f=k.vast||(link&&k.code);if(f){km[k.id]=f;return}while(used.has(L+letters(ki)))ki++;km[k.id]=L+letters(ki);used.add(L+letters(ki))})})});
  return{k:km,g:gm}}
 const sect=s=>{const m=/[Gx]\s*(\d+(?:[.,]\d+)?)/i.exec(String(s||''));return m?parseFloat(m[1].replace(',','.')):0};
 const gLabel=(b,g)=>g.sub?`Δ${g.mA}mA ${g.polen} ${g.A}A`:`hoofddifferentieel Δ${b.hoofd.mA}mA`;
@@ -480,7 +487,7 @@ function bordPages(st,b){
    if(s.first&&g.sub){d.C(x,R0,.7,'b');d.L(x,R0,x,R0-5,.3);breakerV(d,x,R0-2);d.L(x,R0-13.2,x,R1,.3);d.C(x,R1,.7,'b');
     d.T(x+3.3,R0-12.5,'Δ'+g.mA+'mA - type '+g.type,{z:2.3,b:1});d.T(x+3.3,R0-9.3,`${g.polen} - ${g.A}A`,{z:2.3});
     if(st.codering==='cados')d.T(x,R0+4.6,cd.g[g.id],{z:3.3,b:1,a:'m'});d.H(x-8,R0-21,CW,27,'g:'+g.id);}
-   if(s.k)column(d,x,g.sub?R1:R0,s.k,cd.k[s.k.id]);});});
+   if(s.k){const yb=g.sub?R1:R0;column(d,x,yb,s.k,cd.k[s.k.id]);if(s.first)d.A(x-6,yb-4,'i:'+s.k.id);else d.A(x-13,yb+3.4,'i:'+s.k.id)}});});
 }
 /* ---- situatieplan ---- */
 function pindex(st){const cd=codes(st),m={};st.borden.forEach(b=>b.groepen.forEach(g=>g.kringen.forEach(k=>k.punten.forEach((p,i)=>{m[p.id]={p,k,nr:i+1,code:cd.k[k.id]}}))));return m}
@@ -621,13 +628,16 @@ function locate(id){if(!id)return null;const t=id[0],x=id.slice(2);
 function symIcon(t){const d=mk();
  if(t.startsWith('pre:')){const q=CFG.presets[+t.slice(4)]||{s:[]},ss=(q.s||[]).filter(x=>TYPES[x]);d.L(0,0,2.5,0,.3);d.L(2.5,0,6.3,-1.9,.4);d.L(5.2,-1.35,6.3,-1.9,1);d.L(7,0,13,0,.3);d.C(10,-1.6,.75,'n',.2);
   ss.forEach((x,i)=>sym(d,x,13+i*9.5,0,.8,'',1));if(ss.length>1)d.L(13,0,13+9.5,0,.3);
-  return`<svg viewBox="-1 -5.5 34 11" style="width:78px">${opsSVG(d.o)}</svg>`}
+  return`<svg viewBox="-1 -5.5 34 11" style="width:64px">${opsSVG(d.o)}</svg>`}
  if(TYPES[t])sym(d,t,0,0,1,'',1);else breakerV(d,6,5.5);return`<svg viewBox="-1 -6.2 16 12.4">${opsSVG(d.o)}</svg>`}
-function libHtml(){const q=norm(E.q),all=[...CFG.presets.map((x,i)=>['pre:'+i,`${x.naam} · ${x.polen} ${x.curve}${x.A}A · ${x.kabelType} ${x.kabel}`,'Voorgevormde kringen']),['kring','Lege kring (automaat + leiding)','Bord'],['diff','Differentieel','Bord'],...Object.entries(TYPES).map(([k,t])=>[k,t.l,t.g])],gs={};
- const btn=e=>`<button class="sy${E.sym===e[0]?' on':''}" data-sym="${e[0]}">${symIcon(e[0])}<span>${esc(e[1])}</span></button>`;
- all.filter(e=>!q||norm(e[1]).includes(q)).forEach(e=>(gs[e[2]]=gs[e[2]]||[]).push(btn(e)));
- const rec=!q&&E.recent.length?`<h4>Laatst gebruikt</h4>${E.recent.map(k=>all.find(e=>e[0]===k)).filter(Boolean).map(btn).join('')}`:'';
- return rec+(Object.entries(gs).map(([g,o])=>`<h4>${g}</h4>${o.join('')}`).join('')||'<p class="note" style="padding:8px">Geen symbool gevonden.</p>')}
+const CATS=[['Voorgevormde kringen','pre:0'],['Bord','kring'],['Stopcontacten','sc_ak'],['Schakelaars','sw1'],['Verlichting','li'],['Toestellen','t_kook'],['Overige','af'],['Laatst gebruikt','★']];
+function libAll(){return[...CFG.presets.map((x,i)=>['pre:'+i,`${x.naam} · ${x.polen} ${x.curve}${x.A}A · ${x.kabelType} ${x.kabel}`,'Voorgevormde kringen']),['kring','Lege kring (automaat + leiding)','Bord'],['diff','Differentieel','Bord'],...Object.entries(TYPES).map(([k,t])=>[k,t.l,t.g])]}
+function libHtml(){const q=norm(E.q),all=libAll(),btn=e=>`<button class="sy${E.sym===e[0]?' on':''}" data-sym="${e[0]}">${symIcon(e[0])}<span>${esc(e[1])}</span></button>`;
+ if(q)return all.filter(e=>norm(e[1]).includes(q)).map(btn).join('')||'<p class="note" style="padding:8px">Geen symbool gevonden.</p>';
+ if(!E.cat)E.cat=CATS[0][0];
+ const list=E.cat==='Laatst gebruikt'?E.recent.map(k=>all.find(e=>e[0]===k)).filter(Boolean):all.filter(e=>e[2]===E.cat);
+ return`<h4>${E.cat}</h4>`+(list.map(btn).join('')||'<p class="note" style="padding:8px">Nog niets gebruikt.</p>')}
+const catsHtml=()=>CATS.map(c=>`<button class="ct${E.cat===c[0]&&!E.q?' on':''}" data-cat="${c[0]}" title="${c[0]}">${c[1]==='★'?'<span style="font-size:20px;line-height:1">★</span>':symIcon(c[1])}</button>`).join('');
 function vSide(){const cd=codes(S),L=locate(E.sel);if(E.sel&&!L)E.sel=null;
  let h=`<div class="seg"><button data-a="mode" data-m="teken" class="${E.mode==='teken'?'on':''}">Tekenen</button><button data-a="mode" data-m="sel" class="${E.mode==='sel'?'on':''}">Selecteren</button></div><datalist id="kamers">${S.kamers.map(k=>`<option value="${esc(k)}">`).join('')}</datalist>`;
  if(L){const bp=`borden.${L.bx}`,gp=`${bp}.groepen.${L.gi}`,kp=`${gp}.kringen.${L.ki}`,dd=`data-g="${L.gi}" data-k="${L.ki}"`;
@@ -636,11 +646,12 @@ function vSide(){const cd=codes(S),L=locate(E.sel);if(E.sel&&!L)E.sel=null;
    <label class="f w2"><span>Symbool</span><select data-b="${pp}.type">${typeOpts(L.p.type)}</select></label>${fld('Aantal',pp+'.aantal',{n:1})}
    <label class="f"><span>Halfwaterdicht</span><select data-b="${pp}.hw" data-bool><option value="">Nee</option><option value="1"${L.p.hw?' selected':''}>Ja</option></select></label>${fld('Tekst / kamer',pp+'.tekst',{c:'w2',list:'kamers'})}</div>
    <div class="row"><button class="sm" data-a="upP" ${dd} data-p="${L.pi}" title="Vroeger in de kring">↓ lager</button><button class="sm" data-a="dnP" ${dd} data-p="${L.pi}" title="Verder in de kring">↑ hoger</button><button class="sm" data-a="dupP" ${dd} data-p="${L.pi}">Kopiëren</button><button class="sm danger" data-a="delP" ${dd} data-p="${L.pi}">Wissen</button></div>`}
-  else if(L.t==='k'){h+=`<h2 style="font-size:14px;margin:12px 0 8px"><span class="lb">${cd.k[L.k.id]}</span> Eigenschappen kring</h2><div class="grid">${fld('Benaming',kp+'.naam',{c:'w2'})}${fld('Polen',kp+'.polen',{opts:POL})}${fld('Curve',kp+'.curve',{opts:['B','C','D']})}${fld('Stroom (A)',kp+'.A',{n:1,opts:AMP})}${fld('Kortsluit (kA)',kp+'.kA',{n:1,opts:[3,4.5,6,10]})}${fld('Kabeltype',kp+'.kabelType',{opts:['XVB','EXVB','XGB','VOB','VVB','EXAVB','SVV']})}${fld('Geleiders',kp+'.kabel',{ph:'3G2,5'})}${fld('Lengte (m)',kp+'.lengte',{n:1})}${fld('Vaste letter',kp+'.code',{ph:'automatisch'})}</div>
+  else if(L.t==='k'){h+=`<h2 style="font-size:14px;margin:12px 0 8px"><span class="lb">${cd.k[L.k.id]}</span> Eigenschappen kring</h2><div class="grid">${fld('Benaming',kp+'.naam',{c:'w2'})}${fld('Polen',kp+'.polen',{opts:POL})}${fld('Curve',kp+'.curve',{opts:['B','C','D']})}${fld('Stroom (A)',kp+'.A',{n:1,opts:AMP})}${fld('Kortsluit (kA)',kp+'.kA',{n:1,opts:[3,4.5,6,10]})}${fld('Kabeltype',kp+'.kabelType',{opts:['XVB','EXVB','XGB','VOB','VVB','EXAVB','SVV']})}${fld('Geleiders',kp+'.kabel',{ph:'3G2,5'})}${fld('Lengte (m)',kp+'.lengte',{n:1})}${fld('Vaste letter',kp+'.vast',{ph:'automatisch'})}</div>
    <div class="row"><button class="sm" data-a="upK" ${dd}>← links</button><button class="sm" data-a="dnK" ${dd}>rechts →</button><button class="sm" data-a="dupK" ${dd}>Kopiëren</button><button class="sm danger" data-a="delK" ${dd}>Wissen</button></div><p class="note">${L.k.bron?'Gekoppeld aan CaDos: wijzigingen gaan terug naar het dossier.':'Alleen in CaDraw (niet in CaDos).'}</p>`}
   else if(L.t==='g'){h+=`<h2 style="font-size:14px;margin:12px 0 8px"><span class="lb">${cd.g[L.g.id]||'Δ'}</span> Eigenschappen differentieel</h2><div class="grid">${fld('Gevoeligheid (mA)',gp+'.mA',{n:1,opts:[10,30,100,300]})}${fld('Stroom (A)',gp+'.A',{n:1,opts:[25,40,63,80]})}${fld('Polen',gp+'.polen',{opts:POL})}${fld('Type',gp+'.type',{opts:['A','B','F','AC']})}</div>${L.g.bron?'':`<div class="row"><button class="sm danger" data-a="delG" data-g="${L.gi}">Wissen</button></div>`}`}
   else{h+=`<h2 style="font-size:14px;margin:12px 0 8px">Hoofddifferentieel</h2><div class="grid">${fld('Gevoeligheid (mA)',bp+'.hoofd.mA',{n:1,opts:[30,100,300]})}${fld('Stroom (A)',bp+'.hoofd.A',{n:1,opts:[25,40,63,80,100]})}${fld('Polen',bp+'.hoofd.polen',{opts:POL})}${fld('Type',bp+'.hoofd.type',{opts:['A','B','F','AC']})}${fld('Voedingskabel','project.voeding')}${fld('Aarding','project.aarding')}</div>`}}
- if(E.mode==='teken')h+=`<input id="libq" placeholder="Zoek symbool" value="${esc(E.q)}" style="margin-top:10px"><div class="lib" id="libl">${libHtml()}</div>`;
+ if(!E.cat)E.cat=CATS[0][0];
+ if(E.mode==='teken')h+=`<input id="libq" placeholder="Zoek symbool" value="${esc(E.q)}" style="margin-top:10px"><div class="libw"><div class="cats" id="libc">${catsHtml()}</div><div class="lib" id="libl">${libHtml()}</div></div>`;
  else if(!L)h+=`<p class="note" style="margin-top:10px">Tik in het schema op een symbool, een automaat of een differentieel.</p>`;
  return h}
 const schemaHtml=()=>allPages(S,{schema:true}).map(p=>pageSVG(p,true)).join('');
@@ -724,10 +735,10 @@ function ask(vraag,def=''){return new Promise(ok=>{const o=$('#ovl');o.innerHTML
 /* ---- gebeurtenissen ---- */
 document.addEventListener('input',e=>{const t=e.target;
  if(t.id==='pzoek'){cloud.picker(t.value);return}
- if(t.id==='libq'){E.q=t.value;$('#libl').innerHTML=libHtml();return}
+ if(t.id==='libq'){E.q=t.value;$('#libl').innerHTML=libHtml();$('#libc').innerHTML=catsHtml();return}
  if(t.dataset.cfg){const[i,f,j]=t.dataset.cfg.split('.'),q=CFG.presets[+i];if(f==='s'){q.s=q.s||['',''];q.s[+j]=t.value}else q[f]=(f==='A'||f==='kA')?+t.value:t.value;saveCfg();return}
  if(t.dataset.b){let v=t.value;if(t.dataset.n!==undefined)v=v===''?'':+v;if(t.dataset.bool!==undefined)v=!!v;setPath(t.dataset.b,v);if(/\.kabel$/.test(t.dataset.b))delete get(t.dataset.b.replace(/\.kabel$/,'')).kabelBron;
-  if(/\.code$/.test(t.dataset.b)&&!String(v).trim())delete get(t.dataset.b.replace(/\.code$/,'')).code;persist();if(t.closest('#side'))redrawSchema()}
+  if(/\.vast$/.test(t.dataset.b)&&!String(v).trim())delete get(t.dataset.b.replace(/\.vast$/,'')).vast;persist();if(t.closest('#side'))redrawSchema()}
  else if(t.dataset.c){setPath(t.dataset.c,t.checked);persist()}});
 document.addEventListener('change',async e=>{const t=e.target;
  if(t.id==='pkring'){P.kring=t.value;P.punt='pid:';render();return}
@@ -740,10 +751,13 @@ document.addEventListener('change',async e=>{const t=e.target;
 document.addEventListener('toggle',e=>{const t=e.target;if(t.matches&&t.matches('details.k')){t.open?open.add(t.dataset.id):open.delete(t.dataset.id)}},true);
 document.addEventListener('click',async e=>{
  const hit=e.target.closest('.hit');if(hit){E.sel=hit.dataset.h;const L=locate(E.sel);if(L)bi=L.bx;render();return}
- const ad=e.target.closest('[data-add]');if(ad){const id=ad.dataset.add,L=locate((id[0]==='p'?'k:':'g:')+id.slice(2));if(!L&&id[0]==='k'){const b=S.borden.find(b=>b.groepen.some(g=>g.id===id.slice(2)));if(b){const g=b.groepen.find(g=>g.id===id.slice(2));bi=S.borden.indexOf(b);mut('',()=>{const k=E.sym.startsWith('pre:')?presetKring(+E.sym.slice(4)):newKring();g.kringen.push(k);E.sel='k:'+k.id})}return}
+ const ad=e.target.closest('[data-add]');if(ad){const id=ad.dataset.add;
+  if(id[0]==='i'){const L=locate('k:'+id.slice(2));if(!L)return;bi=L.bx;mut('',()=>{const k=E.sym.startsWith('pre:')?presetKring(+E.sym.slice(4)):newKring();L.g.kringen.splice(L.ki,0,k);E.sel='k:'+k.id});return}
+  const L=locate((id[0]==='p'?'k:':'g:')+id.slice(2));if(!L&&id[0]==='k'){const b=S.borden.find(b=>b.groepen.some(g=>g.id===id.slice(2)));if(b){const g=b.groepen.find(g=>g.id===id.slice(2));bi=S.borden.indexOf(b);mut('',()=>{const k=E.sym.startsWith('pre:')?presetKring(+E.sym.slice(4)):newKring();g.kringen.push(k);E.sel='k:'+k.id})}return}
   if(!L)return;bi=L.bx;
-  if(id[0]==='p')mut('',()=>{const last=L.k.punten[L.k.punten.length-1],p=newPunt(E.sym,{tekst:last?last.tekst:''});L.k.punten.push(p);E.sel='p:'+p.id;E.recent=[E.sym,...E.recent.filter(x=>x!==E.sym)].slice(0,5)});
+  if(id[0]==='p')mut('',()=>{const last=L.k.punten[L.k.punten.length-1],p=newPunt(E.sym,{tekst:last?last.tekst:''});L.k.punten.push(p);E.sel='p:'+p.id;E.recent=[E.sym,...E.recent.filter(x=>x!==E.sym)].slice(0,8)});
   else mut('',()=>{const k=E.sym.startsWith('pre:')?presetKring(+E.sym.slice(4)):newKring();L.g.kringen.push(k);E.sel='k:'+k.id});return}
+ const ct=e.target.closest('[data-cat]');if(ct){E.cat=ct.dataset.cat;E.q='';const q=$('#libq');if(q)q.value='';$('#libl').innerHTML=libHtml();$('#libl').scrollTop=0;$('#libc').innerHTML=catsHtml();return}
  const sy=e.target.closest('[data-sym]');if(sy){E.sym=sy.dataset.sym;E.mode='teken';
   if(E.sym==='diff'){mut('Differentieel toegevoegd',()=>{const g=newGroep();B().groepen.push(g);E.sel='g:'+g.id;E.sym='kring'})}else render();return}
  const tb=e.target.closest('[data-tab]');if(tb){tab=tb.dataset.tab;render();window.scrollTo(0,0);return}
