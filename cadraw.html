@@ -418,8 +418,17 @@ const presetUitKring=(k,naam)=>({naam,polen:k.polen,curve:k.curve,A:k.A,kA:k.kA,
 /* ================= toestand ================= */
 let S=CLOUD?blank():loadLocal(),tab='schema',zoom=1,undoStack=[],bi=0;const open=new Set();
 const E={mode:'teken',sym:'sc_ak',sel:null,q:'',recent:[]};
-const P={mode:'teken',wat:'punt',sel:null,kring:'',punt:'',zoom:1,pi:0,draw:null,drag:null,grid:true,snapGrid:true,snapMuur:true,transp:false};
+const P={rot:0,last:null,mode:'teken',wat:'punt',sel:null,kring:'',punt:'',zoom:1,pi:0,draw:null,drag:null,grid:true,snapGrid:true,snapMuur:true,transp:false};
 const ptool=()=>P.mode==='sel'?'hand':P.mode==='gom'?'gom':P.wat;
+const geplaatst=()=>new Set(S.plannen.flatMap(p=>p.items.map(i=>i.pid)));
+/* zoals Trikker: het volgende nog niet geplaatste component staat meteen klaar (eerst in de huidige kring, dan de volgende letters) */
+function autoPunt(vanaf){const pls=geplaatst(),ks=allKringen();if(!ks.length){P.punt='';return null}
+ let st=ks.findIndex(x=>x.k.id===(vanaf||P.kring));if(st<0)st=0;
+ for(let i=0;i<ks.length;i++){const x=ks[(st+i)%ks.length],n=x.k.punten.find(p=>!pls.has(p.id));if(n){P.kring=x.k.id;P.punt='pid:'+n.id;return x}}
+ P.punt='';return null}
+function ghostHtml(pl){if(!P.punt||ptool()!=='punt')return'';const cd=codes(S),kr=allKringen().find(x=>x.k.id===P.kring);if(!kr)return'';
+ let ix,pid;if(P.punt.startsWith('pid:')){ix=pindex(S);pid=P.punt.slice(4)}else{pid='__nieuw';ix={__nieuw:{p:{type:P.punt.slice(4),aantal:1,tekst:''},k:kr.k,nr:kr.k.punten.length+1,code:cd.k[kr.k.id]}}}
+ const r=itemOps(pl,{pid,x:0,y:0,rot:P.rot},ix);return r?opsSVG(r.ops):''}
 function migrate(j){if(!j.borden&&j.groepen){j.borden=[newBord({hoofd:j.hoofd,groepen:j.groepen})];delete j.groepen;delete j.hoofd}
  if(!j.plannen||!j.plannen.length)j.plannen=[newPlan()];if(!j.print)j.print={schema:true,plan:true,kringen:true,mat:false};if(!j.kamers)j.kamers=[];j.borden.forEach(b=>{if(!b.groepen.some(g=>!g.sub))b.groepen.unshift({id:uid(),sub:false,kringen:[]})});return j}
 function loadLocal(){try{const j=JSON.parse(localStorage.getItem(KEY));if(j&&(j.borden||j.groepen))return migrate(j)}catch(e){}return sample()}
@@ -781,6 +790,7 @@ function vPlan(){P.pi=clamp(P.pi,0,S.plannen.length-1);const pl=S.plannen[P.pi],
  pl.muren.forEach((m,i)=>{svg+=`<line x1="${m[0]}" y1="${m[1]}" x2="${m[2]}" y2="${m[3]}" stroke="#000" stroke-width="${pl.mw||3.2}" stroke-linecap="square"/><line class="wl" data-w="${i}" x1="${m[0]}" y1="${m[1]}" x2="${m[2]}" y2="${m[3]}"/>`});
  pl.items.forEach(it=>{const r=itemOps(pl,it,ix);if(!r)return;const e2=ix[it.pid],hl=e2&&e2.k.id===P.kring;svg+=`<g class="pi${it.id===P.sel?' sel':''}" data-it="${it.id}"${hl?' style="filter:drop-shadow(0 0 2px #0b6bcb)"':''}>${opsSVG(r.ops)}<circle class="hb" cx="${r.cx.toFixed(1)}" cy="${r.cy.toFixed(1)}" r="${r.r.toFixed(1)}"/></g>`});
  pl.teksten.forEach(t=>{const z=t.z||12,w=Math.max(20,String(t.t).length*z*.56);svg+=`<g class="pi${t.id===P.sel?' sel':''}" data-tx="${t.id}"><text x="${t.x}" y="${t.y}" font-size="${z}">${esc(t.t)}</text><rect class="hb" x="${t.x-3}" y="${t.y-z}" width="${w+6}" height="${z*1.35}"/></g>`});
+ const gh=ghostHtml(pl);svg+=`<g id="ghost" pointer-events="none" opacity=".55" style="filter:drop-shadow(0 0 1.5px #0b6bcb)" visibility="${gh&&P.last?'visible':'hidden'}"${P.last?` transform="translate(${P.last[0]} ${P.last[1]})"`:''}>${gh}</g>`;
  svg+=`<line id="prev" stroke="#0b6bcb" stroke-width="3" stroke-dasharray="6 5" visibility="hidden"/></svg>`;
  /* linkerpaneel: letters + componenten */
  let lets='';S.borden.forEach((b,bx)=>{if(S.borden.length>1)lets+=`<div class="plh">${esc(b.naam)}</div>`;
@@ -791,8 +801,9 @@ function vPlan(){P.pi=clamp(P.pi,0,S.plannen.length-1);const pl=S.plannen[P.pi],
    return`<button class="pc${op?' gepl':''}${P.punt==='pid:'+p.id?' on':''}" data-a="ppick" data-pp="${p.id}" title="${op?'Geplaatst - tik om te tonen':'Tik en plaats op het plan'}">${symIcon(p.type)}<span><b>${esc(cd.k[kr.k.id])}${i+1}</b> ${esc(p.tekst||(TYPES[p.type]||{}).l||'')}${p.aantal>1?' x'+p.aantal:''}</span>${op?'<em>✓</em>':''}</button>`}).join('')
   +`<select id="pnew" class="pnew"><option value="">+ nieuw symbool in ${esc(cd.k[kr.k.id])}</option>${typeOpts(P.punt.startsWith('new:')?P.punt:'','new:')}</select>`}
  else comp='<p class="note" style="padding:8px">Nog geen kringen. Teken eerst het eendraadschema.</p>';
- const hint=tl==='muur'?'Sleep om een muur te tekenen; lijnen worden recht getrokken en klikken vast aan hoeken.':tl==='tekst'?'Tik op het plan om een tekst te plaatsen.':tl==='gom'?'Tik op een symbool, muur of tekst om het van het plan te halen.':tl==='hand'?'Tik op een symbool om het te selecteren; sleep om te verplaatsen.':(P.punt?'Tik op het plan om het gekozen component te plaatsen.':'Kies links een letter en een component.');
+ const hint=tl==='muur'?'Sleep om een muur te tekenen; lijnen worden recht getrokken en klikken vast aan hoeken.':tl==='tekst'?'Tik op het plan om een tekst te plaatsen.':tl==='gom'?'Tik op een symbool, muur of tekst om het van het plan te halen.':tl==='hand'?'Tik op een symbool om het te selecteren; sleep om te verplaatsen.':(P.punt?'Klik links om te plaatsen, rechts om 90° te draaien. Het volgende component staat daarna meteen klaar.':'Alle componenten staan op het plan. Kies links een letter of "+ nieuw symbool".');
  const ck=(k,l)=>`<label class="pck"><input type="checkbox" data-a="pck" data-k="${k}"${P[k]?' checked':''}>${l}</label>`;
+ const rotKnop=tl==='punt'&&P.punt?` <button class="sm" data-a="prot" title="Rechtermuisknop of R">↻ Draaien (${P.rot*90}°)</button>`:'';
  return`<div class="card ptb"><div class="row" style="margin:0">
   <div class="seg"><button data-a="pmode" data-m="teken" class="${P.mode==='teken'?'on':''}">✎ Tekenen</button><button data-a="pmode" data-m="sel" class="${P.mode==='sel'?'on':''}">↖ Selecteren</button><button data-a="pmode" data-m="gom" class="${P.mode==='gom'?'on':''}">✕ Wissen</button></div>
   <span class="pzoom"><button class="sm" data-a="pzo">−</button><input type="range" id="pzr" min="30" max="400" value="${Math.round(P.zoom*100)}"><button class="sm" data-a="pzi">+</button></span>
@@ -810,7 +821,7 @@ function vPlan(){P.pi=clamp(P.pi,0,S.plannen.length-1);const pl=S.plannen[P.pi],
  <div class="pws"><div class="pside card">
   <div class="ptools"><button class="${P.mode==='teken'&&P.wat==='muur'?'on':''}" data-a="pwat" data-w="muur" title="Muren tekenen">⌂<small>Muren</small></button><button class="${P.mode==='teken'&&P.wat==='tekst'?'on':''}" data-a="pwat" data-w="tekst" title="Tekst plaatsen"><i style="font-family:serif">abc</i><small>Tekst</small></button></div>
   <div class="pcols"><div class="plet">${lets}</div><div class="pcomp">${comp}</div></div></div>
- <div><p class="note" style="margin:0 0 6px">${hint}</p><div class="pages">${svg}</div></div></div>`}
+ <div><p class="note" style="margin:0 0 6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span>${hint}</span>${rotKnop}</p><div class="pages">${svg}</div></div></div>`}
 function render(){gc();const nw=checks(S).filter(x=>x.lvl==='w').length;
  $('#tabs').innerHTML=[['doc','Document'],['schema','Eendraadschema'],['plan','Situatieplan'],['kring','Kringen'+(nw?`<span class="badge">${nw}</span>`:'')],['mat','Materiaallijst'],['print','Afdrukken'],['extra','Extra']].map(t=>`<button data-tab="${t[0]}" class="${tab===t[0]?'on':''}">${t[1]}</button>`).join('');
  const sc=document.querySelector('.pages'),sx=sc?sc.scrollLeft:0,sy=sc?sc.scrollTop:0,sd=$('.lib'),ls=sd?sd.scrollTop:0;
@@ -901,7 +912,7 @@ document.addEventListener('click',async e=>{
  const ct=e.target.closest('[data-cat]');if(ct){E.cat=ct.dataset.cat;E.q='';const q=$('#libq');if(q)q.value='';$('#libl').innerHTML=libHtml();$('#libl').scrollTop=0;$('#libc').innerHTML=catsHtml();return}
  const sy=e.target.closest('[data-sym]');if(sy){E.sym=sy.dataset.sym;E.mode='teken';
   if(E.sym==='diff'){E.sym='kring';await voegDiffToe(B())}else render();return}
- const tb=e.target.closest('[data-tab]');if(tb){tab=tb.dataset.tab;render();window.scrollTo(0,0);return}
+ const tb=e.target.closest('[data-tab]');if(tb){tab=tb.dataset.tab;if(tab==='plan'&&P.mode==='teken'&&P.wat==='punt'&&!P.punt)autoPunt();render();window.scrollTo(0,0);return}
  const pr=e.target.closest('[data-pid]');if(pr){cloud.open(pr.dataset.pid);return}
  const b=e.target.closest('[data-a]');if(!b)return;const a=b.dataset.a,gi=+b.dataset.g,ki=+b.dataset.k,pi=+b.dataset.p,G=B().groepen[gi],K=G&&G.kringen[ki],pl=S.plannen[P.pi];
  if(a==='undo'){if(undoStack.length){S=JSON.parse(undoStack.pop());persist();render();toast('Teruggezet')}}
@@ -947,7 +958,8 @@ document.addEventListener('click',async e=>{
  else if(a==='zi'||a==='zo'){zoom=clamp(zoom*(a==='zi'?1.25:.8),.35,3);render()}
  else if(a==='pzi'||a==='pzo'){P.zoom=clamp(P.zoom*(a==='pzi'?1.25:.8),.3,4);render()}
  else if(a==='goK')goKring(b.dataset.kid);
- else if(a==='pmode'){P.mode=b.dataset.m;if(P.mode==='teken'&&P.wat!=='muur'&&P.wat!=='tekst')P.wat='punt';P.sel=null;render()}
+ else if(a==='pmode'){P.mode=b.dataset.m;if(P.mode==='teken'&&P.wat!=='muur'&&P.wat!=='tekst'){P.wat='punt';if(!P.punt)autoPunt()}P.sel=null;render()}
+ else if(a==='prot'){P.rot=(P.rot+1)%4;render()}
  else if(a==='pwat'){const w=b.dataset.w;if(P.mode==='teken'&&P.wat===w)P.wat='punt';else{P.mode='teken';P.wat=w}P.sel=null;render()}
  else if(a==='pck'){P[b.dataset.k]=b.checked;render()}
  else if(a==='ppg'){P.pi=clamp(P.pi+(+b.dataset.d),0,S.plannen.length-1);P.sel=null;render()}
@@ -972,17 +984,18 @@ function snapPt(pl,x,y,skip){let best=null,bd=14;pl.muren.forEach(m=>{[[m[0],m[1
 function wallSnap(pl,x,y){let best=null,bd=16;pl.muren.forEach(m=>{const dx=m[2]-m[0],dy=m[3]-m[1],l2=dx*dx+dy*dy;if(!l2)return;const t=clamp(((x-m[0])*dx+(y-m[1])*dy)/l2,0,1),px=m[0]+t*dx,py=m[1]+t*dy,dd=Math.hypot(px-x,py-y);if(dd<bd){bd=dd;best=[Math.round(px),Math.round(py)]}});return best||[x,y]}
 const gridR=(v,st)=>P.snapGrid?Math.round(v/st)*st:v;
 function plaatsPunt(pl,x0,y0){let[x,y]=[x0,y0];if(P.snapMuur){const w=wallSnap(pl,x0,y0);if(w[0]!==x0||w[1]!==y0)return w}return[gridR(x,5),gridR(y,5)]}
-document.addEventListener('pointerdown',e=>{const s=e.target.closest&&e.target.closest('#plan');if(!s)return;const pl=S.plannen[P.pi],[x,y]=svgPt(e),tl=ptool();
+document.addEventListener('pointerdown',e=>{const s=e.target.closest&&e.target.closest('#plan');if(!s||e.button===2)return;const pl=S.plannen[P.pi],[x,y]=svgPt(e),tl=ptool();
  if(tl==='muur'){const a=P.snapMuur?snapPt(pl,x,y):[x,y],a2=(a[0]===x&&a[1]===y)?[gridR(x,10),gridR(y,10)]:a;P.draw={x1:a2[0],y1:a2[1],x2:a2[0],y2:a2[1]};s.setPointerCapture(e.pointerId);e.preventDefault()}
  else if(tl==='hand'){const g=e.target.closest('[data-it],[data-tx]');
   if(g){const it=g.dataset.it?pl.items.find(i=>i.id===g.dataset.it):pl.teksten.find(t=>t.id===g.dataset.tx);P.sel=it.id;P.drag={it,g,tx:!!g.dataset.tx,sx:x,sy:y,ox:it.x,oy:it.y,moved:false};g.setPointerCapture(e.pointerId);e.preventDefault()}
   else if(P.sel){P.sel=null;render()}}});
 document.addEventListener('pointermove',e=>{
+ if(!P.draw&&!P.drag&&ptool()==='punt'&&e.pointerType!=='touch'){const g=$('#ghost');if(g&&g.firstChild&&e.target.closest&&e.target.closest('#plan')){const pl=S.plannen[P.pi],[x0,y0]=svgPt(e),q=plaatsPunt(pl,x0,y0);P.last=q;g.setAttribute('transform',`translate(${q[0]} ${q[1]})`);g.setAttribute('visibility','visible')}else if(g)g.setAttribute('visibility','hidden')}
  if(P.draw){let[x,y]=svgPt(e);const d=P.draw,dx=Math.abs(x-d.x1),dy=Math.abs(y-d.y1);if(dx<dy*.18)x=d.x1;else if(dy<dx*.18)y=d.y1;
   let a=P.snapMuur?snapPt(S.plannen[P.pi],x,y):[x,y];if(a[0]===x&&a[1]===y)a=[d.x1===x?x:gridR(x,10),d.y1===y?y:gridR(y,10)];d.x2=a[0];d.y2=a[1];
   const pv=$('#prev');if(pv){pv.setAttribute('x1',d.x1);pv.setAttribute('y1',d.y1);pv.setAttribute('x2',d.x2);pv.setAttribute('y2',d.y2);pv.setAttribute('visibility','visible')}}
  else if(P.drag){const[x,y]=svgPt(e),g=P.drag;if(Math.hypot(x-g.sx,y-g.sy)>3)g.moved=true;if(g.moved)g.g.setAttribute('transform',`translate(${x-g.sx} ${y-g.sy})`);g.nx=g.ox+x-g.sx;g.ny=g.oy+y-g.sy}});
-document.addEventListener('pointerup',async e=>{const pl=S.plannen[P.pi];
+document.addEventListener('pointerup',async e=>{if(e.button===2)return;const pl=S.plannen[P.pi];
  if(P.draw){const d=P.draw;P.draw=null;if(Math.hypot(d.x2-d.x1,d.y2-d.y1)>10)mut('',()=>pl.muren.push([d.x1,d.y1,d.x2,d.y2]));else render();return}
  if(P.drag){const g=P.drag;P.drag=null;if(g.moved){snap();const w=g.tx?[gridR(g.nx,5),gridR(g.ny,5)]:plaatsPunt(pl,g.nx,g.ny);g.it.x=clamp(w[0],0,1000);g.it.y=clamp(w[1],0,pl.h||707);persist()}render();return}
  const s=e.target.closest&&e.target.closest('#plan');if(!s)return;const tl=ptool();
@@ -993,8 +1006,17 @@ document.addEventListener('pointerup',async e=>{const pl=S.plannen[P.pi];
   if(!P.punt){toast(`Alle componenten van ${codes(S).k[kr.k.id]} staan op het plan. Kies links een andere letter of "+ nieuw symbool".`);return}
   const[x0,y0]=svgPt(e),[x,y]=plaatsPunt(pl,x0,y0);
   mut('',()=>{let pid;if(P.punt.startsWith('pid:'))pid=P.punt.slice(4);else{const t=P.punt.slice(4),p=newPunt(t,{tekst:''});kr.k.punten.push(p);pid=p.id}
-   pl.items.push({id:uid(),pid,x,y,rot:0});P.sel=null;
-   if(P.punt.startsWith('pid:')){const pls=new Set(S.plannen.flatMap(p=>p.items.map(i=>i.pid))),n=kr.k.punten.find(p=>!pls.has(p.id));P.punt=n?'pid:'+n.id:''}})}});
+   pl.items.push({id:uid(),pid,x,y,rot:P.rot});P.sel=null;P.last=[x,y];
+   if(P.punt.startsWith('pid:')){const pls=geplaatst(),n=kr.k.punten.find(p=>!pls.has(p.id));
+    if(n)P.punt='pid:'+n.id;else{const cd=codes(S),van=cd.k[kr.k.id],nx=autoPunt(kr.k.id);setTimeout(()=>toast(nx?`${van} volledig geplaatst - verder met ${cd.k[nx.k.id]}`:`${van} geplaatst - alle componenten staan op het plan`))}}})}});
+document.addEventListener('contextmenu',e=>{const s=e.target.closest&&e.target.closest('#plan');if(!s)return;e.preventDefault();const pl=S.plannen[P.pi],tl=ptool();
+ if(tl==='punt'&&P.punt){P.rot=(P.rot+1)%4;const g=$('#ghost');if(g)g.innerHTML=ghostHtml(pl);const kb=$('[data-a=prot]');if(kb)kb.textContent=`↻ Draaien (${P.rot*90}°)`;return}
+ const g=e.target.closest('[data-it]');if(g){const it=pl.items.find(i=>i.id===g.dataset.it);if(it)mut('',()=>{it.rot=((it.rot||0)+1)%4;P.sel=it.id})}});
+document.addEventListener('keydown',e=>{if(tab!=='plan'||/INPUT|SELECT|TEXTAREA/.test((document.activeElement||{}).tagName||''))return;
+ if(e.key==='r'||e.key==='R'){if(ptool()==='punt'&&P.punt){P.rot=(P.rot+1)%4;const g=$('#ghost');if(g)g.innerHTML=ghostHtml(S.plannen[P.pi]);const kb=$('[data-a=prot]');if(kb)kb.textContent=`↻ Draaien (${P.rot*90}°)`}
+  else if(P.sel){const it=S.plannen[P.pi].items.find(i=>i.id===P.sel);if(it)mut('',()=>{it.rot=((it.rot||0)+1)%4})}}
+ else if(e.key==='Escape'){P.mode='sel';P.sel=null;render()}
+ else if((e.key==='Delete'||e.key==='Backspace')&&P.sel){const pl=S.plannen[P.pi];mut('Van het plan gehaald',()=>{pl.items=pl.items.filter(i=>i.id!==P.sel);pl.teksten=(pl.teksten||[]).filter(t=>t.id!==P.sel);P.sel=null})}});
 
 /* ================= CaSuite-koppeling (Supabase) ================= */
 const cloud={sb:null,pid:null,proj:null,projecten:[],plannen:[],dirty:false,t:null,who:'',backup:false,saving:false,
