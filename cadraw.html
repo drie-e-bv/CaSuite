@@ -592,11 +592,11 @@ function bordPages(st,b){
 function pindex(st){const cd=codes(st),m={};st.borden.forEach(b=>b.groepen.forEach(g=>g.kringen.forEach(k=>k.punten.forEach((p,i)=>{m[p.id]={p,k,nr:i+1,code:cd.k[k.id]}}))));return m}
 function xform(ops,rot,s,tx,ty){const pt=(x,y)=>{for(let i=0;i<rot;i++){const t=x;x=-y;y=t}return[x*s+tx,y*s+ty]};
  return ops.map(o=>{const t=o[0];
-  if(t==='L'){const a=pt(o[1],o[2]),b=pt(o[3],o[4]);return['L',a[0],a[1],b[0],b[1],o[5]*s,o[6]]}
+  if(t==='L'){const a=pt(o[1],o[2]),b=pt(o[3],o[4]);return['L',a[0],a[1],b[0],b[1],o[5]*s,o[6],o[7]]}
   if(t==='C'){const a=pt(o[1],o[2]);return['C',a[0],a[1],o[3]*s,o[4],o[5]*s]}
   if(t==='R'){const a=pt(o[1],o[2]),b=pt(o[1]+o[3],o[2]+o[4]);return['R',Math.min(a[0],b[0]),Math.min(a[1],b[1]),Math.abs(b[0]-a[0]),Math.abs(b[1]-a[1]),o[5],o[6]*s]}
   if(t==='F'){const a=pt(o[1],o[2]),b=pt(o[3],o[4]),c=pt(o[5],o[6]);return['F',...a,...b,...c]}
-  if(t==='T'){const a=pt(o[1],o[2]);return['T',a[0],a[1]+(rot%2?o[4]*s*.35:0),o[3],o[4]*s,rot?'m':o[5],0,o[7],o[8]]}
+  if(t==='T'){const a=pt(o[1],o[2]);return['T',a[0],a[1]+(rot%2?o[4]*s*.35:0),o[3],o[4]*s,rot?'m':o[5],rot?0:o[6],o[7],o[8],o[9]]}
   return o})}
 function itemOps(pl,it,ix){const e=ix[it.pid];if(!e)return null;const d=mk(),s=pl.sym||3,rot=((it.rot||0)%4+4)%4;
  sym(d,e.p.type,0,0,1,e.p.tekst,e.p.aantal);
@@ -605,7 +605,7 @@ function itemOps(pl,it,ix){const e=ix[it.pid];if(!e)return null;const d=mk(),s=p
  ops.push(['T',it.x+lp[0]*s,it.y+lp[1]*s+(rot%2?1*s:0),lb,2.5*s,an,0,1,0]);
  const c=[[w/2,0],[0,w/2],[-w/2,0],[0,-w/2]][rot];
  return{ops,cx:it.x+c[0]*s,cy:it.y+c[1]*s,r:(w/2+2.5)*s,lb}}
-function planFlat(st,pl){const ix=pindex(st),o=[];pl.muren.forEach(m=>o.push(['L',m[0],m[1],m[2],m[3],pl.mw||3.2,0]));pl.items.forEach(it=>{const r=itemOps(pl,it,ix);if(r)o.push(...r.ops)});(pl.teksten||[]).forEach(t=>o.push(['T',t.x,t.y,t.t,t.z||12,'s',0,0,0]));return o}
+function planFlat(st,pl){const ix=pindex(st),o=[];cadOps(pl,o);pl.muren.forEach(m=>o.push(['L',m[0],m[1],m[2],m[3],pl.mw||3.2,0]));pl.items.forEach(it=>{const r=itemOps(pl,it,ix);if(r)o.push(...r.ops)});(pl.teksten||[]).forEach(t=>o.push(['T',t.x,t.y,t.t,t.z||12,'s',0,0,0]));return o}
 
 /* alle pagina's voor PDF/voorbeeld; parts = {schema,plan,kringen,mat} */
 function tablePages(soort,cols,rows){const out=[],per=34;for(let i=0;i<Math.max(1,rows.length);i+=per)out.push({soort,sub:'',f:draw=>{const d=draw.d;let y=M+9;
@@ -613,7 +613,7 @@ function tablePages(soort,cols,rows){const out=[],per=34;for(let i=0;i<Math.max(
   rows.slice(i,i+per).forEach(r=>{y+=4.4;r.forEach((v,j)=>{const c=cols[j],t=String(v??'');d.T(M+4+c[1],y,t.length>c[2]?t.slice(0,c[2]-1)+'.':t,{z:2.4,a:c[3]||'s',b:j===0&&cols[0][4]})})})}});return out}
 function allPages(st,parts){parts=parts||{schema:true,plan:true};const out=[],cd=codes(st);
  if(parts.schema)st.borden.forEach(b=>bordPages(st,b).forEach(f=>out.push({soort:'Eendraadschema',sub:b.naam,f})));
- if(parts.plan)st.plannen.forEach(pl=>{if(!pl.items.length&&!pl.muren.length&&!(pl.teksten||[]).length&&!(pl.bg&&pl.bg.data))return;
+ if(parts.plan)st.plannen.forEach(pl=>{if(!pl.items.length&&!pl.muren.length&&!(pl.teksten||[]).length&&!(pl.bg&&pl.bg.data)&&!pl.cad)return;
   out.push({soort:'Situatieplan',sub:pl.naam,pl,f:draw=>{const H=pl.h||707,k=Math.min((PW-2*M-6)/1000,(PH-2*M-TBH-6)/H),ox=M+3+((PW-2*M-6)-1000*k)/2,oy=M+3;
    draw.bg={data:pl.bg&&pl.bg.data,x:ox,y:oy,w:1000*k,h:H*k};draw.d.o.push(...xform(planFlat(st,pl),0,k,ox,oy))}})});
  if(parts.kringen)out.push(...tablePages('Lijst met kringen',[['Kring',0,8,'s',1],['Benaming',16,46],['Beveiliging',104,18],['Kabel',136,22],['Lengte',178,8],['Differentieel',196,30],['Punten',276,5,'e']],
@@ -623,11 +623,11 @@ function allPages(st,parts){parts=parts||{schema:true,plan:true};const out=[],cd
 /* SVG backend */
 function opsSVG(ops,edit){const f={n:'none',w:'#fff',b:'#000'};let s='',top='';
  for(const o of ops){const t=o[0];
-  if(t==='L')s+=`<line x1="${o[1].toFixed(2)}" y1="${o[2].toFixed(2)}" x2="${o[3].toFixed(2)}" y2="${o[4].toFixed(2)}" stroke="#000" stroke-width="${(+o[5]).toFixed(2)}" stroke-linecap="round"/>`;
+  if(t==='L')s+=`<line x1="${o[1].toFixed(2)}" y1="${o[2].toFixed(2)}" x2="${o[3].toFixed(2)}" y2="${o[4].toFixed(2)}" stroke="${o[7]||'#000'}" stroke-width="${(+o[5]).toFixed(2)}" stroke-linecap="round"/>`;
   else if(t==='C')s+=`<circle cx="${o[1].toFixed(2)}" cy="${o[2].toFixed(2)}" r="${o[3].toFixed(2)}" fill="${f[o[4]]}" stroke="#000" stroke-width="${(+o[5]).toFixed(2)}"/>`;
   else if(t==='R')s+=`<rect x="${o[1].toFixed(2)}" y="${o[2].toFixed(2)}" width="${o[3].toFixed(2)}" height="${o[4].toFixed(2)}" fill="${f[o[5]]}" stroke="#000" stroke-width="${(+o[6]).toFixed(2)}"/>`;
   else if(t==='F')s+=`<polygon points="${o.slice(1).map(v=>v.toFixed(2)).join(' ')}" fill="#000"/>`;
-  else if(t==='T')s+=`<text x="${o[1].toFixed(2)}" y="${o[2].toFixed(2)}" font-size="${o[4].toFixed(2)}" text-anchor="${{s:'start',m:'middle',e:'end'}[o[5]]}"${o[6]?` transform="rotate(${-o[6]} ${o[1].toFixed(2)} ${o[2].toFixed(2)})"`:''}${o[7]?' font-weight="700"':''}${o[8]?' font-style="italic"':''}>${esc(o[3])}</text>`;
+  else if(t==='T')s+=`<text x="${o[1].toFixed(2)}" y="${o[2].toFixed(2)}" font-size="${o[4].toFixed(2)}" text-anchor="${{s:'start',m:'middle',e:'end'}[o[5]]}"${o[6]?` transform="rotate(${-o[6]} ${o[1].toFixed(2)} ${o[2].toFixed(2)})"`:''}${o[7]?' font-weight="700"':''}${o[8]?' font-style="italic"':''}${o[9]?` fill="${o[9]}"`:''}>${esc(o[3])}</text>`;
   else if(t==='H'&&edit)s+=`<rect class="hit${E.sel===o[5]?' sel':''}" data-h="${o[5]}" x="${o[1].toFixed(2)}" y="${o[2].toFixed(2)}" width="${o[3]}" height="${o[4].toFixed(2)}"/>`;
   else if(t==='A'&&edit&&E.mode==='teken'&&((o[3][0]==='p')===!!TYPES[E.sym]))top+=`<g class="addm" data-add="${o[3]}" transform="translate(${o[1].toFixed(2)} ${o[2].toFixed(2)})"><circle r="2.3"/><path d="M-1.2 0H1.2M0 -1.2V1.2"/></g>`;}
  return s+top}
@@ -639,12 +639,12 @@ function buildPdf(st,parts){
  allPages(st,parts).forEach((pg,pi)=>{if(pi)doc.addPage('a4','landscape');
   if(pg.bg&&pg.bg.data){try{if(doc.GState)doc.setGState(new doc.GState({opacity:.55}));doc.addImage(pg.bg.data,'JPEG',pg.bg.x,pg.bg.y,pg.bg.w,pg.bg.h);if(doc.GState)doc.setGState(new doc.GState({opacity:1}))}catch(e){}}
   for(const o of pg.ops){const t=o[0];
-   if(t==='L'){doc.setLineWidth(o[5]);doc.setLineCap(1);doc.setDrawColor(0);doc.line(o[1],o[2],o[3],o[4])}
+   if(t==='L'){doc.setLineWidth(o[5]);doc.setLineCap(1);doc.setDrawColor(o[7]||'#000000');doc.line(o[1],o[2],o[3],o[4])}
    else if(t==='C'){doc.setLineWidth(o[5]);doc.setDrawColor(0);if(o[4]==='b'){doc.setFillColor(0);doc.circle(o[1],o[2],o[3],'FD')}else if(o[4]==='w'){doc.setFillColor(255,255,255);doc.circle(o[1],o[2],o[3],'FD')}else doc.circle(o[1],o[2],o[3],'S')}
    else if(t==='R'){doc.setLineWidth(o[6]);doc.setDrawColor(0);if(o[5]==='w'){doc.setFillColor(255,255,255);doc.rect(o[1],o[2],o[3],o[4],'FD')}else doc.rect(o[1],o[2],o[3],o[4],'S')}
    else if(t==='F'){doc.setFillColor(0);doc.triangle(o[1],o[2],o[3],o[4],o[5],o[6],'F')}
    else if(t==='T'){let str=o[3].replace(/Ω/g,'Ohm'),x=o[1];const z=o[4];
-    doc.setFont('helvetica',o[7]&&o[8]?'bolditalic':o[7]?'bold':o[8]?'italic':'normal');doc.setFontSize(z*pt);doc.setTextColor(0);
+    doc.setFont('helvetica',o[7]&&o[8]?'bolditalic':o[7]?'bold':o[8]?'italic':'normal');doc.setFontSize(z*pt);doc.setTextColor(o[9]||'#000000');
     if(str[0]==='Δ'){doc.setLineWidth(.18+.12*o[7]);doc.setDrawColor(0);doc.triangle(x,o[2],x+.66*z,o[2],x+.33*z,o[2]-.72*z,'S');x+=.8*z;str=str.slice(1)}
     str=str.replace(/Δ/g,'d');
     if(o[6])doc.text(str,x,o[2],{angle:o[6]});else doc.text(str,x,o[2],{align:{s:'left',m:'center',e:'right'}[o[5]]});}
@@ -786,6 +786,7 @@ function vPlan(){P.pi=clamp(P.pi,0,S.plannen.length-1);const pl=S.plannen[P.pi],
  <rect width="1000" height="${H}" fill="#fff"/>`;
  if(pl.bg&&pl.bg.data)svg+=`<image href="${pl.bg.data}" width="1000" height="${H}" opacity="${P.transp?.28:.55}" preserveAspectRatio="none"/>`;
  else if(pl.bg)svg+=`<text x="500" y="40" font-size="14" text-anchor="middle" fill="#999">Achtergrond niet lokaal bewaard - opnieuw laden</text>`;
+ svg+=cadSvg(pl);
  if(P.grid)svg+=`<rect width="1000" height="${H}" fill="url(#g50)" pointer-events="none"/>`;
  pl.muren.forEach((m,i)=>{svg+=`<line x1="${m[0]}" y1="${m[1]}" x2="${m[2]}" y2="${m[3]}" stroke="#000" stroke-width="${pl.mw||3.2}" stroke-linecap="square"/><line class="wl" data-w="${i}" x1="${m[0]}" y1="${m[1]}" x2="${m[2]}" y2="${m[3]}"/>`});
  pl.items.forEach(it=>{const r=itemOps(pl,it,ix);if(!r)return;const e2=ix[it.pid],hl=e2&&e2.k.id===P.kring;svg+=`<g class="pi${it.id===P.sel?' sel':''}" data-it="${it.id}"${hl?' style="filter:drop-shadow(0 0 2px #0b6bcb)"':''}>${opsSVG(r.ops)}<circle class="hb" cx="${r.cx.toFixed(1)}" cy="${r.cy.toFixed(1)}" r="${r.r.toFixed(1)}"/></g>`});
@@ -810,7 +811,7 @@ function vPlan(){P.pi=clamp(P.pi,0,S.plannen.length-1);const pl=S.plannen[P.pi],
   <span class="pzoom"><button class="sm" data-a="ppg" data-d="-1"${P.pi?'':' disabled'}>‹</button><b style="min-width:120px;text-align:center">${esc(pl.naam)} <small style="color:var(--mut);font-weight:400">${P.pi+1}/${S.plannen.length}</small></b><button class="sm" data-a="ppg" data-d="1"${P.pi<S.plannen.length-1?'':' disabled'}>›</button><button class="sm" data-a="addPlan" title="Verdieping toevoegen">+</button></span>
   <span class="pzoom">${ck('transp','Transparant')}${ck('grid','Toon grid')}${ck('snapGrid','Kleef aan grid')}${ck('snapMuur','Kleef aan muren')}</span></div>
  <div class="row"><input data-b="plannen.${P.pi}.naam" data-r value="${esc(pl.naam)}" style="width:140px" title="Naam verdieping">
-  <label class="sm filel">Achtergrond (PDF/afbeelding)<input type="file" id="bgFile" accept="image/*,application/pdf" style="display:none"></label>
+  <label class="sm filel">Achtergrond (AutoCAD, PDF, afbeelding)<input type="file" id="bgFile" accept=".dxf,.dwg,image/*,application/pdf" style="display:none"></label>${pl.cad?`<button class="sm" data-a="cadLagen">Lagen (${pl.cad.lagen.filter(l=>l.aan!==false).length}/${pl.cad.lagen.length})</button>`:''}
   ${CLOUD&&cloud.plannen.length?`<select id="casnap" style="max-width:180px"><option value="">Plan uit CaSnap...</option>${cloud.plannen.map((p,i)=>`<option value="${i}">${esc(p.naam||'Naamloos plan')}</option>`).join('')}</select>`:''}
   ${pl.bg?`<button class="sm" data-a="noBg">Achtergrond weg</button>`:''}
   <select data-b="plannen.${P.pi}.sym" data-n data-r title="Symboolgrootte"><option value="2"${pl.sym==2?' selected':''}>Symbolen klein</option><option value="3"${pl.sym==3?' selected':''}>Symbolen normaal</option><option value="4.2"${pl.sym==4.2?' selected':''}>Symbolen groot</option></select>
@@ -865,6 +866,93 @@ function voegDiffToe(b){const g=newGroep();bi=S.borden.indexOf(b);
 const nieuweKring=()=>E.sym.startsWith('pre:')?presetKring(+E.sym.slice(4)):newKring();
 function loadScript(src){return new Promise((ok,no)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>no(new Error('Kon '+src+' niet laden'));document.head.appendChild(s)})}
 
+/* ---- AutoCAD (DXF) als achterliggende laag: vectoren per laag, kiesbare uitsnede, lagen aan/uit, muren om aan te kleven ---- */
+const CAD_KLEUR='#8a9099';
+const cadPaths=d=>{const out=[];let cur=null;String(d).replace(/([ML])([-\d.]+) ([-\d.]+)/g,(m,c,x,y)=>{x=+x;y=+y;if(c==='M'){cur=[[x,y]];out.push(cur)}else if(cur)cur.push([x,y])});return out};
+const cadCache=new WeakMap();
+function cadSegs(pl){if(!pl.cad)return[];let c=cadCache.get(pl.cad);if(c)return c;c=[];pl.cad.lagen.forEach(l=>{if(!l.snap||l.aan===false)return;cadPaths(l.d).forEach(pts=>{for(let i=1;i<pts.length;i++)c.push([pts[i-1][0],pts[i-1][1],pts[i][0],pts[i][1]])})});cadCache.set(pl.cad,c);return c}
+function cadOps(pl,o){if(!pl.cad)return;pl.cad.lagen.forEach(l=>{if(l.aan===false)return;cadPaths(l.d).forEach(pts=>{for(let i=1;i<pts.length;i++)o.push(['L',pts[i-1][0],pts[i-1][1],pts[i][0],pts[i][1],.6,0,CAD_KLEUR])})});
+ (pl.cad.tekst||[]).forEach(t=>{const l=pl.cad.lagen.find(x=>x.n===t.l);if(l&&l.aan===false)return;o.push(['T',t.x,t.y,t.t,t.z,'s',t.r||0,0,0,CAD_KLEUR])})}
+function cadSvg(pl){if(!pl.cad)return'';return`<g pointer-events="none" opacity="${P.transp?.4:1}"><g fill="none" stroke="${CAD_KLEUR}" stroke-width=".6" stroke-linejoin="round" stroke-linecap="round">${pl.cad.lagen.filter(l=>l.aan!==false).map(l=>`<path d="${l.d}"/>`).join('')}</g>`
+ +(pl.cad.tekst||[]).filter(t=>{const l=pl.cad.lagen.find(x=>x.n===t.l);return!l||l.aan!==false}).map(t=>`<text x="${t.x}" y="${t.y}" font-size="${t.z}" fill="${CAD_KLEUR}"${t.r?` transform="rotate(${-t.r} ${t.x} ${t.y})"`:''}>${esc(t.t)}</text>`).join('')+`</g>`}
+/* DXF lezen -> lagen met polylijnen in tekeningcoördinaten (blokken uitgeklapt, bogen benaderd) */
+function dxfLees(txt){const DP=window.DxfParser&&(window.DxfParser.default||window.DxfParser);const dxf=new DP().parseSync(txt);if(!dxf)throw new Error('Geen geldig DXF-bestand.');
+ const lagen={},blocks=dxf.blocks||{},I=[1,0,0,1,0,0],R=Math.PI/180;
+ const L=n=>lagen[n]||(lagen[n]={n,polys:[],tekst:[],aantal:0});
+ const mul=(a,b)=>[a[0]*b[0]+a[1]*b[2],a[0]*b[1]+a[1]*b[3],a[2]*b[0]+a[3]*b[2],a[2]*b[1]+a[3]*b[3],a[0]*b[4]+a[1]*b[5]+a[4],a[2]*b[4]+a[3]*b[5]+a[5]];
+ const tr=(m,x,y)=>[m[0]*x+m[1]*y+m[4],m[2]*x+m[3]*y+m[5]];
+ const boog=(cx,cy,r,a0,a1)=>{while(a1<=a0)a1+=2*Math.PI;const n=Math.max(4,Math.ceil((a1-a0)/(Math.PI/18))),o=[];for(let i=0;i<=n;i++){const a=a0+(a1-a0)*i/n;o.push([cx+r*Math.cos(a),cy+r*Math.sin(a)])}return o};
+ const bulge=(p,q,b)=>{const d=Math.hypot(q[0]-p[0],q[1]-p[1]);if(!b||d<1e-9)return[q];const th=4*Math.atan(b),r=d/(2*Math.sin(th/2)),mx=(p[0]+q[0])/2,my=(p[1]+q[1])/2,h=Math.sqrt(Math.max(0,r*r-d*d/4))*Math.sign(b)*(Math.abs(th)>Math.PI?-1:1),ux=(q[0]-p[0])/d,uy=(q[1]-p[1])/d,cx=mx-uy*h,cy=my+ux*h,a0=Math.atan2(p[1]-cy,p[0]-cx);
+  const n=Math.max(3,Math.ceil(Math.abs(th)/(Math.PI/18))),o=[];for(let i=1;i<=n;i++){const a=a0+th*i/n;o.push([cx+Math.abs(r)*Math.cos(a),cy+Math.abs(r)*Math.sin(a)])}return o};
+ const ext=e=>(e.extrusionDirectionZ<0||(e.extrusionDirection&&e.extrusionDirection.z<0))?[-1,0,0,1,0,0]:I;
+ const strip=t=>String(t||'').replace(/\\P/g,' ').replace(/\\[A-Za-z][^;\\{}]*;/g,'').replace(/[{}]/g,'').replace(/\\(.)/g,'$1').replace(/%%[cC]/g,'Ø').replace(/%%[dD]/g,'°').replace(/%%[pP]/g,'±').trim();
+ function walk(ents,m,ouder,diep){(ents||[]).forEach(e=>{if(e.inPaperSpace)return;let ln=e.layer||'0';if(ln==='0'&&ouder)ln=ouder;const l=L(ln);l.aantal++;const mm=mul(m,ext(e)),poly=(pts,dicht)=>{if(pts.length<2)return;const o=pts.map(q=>tr(mm,q[0],q[1]));if(dicht)o.push(o[0]);l.polys.push(o)};
+  switch(e.type){
+   case'LINE':poly(e.vertices.map(v=>[v.x,v.y]));break;
+   case'LWPOLYLINE':case'POLYLINE':{const v=(e.vertices||[]).filter(x=>x&&x.x!=null);if(v.length<2)break;const o=[[v[0].x,v[0].y]],dicht=e.shape||e.closed;
+    for(let i=0;i<v.length-(dicht?0:1);i++){const a=v[i],b=v[(i+1)%v.length];o.push(...bulge([a.x,a.y],[b.x,b.y],a.bulge||0))}poly(o);break}
+   case'CIRCLE':poly(boog(e.center.x,e.center.y,e.radius,0,2*Math.PI));break;
+   case'ARC':poly(boog(e.center.x,e.center.y,e.radius,e.startAngle,e.endAngle));break;
+   case'ELLIPSE':{const c=e.center,M=e.majorAxisEndPoint,ra=Math.hypot(M.x,M.y),rb=ra*(e.axisRatio||1),rot=Math.atan2(M.y,M.x);let a0=e.startAngle||0,a1=e.endAngle==null?2*Math.PI:e.endAngle;while(a1<=a0)a1+=2*Math.PI;const o=[];
+    for(let i=0;i<=36;i++){const a=a0+(a1-a0)*i/36,x=ra*Math.cos(a),y=rb*Math.sin(a);o.push([c.x+x*Math.cos(rot)-y*Math.sin(rot),c.y+x*Math.sin(rot)+y*Math.cos(rot)])}poly(o);break}
+   case'SPLINE':{const v=(e.fitPoints&&e.fitPoints.length?e.fitPoints:e.controlPoints)||[];poly(v.map(q=>[q.x,q.y]));break}
+   case'SOLID':case'3DFACE':{const v=(e.points||e.vertices||[]).map(q=>[q.x,q.y]);if(v.length>2)poly(e.type==='SOLID'&&v.length===4?[v[0],v[1],v[3],v[2]]:v,true);break}
+   case'TEXT':case'MTEXT':case'ATTRIB':{const t=strip(e.text);if(!t)break;const pos=e.type==='MTEXT'?e.position:(e.halign||e.valign)&&e.endPoint?e.endPoint:e.startPoint;if(!pos)break;
+    const h=(e.type==='MTEXT'?e.height:e.textHeight)||2.5,sc=Math.sqrt(Math.abs(mm[0]*mm[3]-mm[1]*mm[2]))||1,q=tr(mm,pos.x,pos.y);
+    let r=e.rotation||(e.directionVector?Math.atan2(e.directionVector.y,e.directionVector.x)/R:0);r+=Math.atan2(mm[2],mm[0])/R;l.tekst.push({x:q[0],y:q[1],t:t.slice(0,60),h:h*sc,r});break}
+   case'INSERT':{const b=blocks[e.name];if(!b||diep>8)break;const bp=b.position||{x:0,y:0},sx=e.xScale||1,sy=e.yScale||1,a=(e.rotation||0)*R,c=Math.cos(a),sn=Math.sin(a),
+    nc=Math.max(1,e.columnCount||1),nr=Math.max(1,e.rowCount||1);
+    for(let ci=0;ci<nc;ci++)for(let ri=0;ri<nr;ri++){const ox=ci*(e.columnSpacing||0),oy=ri*(e.rowSpacing||0),px=e.position.x+c*ox-sn*oy,py=e.position.y+sn*ox+c*oy;
+     const loc=mul([c,-sn,sn,c,px,py],mul([sx,0,0,sy,0,0],[1,0,0,1,-bp.x,-bp.y]));walk(b.entities,mul(mm,loc),ln,diep+1)}break}
+   case'DIMENSION':{const b=blocks[e.block];if(b&&diep<=8)walk(b.entities,mm,ln,diep+1);break}
+  }})}
+ walk(dxf.entities,I,null,0);
+ const lijst=Object.values(lagen).filter(l=>l.polys.length||l.tekst.length);if(!lijst.length)throw new Error('Geen tekening gevonden in de modelruimte van dit DXF-bestand.');
+ /* robuuste omhullende: verdwaalde objecten ver buiten het plan negeren */
+ const xs=[],ys=[];lijst.forEach(l=>l.polys.forEach(pp=>pp.forEach((q,i)=>{if(i%3===0){xs.push(q[0]);ys.push(q[1])}})));xs.sort((a,b)=>a-b);ys.sort((a,b)=>a-b);
+ const pc=(a,f)=>a[Math.min(a.length-1,Math.max(0,Math.floor(f*(a.length-1))))];let x0=pc(xs,.003),x1=pc(xs,.997),y0=pc(ys,.003),y1=pc(ys,.997);const mx=(x1-x0)*.03||1,my=(y1-y0)*.03||1;
+ return{lagen:lijst,box:{x0:x0-mx,x1:x1+mx,y0:y0-my,y1:y1+my},eenheid:dxf.header&&dxf.header.$INSUNITS}}
+/* dialoog: lagen kiezen (tonen / kleven) en eventueel een uitsnede slepen (bv. één verdieping uit een tekening met alle verdiepingen) */
+function cadDialoog(res,naam){return new Promise(ok=>{const o=$('#ovl'),b=res.box,W=560,k=W/(b.x1-b.x0),Hh=Math.min(380,Math.max(120,(b.y1-b.y0)*k)),kk=Math.min(k,Hh/(b.y1-b.y0)),px=x=>((x-b.x0)*kk).toFixed(1),py=y=>((b.y1-y)*kk).toFixed(1);
+ const uit=/maat|dim|arcer|hatch|kader|frame|viewport|vport|defpoints|tekenkader|cartouche/i,muur=/muur|mur|wall|wand|a-wall|gevel/i;
+ res.lagen.forEach(l=>{l.aan=!uit.test(l.n);l.snap=muur.test(l.n)});
+ const prev=()=>res.lagen.filter(l=>l.aan).map(l=>`<path d="${l.polys.map(pp=>'M'+pp.map(q=>px(q[0])+' '+py(q[1])).join('L')).join('')}"/>`).join('');
+ let sel=null;
+ o.innerHTML=`<div class="card" style="max-width:920px"><h2>AutoCAD-tekening: ${esc(naam)}</h2>
+  <p class="note" style="margin-top:0">Sleep in het voorbeeld een rechthoek rond het deel dat je wil gebruiken (bv. één verdieping). Zonder rechthoek wordt de hele tekening gebruikt.</p>
+  <div style="display:flex;gap:12px;flex-wrap:wrap"><div style="flex:1 1 560px;min-width:0"><svg id="cadpv" viewBox="0 0 ${W} ${(b.y1-b.y0)*kk}" style="width:100%;max-height:420px;border:1px solid var(--line);border-radius:8px;background:#fff;touch-action:none;cursor:crosshair"><g id="cadpvl" fill="none" stroke="#555" stroke-width=".6">${prev()}</g><rect id="cadsel" fill="rgba(11,107,203,.12)" stroke="#0b6bcb" stroke-width="1.2" visibility="hidden"/></svg></div>
+  <div style="flex:1 1 240px;max-height:420px;overflow:auto"><table><tr><th>Laag</th><th>Tonen</th><th title="Symbolen kleven aan lijnen op deze laag">Kleven</th></tr>${res.lagen.map((l,i)=>`<tr><td style="font-size:12.5px">${esc(l.n)}<br><small style="color:var(--mut)">${l.polys.length} lijnen${l.tekst.length?', '+l.tekst.length+' teksten':''}</small></td><td><input type="checkbox" data-cl="${i}" data-f="aan"${l.aan?' checked':''} style="width:auto"></td><td><input type="checkbox" data-cl="${i}" data-f="snap"${l.snap?' checked':''} style="width:auto"></td></tr>`).join('')}</table></div></div>
+  <div class="row"><button class="pri" id="cadok">Plaatsen als achtergrond</button><button id="cadwis">Uitsnede wissen</button><button id="cadno">Annuleren</button><span class="note" id="cadinfo"></span></div></div>`;
+ o.style.display='flex';const sv=$('#cadpv'),rc=$('#cadsel');let st=null;
+ const pt=e=>{const p=sv.createSVGPoint();p.x=e.clientX;p.y=e.clientY;const q=p.matrixTransform(sv.getScreenCTM().inverse());return[q.x,q.y]};
+ const toon=()=>{if(!sel){rc.setAttribute('visibility','hidden');return}rc.setAttribute('x',Math.min(sel[0],sel[2]));rc.setAttribute('y',Math.min(sel[1],sel[3]));rc.setAttribute('width',Math.abs(sel[2]-sel[0]));rc.setAttribute('height',Math.abs(sel[3]-sel[1]));rc.setAttribute('visibility','visible')};
+ sv.onpointerdown=e=>{st=pt(e);sel=[...st,...st];sv.setPointerCapture(e.pointerId);toon()};sv.onpointermove=e=>{if(!st)return;const q=pt(e);sel=[st[0],st[1],q[0],q[1]];toon()};
+ sv.onpointerup=()=>{st=null;if(sel&&(Math.abs(sel[2]-sel[0])<8||Math.abs(sel[3]-sel[1])<8))sel=null;toon()};
+ o.querySelectorAll('[data-cl]').forEach(c=>c.onchange=()=>{res.lagen[+c.dataset.cl][c.dataset.f]=c.checked;if(c.dataset.f==='aan')$('#cadpvl').innerHTML=prev()});
+ const done=v=>{o.style.display='none';o.innerHTML='';ok(v)};
+ $('#cadwis').onclick=()=>{sel=null;toon()};$('#cadno').onclick=()=>done(null);
+ $('#cadok').onclick=()=>{let box=b;if(sel){const xa=Math.min(sel[0],sel[2])/kk+b.x0,xb=Math.max(sel[0],sel[2])/kk+b.x0,ya=b.y1-Math.max(sel[1],sel[3])/kk,yb=b.y1-Math.min(sel[1],sel[3])/kk;box={x0:xa,x1:xb,y0:ya,y1:yb}}
+  if(!res.lagen.some(l=>l.aan)){$('#cadinfo').textContent='Zet minstens één laag aan.';return}done(box)}})}
+/* omzetten naar plancoördinaten (breedte 1000) en bijsnijden tot de uitsnede */
+function cadNaarPlan(res,box,naam){const k=1000/(box.x1-box.x0),H=Math.round((box.y1-box.y0)*k),X=x=>(x-box.x0)*k,Y=y=>(box.y1-y)*k,r1=v=>Math.round(v*10)/10;
+ const binnen=pp=>{let a=Infinity,b=-Infinity,c=Infinity,d=-Infinity;pp.forEach(q=>{a=Math.min(a,q[0]);b=Math.max(b,q[0]);c=Math.min(c,q[1]);d=Math.max(d,q[1])});return!(b<box.x0||a>box.x1||d<box.y0||c>box.y1)};
+ const lagen=[],tekst=[];
+ res.lagen.forEach(l=>{if(!l.aan)return;let d='';l.polys.forEach(pp=>{if(!binnen(pp))return;let vx=null,vy=null,s2='';pp.forEach((q,i)=>{const x=r1(X(q[0])),y=r1(Y(q[1]));if(i&&x===vx&&y===vy)return;s2+=(s2?'L':'M')+x+' '+y;vx=x;vy=y});if(s2.includes('L'))d+=s2});
+  if(d)lagen.push({n:l.n,d,snap:!!l.snap,aan:true});
+  l.tekst.forEach(t=>{if(t.x<box.x0||t.x>box.x1||t.y<box.y0||t.y>box.y1)return;tekst.push({l:l.n,x:r1(X(t.x)),y:r1(Y(t.y)),t:t.t,z:Math.max(2,r1(t.h*k)),r:Math.round(t.r||0)})})});
+ return{cad:{naam,lagen,tekst},h:Math.max(100,H)}}
+async function laadDxf(file){if(/\.dwg$/i.test(file.name)){melding('DWG kan niet rechtstreeks gelezen worden','DWG is het gesloten bestandsformaat van AutoCAD.\n\nSla de tekening op als DXF: in AutoCAD via Opslaan als → AutoCAD DXF (*.dxf), of vraag de architect om een DXF. Zonder AutoCAD kan het met de gratis ODA File Converter (DWG → DXF).\n\nKies daarna het DXF-bestand hier opnieuw.');return}
+ toast('AutoCAD-tekening lezen...');if(!window.DxfParser)await loadScript('https://cdn.jsdelivr.net/npm/dxf-parser@1.1.2/dist/dxf-parser.js');
+ const res=dxfLees(await file.text()),box=await cadDialoog(res,file.name);if(!box)return;
+ const{cad,h}=cadNaarPlan(res,box,file.name),kb=Math.round(JSON.stringify(cad).length/1024);
+ if(kb>4500){melding('Tekening te groot',`Deze uitsnede is ${Math.round(kb/1024*10)/10} MB aan lijnen. Zet lagen uit die je niet nodig hebt (meubels, arcering, maatlijnen) of kies een kleinere uitsnede.`);return}
+ const pl=S.plannen[P.pi],had=pl.items.length+pl.muren.length;
+ mut('',()=>{pl.cad=cad;pl.h=h;pl.bg=null;if(!pl.sym||pl.sym>3)pl.sym=3});
+ toast(`AutoCAD-tekening geplaatst (${cad.lagen.length} lagen, ${kb} kB)`+(had?' - controleer de plaats van wat er al op het plan stond':''))}
+function cadLagenDialoog(){const pl=S.plannen[P.pi];if(!pl.cad)return;const o=$('#ovl');
+ o.innerHTML=`<div class="card"><h2>Lagen van ${esc(pl.cad.naam||'de AutoCAD-tekening')}</h2><table><tr><th>Laag</th><th>Tonen</th><th>Kleven</th></tr>${pl.cad.lagen.map((l,i)=>`<tr><td>${esc(l.n)}</td><td><input type="checkbox" data-cl2="${i}" data-f="aan"${l.aan!==false?' checked':''} style="width:auto"></td><td><input type="checkbox" data-cl2="${i}" data-f="snap"${l.snap?' checked':''} style="width:auto"></td></tr>`).join('')}</table>
+ <div class="row"><button class="pri" data-a="closeOvl">Klaar</button><button class="sm danger" data-a="cadWeg">AutoCAD-laag verwijderen</button></div></div>`;o.style.display='flex';
+ o.querySelectorAll('[data-cl2]').forEach(c=>c.onchange=()=>{const l=pl.cad.lagen[+c.dataset.cl2];l[c.dataset.f]=c.checked;cadCache.delete(pl.cad);persist();render()})}
 /* ---- achtergrond: afbeelding of pdf -> jpeg dataURL ---- */
 function canvasToBg(cv){const max=1800,k=Math.min(1,max/Math.max(cv.width,cv.height)),c=document.createElement('canvas');c.width=Math.round(cv.width*k);c.height=Math.round(cv.height*k);
  const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(cv,0,0,c.width,c.height);return{data:c.toDataURL('image/jpeg',.82),w:c.width,h:c.height}}
@@ -877,7 +965,7 @@ async function blobToBg(blob){
   await page.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise;return canvasToBg(cv)}
  const img=await new Promise((ok,no)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=()=>no(new Error('Afbeelding niet leesbaar'));i.src=URL.createObjectURL(blob)});
  const cv=document.createElement('canvas');cv.width=img.naturalWidth;cv.height=img.naturalHeight;cv.getContext('2d').drawImage(img,0,0);return canvasToBg(cv)}
-function setBg(bg){mut('Achtergrond geplaatst',()=>{const pl=S.plannen[P.pi],oh=pl.h||707,nh=Math.round(1000*bg.h/bg.w);pl.bg=bg;pl.h=nh;
+function setBg(bg){mut('Achtergrond geplaatst',()=>{const pl=S.plannen[P.pi],oh=pl.h||707,nh=Math.round(1000*bg.h/bg.w);pl.bg=bg;pl.h=nh;delete pl.cad;
  if(pl.items.length||pl.muren.length){const f=nh/oh;if(nh<oh){pl.items.forEach(i=>i.y=Math.min(i.y,nh-10));pl.muren.forEach(m=>{m[1]=Math.min(m[1],nh);m[3]=Math.min(m[3],nh)})}void f}})}
 /* eenvoudige dialoog (prompt() werkt niet overal) */
 function ask(vraag,def=''){return new Promise(ok=>{const o=$('#ovl');o.innerHTML=`<div class="card"><h2>${esc(vraag)}</h2><input id="askv" value="${esc(def)}"><div class="row"><button class="pri" id="asko">OK</button><button id="askc">Annuleren</button></div></div>`;o.style.display='flex';
@@ -895,7 +983,8 @@ document.addEventListener('input',e=>{const t=e.target;
 document.addEventListener('change',async e=>{const t=e.target;
  if(t.id==='pnew'){if(t.value){P.punt=t.value;P.mode='teken';P.wat='punt';render()}return}
  if(t.id==='pzr'){P.zoom=clamp(+t.value/100,.3,4);render();return}
- if(t.id==='bgFile'&&t.files[0]){try{toast('Achtergrond verwerken...');setBg(await blobToBg(t.files[0]))}catch(err){toast('Achtergrond mislukt: '+err.message+' - probeer een PNG of JPG.')}return}
+ if(t.id==='bgFile'&&t.files[0]){const f=t.files[0];t.value='';if(/\.(dxf|dwg)$/i.test(f.name)){try{await laadDxf(f)}catch(err){melding('AutoCAD-tekening niet gelezen',String(err.message||err))}return}
+  try{toast('Achtergrond verwerken...');setBg(await blobToBg(f))}catch(err){toast('Achtergrond mislukt: '+err.message+' - probeer een PNG of JPG.')}return}
  if(t.id==='casnap'&&t.value!==''){try{toast('Plan ophalen...');const r=await fetch(cloud.plannen[+t.value].afbeelding_url);if(!r.ok)throw new Error('HTTP '+r.status);setBg(await blobToBg(await r.blob()))}catch(err){toast('Plan ophalen mislukt: '+err.message)}return}
  if(!(t.dataset.b||t.dataset.c))return;
  if(t.dataset.b==='codering'||t.dataset.r!==undefined||/^borden\.\d+\.naam$/.test(t.dataset.b)||/^plannen\.\d+\.naam$/.test(t.dataset.b)){render();return}
@@ -971,6 +1060,8 @@ document.addEventListener('click',async e=>{
  else if(a==='addPlan'){const n=await ask('Naam van de verdieping','Verdieping '+S.plannen.length);if(n)mut('',()=>{S.plannen.push(newPlan(n));P.pi=S.plannen.length-1})}
  else if(a==='delPlan')mut('Verdieping verwijderd',()=>{S.plannen.splice(P.pi,1);P.pi=0});
  else if(a==='noBg')mut('Achtergrond verwijderd',()=>{pl.bg=null});
+ else if(a==='cadLagen')cadLagenDialoog();
+ else if(a==='cadWeg'){$('#ovl').style.display='none';mut('AutoCAD-laag verwijderd',()=>{delete pl.cad})}
  else if(a==='rot'){const it=pl.items.find(i=>i.id===P.sel);if(it)mut('',()=>{it.rot=((it.rot||0)+1)%4})}
  else if(a==='delIt')mut('Van het plan gehaald',()=>{pl.items=pl.items.filter(i=>i.id!==P.sel);P.sel=null});
  else if(a==='proj')cloud.picker('');
@@ -980,8 +1071,8 @@ document.addEventListener('click',async e=>{
 });
 /* ---- situatieplan: aanwijzer ---- */
 function svgPt(e){const s=$('#plan'),p=s.createSVGPoint();p.x=e.clientX;p.y=e.clientY;const q=p.matrixTransform(s.getScreenCTM().inverse());return[Math.round(q.x),Math.round(q.y)]}
-function snapPt(pl,x,y,skip){let best=null,bd=14;pl.muren.forEach(m=>{[[m[0],m[1]],[m[2],m[3]]].forEach(c=>{const dd=Math.hypot(c[0]-x,c[1]-y);if(dd<bd){bd=dd;best=c}})});return best||[x,y]}
-function wallSnap(pl,x,y){let best=null,bd=16;pl.muren.forEach(m=>{const dx=m[2]-m[0],dy=m[3]-m[1],l2=dx*dx+dy*dy;if(!l2)return;const t=clamp(((x-m[0])*dx+(y-m[1])*dy)/l2,0,1),px=m[0]+t*dx,py=m[1]+t*dy,dd=Math.hypot(px-x,py-y);if(dd<bd){bd=dd;best=[Math.round(px),Math.round(py)]}});return best||[x,y]}
+function snapPt(pl,x,y,skip){let best=null,bd=14;[...pl.muren,...cadSegs(pl)].forEach(m=>{[[m[0],m[1]],[m[2],m[3]]].forEach(c=>{const dd=Math.hypot(c[0]-x,c[1]-y);if(dd<bd){bd=dd;best=c}})});return best||[x,y]}
+function wallSnap(pl,x,y){let best=null,bd=16;[...pl.muren,...cadSegs(pl)].forEach(m=>{const dx=m[2]-m[0],dy=m[3]-m[1],l2=dx*dx+dy*dy;if(!l2)return;const t=clamp(((x-m[0])*dx+(y-m[1])*dy)/l2,0,1),px=m[0]+t*dx,py=m[1]+t*dy,dd=Math.hypot(px-x,py-y);if(dd<bd){bd=dd;best=[Math.round(px),Math.round(py)]}});return best||[x,y]}
 const gridR=(v,st)=>P.snapGrid?Math.round(v/st)*st:v;
 function plaatsPunt(pl,x0,y0){let[x,y]=[x0,y0];if(P.snapMuur){const w=wallSnap(pl,x0,y0);if(w[0]!==x0||w[1]!==y0)return w}return[gridR(x,5),gridR(y,5)]}
 document.addEventListener('pointerdown',e=>{const s=e.target.closest&&e.target.closest('#plan');if(!s||e.button===2)return;const pl=S.plannen[P.pi],[x,y]=svgPt(e),tl=ptool();

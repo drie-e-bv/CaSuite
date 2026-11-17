@@ -11,6 +11,17 @@ Werkwijze (17/11/2026: opgezet zoals Trikker)
   kring (met vaste letter), differentieel en hoofddifferentieel.
 - Afdrukken: dossier samenstellen (schema, plan, lijst met kringen, materiaallijst) met voorbeeld en PDF.
 
+Situatieplan - AutoCAD als achterliggende laag (17/11/2026)
+- Knop "Achtergrond (AutoCAD, PDF, afbeelding)" leest .dxf (dxf-parser 1.1.2 via jsdelivr).
+  Lijnen, polylijnen (met bogen/bulge), cirkels, bogen, ellipsen, splines, teksten; blokken (INSERT, ook rijen/kolommen)
+  en maatlijnen worden uitgeklapt. Arcering (HATCH) wordt overgeslagen. Verdwaalde objecten ver buiten het plan
+  worden genegeerd voor de schaal.
+- Dialoog: lagen aan/uit, per laag "kleven" (symbolen kleven aan die lijnen; standaard lagen met muur/wall/wand
+  in de naam), en een uitsnede slepen (bv. één verdieping uit een tekening met alle verdiepingen).
+- Bewaard als vectoren per laag in plannen[].cad = {naam, lagen:[{n,d,snap,aan}], tekst:[...]}; grijs getekend,
+  ook in de PDF. Maximum ca. 4,5 MB per plan.
+- .dwg wordt niet gelezen (gesloten formaat): melding met uitleg om als DXF op te slaan.
+
 Gegevens
 - Eigen tabel project_cadraw_data (1 rij per project, zie supabase/migrations/20261116_project_cadraw_data.sql).
 - Leest project_elektro_dossiers (CaDos): zekeringen.kasten -> borden, differentielen -> groepen, automaten -> kringen.
