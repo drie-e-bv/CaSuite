@@ -1212,7 +1212,7 @@ const cloud={sb:null,pid:null,proj:null,projecten:[],plannen:[],dirty:false,t:nu
  async open(pid){if(this.dirty)await this.save();$('#ovl').style.display='none';$('#ovl').innerHTML='';this.status('Laden...');
   try{const sb=this.sb,[own,dos,pls]=await Promise.all([sb.from('project_cadraw_data').select('*').eq('project_id',pid).maybeSingle(),sb.from('project_elektro_dossiers').select('*').eq('project_id',pid).maybeSingle(),sb.from('project_plannen').select('id,naam,afbeelding_url').eq('project_id',pid).order('created_at',{ascending:true})]);
    if(own.error)throw own.error;if(dos.error)throw dos.error;
-   this.pid=pid;this.proj=this.projecten.find(p=>p.id===pid);this.plannen=(pls.data||[]).filter(p=>p.afbeelding_url);this.backup=false;
+   this.pid=pid;this.ver=own.data?own.data.updated_at:null;this.proj=this.projecten.find(p=>p.id===pid);this.plannen=(pls.data||[]).filter(p=>p.afbeelding_url);this.backup=false;
    try{localStorage.setItem('cadraw-project',pid)}catch(e){}
    let st=own.data&&own.data.data&&own.data.data.borden?migrate(own.data.data):null,nieuw=!st,msg='';
    if(dos.data&&dos.data.data&&dos.data.data.zekeringen){const fresh=fromCaDos(dos.data.data);delete fresh._over;st=st?keep(st,fresh):fresh}
@@ -1228,8 +1228,15 @@ const cloud={sb:null,pid:null,proj:null,projecten:[],plannen:[],dirty:false,t:nu
  excl(fn){const p=this.lock.then(fn,fn);this.lock=p.catch(()=>{});return p},
  save(){return this.excl(()=>this._save())},
  async _save(){if(!this.pid)return;clearTimeout(this.t);this.dirty=false;this.status('Bewaren...');
-  try{const nu=new Date().toISOString(),r=await this.sb.from('project_cadraw_data').upsert({project_id:this.pid,data:S,updated_at:nu,bijgewerkt_door:this.who},{onConflict:'project_id'}).select('id');
-   if(r.error)throw r.error;if(!r.data||!r.data.length)throw new Error('geen rij bewaard (rechten?)');
+  try{const nu=new Date().toISOString(),rij={project_id:this.pid,data:S,updated_at:nu,bijgewerkt_door:this.who};
+   /* versiecontrole: twee mensen in dezelfde tekening mogen elkaars werk niet stil overschrijven */
+   const r=this.ver?await this.sb.from('project_cadraw_data').update(rij).eq('project_id',this.pid).eq('updated_at',this.ver).select('id')
+    :await this.sb.from('project_cadraw_data').upsert(rij,{onConflict:'project_id'}).select('id');
+   if(r.error)throw r.error;
+   if(!r.data||!r.data.length){if(this.ver){const q=await this.sb.from('project_cadraw_data').select('bijgewerkt_door').eq('project_id',this.pid).maybeSingle();
+     this.dirty=false;await this.open(this.pid);this.status('Opnieuw ingelezen');
+     melding('Tekening intussen elders gewijzigd',`${(q.data&&q.data.bijgewerkt_door)||'Iemand anders'} heeft deze tekening net bewaard. CaDraw heeft die versie ingelezen; je laatste wijziging(en) moet je opnieuw doen.`);return}throw new Error('geen rij bewaard (rechten?)')}
+   this.ver=nu;
    const n=await this.push();this.status('Bewaard '+new Date().toLocaleTimeString('nl-BE',{hour:'2-digit',minute:'2-digit'})+(n?` · ${n} waarden naar CaDos`:''));
   }catch(err){this.dirty=true;this.status('Niet bewaard!');toast('Bewaren mislukt: '+(err.message||err))}
   if(this.dirty){clearTimeout(this.t);this.t=setTimeout(()=>this.save(),4000)}},

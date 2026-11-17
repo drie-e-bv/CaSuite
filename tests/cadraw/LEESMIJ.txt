@@ -1,0 +1,7 @@
+Playwright-tests voor CaDraw (16-17/11/2026). Ze verwachten:
+- Playwright in /opt/npm-tools/node_modules/playwright, Chrome in /usr/bin/google-chrome
+- jspdf/dxf-parser/pdfjs lokaal in /home/claude/edstest/node_modules en de stub in /home/claude/edstest/stub/supabase.js
+  (kopie hier: stub-supabase.js - een nep-Supabase met testproject p1/p2 en een CaDos-dossier)
+- python3 -m http.server 8765 in de repo-map (cloud-tests: t13, t14, t22, t23) en 8766 (t21: index/cadraw/cados.html laden)
+Pad-aanpassingen nodig om ze elders te draaien. t22 = CaDos-wijziging wordt niet overschreven, t23 = versiecontrole
+van de tekening, t20 = ingebedde modus (harness), t21 = de gebouwde apps laden zonder fouten.

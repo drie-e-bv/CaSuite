@@ -1,0 +1,15 @@
+import { chromium } from '/opt/npm-tools/node_modules/playwright/index.mjs';
+const b = await chromium.launch({executablePath:'/usr/bin/google-chrome',args:['--no-sandbox']});
+const p = await b.newPage({viewport:{width:1400,height:950}});
+const errs=[];p.on('pageerror',e=>errs.push('PAGEERR '+e.message));
+await p.route('**/jspdf.umd.min.js',r=>r.fulfill({path:'/home/claude/edstest/node_modules/jspdf/dist/jspdf.umd.min.js',contentType:'text/javascript'}));
+await p.route('**/supabase.js',r=>r.fulfill({path:'/home/claude/edstest/stub/supabase.js',contentType:'text/javascript'}));
+await p.goto('http://localhost:8765/cadraw-bron.html');await p.waitForTimeout(500);await p.click('.pl[data-pid=p1]');await p.waitForTimeout(500);
+const dr=()=>p.evaluate(()=>{const c=codes(S);return S.borden[0].groepen.map(g=>g.kringen.map(k=>c.k[k.id]+':'+k.naam+'('+k.punten.length+')').join(',')).join(' | ')});
+await p.click('.ct[data-cat="Voorgevormde kringen"]');await p.click('[data-sym="pre:3"]');
+const kid=await p.evaluate(()=>S.borden[0].groepen[0].kringen.find(k=>k.naam==='Oven').id);await p.click(`.addm[data-add="i:${kid}"]`);await p.waitForTimeout(3200);
+console.log('voor heropenen',await dr());
+await p.click('#bproj');await p.click('.pl[data-pid=p2]');await p.waitForTimeout(400);await p.click('#bproj');await p.click('.pl[data-pid=p1]');await p.waitForTimeout(500);
+console.log('na heropenen  ',await dr());
+console.log('in CaDos      ',await p.evaluate(()=>{const k=__DB.project_elektro_dossiers[0].data.zekeringen.kasten[0],c=cadosCodes(k.rijen).codes;return k.rijen.flatMap(r=>r.items).filter(i=>i.categorie==='Automaat').map(i=>c[i.id]+':'+i.naam+' '+i.polen+' '+i.A+' '+i.curve+' kA'+i.kA).join(', ')}));
+console.log(errs.join('\n')||'no errors');await b.close();
