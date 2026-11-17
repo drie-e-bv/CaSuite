@@ -221,11 +221,11 @@ function fromCaDos(src){
   const direct=b.groepen[0],gmap={};let hoofd=false;
   flat.forEach(it=>{const x=it.cadraw||{};
    if(it.categorie==='Differentieel'){
-    if(it.isHoofd&&!hoofd){hoofd=true;b.hoofd={mA:num(it.mA)||300,A:num(it.A)||40,polen:it.polen||b.hoofd.polen,type:x.type||'A',bron:it.id};direct.letter=codes[it.id];gmap[it.id]=direct}
-    else{const g=newGroep({mA:num(it.mA)||30,A:num(it.A)||40,polen:it.polen||'2P',type:x.type||'A',bron:it.id,letter:codes[it.id]});b.groepen.push(g);gmap[it.id]=g}
+    if(it.isHoofd&&!hoofd){hoofd=true;b.hoofd={mA:num(it.mA)||300,A:num(it.A)||40,polen:it.polen||b.hoofd.polen,type:it.diffType||x.type||'A',bron:it.id};direct.letter=codes[it.id];gmap[it.id]=direct}
+    else{const g=newGroep({mA:num(it.mA)||30,A:num(it.A)||40,polen:it.polen||'2P',type:it.diffType||x.type||'A',bron:it.id,letter:codes[it.id]});b.groepen.push(g);gmap[it.id]=g}
    }else if(it.categorie==='Automaat'){
     const A=num(it.A)||20,kab=kabFmt(it.kabelType)||kabFmt(x.kabel),gd=groupOf[it.id],g=(gd&&gmap[gd.id])||direct;
-    g.kringen.push(newKring({naam:it.naam||'',polen:it.polen||'2P',A,curve:x.curve||'C',kA:x.kA??3,kabelType:x.mantel||'XVB',lengte:x.lengte??'',
+    g.kringen.push(newKring({naam:it.naam||'',polen:it.polen||'2P',A,curve:it.curve||x.curve||'C',kA:(it.kA!==undefined&&it.kA!=='')?parseFloat(String(it.kA).replace(',','.')):(x.kA??3),kabelType:x.mantel||'XVB',lengte:x.lengte??'',
      kabel:kab||(A<=16?'3G1,5':'3G2,5'),kabelBron:kab?undefined:'standaard',bron:it.id,code:codes[it.id],rem:!!it.isRem,
      punten:(x.punten||[]).map(p=>newPunt(p.type,{id:p.id||uid(),aantal:p.aantal||1,tekst:p.tekst||'',hw:!!p.hw}))}));
    }else if(it.categorie!=='Leeg')over++;});
@@ -249,6 +249,67 @@ function keep(old,fresh){
   ob.groepen.forEach(og2=>og2.kringen.forEach(k=>{if(k.bron||seen.has(k.id))return;
    const g=b.groepen.find(x=>x.bron&&x.bron===og2.bron)||b.groepen.find(x=>!x.sub);delete k.code;g.kringen.push(k)}))});
  return fresh}
+/* ---- structuur van de CaDos-kast aanpassen (zelfde regels als CaDos: rijbreedte, max. 8 automaten per gewoon
+   differentieel, letters via computeZekeringCodesVoorRijen, kamgeleiders en bedrading van het uitvoeringsplan) ---- */
+const AO=["2A","4A","6A","10A","13A","16A","20A","25A","32A","40A","50A","63A","80A","100A","125A"],MO=["10mA","30mA","100mA","300mA"],PN={'1P':1,'2P':2,'3P':3,'4P':4},MAX_PER_DIFF=8;
+const modW=m=>{const n=parseInt(m.breedte);return Number.isNaN(n)?1:n};
+const kastVan=(d,id)=>((d&&d.zekeringen&&d.zekeringen.kasten)||[]).find(k=>k.id===id);
+function posVan(kast,id){for(let ri=0;ri<kast.rijen.length;ri++){const r=kast.rijen[ri],i=(r.items||[]).findIndex(x=>x.id===id);if(i>=0)return{r,i,ri}}return null}
+const vrijIn=(kast,r)=>(+kast.maat||24)-(r.items||[]).reduce((t,x)=>t+modW(x),0);
+function pruneLeeg(r){const it=r.items;while(it.length&&it[it.length-1].categorie==='Leeg'&&it[it.length-1].isAutoGap)it.pop();
+ for(let i=it.length-2;i>=0;i--)if(it[i].categorie==='Leeg'&&it[i].isAutoGap&&it[i+1].categorie==='Leeg'&&it[i+1].isAutoGap){it[i].breedte=modW(it[i])+modW(it[i+1]);it.splice(i+1,1)}}
+function nieuwAutomaat(k){const pol=PN[k.polen]?k.polen:'2P';
+ return{id:uid(),categorie:'Automaat',type:'',polen:pol,mA:'',A:AO.includes(k.A+'A')?k.A+'A':'20A',breedte:PN[pol],naam:k.naam||'',isRem:false,kabelOpKlemmen:false,kabelType:'',kabelAantal:1,curve:k.curve||'',kA:k.kA===''||k.kA==null?'':String(k.kA)}}
+const rijNaam=(kast,ri)=>`rij ${ri+1} van ${kast.naam||'de zekeringkast'}`;
+function kastOp(d,op){const fail=msg=>({ok:false,msg}),kast=kastVan(d,op.kastId);
+ if(!kast)return fail('Deze zekeringkast bestaat niet meer in CaDos. Lees CaDos opnieuw in (tabblad Document).');
+ if(op.t==='ins'){const m=nieuwAutomaat(op.kring);let p=null,idx;
+  if(op.voor&&(p=posVan(kast,op.voor)))idx=p.i;else if(op.na&&(p=posVan(kast,op.na)))idx=p.i+1;else if(op.groep&&(p=posVan(kast,op.groep)))idx=p.i+1;
+  else{if(!kast.rijen.length)kast.rijen.push({id:uid(),items:[]});const r=kast.rijen[kast.rijen.length-1];p={r,i:r.items.length,ri:kast.rijen.length-1};idx=r.items.length}
+  const v=vrijIn(kast,p.r),maat=+kast.maat||24;
+  if(v<modW(m))return fail(`${rijNaam(kast,p.ri)[0].toUpperCase()+rijNaam(kast,p.ri).slice(1)} zit vol (${maat-v} van ${maat} modules gebruikt, deze automaat heeft er ${modW(m)} nodig).\n\nDe kring kan hier niet logisch tussengevoegd worden op het schema: dan zou de volgorde van de letters niet meer overeenkomen met de kast. Maak eerst plaats in CaDos (module verplaatsen, rij toevoegen of de kast groter maken) en voeg de kring daarna toe.`);
+  if(op.groep){const{groupOf,codes}=cadosCodes(kast.rijen),gd=kast.rijen.flatMap(r=>r.items).find(x=>x.id===op.groep);
+   if(gd&&!gd.isHoofd){const n=kast.rijen.flatMap(r=>r.items).filter(x=>x.categorie==='Automaat'&&!x.isRem&&groupOf[x.id]&&groupOf[x.id].id===gd.id).length;
+    if(n>=MAX_PER_DIFF)return fail(`Differentieel ${codes[gd.id]||''} heeft al ${n} automaten. CaDos laat er hoogstens ${MAX_PER_DIFF} toe achter een differentieel dat geen hoofddifferentieel is.\n\nVoeg eerst een nieuw differentieel toe, of zet de kring achter een ander differentieel.`)}}
+  p.r.items.splice(idx,0,m);
+  if(op.groep){const g2=cadosCodes(kast.rijen).groupOf;if(!g2[m.id]||g2[m.id].id!==op.groep)m.linkedDiffId=op.groep}
+  const L=p.r.items[idx-1],R=p.r.items[idx+1];
+  (kast.kamgeleiders||[]).forEach(k=>{if(L&&R&&k.rijId===p.r.id&&k.moduleIds.includes(L.id)&&k.moduleIds.includes(R.id))k.moduleIds.splice(k.moduleIds.indexOf(L.id)+1,0,m.id)});
+  return{ok:true,id:m.id,kam:(kast.kamgeleiders||[]).some(k=>k.moduleIds.includes(m.id))}}
+ if(op.t==='swap'){const pa=posVan(kast,op.a),pb=posVan(kast,op.b);if(!pa||!pb)return fail('Deze automaat bestaat niet meer in CaDos. Lees CaDos opnieuw in.');
+  const A_=pa.r.items[pa.i],B_=pb.r.items[pb.i],g0=cadosCodes(kast.rijen).groupOf,ga=g0[A_.id],gb=g0[B_.id];
+  if(pa.r!==pb.r){const wa=modW(A_),wb=modW(B_);if(vrijIn(kast,pa.r)+wa-wb<0||vrijIn(kast,pb.r)+wb-wa<0)return fail(`Wisselen lukt niet: ${wa>wb?rijNaam(kast,pb.ri):rijNaam(kast,pa.ri)} zit vol.`)}
+  pa.r.items[pa.i]=B_;pb.r.items[pb.i]=A_;
+  const g1=cadosCodes(kast.rijen).groupOf;[[A_,ga],[B_,gb]].forEach(([m,g])=>{if(g&&(!g1[m.id]||g1[m.id].id!==g.id))m.linkedDiffId=g.id});
+  (kast.kamgeleiders||[]).forEach(k=>{const ia=k.moduleIds.indexOf(A_.id),ib=k.moduleIds.indexOf(B_.id);if(ia>=0&&ib<0)k.moduleIds[ia]=B_.id;else if(ib>=0&&ia<0)k.moduleIds[ib]=A_.id});
+  return{ok:true}}
+ if(op.t==='del'){const p=posVan(kast,op.id);if(!p)return{ok:true};p.r.items.splice(p.i,1);pruneLeeg(p.r);const id=op.id;
+  kast.bedrading=(kast.bedrading||[]).filter(w=>!(w.a&&w.a.m===id)&&!(w.b&&w.b.m===id));
+  kast.kamgeleiders=(kast.kamgeleiders||[]).map(k=>Object.assign(k,{moduleIds:(k.moduleIds||[]).filter(x=>x!==id)})).filter(k=>k.moduleIds.length);
+  (function walk(o){if(Array.isArray(o)){for(let i=o.length-1;i>=0;i--){if(o[i]===id)o.splice(i,1);else if(o[i]&&typeof o[i]==='object')walk(o[i])}}
+   else for(const k in o){if(k==='id')continue;const v=o[k];if(v===id)o[k]='';else if(v&&typeof v==='object')walk(v)}})(d);
+  return{ok:true}}
+ if(op.t==='diff'){const g=op.groep,pol=PN[g.polen]?g.polen:'2P',m={id:uid(),categorie:'Differentieel',type:'',polen:pol,mA:MO.includes(g.mA+'mA')?g.mA+'mA':'30mA',A:AO.includes(g.A+'A')?g.A+'A':'40A',breedte:Math.max(2,PN[pol]),naam:'',isHoofd:false,diffType:g.type||'',kabelOpKlemmen:false,kabelType:'',kabelAantal:1};
+  kast.rijen.push({id:uid(),items:[m]});return{ok:true,id:m.id,rij:kast.rijen.length}}
+ return fail('Onbekende bewerking')}
+/* velden van gekoppelde automaten/differentielen naar het CaDos-dossier; geeft terug wat niet paste */
+function syncVelden(d){const byId={},rowOf={},kastOf={};(d.zekeringen.kasten||[]).forEach(k=>(k.rijen||[]).forEach(r=>(r.items||[]).forEach(it=>{byId[it.id]=it;rowOf[it.id]=r;kastOf[it.id]=k})));
+ let n=0;const terug=[],set=(o,k,v)=>{if(JSON.stringify(o[k]??null)!==JSON.stringify(v??null)){o[k]=v;n++}};
+ const polen=(it,p,obj)=>{if(!PN[p]||it.polen===p)return;const r=rowOf[it.id],kast=kastOf[it.id],ob=modW(it),nb=PN[p];
+  if(PN[it.polen]===ob||!it.polen){if(vrijIn(kast,r)+ob-nb<0){terug.push({obj,oud:it.polen||'2P',msg:`${obj.naam||'Differentieel'}: ${p} past niet in ${rijNaam(kast,kast.rijen.indexOf(r))} (rij vol). Polen teruggezet naar ${it.polen||'2P'}.`});return}it.breedte=nb}
+  it.polen=p;n++};
+ const diff=(it,h)=>{if(!it||it.categorie!=='Differentieel')return;if(MO.includes(h.mA+'mA'))set(it,'mA',h.mA+'mA');if(AO.includes(h.A+'A'))set(it,'A',h.A+'A');polen(it,h.polen,h);set(it,'diffType',h.type||'')};
+ S.borden.forEach(b=>{if(!b.kastId)return;diff(byId[b.hoofd.bron],b.hoofd);b.groepen.forEach(g=>{if(g.sub)diff(byId[g.bron],g);
+  g.kringen.forEach(k=>{const it=byId[k.bron];if(!it||it.categorie!=='Automaat')return;
+   set(it,'naam',k.naam||'');if(AO.includes(k.A+'A'))set(it,'A',k.A+'A');polen(it,k.polen,k);
+   set(it,'curve',k.curve||'');set(it,'kA',k.kA===''||k.kA==null?'':String(k.kA));
+   if((it.kabelOpKlemmen||it.kabelType)&&k.kabel&&kabFmt(it.kabelType)!==kabFmt(k.kabel))set(it,'kabelType',k.kabel);
+   set(it,'cadraw',{mantel:k.kabelType,kabel:k.kabel,lengte:k.lengte,punten:k.punten.map(p=>({id:p.id,type:p.type,aantal:p.aantal,tekst:p.tekst,hw:!!p.hw}))})})})});
+ return{n,terug}}
+/* letters van CaDraw gelijkzetten met CaDos */
+function syncCodes(d){S.borden.forEach(b=>{const kast=kastVan(d,b.kastId);if(!kast)return;const{codes}=cadosCodes(kast.rijen);
+ if(b.hoofd.bron&&codes[b.hoofd.bron])b.groepen.filter(g=>!g.sub).forEach(g=>g.letter=codes[b.hoofd.bron]);
+ b.groepen.forEach(g=>{if(g.bron&&codes[g.bron])g.letter=codes[g.bron];g.kringen.forEach(k=>{if(k.bron){if(codes[k.bron])k.code=codes[k.bron];delete k.vast}})})})}
 /* ---- CaCalc (project_cacalc_data.data.boards) ---- */
 function calcKring(eg){const pol=eg.polen||'2P',n={ '1P':3,'2P':3,'1P+N':3,'3P':4,'3P+N':5,'4P':5}[pol]||3;
  return{A:+eg.In||'',curve:String(eg.curve||'C').replace(/-?curve/i,'').trim()||'C',polen:pol,kA:eg.icu===''||eg.icu==null?'':+eg.icu,kabelType:eg.mantel||'XVB',
@@ -268,16 +329,18 @@ function fromCaCalc(calc){const st=blank();st.borden=[];
   st.borden.push(b)});
  if(!st.borden.length)throw new Error('Geen borden met eindgroepen gevonden in de CaCalc-gegevens.');return st}
 function sample(){
- const A=(naam,a=20,kabel='')=>({categorie:'Automaat',id:uid(),naam,A:a+'A',polen:'2P',kabelType:kabel});
- const D=(mA,hoofd)=>({categorie:'Differentieel',id:uid(),mA:mA+'mA',A:'63A',polen:'2P',isHoofd:!!hoofd});
- const st=fromCaDos({instellingen:{project:'Voorbeeldwoning',adres:'Voorbeeldstraat 1, 9000 Gent',klant:'Fam. Voorbeeld',spanning:'Mono',installateur:'Casentis'},
+ const A=(naam,a=20,kabel='')=>({categorie:'Automaat',id:uid(),naam,A:a+'A',polen:'2P',breedte:2,kabelType:kabel,kabelOpKlemmen:!!kabel,kabelAantal:1,type:'',mA:'',isRem:false});
+ const D=(mA,hoofd)=>({categorie:'Differentieel',id:uid(),mA:mA+'mA',A:'63A',polen:'2P',breedte:2,isHoofd:!!hoofd,type:'',naam:'',kabelType:'',kabelAantal:1,kabelOpKlemmen:false});
+ const dos={instellingen:{project:'Voorbeeldwoning',adres:'Voorbeeldstraat 1, 9000 Gent',klant:'Fam. Voorbeeld',spanning:'Mono',installateur:'Casentis'},
   kamers:['Leefruimte','Keuken','Badkamer','Slaapkamer 1','Slaapkamer 2','Nachthal','Wasplaats','Terras'],verdiepingen:[{code:'G',label:'Gelijkvloers'},{code:'V1',label:'Verdieping 1'}],
-  zekeringen:{kasten:[{id:'k1',naam:'Zekeringkast 1',rijen:[
-   {items:[D(300,1),A('KNX voeding',16),A('Patchkast'),A('Koelkast'),A('Diepvries'),A('Dampkap'),A('Oven'),A('Kookplaat',32,'3g6'),A('CV ketel'),A('Reserve')]},
+  zekeringen:{kasten:[{id:'k1',naam:'Zekeringkast 1',maat:24,rijen:[
+   {items:[D(300,1),A('KNX voeding',16),A('Patchkast'),A('Koelkast'),A('Diepvries'),A('Dampkap'),A('Oven'),A('Kookplaat',32,'3g6'),A('CV ketel'),A('Reserve'),A('Reserve'),A('Reserve')]},
    {items:[D(30),A('Vaatwas'),A('Droogkast'),A('Wasmachine'),A('Ventilatie',20,'3g2.5'),A('Stopcontacten leefruimte'),A('Stopcontacten badkamer'),A('Stopcontacten slaapkamer 1'),A('Technische ruimte')]},
    {items:[D(30),A('Verlichting leefruimte',16),A('Verlichting nachthal',16),A('Stopcontacten slaapkamer 2'),A('Stopcontacten keuken'),A('Buitenkeuken'),A('Laadpaal',32,'3g6'),A('Reserve')]},
    {items:[D(10),A('Handdoekradiator badkamer 1',20,'3g2,5'),A('Handdoekradiator badkamer 2',20,'3g2.5')]}
-  ]}]}});
+  ]}]}};
+ dos.zekeringen.kasten[0].rijen.forEach((r,i)=>r.id='r'+(i+1));
+ const st=fromCaDos(dos);st.cadosLokaal=dos;
  const P=(t,o)=>newPunt(t,o),set=(naam,pts)=>st.borden[0].groepen.forEach(g=>g.kringen.forEach(k=>{if(k.naam===naam)k.punten=pts()}));
  set('KNX voeding',()=>[P('dom',{tekst:'KNX'})]);
  set('Patchkast',()=>[P('sc_ak',{aantal:2,tekst:'Patchkast'})]);
@@ -303,7 +366,7 @@ function sample(){
  set('Laadpaal',()=>[P('t_ev',{tekst:'Oprit 7,4 kW'})]);
  set('Handdoekradiator badkamer 1',()=>[P('t_verw',{tekst:'Badkamer 1'})]);
  set('Handdoekradiator badkamer 2',()=>[P('t_verw',{tekst:'Badkamer 2'})]);
- st.borden.forEach(b=>{delete b.kastId;delete b.hoofd.bron;b.groepen.forEach(g=>{delete g.bron;g.kringen.forEach(k=>{delete k.kabelBron;delete k.bron})})});
+ st.borden.forEach(b=>b.groepen.forEach(g=>g.kringen.forEach(k=>{delete k.kabelBron})));
  const pl=st.plannen[0];pl.muren=[[120,110,880,110],[880,110,880,600],[880,600,120,600],[120,600,120,110],[520,110,520,380],[520,380,700,380],[760,380,880,380]];
  const kr=n=>st.borden[0].groepen.flatMap(g=>g.kringen).find(k=>k.naam===n),put=(n,i,x,y,rot)=>pl.items.push({id:uid(),pid:kr(n).punten[i].id,x,y,rot});
  put('Stopcontacten leefruimte',0,124,220,0);put('Stopcontacten leefruimte',1,124,300,0);put('Stopcontacten leefruimte',2,250,596,3);put('Stopcontacten leefruimte',4,516,250,2);
@@ -336,6 +399,7 @@ function migrate(j){if(!j.borden&&j.groepen){j.borden=[newBord({hoofd:j.hoofd,gr
 function loadLocal(){try{const j=JSON.parse(localStorage.getItem(KEY));if(j&&(j.borden||j.groepen))return migrate(j)}catch(e){}return sample()}
 function persist(){gc();
  if(CLOUD){cloud.dirty=true;cloud.status('Wijzigingen...');clearTimeout(cloud.t);cloud.t=setTimeout(()=>cloud.save(),1800);return}
+ if(S.cadosLokaal){const{terug}=syncVelden(S.cadosLokaal);if(terug.length){terug.forEach(t=>{t.obj.polen=t.oud});setTimeout(()=>{render();melding('Past niet in de kast',terug.map(t=>t.msg).join('\n'))})}}
  try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){try{const c=JSON.parse(JSON.stringify(S));c.plannen.forEach(p=>{if(p.bg)p.bg.data=''});localStorage.setItem(KEY,JSON.stringify(c))}catch(e2){}}}
 function snap(){undoStack.push(JSON.stringify(S));if(undoStack.length>25)undoStack.shift()}
 const B=()=>S.borden[bi=clamp(bi,0,S.borden.length-1)];
@@ -570,6 +634,7 @@ function checks(st){const w=[],cd=codes(st),add=(lvl,msg,kid)=>w.push({lvl,msg,k
   b.groepen.forEach(g=>{const prot=g.sub?+g.mA:+b.hoofd.mA;
   if(g.sub&&prot<=30&&g.kringen.length>8)add('w',`${bn}${gLabel(b,g)}: ${g.kringen.length} kringen achter één differentieel van max. 30 mA (maximaal 8 eindstroombanen).`,g.kringen[0].id);
   g.kringen.forEach(k=>{const c=`${bn}${cd.k[k.id]} ${k.naam||''}`.trim(),cat=p=>(TYPES[p.type]||{}).c,sc=k.punten.filter(p=>cat(p)==='sc').length,li=k.punten.filter(p=>cat(p)==='li').length,mm=sect(k.kabel),res=/reserve/i.test(k.naam);
+   if(b.kastId&&!k.bron)add('w',`${c}: bestaat niet in de zekeringkast van CaDos (letters kunnen afwijken). Open de kring en kies "In CaDos aanmaken".`,k.id);
    if(!res&&!k.kabel)add('i',`${c}: kabel niet ingevuld.`,k.id);
    if(!res&&k.kabelBron==='standaard')add('i',`${c}: kabel ${k.kabel} is een standaardwaarde (niet ingevuld in CaDos of CaCalc) - nakijken.`,k.id);
    if(!res&&!k.punten.length)add('i',`${c}: nog geen aftakpunten.`,k.id);
@@ -646,10 +711,10 @@ function vSide(){const cd=codes(S),L=locate(E.sel);if(E.sel&&!L)E.sel=null;
    <label class="f w2"><span>Symbool</span><select data-b="${pp}.type">${typeOpts(L.p.type)}</select></label>${fld('Aantal',pp+'.aantal',{n:1})}
    <label class="f"><span>Halfwaterdicht</span><select data-b="${pp}.hw" data-bool><option value="">Nee</option><option value="1"${L.p.hw?' selected':''}>Ja</option></select></label>${fld('Tekst / kamer',pp+'.tekst',{c:'w2',list:'kamers'})}</div>
    <div class="row"><button class="sm" data-a="upP" ${dd} data-p="${L.pi}" title="Vroeger in de kring">↓ lager</button><button class="sm" data-a="dnP" ${dd} data-p="${L.pi}" title="Verder in de kring">↑ hoger</button><button class="sm" data-a="dupP" ${dd} data-p="${L.pi}">Kopiëren</button><button class="sm danger" data-a="delP" ${dd} data-p="${L.pi}">Wissen</button></div>`}
-  else if(L.t==='k'){h+=`<h2 style="font-size:14px;margin:12px 0 8px"><span class="lb">${cd.k[L.k.id]}</span> Eigenschappen kring</h2><div class="grid">${fld('Benaming',kp+'.naam',{c:'w2'})}${fld('Polen',kp+'.polen',{opts:POL})}${fld('Curve',kp+'.curve',{opts:['B','C','D']})}${fld('Stroom (A)',kp+'.A',{n:1,opts:AMP})}${fld('Kortsluit (kA)',kp+'.kA',{n:1,opts:[3,4.5,6,10]})}${fld('Kabeltype',kp+'.kabelType',{opts:['XVB','EXVB','XGB','VOB','VVB','EXAVB','SVV']})}${fld('Geleiders',kp+'.kabel',{ph:'3G2,5'})}${fld('Lengte (m)',kp+'.lengte',{n:1})}${fld('Vaste letter',kp+'.vast',{ph:'automatisch'})}</div>
-   <div class="row"><button class="sm" data-a="upK" ${dd}>← links</button><button class="sm" data-a="dnK" ${dd}>rechts →</button><button class="sm" data-a="dupK" ${dd}>Kopiëren</button><button class="sm danger" data-a="delK" ${dd}>Wissen</button></div><p class="note">${L.k.bron?'Gekoppeld aan CaDos: wijzigingen gaan terug naar het dossier.':'Alleen in CaDraw (niet in CaDos).'}</p>`}
-  else if(L.t==='g'){h+=`<h2 style="font-size:14px;margin:12px 0 8px"><span class="lb">${cd.g[L.g.id]||'Δ'}</span> Eigenschappen differentieel</h2><div class="grid">${fld('Gevoeligheid (mA)',gp+'.mA',{n:1,opts:[10,30,100,300]})}${fld('Stroom (A)',gp+'.A',{n:1,opts:[25,40,63,80]})}${fld('Polen',gp+'.polen',{opts:POL})}${fld('Type',gp+'.type',{opts:['A','B','F','AC']})}</div>${L.g.bron?'':`<div class="row"><button class="sm danger" data-a="delG" data-g="${L.gi}">Wissen</button></div>`}`}
-  else{h+=`<h2 style="font-size:14px;margin:12px 0 8px">Hoofddifferentieel</h2><div class="grid">${fld('Gevoeligheid (mA)',bp+'.hoofd.mA',{n:1,opts:[30,100,300]})}${fld('Stroom (A)',bp+'.hoofd.A',{n:1,opts:[25,40,63,80,100]})}${fld('Polen',bp+'.hoofd.polen',{opts:POL})}${fld('Type',bp+'.hoofd.type',{opts:['A','B','F','AC']})}${fld('Voedingskabel','project.voeding')}${fld('Aarding','project.aarding')}</div>`}}
+  else if(L.t==='k'){h+=`<h2 style="font-size:14px;margin:12px 0 8px"><span class="lb">${cd.k[L.k.id]}</span> Eigenschappen kring</h2><div class="grid">${fld('Benaming',kp+'.naam',{c:'w2'})}${fld('Polen',kp+'.polen',{opts:POL})}${fld('Curve',kp+'.curve',{opts:['B','C','D']})}${fld('Stroom (A)',kp+'.A',{n:1,opts:AMP})}${fld('Kortsluit (kA)',kp+'.kA',{n:1,opts:[3,4.5,6,10]})}${fld('Kabeltype',kp+'.kabelType',{opts:['XVB','EXVB','XGB','VOB','VVB','EXAVB','SVV']})}${fld('Geleiders',kp+'.kabel',{ph:'3G2,5'})}${fld('Lengte (m)',kp+'.lengte',{n:1})}${L.b.kastId?'':fld('Vaste letter',kp+'.vast',{ph:'automatisch'})}</div>
+   <div class="row"><button class="sm" data-a="upK" ${dd}>← links</button><button class="sm" data-a="dnK" ${dd}>rechts →</button><button class="sm" data-a="dupK" ${dd}>Kopiëren</button><button class="sm danger" data-a="delK" ${dd}>Wissen</button></div><p class="note">${L.k.bron?'Gekoppeld aan CaDos: wijzigingen, tussenvoegen, verplaatsen en wissen gebeuren ook in de zekeringkast; de letter volgt CaDos.':L.b.kastId?`Deze kring bestaat nog niet in de zekeringkast van CaDos.</p><div class="row"><button class="sm pri" data-a="naarCados" ${dd}>In CaDos aanmaken</button></div><p class="note">`:'Alleen in CaDraw (bord niet gekoppeld aan CaDos).'}</p>`}
+  else if(L.t==='g'){h+=`<h2 style="font-size:14px;margin:12px 0 8px"><span class="lb">${cd.g[L.g.id]||'Δ'}</span> Eigenschappen differentieel</h2><div class="grid">${fld('Gevoeligheid (mA)',gp+'.mA',{n:1,opts:[10,30,100,300]})}${fld('Stroom (A)',gp+'.A',{n:1,opts:[25,40,63,80]})}${fld('Polen',gp+'.polen',{opts:POL})}${fld('Type',gp+'.type',{opts:['A','A-SI','B','F','AC']})}</div>${L.g.bron?'':`<div class="row"><button class="sm danger" data-a="delG" data-g="${L.gi}">Wissen</button></div>`}`}
+  else{h+=`<h2 style="font-size:14px;margin:12px 0 8px">Hoofddifferentieel</h2><div class="grid">${fld('Gevoeligheid (mA)',bp+'.hoofd.mA',{n:1,opts:[30,100,300]})}${fld('Stroom (A)',bp+'.hoofd.A',{n:1,opts:[25,40,63,80,100]})}${fld('Polen',bp+'.hoofd.polen',{opts:POL})}${fld('Type',bp+'.hoofd.type',{opts:['A','A-SI','B','F','AC']})}${fld('Voedingskabel','project.voeding')}${fld('Aarding','project.aarding')}</div>`}}
  if(!E.cat)E.cat=CATS[0][0];
  if(E.mode==='teken')h+=`<input id="libq" placeholder="Zoek symbool" value="${esc(E.q)}" style="margin-top:10px"><div class="libw"><div class="cats" id="libc">${catsHtml()}</div><div class="lib" id="libl">${libHtml()}</div></div>`;
  else if(!L)h+=`<p class="note" style="margin-top:10px">Tik in het schema op een symbool, een automaat of een differentieel.</p>`;
@@ -712,6 +777,34 @@ async function saveFile(filename,data){
  try{const b=data instanceof Blob?data:new Blob([data]),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=filename;document.body.appendChild(a);a.click();a.remove();if(window.claude)toast('Downloaden is in deze weergave niet beschikbaar')}catch(e){toast('Downloaden lukt hier niet')}}
 const fname=ext=>'cadraw-'+((S.project.naam||'project').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'project')+'.'+ext;
 const mut=(msg,fn)=>{snap();fn();persist();render();if(msg)toast(msg,true)};
+function melding(titel,tekst){const o=$('#ovl');o.innerHTML=`<div class="card"><h2>${esc(titel)}</h2><p style="white-space:pre-line;margin:0">${esc(tekst)}</p><div class="row"><button class="pri" data-a="closeOvl">OK</button></div></div>`;o.style.display='flex'}
+function bevestig(titel,tekst,ja='Ja'){return new Promise(ok=>{const o=$('#ovl');o.innerHTML=`<div class="card"><h2>${esc(titel)}</h2><p style="white-space:pre-line;margin:0">${esc(tekst)}</p><div class="row"><button class="pri" id="bvja">${esc(ja)}</button><button id="bvnee">Annuleren</button></div></div>`;o.style.display='flex';
+ const done=v=>{o.style.display='none';o.innerHTML='';ok(v)};$('#bvja').onclick=()=>done(true);$('#bvnee').onclick=()=>done(false)})}
+/* voert een structuurwijziging uit op CaDos (online of lokaal) en past daarna CaDraw aan; alles of niets */
+let bezig=false;
+async function struct(op,naCaDraw,okMsg){if(bezig)return false;bezig=true;
+ try{let r;if(CLOUD)r=await cloud.kastOp(op);else{const d=JSON.parse(JSON.stringify(S.cadosLokaal));r=kastOp(d,op);if(r.ok){S.cadosLokaal=d;r.data=d}}
+  if(!r.ok){melding('Niet mogelijk in de kast',r.msg);return false}
+  undoStack=[];naCaDraw(r);syncCodes(r.data);persist();render();toast((okMsg||'Aangepast')+' - ook in CaDos'+(r.kam?' (mee op de kamgeleider)':''));return true}
+ catch(err){melding('CaDos niet bijgewerkt',String(err.message||err));return false}
+ finally{bezig=false}}
+const groepBron=(b,g)=>g.sub?g.bron:b.hoofd.bron;
+/* kring invoegen op positie idx in groep g (van bord b); in CaDos op dezelfde plaats */
+function voegKringIn(b,g,idx,k){bi=S.borden.indexOf(b);
+ if(!b.kastId)return mut('',()=>{g.kringen.splice(idx,0,k);E.sel='k:'+k.id;open.add(k.id)});
+ const ks=g.kringen,voor=(ks.slice(idx).find(x=>x.bron)||{}).bron,na=voor?null:([...ks.slice(0,idx)].reverse().find(x=>x.bron)||{}).bron;
+ return struct({t:'ins',kastId:b.kastId,kring:k,voor,na,groep:groepBron(b,g)},r=>{k.bron=r.id;delete k.vast;g.kringen.splice(idx,0,k);E.sel='k:'+k.id;open.add(k.id)},'Kring tussengevoegd')}
+function verplaatsKring(L,dir){const j=L.ki+dir,ks=L.g.kringen;if(j<0||j>=ks.length)return;const A_=ks[L.ki],B_=ks[j],wissel=()=>{ks[L.ki]=B_;ks[j]=A_};
+ if(!L.b.kastId||!A_.bron||!B_.bron)return mut('',wissel);
+ return struct({t:'swap',kastId:L.b.kastId,a:A_.bron,b:B_.bron},wissel,'Kring verplaatst')}
+async function wisKring(L){const k=L.k;
+ if(!L.b.kastId||!k.bron)return mut('Kring verwijderd',()=>{L.g.kringen.splice(L.ki,1);E.sel=null});
+ if(!await bevestig('Kring wissen',`${codes(S).k[k.id]} ${k.naam||''} wordt ook uit de zekeringkast in CaDos verwijderd. Verwijzingen ernaar (driverkast, patchkast, laadpaal, verwarming, alarm) en draden in het uitvoeringsplan worden losgekoppeld. De letters erna schuiven op.`,'Wissen'))return;
+ return struct({t:'del',kastId:L.b.kastId,id:k.bron},()=>{L.g.kringen.splice(L.ki,1);E.sel=null},'Kring gewist')}
+function voegDiffToe(b){const g=newGroep();bi=S.borden.indexOf(b);
+ if(!b.kastId)return mut('Differentieel toegevoegd',()=>{b.groepen.push(g);E.sel='g:'+g.id});
+ return struct({t:'diff',kastId:b.kastId,groep:g},r=>{g.bron=r.id;b.groepen.push(g);E.sel='g:'+g.id},'Differentieel toegevoegd op een nieuwe rij')}
+const nieuweKring=()=>E.sym.startsWith('pre:')?presetKring(+E.sym.slice(4)):newKring();
 function loadScript(src){return new Promise((ok,no)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>no(new Error('Kon '+src+' niet laden'));document.head.appendChild(s)})}
 
 /* ---- achtergrond: afbeelding of pdf -> jpeg dataURL ---- */
@@ -752,23 +845,24 @@ document.addEventListener('toggle',e=>{const t=e.target;if(t.matches&&t.matches(
 document.addEventListener('click',async e=>{
  const hit=e.target.closest('.hit');if(hit){E.sel=hit.dataset.h;const L=locate(E.sel);if(L)bi=L.bx;render();return}
  const ad=e.target.closest('[data-add]');if(ad){const id=ad.dataset.add;
-  if(id[0]==='i'){const L=locate('k:'+id.slice(2));if(!L)return;bi=L.bx;mut('',()=>{const k=E.sym.startsWith('pre:')?presetKring(+E.sym.slice(4)):newKring();L.g.kringen.splice(L.ki,0,k);E.sel='k:'+k.id});return}
-  const L=locate((id[0]==='p'?'k:':'g:')+id.slice(2));if(!L&&id[0]==='k'){const b=S.borden.find(b=>b.groepen.some(g=>g.id===id.slice(2)));if(b){const g=b.groepen.find(g=>g.id===id.slice(2));bi=S.borden.indexOf(b);mut('',()=>{const k=E.sym.startsWith('pre:')?presetKring(+E.sym.slice(4)):newKring();g.kringen.push(k);E.sel='k:'+k.id})}return}
+  if(id[0]==='i'){const L=locate('k:'+id.slice(2));if(L)await voegKringIn(L.b,L.g,L.ki,nieuweKring());return}
+  const L=locate((id[0]==='p'?'k:':'g:')+id.slice(2));if(!L&&id[0]==='k'){const b=S.borden.find(b=>b.groepen.some(g=>g.id===id.slice(2)));if(b){const g=b.groepen.find(g=>g.id===id.slice(2));await voegKringIn(b,g,g.kringen.length,nieuweKring())}return}
   if(!L)return;bi=L.bx;
   if(id[0]==='p')mut('',()=>{const last=L.k.punten[L.k.punten.length-1],p=newPunt(E.sym,{tekst:last?last.tekst:''});L.k.punten.push(p);E.sel='p:'+p.id;E.recent=[E.sym,...E.recent.filter(x=>x!==E.sym)].slice(0,8)});
-  else mut('',()=>{const k=E.sym.startsWith('pre:')?presetKring(+E.sym.slice(4)):newKring();L.g.kringen.push(k);E.sel='k:'+k.id});return}
+  else await voegKringIn(L.b,L.g,L.g.kringen.length,nieuweKring());return}
  const ct=e.target.closest('[data-cat]');if(ct){E.cat=ct.dataset.cat;E.q='';const q=$('#libq');if(q)q.value='';$('#libl').innerHTML=libHtml();$('#libl').scrollTop=0;$('#libc').innerHTML=catsHtml();return}
  const sy=e.target.closest('[data-sym]');if(sy){E.sym=sy.dataset.sym;E.mode='teken';
-  if(E.sym==='diff'){mut('Differentieel toegevoegd',()=>{const g=newGroep();B().groepen.push(g);E.sel='g:'+g.id;E.sym='kring'})}else render();return}
+  if(E.sym==='diff'){E.sym='kring';await voegDiffToe(B())}else render();return}
  const tb=e.target.closest('[data-tab]');if(tb){tab=tb.dataset.tab;render();window.scrollTo(0,0);return}
  const pr=e.target.closest('[data-pid]');if(pr){cloud.open(pr.dataset.pid);return}
  const b=e.target.closest('[data-a]');if(!b)return;const a=b.dataset.a,gi=+b.dataset.g,ki=+b.dataset.k,pi=+b.dataset.p,G=B().groepen[gi],K=G&&G.kringen[ki],pl=S.plannen[P.pi];
  if(a==='undo'){if(undoStack.length){S=JSON.parse(undoStack.pop());persist();render();toast('Teruggezet')}}
- else if(a==='addK')mut('',()=>{const k=newKring();G.kringen.push(k);open.add(k.id)});
- else if(a==='delK')mut(K.bron?'Kring uit CaDraw verwijderd (blijft in CaDos staan tot ze daar verwijderd wordt)':'Kring verwijderd',()=>G.kringen.splice(ki,1));
- else if(a==='dupK')mut('',()=>{const c=JSON.parse(JSON.stringify(K));c.id=uid();c.punten.forEach(p=>p.id=uid());delete c.bron;delete c.code;G.kringen.splice(ki+1,0,c);open.add(c.id)});
- else if(a==='upK'&&ki>0)mut('',()=>G.kringen.splice(ki-1,0,G.kringen.splice(ki,1)[0]));
- else if(a==='dnK'&&ki<G.kringen.length-1)mut('',()=>G.kringen.splice(ki+1,0,G.kringen.splice(ki,1)[0]));
+ else if(a==='addK')await voegKringIn(B(),G,G.kringen.length,newKring());
+ else if(a==='delK')await wisKring(locate('k:'+K.id));
+ else if(a==='dupK'){const c=JSON.parse(JSON.stringify(K));c.id=uid();c.punten.forEach(p=>p.id=uid());delete c.bron;delete c.code;delete c.vast;await voegKringIn(B(),G,ki+1,c)}
+ else if(a==='upK'&&ki>0)await verplaatsKring(locate('k:'+K.id),-1);
+ else if(a==='dnK'&&ki<G.kringen.length-1)await verplaatsKring(locate('k:'+K.id),1);
+ else if(a==='naarCados'){const L=locate('k:'+K.id);if(L){const k=L.k;L.g.kringen.splice(L.ki,1);const ok=await voegKringIn(L.b,L.g,L.ki,k);if(!ok){L.g.kringen.splice(L.ki,0,k);render()}}}
  else if(a==='addP')mut('',()=>{const last=K.punten[K.punten.length-1];K.punten.push(newPunt(b.dataset.t,{tekst:last?last.tekst:''}))});
  else if(a==='delP')mut('Punt verwijderd',()=>K.punten.splice(pi,1));
  else if(a==='upP'&&pi>0)mut('',()=>K.punten.splice(pi-1,0,K.punten.splice(pi,1)[0]));
@@ -778,7 +872,7 @@ document.addEventListener('click',async e=>{
  else if(a==='addPre'){CFG.presets.push({naam:'Nieuwe kring',polen:'2P',curve:'C',A:20,kA:3,kabelType:'XVB',kabel:'3G2,5',s:['','']});saveCfg();render()}
  else if(a==='delPre'){CFG.presets.splice(+b.dataset.i,1);saveCfg();if(E.sym.startsWith('pre:'))E.sym='sc_ak';render()}
  else if(a==='resetPre'){CFG.presets=DEF_PRESETS();saveCfg();render();toast('Standaardlijst hersteld')}
- else if(a==='addG')mut('',()=>B().groepen.push(newGroep()));
+ else if(a==='addG')await voegDiffToe(B());
  else if(a==='delG')mut('Differentieel verwijderd',()=>B().groepen.splice(gi,1));
  else if(a==='addB')mut('',()=>{S.borden.push(newBord({naam:'Zekeringkast '+(S.borden.length+1)}));bi=S.borden.length-1});
  else if(a==='delB')mut('Bord verwijderd',()=>{S.borden.splice(bi,1);bi=0});
@@ -789,7 +883,7 @@ document.addEventListener('click',async e=>{
  else if(a==='doImp'){try{let txt=$('#impTxt').value.trim();const f=$('#impFile').files[0];if(!txt&&f)txt=await f.text();if(!txt)throw new Error('Niets om te importeren.');
    let j=JSON.parse(txt);if(Array.isArray(j))j=j[0];const jd=j.data&&(j.data.boards||j.data.zekeringen)?j.data:j;let msg;
    if(jd.boards){const hasK=allKringen().length&&!/Voorbeeldwoning/.test(S.project.naam);if(hasK){snap();const n=mergeCaCalc(S,jd);persist();render();toast(`CaCalc: ${n} kringen aangevuld`,true);return}j=fromCaCalc(jd);msg='CaCalc geïmporteerd'}
-   else if(j.borden||j.groepen)j=migrate(j);else{j=fromCaDos(jd);msg=`CaDos geïmporteerd${j._over?', '+j._over+' andere modules overgeslagen':''}`;delete j._over}
+   else if(j.borden||j.groepen)j=migrate(j);else{j=fromCaDos(jd);j.cadosLokaal=JSON.parse(JSON.stringify(jd));msg=`CaDos geïmporteerd${j._over?', '+j._over+' andere modules overgeslagen':''}`;delete j._over}
    mut('',()=>{S=j;bi=0});toast(msg||'Geïmporteerd',true)}catch(err){toast('Import mislukt: '+err.message)}}
  else if(a==='json')saveFile(fname('json'),JSON.stringify(S,null,1));
  else if(a==='csv')saveFile(fname('csv'),'﻿Omschrijving;Aantal\r\n'+materials(S).map(m=>`"${m[0].replace(/"/g,'""')}";${m[1]}`).join('\r\n'));
@@ -866,37 +960,35 @@ const cloud={sb:null,pid:null,proj:null,projecten:[],plannen:[],dirty:false,t:nu
    S=st;bi=0;P.pi=0;P.sel=null;undoStack=[];E.sel=null;this.dirty=false;$('#bproj').textContent=(this.proj?this.proj.naam:'Project')+' ▾';this.status(nieuw?'Nog niet bewaard':'Geladen');render();
    if(msg)toast(msg);
   }catch(err){this.status('Fout');toast('Laden mislukt: '+(err.message||err))}},
- async save(){if(!this.pid||this.saving)return;this.saving=true;clearTimeout(this.t);this.dirty=false;this.status('Bewaren...');
+ lock:Promise.resolve(),
+ excl(fn){const p=this.lock.then(fn,fn);this.lock=p.catch(()=>{});return p},
+ save(){return this.excl(()=>this._save())},
+ async _save(){if(!this.pid)return;clearTimeout(this.t);this.dirty=false;this.status('Bewaren...');
   try{const nu=new Date().toISOString(),r=await this.sb.from('project_cadraw_data').upsert({project_id:this.pid,data:S,updated_at:nu,bijgewerkt_door:this.who},{onConflict:'project_id'}).select('id');
    if(r.error)throw r.error;if(!r.data||!r.data.length)throw new Error('geen rij bewaard (rechten?)');
    const n=await this.push();this.status('Bewaard '+new Date().toLocaleTimeString('nl-BE',{hour:'2-digit',minute:'2-digit'})+(n?` · ${n} waarden naar CaDos`:''));
   }catch(err){this.dirty=true;this.status('Niet bewaard!');toast('Bewaren mislukt: '+(err.message||err))}
-  this.saving=false;if(this.dirty){clearTimeout(this.t);this.t=setTimeout(()=>this.save(),4000)}},
+  if(this.dirty){clearTimeout(this.t);this.t=setTimeout(()=>this.save(),4000)}},
  /* schrijft gewijzigde waarden van gekoppelde automaten/differentielen terug in het CaDos-dossier */
- async push(tries=0){const sb=this.sb,q=await sb.from('project_elektro_dossiers').select('*').eq('project_id',this.pid).maybeSingle();if(q.error||!q.data||!q.data.data||!q.data.data.zekeringen)return 0;
-  const row=q.data,d=JSON.parse(JSON.stringify(row.data)),byId={},rowOf={},kastOf={};
-  d.zekeringen.kasten.forEach(k=>(k.rijen||[]).forEach(r=>(r.items||[]).forEach(it=>{byId[it.id]=it;rowOf[it.id]=r;kastOf[it.id]=k})));
-  let n=0;const AO=["2A","4A","6A","10A","13A","16A","20A","25A","32A","40A","50A","63A","80A","100A","125A"],MO=["10mA","30mA","100mA","300mA"],PN={'1P':1,'2P':2,'3P':3,'4P':4};
-  const set=(o,k,v)=>{if(JSON.stringify(o[k]??null)!==JSON.stringify(v??null)){o[k]=v;n++}};
-  const polen=(it,p)=>{if(!PN[p]||it.polen===p)return;const r=rowOf[it.id],maat=+kastOf[it.id].maat||0,som=(r.items||[]).reduce((a,x)=>a+(+x.breedte||0),0),nb=PN[p],ob=+it.breedte||0;
-   if(PN[it.polen]===ob){if(maat&&som-ob+nb>maat)return;it.breedte=nb}it.polen=p;n++};
-  const diff=(it,h)=>{if(!it||it.categorie!=='Differentieel')return;if(MO.includes(h.mA+'mA'))set(it,'mA',h.mA+'mA');if(AO.includes(h.A+'A'))set(it,'A',h.A+'A');polen(it,h.polen);set(it,'cadraw',{type:h.type})};
-  S.borden.forEach(b=>{diff(byId[b.hoofd.bron],b.hoofd);b.groepen.forEach(g=>{if(g.sub)diff(byId[g.bron],g);
-   g.kringen.forEach(k=>{const it=byId[k.bron];if(!it||it.categorie!=='Automaat')return;
-    set(it,'naam',k.naam||'');if(AO.includes(k.A+'A'))set(it,'A',k.A+'A');polen(it,k.polen);
-    if((it.kabelOpKlemmen||it.kabelType)&&k.kabel&&kabFmt(it.kabelType)!==kabFmt(k.kabel))set(it,'kabelType',k.kabel);
-    set(it,'cadraw',{curve:k.curve,kA:k.kA,mantel:k.kabelType,kabel:k.kabel,lengte:k.lengte,punten:k.punten.map(p=>({id:p.id,type:p.type,aantal:p.aantal,tekst:p.tekst,hw:!!p.hw}))})})})});
-  if(!n)return 0;
+ async schrijfDossier(wijzig,tries=0){const sb=this.sb,q=await sb.from('project_elektro_dossiers').select('*').eq('project_id',this.pid).maybeSingle();
+  if(q.error)throw q.error;if(!q.data||!q.data.data||!q.data.data.zekeringen)return{ok:false,msg:'Dit project heeft geen CaDos-dossier met een zekeringkast.'};
+  const row=q.data,d=JSON.parse(JSON.stringify(row.data)),r=wijzig(d);if(!r.ok||!r.n)return Object.assign(r,{data:d});
   if(!this.backup){const bk=await sb.from('dossier_backups').insert({dossier_id:row.id,data:row.data,reden:'CaDraw: voor terugschrijven'});if(bk.error)throw new Error('back-up van CaDos-dossier mislukt, niets teruggeschreven: '+bk.error.message);this.backup=true}
   const u=await sb.from('project_elektro_dossiers').update({data:d,updated_at:new Date().toISOString(),bijgewerkt_door:this.who}).eq('id',row.id).eq('updated_at',row.updated_at).select('id');
-  if(u.error)throw u.error;if(!u.data||!u.data.length){if(tries<2)return this.push(tries+1);throw new Error('CaDos-dossier werd intussen elders gewijzigd; terugschrijven overgeslagen')}
-  return n},
- async resync(){if(this.dirty)await this.save();await this.open(this.pid);toast('CaDos opnieuw ingelezen')},
+  if(u.error)throw u.error;if(!u.data||!u.data.length){if(tries<2)return this.schrijfDossier(wijzig,tries+1);throw new Error('Het CaDos-dossier werd intussen elders gewijzigd; probeer opnieuw.')}
+  return Object.assign(r,{data:d})},
+ async push(){const r=await this.schrijfDossier(d=>{const x=syncVelden(d);return{ok:true,n:x.n,terug:x.terug}});
+  if(r.terug&&r.terug.length){r.terug.forEach(t=>{t.obj.polen=t.oud});this.dirty=true;render();melding('Past niet in de kast',r.terug.map(t=>t.msg).join('\n'))}
+  return r.n||0},
+ kastOp(op){return this.excl(async()=>{if(this.dirty)await this._save();this.status('CaDos bijwerken...');
+  const r=await this.schrijfDossier(d=>{const x=kastOp(d,op);if(x.ok){const v=syncVelden(d);x.n=1+v.n}return x});
+  this.status(r.ok?'CaDos bijgewerkt':'');if(r.ok)this.dirty=true;return r})},
+ async resync(){await this.save();await this.open(this.pid);toast('CaDos opnieuw ingelezen')},
  async calc(){try{const c=await this.sb.from('project_cacalc_data').select('data').eq('project_id',this.pid).maybeSingle();if(!c.data||!c.data.data){toast('Dit project heeft geen CaCalc-berekening.');return}
   snap();const n=mergeCaCalc(S,c.data.data);persist();render();toast(n?`${n} kringen aangevuld uit CaCalc (koppeling op naam)`:'Geen kringen met dezelfde naam gevonden in CaCalc',!!n)}catch(err){toast('CaCalc lezen mislukt: '+(err.message||err))}}
 };
 const allK=st=>st.borden.reduce((n,b)=>n+b.groepen.reduce((m,g)=>m+g.kringen.length,0),0);
-window.addEventListener('beforeunload',e=>{if(CLOUD&&cloud.dirty){cloud.save();e.preventDefault();e.returnValue=''}});
+window.addEventListener('beforeunload',e=>{if(CLOUD&&(cloud.dirty||bezig)){cloud.save();e.preventDefault();e.returnValue=''}});
 document.addEventListener('visibilitychange',()=>{if(CLOUD&&document.hidden&&cloud.dirty)cloud.save()});
 if(CLOUD)cloud.init();else render();
 </script>

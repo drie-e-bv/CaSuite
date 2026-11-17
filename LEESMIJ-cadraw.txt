@@ -20,20 +20,30 @@ Gegevens
   In, curve, polen, icu, mantel, sectie, lengte.
 - Leest project_plannen (CaSnap) om een bestaand plan als achtergrond te kiezen.
 
-Terugschrijven naar CaDos (automatisch bij bewaren, enkel voor automaten/differentielen die uit CaDos komen)
-- Automaat: naam, A, polen (+ breedte als die gelijk was aan het aantal polen en de rij niet overloopt),
-  kabelType (alleen als "Voedingskabel komt op klemmen" aanstaat of er al een waarde stond).
-- Differentieel: mA, A, polen.
-- Nieuwe sleutel "cadraw" op het item:
-    automaat:      { curve, kA, mantel, kabel, lengte, punten:[{id,type,aantal,tekst,hw}] }
-    differentieel: { type }
-- Voor de eerste terugschrijving per sessie: kopie van het dossier in dossier_backups (reden "CaDraw: voor terugschrijven").
-- Optimistische controle op updated_at; bij een gelijktijdige wijziging wordt opnieuw gelezen (max. 2x) en anders overgeslagen.
-- NIET teruggeschreven: kringen die in CaDraw zijn toegevoegd of verwijderd (aanmaken/verwijderen blijft in CaDos).
+Terugschrijven naar CaDos (17/11/2026: CaDraw en de zekeringkast in CaDos blijven altijd gelijk)
+- Velden (automatisch bij bewaren): automaat naam, A, polen (+ breedte), curve, kA (de eigen CaDos-velden
+  curve/kA/diffType), kabelType als "Voedingskabel komt op klemmen" aanstaat; differentieel mA, A, polen, diffType.
+  CaDraw-eigen gegevens staan op het item onder "cadraw": {mantel, kabel, lengte, punten}.
+- Structuur (meteen, alles of niets):
+  * kring tussenvoegen  -> nieuwe automaat in CaDos op dezelfde plaats (voor de volgende / na de vorige
+    gekoppelde kring, of direct na het differentieel). linkedDiffId alleen als de plaats dat vraagt.
+    Staat de nieuwe automaat tussen twee modules op dezelfde kamgeleider, dan komt hij mee op die kam.
+  * kring verplaatsen   -> de twee automaten wisselen van plaats in de kast (kamgeleider volgt de plaats).
+  * kring wissen        -> automaat uit de kast, zoals CaDos: draden in het uitvoeringsplan weg, kamgeleiders
+    bijgewerkt, alle verwijzingen (driverkast, patchkast, laadpalen, verwarming, alarm, ...) leeggemaakt.
+  * differentieel       -> nieuwe rij onderaan de kast met het differentieel.
+- Geweigerd met uitleg (niets gewijzigd, in CaDraw noch CaDos):
+  * de rij in de kast zit vol (kast.maat, standaard 24 modules);
+  * een differentieel dat geen hoofddifferentieel is heeft al 8 automaten (zelfde regel als CaDos);
+  * polen wijzigen waardoor de rij overloopt (polen worden teruggezet).
+- Letters: na elke wijziging opnieuw berekend met dezelfde logica als computeZekeringCodesVoorRijen en
+  overgenomen in CaDraw. Op een gekoppeld bord is er geen "vaste letter".
+- Voor de eerste wijziging per sessie: kopie van het dossier in dossier_backups. Optimistische controle op
+  updated_at (max. 3 pogingen).
+- Ongedaan maken werkt niet over een structuurwijziging heen (die staat dan al in CaDos).
 
 Nog te doen in CaDos zelf (bronbestand src2.html, via de centrale release-chat)
-- Module-editor Automaat: velden Curve (B/C/D), Kortsluitvermogen (kA), Kabeltype/mantel (XVB, EXVB, ...),
-  Geleiders (3G2,5), Lengte (m) -> lezen/schrijven in item.cadraw.{curve,kA,mantel,kabel,lengte}.
-- Module-editor Differentieel: Type (A/B/F/AC) -> item.cadraw.type.
+- Module-editor Automaat: Kabeltype/mantel (XVB, EXVB, ...), Geleiders (3G2,5), Lengte (m)
+  -> lezen/schrijven in item.cadraw.{mantel,kabel,lengte}. (Curve, kA en type differentieel gebruiken al de CaDos-velden.)
 - Knop/tab "CaDraw" die cadraw.html?project=<id> opent.
 - CaMat: materiaallijst van CaDraw (nu CSV) rechtstreeks overnemen.
