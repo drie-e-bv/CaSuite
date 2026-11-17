@@ -1,8 +1,23 @@
-CaDraw - eendraadschema + situatieplan (testversie, 16/11/2026)
+CaDraw - eendraadschema + situatieplan (17/11/2026: in CaSuite ingebouwd)
 
-Bestand: cadraw.html (losstaand, GEEN onderdeel van src2.html / build-apps.js; nog geen knop in het menu).
-Adres:   .../CaSuite/cadraw.html   (optioneel ?project=<project-id>)
-Login:   gebruikt de bestaande CaSuite-aanmelding (zelfde site). Niet aangemeld -> verwijst naar index.html.
+Waar:    tabblad "Schema & plan" in index.html (volledige site) en in de CaDos-app (cados.html), plus een eigen
+         losse app cadraw.html (APP_MODE 'cadraw', CaDos-icoon, manifest-cadraw.json).
+Bron:    cadraw-bron.html (de eigenlijke CaDraw-app). bouw-cadraw.js zet die als base64 in index.html
+         (#cadraw-bron, tussen <!--CADRAW-BEGIN--> en <!--CADRAW-END-->) en maakt werf/planning/cados/cacalc/
+         cadraw.html opnieuw gelijk met index.html (hun eigen <head>-begin blijft). cabon.html niet (andere bron).
+         Na elke wijziging aan cadraw-bron.html of index.html:  node bouw-cadraw.js
+Ingebed: index.html start CaDraw in een iframe (srcdoc, zelfde origin) zodat CSS/JS niet botsen. De brug
+         window.CaSuiteCadraw geeft: sb (de aanmelding van CaSuite), projectId() (de projectkiezer bovenaan),
+         flushCados() (wachtende CaDos-bewaring eerst wegschrijven vóór CaDraw in het dossier schrijft) en
+         cadosGewijzigd(pid) (CaDos herlaadt bij de volgende keer dat je het Dossier-tabblad opent).
+         CaDraw zelf geeft window.CaDrawEmbed = {project(id), isDirty(), flush()}.
+Los:     cadraw-bron.html werkt ook nog op zichzelf (lokaal demodossier, of ?cloud=1 met eigen projectkiezer).
+
+Lagen (17/11/2026): situatieplan heeft 4 lagen - elektro, muziek, alarm, netwerk - elk een eigen blad in de PDF.
+- muziek: zones uit CaDos (muziek), luidsprekers/bedieningen per zone beheerd in CaDraw (S.muziekPunten).
+- alarm: centrale + toestellen uit CaDos (alarmCentrale / alarm-rijen), nummering CEN, 1A, 2A ... enkel lezen.
+- netwerk: patchpanelen (P1, poorten 1.01 ...; ap/wifi -> AP-symbool) en camera's (C1 ...) uit CaDos, enkel lezen.
+Papierformaat: A4 / A3 / A2 onder Afdrukken (schema- en tabelbladen passen zich aan).
 
 Werkwijze (17/11/2026: opgezet zoals Trikker)
 - Zes tabbladen: Document, Eendraadschema, Situatieplan, Kringen, Materiaallijst, Afdrukken.
