@@ -62,14 +62,19 @@ Terugschrijven naar CaDos (17/11/2026: CaDraw en de zekeringkast in CaDos blijve
   * de rij in de kast zit vol (kast.maat, standaard 24 modules);
   * een differentieel dat geen hoofddifferentieel is heeft al 8 automaten (zelfde regel als CaDos);
   * polen wijzigen waardoor de rij overloopt (polen worden teruggezet).
+- Enkel velden die in CaDraw gewijzigd werden gaan terug (vergelijking met BASIS = de stand bij het inlezen), zodat
+  een wijziging die intussen in CaDos gebeurde nooit stil overschreven wordt. Het item.cadraw-blok gaat altijd mee.
 - Letters: na elke wijziging opnieuw berekend met dezelfde logica als computeZekeringCodesVoorRijen en
   overgenomen in CaDraw. Op een gekoppeld bord is er geen "vaste letter".
 - Voor de eerste wijziging per sessie: kopie van het dossier in dossier_backups. Optimistische controle op
   updated_at (max. 3 pogingen).
 - Ongedaan maken werkt niet over een structuurwijziging heen (die staat dan al in CaDos).
+- Eigen tekening (project_cadraw_data): versiecontrole op updated_at. Bewaarde iemand anders intussen, dan leest
+  CaDraw die versie in en meldt dat de laatste wijziging opnieuw moet.
 
-Nog te doen in CaDos zelf (bronbestand src2.html, via de centrale release-chat)
-- Module-editor Automaat: Kabeltype/mantel (XVB, EXVB, ...), Geleiders (3G2,5), Lengte (m)
-  -> lezen/schrijven in item.cadraw.{mantel,kabel,lengte}. (Curve, kA en type differentieel gebruiken al de CaDos-velden.)
-- Knop/tab "CaDraw" die cadraw.html?project=<id> opent.
+Nog te doen
+- Module-editor Automaat in CaDos: Kabeltype/mantel, Geleiders, Lengte -> lezen/schrijven in item.cadraw.
 - CaMat: materiaallijst van CaDraw (nu CSV) rechtstreeks overnemen.
+- Verlichting/laadpalen/motoren uit CaDos automatisch als punten in de juiste CaDraw-kring zetten (nu dubbel invoeren).
+- Herstelknop voor dossier_backups in CaDos.
+Zie ook de project-doc claude/doorlichting-cadraw-samenhang-2026-11-17.md.
