@@ -304,6 +304,22 @@ function sample(){
  put('Stopcontacten keuken',0,640,114,1);put('Stopcontacten keuken',1,760,114,1);put('Oven',0,876,200,2);put('Kookplaat',0,876,280,2);put('Vaatwas',1,600,376,3);
  delete st._over;return st}
 
+/* ---- instellingen (per browser): voorgevormde kringen = automaat + kabel + symbolen in één klik ---- */
+const DEF_PRESETS=()=>[
+ {naam:'Stopcontacten',polen:'2P',curve:'C',A:20,kA:3,kabelType:'XVB',kabel:'3G2,5',s:['sc_ak','']},
+ {naam:'Verlichting',polen:'2P',curve:'C',A:16,kA:3,kabelType:'XVB',kabel:'3G1,5',s:['li','']},
+ {naam:'Gemengde kring',polen:'2P',curve:'C',A:20,kA:3,kabelType:'XVB',kabel:'3G2,5',s:['sc_ak','li']},
+ {naam:'Wasmachine',polen:'2P',curve:'C',A:20,kA:3,kabelType:'XVB',kabel:'3G2,5',s:['sc_ak','t_was']},
+ {naam:'Droogkast',polen:'2P',curve:'C',A:20,kA:3,kabelType:'XVB',kabel:'3G2,5',s:['sc_ak','t_droog']},
+ {naam:'Vaatwasmachine',polen:'2P',curve:'C',A:20,kA:3,kabelType:'XVB',kabel:'3G2,5',s:['sc_ak','t_vaat']},
+ {naam:'Oven',polen:'2P',curve:'C',A:20,kA:3,kabelType:'XVB',kabel:'3G2,5',s:['t_oven','']},
+ {naam:'Kookplaat',polen:'2P',curve:'C',A:32,kA:3,kabelType:'XVB',kabel:'3G6',s:['t_kook','']},
+ {naam:'Laadstation',polen:'2P',curve:'C',A:32,kA:3,kabelType:'XVB',kabel:'3G6',s:['t_ev','']},
+ {naam:'Automaat + kabel',polen:'2P',curve:'C',A:20,kA:3,kabelType:'XVB',kabel:'3G2,5',s:['','']}];
+let CFG=(()=>{try{const j=JSON.parse(localStorage.getItem('cadraw-instellingen'));if(j&&Array.isArray(j.presets))return j}catch(e){}return{presets:DEF_PRESETS()}})();
+const saveCfg=()=>{try{localStorage.setItem('cadraw-instellingen',JSON.stringify(CFG))}catch(e){}};
+const presetKring=i=>{const q=CFG.presets[i];if(!q)return newKring();return newKring({naam:q.naam==='Automaat + kabel'?'':q.naam,polen:q.polen,curve:q.curve,A:q.A,kA:q.kA,kabelType:q.kabelType,kabel:q.kabel,punten:(q.s||[]).filter(t=>TYPES[t]).map(t=>newPunt(t))})};
+
 /* ================= toestand ================= */
 let S=CLOUD?blank():loadLocal(),tab='schema',zoom=1,undoStack=[],bi=0;const open=new Set();
 const E={mode:'teken',sym:'sc_ak',sel:null,q:'',recent:[]};
@@ -404,7 +420,7 @@ function column(d,x,yb,k,code){
  d.C(x,yb,.7,'b');d.T(x-1.6,yb+4.6,code,{z:code.length>2?2.8:3.3,b:1,a:'e'});
  breakerV(d,x,yb);
  d.T(x+3.3,yb-7.4,`${k.polen||''} - ${k.curve||''} ${k.A||'?'}A`,{z:2.3});
- if(k.kA)d.T(x+3.3,yb-4.5,k.kA+'kA',{z:2});
+ if(k.kA){const kt=String(Math.round(k.kA*1000));d.R(x+3.1,yb-6.2,kt.length*1.2+1.1,2.7,'n',.15);d.T(x+3.65,yb-4.2,kt,{z:2})}
  d.T(x-1.5,yb-13,`${k.kabelType||''} ${k.kabel||''}`.trim(),{z:2.3,r:90});
  const nm=wrap(k.naam,14,3);nm.forEach((l,i)=>d.T(x+3.3,yb-13.5-(nm.length-1-i)*2.7,l,{z:2.1,i:1}));
  const n=k.punten.length,yp0=yb-28,RH=n?clamp((yp0-TOP)/n,5.6,11):11,s=clamp(RH/11,.5,1)*.9;
@@ -425,7 +441,7 @@ function feed(d,st,b,gl){const y=R0,a=M,h=b.hoofd,hx=a+27;
  d.L(a+5,y,hx,y,.5);d.L(hx+9,y,a+52,y,.5);
  d.R(a+8,y-4,11,8,'w',.3);d.L(a+8,y-2.1,a+19,y-2.1,.25);d.T(a+13.5,y+2.2,'kWh',{a:'m',z:2.5});
  d.C(hx,y,.6,'b');d.L(hx,y,hx+7.6,y-3,.4);d.L(hx+6.2,y-2.45,hx+7.6,y-3,1.05);
- d.T(hx-1,y-13,'Δ'+h.mA+'mA',{z:2.4,b:1});d.T(hx-1,y-10,`${h.polen} - ${h.A}A`,{z:2.3});d.T(hx-1,y-7.2,'type '+h.type,{z:2});
+ d.T(hx-1,y-10.5,'Δ'+h.mA+'mA - type '+h.type,{z:2.4,b:1});d.T(hx-1,y-7.2,`${h.polen} - ${h.A}A`,{z:2.3});
  if(gl)d.T(hx+4,y+4.6,gl,{z:3.3,b:1,a:'m'});
  const ex=a+38;d.L(ex,y+2,ex,y+5,.3);d.L(ex-2.2,y+5,ex+2.2,y+5,.35);d.L(ex-1.4,y+6,ex+1.4,y+6,.35);d.L(ex-.6,y+7,ex+.6,y+7,.35);
  d.T(ex+3.2,y+6.6,st.project.aarding||'',{z:2.2});
@@ -462,7 +478,7 @@ function bordPages(st,b){
    a=e+1}
   sl.forEach((s,j)=>{const x=xs(j),g=s.g;
    if(s.first&&g.sub){d.C(x,R0,.7,'b');d.L(x,R0,x,R0-5,.3);breakerV(d,x,R0-2);d.L(x,R0-13.2,x,R1,.3);d.C(x,R1,.7,'b');
-    d.T(x+3.3,R0-14.5,'Δ'+g.mA+'mA',{z:2.4,b:1});d.T(x+3.3,R0-11.5,`${g.polen} - ${g.A}A`,{z:2.3});d.T(x+3.3,R0-8.7,'type '+g.type,{z:2});
+    d.T(x+3.3,R0-12.5,'Δ'+g.mA+'mA - type '+g.type,{z:2.3,b:1});d.T(x+3.3,R0-9.3,`${g.polen} - ${g.A}A`,{z:2.3});
     if(st.codering==='cados')d.T(x,R0+4.6,cd.g[g.id],{z:3.3,b:1,a:'m'});d.H(x-8,R0-21,CW,27,'g:'+g.id);}
    if(s.k)column(d,x,g.sub?R1:R0,s.k,cd.k[s.k.id]);});});
 }
@@ -602,8 +618,12 @@ function locate(id){if(!id)return null;const t=id[0],x=id.slice(2);
    for(let ki=0;ki<g.kringen.length;ki++){const k=g.kringen[ki];if(t==='k'&&k.id===x)return{t,bx,gi,ki,b,g,k};
     if(t==='p'){const pi=k.punten.findIndex(q=>q.id===x);if(pi>=0)return{t,bx,gi,ki,pi,b,g,k,p:k.punten[pi]}}}}}
  return null}
-function symIcon(t){const d=mk();if(TYPES[t])sym(d,t,0,0,1,'',1);else breakerV(d,6,5.5);return`<svg viewBox="-1 -6.2 16 12.4">${opsSVG(d.o)}</svg>`}
-function libHtml(){const q=norm(E.q),all=[['kring','Kring (automaat + leiding)','Bord'],['diff','Differentieel','Bord'],...Object.entries(TYPES).map(([k,t])=>[k,t.l,t.g])],gs={};
+function symIcon(t){const d=mk();
+ if(t.startsWith('pre:')){const q=CFG.presets[+t.slice(4)]||{s:[]},ss=(q.s||[]).filter(x=>TYPES[x]);d.L(0,0,2.5,0,.3);d.L(2.5,0,6.3,-1.9,.4);d.L(5.2,-1.35,6.3,-1.9,1);d.L(7,0,13,0,.3);d.C(10,-1.6,.75,'n',.2);
+  ss.forEach((x,i)=>sym(d,x,13+i*9.5,0,.8,'',1));if(ss.length>1)d.L(13,0,13+9.5,0,.3);
+  return`<svg viewBox="-1 -5.5 34 11" style="width:78px">${opsSVG(d.o)}</svg>`}
+ if(TYPES[t])sym(d,t,0,0,1,'',1);else breakerV(d,6,5.5);return`<svg viewBox="-1 -6.2 16 12.4">${opsSVG(d.o)}</svg>`}
+function libHtml(){const q=norm(E.q),all=[...CFG.presets.map((x,i)=>['pre:'+i,`${x.naam} · ${x.polen} ${x.curve}${x.A}A · ${x.kabelType} ${x.kabel}`,'Voorgevormde kringen']),['kring','Lege kring (automaat + leiding)','Bord'],['diff','Differentieel','Bord'],...Object.entries(TYPES).map(([k,t])=>[k,t.l,t.g])],gs={};
  const btn=e=>`<button class="sy${E.sym===e[0]?' on':''}" data-sym="${e[0]}">${symIcon(e[0])}<span>${esc(e[1])}</span></button>`;
  all.filter(e=>!q||norm(e[1]).includes(q)).forEach(e=>(gs[e[2]]=gs[e[2]]||[]).push(btn(e)));
  const rec=!q&&E.recent.length?`<h4>Laatst gebruikt</h4>${E.recent.map(k=>all.find(e=>e[0]===k)).filter(Boolean).map(btn).join('')}`:'';
@@ -625,7 +645,13 @@ function vSide(){const cd=codes(S),L=locate(E.sel);if(E.sel&&!L)E.sel=null;
  return h}
 const schemaHtml=()=>allPages(S,{schema:true}).map(p=>pageSVG(p,true)).join('');
 function redrawSchema(){const el=$('#sch');if(el)el.innerHTML=schemaHtml()}
-function vSchema(){return`<div class="ws"><div class="side card" id="side">${vSide()}</div><div><div class="row" style="margin:0 0 8px"><button class="sm" data-a="zo">−</button><button class="sm" data-a="zi">+</button><span class="note">${E.mode==='teken'?(E.sym==='kring'?'Tik op een blauw toevoegpunt (+) naast een rail om een kring toe te voegen.':'Kies een symbool en tik op het blauwe toevoegpunt (+) boven een kring.'):'Tik op een onderdeel om het te selecteren.'}</span></div><div class="pages" id="sch">${schemaHtml()}</div></div></div>`}
+function vSchema(){return`<div class="ws"><div class="side card" id="side">${vSide()}</div><div><div class="row" style="margin:0 0 8px"><button class="sm" data-a="zo">−</button><button class="sm" data-a="zi">+</button><span class="note">${E.mode==='teken'?(!TYPES[E.sym]?'Tik op een blauw toevoegpunt (+) onder een rail om de kring daar toe te voegen.':'Kies een symbool en tik op het blauwe toevoegpunt (+) boven een kring.'):'Tik op een onderdeel om het te selecteren.'}</span></div><div class="pages" id="sch">${schemaHtml()}</div></div></div>`}
+function vExtra(){const sel=(i,f,v,opts)=>`<select data-cfg="${i}.${f}">${opts.map(o=>{const[a,b]=Array.isArray(o)?o:[o,o];return`<option value="${esc(a)}"${String(a)===String(v)?' selected':''}>${esc(b)}</option>`}).join('')}</select>`,
+ so=[['','(geen)'],...Object.entries(TYPES).map(([k,t])=>[k,t.l])];
+ return`<div class="card"><h2>Voorgevormde kringen <small>automaat + kabel + symbolen in één klik, bovenaan in de symbolenbibliotheek</small></h2>
+ <div class="tw"><table><tr><th>Naam</th><th>Polen</th><th>Curve</th><th>A</th><th>kA</th><th>Kabeltype</th><th>Geleiders</th><th>Symbool 1</th><th>Symbool 2</th><th></th></tr>
+ ${CFG.presets.map((q,i)=>`<tr><td><input data-cfg="${i}.naam" value="${esc(q.naam)}" style="min-width:130px"></td><td>${sel(i,'polen',q.polen,POL)}</td><td>${sel(i,'curve',q.curve,['B','C','D'])}</td><td>${sel(i,'A',q.A,AMP)}</td><td>${sel(i,'kA',q.kA,[3,4.5,6,10])}</td><td>${sel(i,'kabelType',q.kabelType,['XVB','EXVB','XGB','VOB','VVB','EXAVB','SVV'])}</td><td><input data-cfg="${i}.kabel" value="${esc(q.kabel)}" style="width:80px"></td><td>${sel(i,'s.0',(q.s||[])[0]||'',so)}</td><td>${sel(i,'s.1',(q.s||[])[1]||'',so)}</td><td><button class="sm danger" data-a="delPre" data-i="${i}">✕</button></td></tr>`).join('')}</table></div>
+ <div class="row"><button class="sm pri" data-a="addPre">+ voorgevormde kring</button><button class="sm" data-a="resetPre">Standaardlijst herstellen</button><span class="note">Deze instellingen worden bewaard in deze browser.</span></div></div>`}
 function kringTabel(){const cd=codes(S);
  const rows=S.borden.flatMap(b=>b.groepen.flatMap(g=>g.kringen.map(k=>`<tr data-a="goK" data-kid="${k.id}" style="cursor:pointer"><td><b>${cd.k[k.id]}</b></td><td>${S.borden.length>1?esc(b.naam)+' - ':''}${esc(k.naam)}</td><td>${esc(k.polen)} ${esc(k.curve)}${esc(k.A)}A</td><td>${esc(k.kabelType)} ${esc(k.kabel)}</td><td>Δ${g.sub?g.mA:b.hoofd.mA}mA</td><td class="n">${k.punten.length}</td></tr>`))).join('');
  return`<div class="card"><h2>Lijst met kringen</h2><div class="tw"><table><tr><th>Kring</th><th>Benaming</th><th>Beveiliging</th><th>Kabel</th><th>Differentieel</th><th class="n">Punten</th></tr>${rows}</table></div></div>`}
@@ -663,9 +689,9 @@ function vPlan(){P.pi=clamp(P.pi,0,S.plannen.length-1);const pl=S.plannen[P.pi],
   ${S.plannen.length>1?`<button class="sm danger" data-a="delPlan">Verwijder verdieping</button>`:''}<span style="flex:1"></span><span class="note">${placed.size} van ${tot} punten geplaatst</span></div></div>
  <div class="pages">${svg}</div>`}
 function render(){gc();const nw=checks(S).filter(x=>x.lvl==='w').length;
- $('#tabs').innerHTML=[['doc','Document'],['schema','Eendraadschema'],['plan','Situatieplan'],['kring','Kringen'+(nw?`<span class="badge">${nw}</span>`:'')],['mat','Materiaallijst'],['print','Afdrukken']].map(t=>`<button data-tab="${t[0]}" class="${tab===t[0]?'on':''}">${t[1]}</button>`).join('');
+ $('#tabs').innerHTML=[['doc','Document'],['schema','Eendraadschema'],['plan','Situatieplan'],['kring','Kringen'+(nw?`<span class="badge">${nw}</span>`:'')],['mat','Materiaallijst'],['print','Afdrukken'],['extra','Extra']].map(t=>`<button data-tab="${t[0]}" class="${tab===t[0]?'on':''}">${t[1]}</button>`).join('');
  const sc=document.querySelector('.pages'),sx=sc?sc.scrollLeft:0,sy=sc?sc.scrollTop:0,sd=$('.lib'),ls=sd?sd.scrollTop:0;
- $('#v').innerHTML=tab==='doc'?vDoc():tab==='kring'?vKring():tab==='mat'?vMat():tab==='print'?vPrint():tab==='plan'?vPlan():vSchema();
+ $('#v').innerHTML=tab==='doc'?vDoc():tab==='kring'?vKring():tab==='mat'?vMat():tab==='print'?vPrint():tab==='extra'?vExtra():tab==='plan'?vPlan():vSchema();
  const s2=document.querySelector('.pages');if(s2&&sc){s2.scrollLeft=sx;s2.scrollTop=sy}const l2=$('.lib');if(l2)l2.scrollTop=ls}
 let tt;function toast(msg,undo){$('#tmsg').textContent=msg;$('#tundo').style.display=undo?'':'none';$('#toast').style.display='flex';clearTimeout(tt);tt=setTimeout(()=>$('#toast').style.display='none',undo?7000:3800)}
 function goKring(id){if(!id)return;const x=allKringen().find(x=>x.k.id===id);if(x)bi=x.bx;open.add(id);tab='kring';render();const el=document.querySelector(`details[data-id="${id}"]`);if(el)el.scrollIntoView({block:'center'})}
@@ -699,6 +725,7 @@ function ask(vraag,def=''){return new Promise(ok=>{const o=$('#ovl');o.innerHTML
 document.addEventListener('input',e=>{const t=e.target;
  if(t.id==='pzoek'){cloud.picker(t.value);return}
  if(t.id==='libq'){E.q=t.value;$('#libl').innerHTML=libHtml();return}
+ if(t.dataset.cfg){const[i,f,j]=t.dataset.cfg.split('.'),q=CFG.presets[+i];if(f==='s'){q.s=q.s||['',''];q.s[+j]=t.value}else q[f]=(f==='A'||f==='kA')?+t.value:t.value;saveCfg();return}
  if(t.dataset.b){let v=t.value;if(t.dataset.n!==undefined)v=v===''?'':+v;if(t.dataset.bool!==undefined)v=!!v;setPath(t.dataset.b,v);if(/\.kabel$/.test(t.dataset.b))delete get(t.dataset.b.replace(/\.kabel$/,'')).kabelBron;
   if(/\.code$/.test(t.dataset.b)&&!String(v).trim())delete get(t.dataset.b.replace(/\.code$/,'')).code;persist();if(t.closest('#side'))redrawSchema()}
  else if(t.dataset.c){setPath(t.dataset.c,t.checked);persist()}});
@@ -713,10 +740,10 @@ document.addEventListener('change',async e=>{const t=e.target;
 document.addEventListener('toggle',e=>{const t=e.target;if(t.matches&&t.matches('details.k')){t.open?open.add(t.dataset.id):open.delete(t.dataset.id)}},true);
 document.addEventListener('click',async e=>{
  const hit=e.target.closest('.hit');if(hit){E.sel=hit.dataset.h;const L=locate(E.sel);if(L)bi=L.bx;render();return}
- const ad=e.target.closest('[data-add]');if(ad){const id=ad.dataset.add,L=locate((id[0]==='p'?'k:':'g:')+id.slice(2));if(!L&&id[0]==='k'){const b=S.borden.find(b=>b.groepen.some(g=>g.id===id.slice(2)));if(b){const g=b.groepen.find(g=>g.id===id.slice(2));bi=S.borden.indexOf(b);mut('',()=>{const k=newKring();g.kringen.push(k);E.sel='k:'+k.id})}return}
+ const ad=e.target.closest('[data-add]');if(ad){const id=ad.dataset.add,L=locate((id[0]==='p'?'k:':'g:')+id.slice(2));if(!L&&id[0]==='k'){const b=S.borden.find(b=>b.groepen.some(g=>g.id===id.slice(2)));if(b){const g=b.groepen.find(g=>g.id===id.slice(2));bi=S.borden.indexOf(b);mut('',()=>{const k=E.sym.startsWith('pre:')?presetKring(+E.sym.slice(4)):newKring();g.kringen.push(k);E.sel='k:'+k.id})}return}
   if(!L)return;bi=L.bx;
   if(id[0]==='p')mut('',()=>{const last=L.k.punten[L.k.punten.length-1],p=newPunt(E.sym,{tekst:last?last.tekst:''});L.k.punten.push(p);E.sel='p:'+p.id;E.recent=[E.sym,...E.recent.filter(x=>x!==E.sym)].slice(0,5)});
-  else mut('',()=>{const k=newKring();L.g.kringen.push(k);E.sel='k:'+k.id});return}
+  else mut('',()=>{const k=E.sym.startsWith('pre:')?presetKring(+E.sym.slice(4)):newKring();L.g.kringen.push(k);E.sel='k:'+k.id});return}
  const sy=e.target.closest('[data-sym]');if(sy){E.sym=sy.dataset.sym;E.mode='teken';
   if(E.sym==='diff'){mut('Differentieel toegevoegd',()=>{const g=newGroep();B().groepen.push(g);E.sel='g:'+g.id;E.sym='kring'})}else render();return}
  const tb=e.target.closest('[data-tab]');if(tb){tab=tb.dataset.tab;render();window.scrollTo(0,0);return}
@@ -734,6 +761,9 @@ document.addEventListener('click',async e=>{
  else if(a==='dnP'&&pi<K.punten.length-1)mut('',()=>K.punten.splice(pi+1,0,K.punten.splice(pi,1)[0]));
  else if(a==='dupP')mut('',()=>{const c=Object.assign({},K.punten[pi],{id:uid()});K.punten.splice(pi+1,0,c);E.sel='p:'+c.id});
  else if(a==='mode'){E.mode=b.dataset.m;render()}
+ else if(a==='addPre'){CFG.presets.push({naam:'Nieuwe kring',polen:'2P',curve:'C',A:20,kA:3,kabelType:'XVB',kabel:'3G2,5',s:['','']});saveCfg();render()}
+ else if(a==='delPre'){CFG.presets.splice(+b.dataset.i,1);saveCfg();if(E.sym.startsWith('pre:'))E.sym='sc_ak';render()}
+ else if(a==='resetPre'){CFG.presets=DEF_PRESETS();saveCfg();render();toast('Standaardlijst hersteld')}
  else if(a==='addG')mut('',()=>B().groepen.push(newGroep()));
  else if(a==='delG')mut('Differentieel verwijderd',()=>B().groepen.splice(gi,1));
  else if(a==='addB')mut('',()=>{S.borden.push(newBord({naam:'Zekeringkast '+(S.borden.length+1)}));bi=S.borden.length-1});
