@@ -13,6 +13,9 @@
  * Gebruik: node build-apps.js
  * Verwacht src2.html in dezelfde map; schrijft index.html/werf.html/planning.html/cados.html
  * ook in dezelfde map.
+ *
+ * LET OP (2026-11-17): na build-apps.js altijd ook `node bouw-cadraw.js` draaien -- dat zet CaDraw
+ * (cadraw-bron.html) in index.html en maakt werf/planning/cados/cacalc/cadraw.html opnieuw gelijk.
  */
 const fs = require('fs');
 const path = require('path');

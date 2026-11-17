@@ -1,0 +1,60 @@
+{
+  "id": "/CaSuite/cadraw.html",
+  "name": "CaDraw – eendraadschema & situatieplan",
+  "short_name": "CaDraw",
+  "description": "Eendraadschema en situatieplan (elektro, muziek, alarm, netwerk) voor Casentis.",
+  "start_url": "./cadraw.html",
+  "scope": "./cadraw.html",
+  "display": "standalone",
+  "orientation": "any",
+  "lang": "nl",
+  "dir": "ltr",
+  "background_color": "#f2f5f3",
+  "theme_color": "#2F7A4D",
+  "categories": [
+    "business",
+    "productivity"
+  ],
+  "icons": [
+    {
+      "src": "./icons/cados-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/cados-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/cados-icon-192-maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "./icons/cados-icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "./screenshots/gsm-start.png",
+      "sizes": "780x1688",
+      "type": "image/png",
+      "label": "Startscherm van CaSuite",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "./screenshots/pc-werfverslag.png",
+      "sizes": "2560x1600",
+      "type": "image/png",
+      "label": "Werfverslag op de pc",
+      "form_factor": "wide"
+    }
+  ]
+}

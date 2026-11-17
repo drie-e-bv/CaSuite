@@ -1,0 +1,1262 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>CaDraw - eendraadschema en situatieplan</title>
+<!-- CaDraw (testversie, 2026-11-16). Losstaande pagina van CaSuite: eendraadschema + situatieplan.
+     Leest CaDos (project_elektro_dossiers) en CaCalc (project_cacalc_data), bewaart in
+     project_cadraw_data en schrijft gewijzigde waarden van gekoppelde kringen terug naar CaDos.
+     Draait ook zonder Supabase (lokale modus) wanneer de pagina niet op de CaSuite-site staat. -->
+<style>
+:root{--ink:#16181c;--mut:#667085;--line:#d9dde3;--bg:#f4f5f7;--card:#fff;--acc:#0b6bcb;--warn:#b54708;--warnbg:#fff4e5;--infobg:#eef4ff;--danger:#b42318}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;color:var(--ink);background:var(--bg);-webkit-text-size-adjust:100%}
+header{background:#101114;color:#fff;padding:9px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+header h1{font-size:17px;margin:0;font-weight:700;letter-spacing:.2px}
+header .tag{font-size:11px;border:1px solid #555;border-radius:20px;padding:1px 8px;color:#cfd3da}
+header .sp{flex:1}
+#cst{font-size:12px;color:#aab0ba}
+nav{position:sticky;top:0;z-index:5;background:#fff;border-bottom:1px solid var(--line);display:flex;overflow-x:auto}
+nav button{flex:1 0 auto;min-width:84px;border:0;border-radius:0;background:none;padding:11px 8px;font:inherit;font-weight:600;color:var(--mut);border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap}
+nav button.on{color:var(--ink);border-bottom-color:var(--acc)}
+nav .badge{display:inline-block;min-width:18px;padding:0 5px;margin-left:4px;border-radius:9px;background:var(--warn);color:#fff;font-size:11px;line-height:18px}
+main{padding:12px;max-width:1280px;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px}
+.card>h2{font-size:14px;margin:0 0 10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.card>h2 small{font-weight:400;color:var(--mut)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
+.f{display:flex;flex-direction:column;gap:3px;min-width:0}
+.f.w2{grid-column:span 2}
+.f span{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px}
+input,select,textarea{font:inherit;color:inherit;border:1px solid var(--line);border-radius:7px;padding:7px 8px;background:#fff;min-width:0;width:100%}
+input:focus,select:focus,textarea:focus{outline:2px solid #b9d6f5;border-color:var(--acc)}
+button{font:inherit;border:1px solid var(--line);background:#fff;border-radius:7px;padding:7px 11px;cursor:pointer;color:var(--ink)}
+button:hover{background:#f1f3f6}
+button.pri,button.on2{background:var(--acc);border-color:var(--acc);color:#fff}
+button.danger{color:var(--danger)}
+button.sm{padding:4px 8px;font-size:13px}
+header button{background:#23252b;border-color:#3a3d45;color:#fff}
+header button:hover{background:#30333b}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.row select,.row input{width:auto;max-width:100%}
+.lb{background:#101114;color:#fff;border-radius:5px;padding:1px 7px;font-size:13px}
+details.k{border:1px solid var(--line);border-radius:8px;margin-top:8px;background:#fcfcfd}
+details.k>summary{padding:9px 10px;cursor:pointer;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;list-style:none}
+details.k>summary::-webkit-details-marker{display:none}
+details.k>summary .kn{font-weight:600}
+details.k>summary small{color:var(--mut);margin-left:auto}
+details.k[open]{background:#fff;border-color:#b9c0cb}
+details.k .in{padding:2px 10px 10px}
+.pt{display:grid;grid-template-columns:22px minmax(120px,1.4fr) 54px minmax(80px,1fr) auto auto auto;gap:5px;align-items:center;margin-top:6px}
+.pt .no{font-weight:700;color:var(--mut);text-align:right;font-size:13px}
+.pt .hw{display:flex;align-items:center;gap:3px;font-size:12px;color:var(--mut);white-space:nowrap}
+.pt .hw input{width:auto}
+@media(max-width:560px){.pt{grid-template-columns:22px 1fr 54px auto auto}.pt .tx{grid-column:2/3;grid-row:2}.pt .hw{grid-column:3/6;grid-row:2}}
+.pages{overflow:auto;background:#8d939c;border-radius:10px;padding:10px;max-height:78vh}
+.pages svg{display:block;background:#fff;margin:0 auto 10px;box-shadow:0 1px 6px rgba(0,0,0,.35)}
+.pages svg text{font-family:Helvetica,Arial,sans-serif;fill:#000;user-select:none}
+.pages svg .hit{fill:transparent;cursor:pointer}
+.pages svg .hit:hover{fill:rgba(11,107,203,.08)}
+.pages svg .hit.sel{fill:rgba(11,107,203,.13);stroke:#0b6bcb;stroke-width:.3}
+.pages svg .addm{cursor:pointer}
+.pages svg .addm circle{fill:#0b6bcb;stroke:#fff;stroke-width:.3}
+.pages svg .addm path{stroke:#fff;stroke-width:.5;stroke-linecap:round}
+.pages svg .addm:hover circle{fill:#084f97}
+.ws{display:grid;grid-template-columns:300px minmax(0,1fr);gap:12px;align-items:start}
+.ws .side{position:sticky;top:52px;max-height:calc(100vh - 64px);overflow:auto}
+.lib{overflow:auto;max-height:46vh;border:1px solid var(--line);border-radius:8px;margin-top:8px}
+@media(max-width:860px){.ws{grid-template-columns:minmax(0,1fr)}.ws .side{position:static;max-height:none}.lib{max-height:200px}}
+.libw{display:grid;grid-template-columns:50px minmax(0,1fr);gap:6px;margin-top:8px}
+.libw .lib{margin-top:0}
+.cats{display:flex;flex-direction:column;gap:4px}
+.ct{padding:3px;height:38px;display:flex;align-items:center;justify-content:center;background:#eef0f3;border-color:#d0d5dc}
+.ct svg{width:38px;height:28px}
+.ct.on{background:#fff;border-color:var(--acc);box-shadow:inset 3px 0 0 var(--acc)}
+@media(max-width:860px){.libw{grid-template-columns:minmax(0,1fr)}.cats{flex-direction:row;overflow-x:auto}.ct{flex:none;width:50px}}
+.lib h4{margin:0;padding:5px 8px;font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--mut);background:#f4f5f7;position:sticky;top:0}
+.sy{display:flex;align-items:center;gap:8px;width:100%;border:0;border-radius:0;border-bottom:1px solid #eef0f3;padding:5px 8px;text-align:left;font-size:13.5px}
+.sy svg{flex:none;width:44px;height:30px}
+.sy.on{background:#e3effc;box-shadow:inset 3px 0 0 var(--acc)}
+.seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{flex:1;white-space:nowrap;border:0;border-radius:0;font-weight:600;color:var(--mut)}
+.seg button.on{background:var(--acc);color:#fff}
+.chkl{display:flex;align-items:center;gap:8px;padding:6px 0}.chkl input{width:auto}
+#plan .pi{cursor:grab;touch-action:none}
+.ptb{padding:8px 10px}.pzoom{display:inline-flex;flex-wrap:wrap;align-items:center;gap:4px;margin-left:8px}.pzoom input[type=range]{width:110px;padding:0}
+.pck{display:inline-flex;align-items:center;gap:4px;font-size:13px;margin-right:6px;white-space:nowrap}.pck input{width:auto}
+.filel{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:7px;padding:4px 8px;cursor:pointer;background:#fff}
+.pws{display:grid;grid-template-columns:268px minmax(0,1fr);gap:12px;align-items:start}
+.pside{position:sticky;top:52px;padding:8px;max-height:calc(100vh - 64px);display:flex;flex-direction:column}
+.ptools{display:flex;gap:6px;margin-bottom:8px}.ptools button{flex:1;display:flex;flex-direction:column;align-items:center;padding:4px;font-size:18px;line-height:1.1}.ptools small{font-size:11px;color:var(--mut)}.ptools button.on{background:#e3effc;border-color:var(--acc)}
+.pcols{display:grid;grid-template-columns:62px minmax(0,1fr);gap:6px;min-height:0;flex:1}
+.plet{overflow:auto;max-height:calc(100vh - 190px);display:flex;flex-direction:column;gap:3px;padding-right:2px}
+.plh{flex:none;font-size:10px;text-transform:uppercase;letter-spacing:.3px;color:var(--mut);margin:5px 0 1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.plg{margin-bottom:8px}.plg button{font-size:12.5px;padding:6px 2px}
+#plan .pi.dim{opacity:.35;pointer-events:none}
+.plk{flex:none;position:relative;padding:5px 2px;font-weight:700;font-size:14px;background:#eef0f3;border-color:#d0d5dc}
+.plk i{position:absolute;top:-4px;right:-3px;font-style:normal;font-size:10px;line-height:15px;min-width:15px;border-radius:8px;background:var(--warn);color:#fff;font-weight:600}
+.plk.klaar{color:#98a2b3;background:#f6f7f9}.plk.on{background:#fff;color:var(--ink);border-color:var(--acc);box-shadow:inset 3px 0 0 var(--acc)}
+.pcomp{overflow:auto;max-height:calc(100vh - 190px);border:1px solid var(--line);border-radius:8px}
+.pch{padding:6px 8px;font-size:13px;background:#f4f5f7;position:sticky;top:0;z-index:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pc{display:flex;align-items:center;gap:6px;width:100%;border:0;border-radius:0;border-bottom:1px solid #eef0f3;padding:4px 6px;text-align:left;font-size:13px}
+.pc svg{flex:none;width:36px;height:24px}.pc span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pc em{font-style:normal;color:#12b76a;font-weight:700}
+.pc.gepl{color:#98a2b3}.pc.gepl svg{opacity:.45}.pc.on{background:#e3effc;box-shadow:inset 3px 0 0 var(--acc)}
+.pnew{margin:6px;width:calc(100% - 12px);font-size:13px}
+@media(max-width:860px){.pws{grid-template-columns:minmax(0,1fr)}.pside{position:static;max-height:none}.pcols{grid-template-columns:minmax(0,1fr)}.plet{flex-direction:row;overflow-x:auto;max-height:none}.plk{flex:none;min-width:46px}.plh{align-self:center;margin:0 2px}.pcomp{max-height:220px}.pzoom{margin-left:0}}
+#plan .pi .hb{fill:transparent}
+#plan .pi.sel .hb{fill:rgba(11,107,203,.14);stroke:#0b6bcb;stroke-width:.8}
+#plan .wl{stroke:transparent;stroke-width:14;cursor:pointer}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--mut)}
+td.n,th.n{text-align:right;white-space:nowrap}
+.tw{overflow-x:auto}
+.tw td select{min-width:68px;padding-right:22px}
+.tw td select[data-cfg$='.kabelType']{min-width:88px}
+.chk{border-radius:8px;padding:9px 11px;margin-top:7px;display:flex;gap:9px;align-items:flex-start;cursor:pointer;border:1px solid transparent}
+.chk.w{background:var(--warnbg);border-color:#f5d6ad}
+.chk.i{background:var(--infobg);border-color:#cfe0fb}
+.note{color:var(--mut);font-size:13px}
+#toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#101114;color:#fff;padding:9px 14px;border-radius:9px;display:none;gap:12px;align-items:center;z-index:30;max-width:92vw;box-shadow:0 4px 16px rgba(0,0,0,.3)}
+#toast button{background:none;border:0;color:#8ec5ff;padding:0;font-weight:600}
+#ovl{position:fixed;inset:0;background:rgba(16,17,20,.55);z-index:20;display:none;align-items:flex-start;justify-content:center;padding:6vh 12px;overflow:auto}
+#ovl .card{width:100%;max-width:560px}
+.pl{display:flex;justify-content:space-between;gap:8px;padding:9px 6px;border-bottom:1px solid var(--line);cursor:pointer}
+.pl:hover{background:#f1f3f6}
+.pl small{color:var(--mut)}
+html.emb header h1,html.emb header .tag{display:none}
+html.emb header{padding-top:4px;padding-bottom:4px}
+</style>
+</head>
+<body>
+<header>
+  <h1>CaDraw</h1><span class="tag">testversie</span>
+  <button id="bproj" data-a="proj" style="display:none">Project kiezen</button>
+  <span class="sp"></span><span id="cst"></span>
+  <button data-a="pdf">PDF</button>
+</header>
+<nav id="tabs"></nav>
+<main id="v"></main>
+<div id="ovl"></div>
+<div id="toast"><span id="tmsg"></span><button id="tundo" data-a="undo">Ongedaan maken</button></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+"use strict";
+/* ================= basis ================= */
+const KEY='cadraw-lokaal-v2';
+/* Ingebed in CaSuite (tabblad "Tekening" in index.html): de hoofdsite geeft haar aanmelding, de gekozen
+   project-id en een paar haken mee via window.parent.CaSuiteCadraw. Dan geen eigen projectkiezer/aanmelding. */
+const EMB=(()=>{try{return window.parent!==window&&window.parent.CaSuiteCadraw||null}catch(e){return null}})();
+if(EMB)document.documentElement.classList.add('emb');
+const CLOUD=!!EMB||/github\.io$/.test(location.hostname)||/^(localhost|127\.0\.0\.1)$/.test(location.hostname)||/[?&]cloud=1/.test(location.search);
+const SUPABASE_URL='https://eownpxplsnqbghcggugs.supabase.co';
+const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVvd25weHBsc25xYmdoY2dndWdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxMDg1MDcsImV4cCI6MjEwMjY4NDUwN30.KmzypFOwMvH5Rf_AK9EGDt2593vrqHn1UR-WSiURXZs';
+const uid=()=>'m'+Math.random().toString(36).slice(2,10);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const letters=n=>{let s='';n++;while(n>0){n--;s=String.fromCharCode(65+n%26)+s;n=Math.floor(n/26)}return s};
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const norm=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'');
+const $=s=>document.querySelector(s);
+
+const TYPES={
+ sc_ak:{l:'Stopcontact geaard + kinderveiligheid',c:'sc',g:'Stopcontacten'},
+ sc_a:{l:'Stopcontact geaard',c:'sc',g:'Stopcontacten'},
+ sc:{l:'Stopcontact zonder aarding',c:'sc',g:'Stopcontacten'},
+ li:{l:'Lichtpunt',c:'li',g:'Verlichting'},
+ li_w:{l:'Wandlichtpunt',c:'li',g:'Verlichting'},
+ li_spot:{l:'Spot',c:'li',g:'Verlichting'},
+ li_tl:{l:'TL / lijnverlichting',c:'li',g:'Verlichting'},
+ li_n:{l:'Noodverlichting (autonoom)',c:'li',g:'Verlichting'},
+ li_nc:{l:'Noodverlichting (centraal)',c:'li',g:'Verlichting'},
+ sw1:{l:'Schakelaar enkelpolig',c:'sw',g:'Schakelaars'},
+ sw2:{l:'Schakelaar dubbelpolig',c:'sw',g:'Schakelaars'},
+ sww:{l:'Wisselschakelaar',c:'sw',g:'Schakelaars'},
+ swd:{l:'Dubbele aansteking',c:'sw',g:'Schakelaars'},
+ swk:{l:'Kruisschakelaar',c:'sw',g:'Schakelaars'},
+ dk:{l:'Drukknop',c:'sw',g:'Schakelaars'},
+ dim:{l:'Dimmer',c:'sw',g:'Schakelaars'},
+ bm:{l:'Bewegingsmelder',c:'sw',g:'Schakelaars'},
+ t_was:{l:'Wasmachine',c:'toe',g:'Toestellen'},
+ t_droog:{l:'Droogkast',c:'toe',g:'Toestellen'},
+ t_vaat:{l:'Vaatwasmachine',c:'toe',g:'Toestellen'},
+ t_kook:{l:'Kookfornuis',c:'toe',g:'Toestellen'},
+ t_oven:{l:'Elektrische oven',c:'toe',g:'Toestellen'},
+ t_micro:{l:'Microgolfoven',c:'toe',g:'Toestellen'},
+ t_koel:{l:'Koelkast',c:'toe',g:'Toestellen'},
+ t_vries:{l:'Diepvriezer',c:'toe',g:'Toestellen'},
+ t_boiler:{l:'Boiler',c:'toe',g:'Toestellen'},
+ t_verw:{l:'Verwarmingstoestel',c:'toe',g:'Toestellen'},
+ t_motor:{l:'Motor',c:'toe',g:'Toestellen'},
+ t_vent:{l:'Ventilator',c:'toe',g:'Toestellen'},
+ t_ev:{l:'Laadstation auto',c:'toe',g:'Toestellen'},
+ t_trafo:{l:'Transformator',c:'toe',g:'Toestellen'},
+ t_bel:{l:'Bel',c:'toe',g:'Toestellen'},
+ t_pv:{l:'Omvormer zonnepanelen',c:'toe',g:'Toestellen'},
+ t_gen:{l:'Toestel (vrije tekst)',c:'toe',g:'Toestellen'},
+ af:{l:'Aftakkast',c:'div',g:'Overige'},
+ ap:{l:'Aansluitpunt',c:'div',g:'Overige'},
+ dom:{l:'Module / klein toestel (tekst)',c:'div',g:'Overige'}
+};
+const NETTEN=['3 x 400V + N ~ 50Hz','3 x 230V ~ 50Hz','1 x 230V + N ~ 50Hz'];
+/* symbolen van de extra lagen op het situatieplan (niet in het eendraadschema) */
+const LTYPES={
+ ls:{l:'Luidspreker (wand)',laag:'muziek'},ls_p:{l:'Luidspreker (inbouw plafond)',laag:'muziek'},sub:{l:'Subwoofer',laag:'muziek'},mz_kp:{l:'Bediening muziek',laag:'muziek'},mz_bron:{l:'Bron / streamer',laag:'muziek'},
+ al_cen:{l:'Alarmcentrale',laag:'alarm'},al_pir:{l:'Bewegingsdetector (PIR)',laag:'alarm'},al_mc:{l:'Magneetcontact',laag:'alarm'},al_sir:{l:'Sirene',laag:'alarm'},al_rook:{l:'Brand-/rookmelder',laag:'alarm'},al_sens:{l:'Sensor',laag:'alarm'},al_bus:{l:'Bustoestel / bediening',laag:'alarm'},al_gen:{l:'Alarmtoestel',laag:'alarm'},
+ nw_rj:{l:'Datapunt (RJ45)',laag:'netwerk'},nw_ap:{l:'WiFi access point',laag:'netwerk'},nw_cam:{l:'Camera',laag:'netwerk'},nw_tst:{l:'Netwerktoestel',laag:'netwerk'}};
+const LAGEN=[['elektro','Elektro'],['muziek','Muziek'],['alarm','Alarm'],['netwerk','Netwerk']];
+const ALARM_TYPE={PIR:['al_pir','PIR'],Magneet:['al_mc','MC'],Sirene:['al_sir','SIR'],Brand:['al_rook','BR'],Sensor:['al_sens','S'],Bus:['al_bus','BUS']};
+const AMP=[2,4,6,10,13,16,20,25,32,40,50,63,80,100,125],POL=['1P','2P','3P','4P'];
+
+/* ================= model ================= */
+const newKring=(o={})=>Object.assign({id:uid(),naam:'',polen:'2P',curve:'C',A:20,kA:3,kabelType:'XVB',kabel:'3G2,5',lengte:'',punten:[]},o);
+const newPunt=(type='sc_ak',o={})=>Object.assign({id:uid(),type,aantal:1,tekst:'',hw:false},o);
+const newGroep=(o={})=>Object.assign({id:uid(),sub:true,mA:30,A:40,polen:'2P',type:'A',kringen:[]},o);
+const newBord=(o={})=>Object.assign({id:uid(),naam:'Zekeringkast 1',hoofd:{mA:300,A:40,polen:'4P',type:'A'},groepen:[{id:uid(),sub:false,kringen:[]}]},o);
+const newPlan=(naam='Gelijkvloers')=>({id:uid(),naam,h:707,sym:3,mw:3.2,muren:[],items:[],teksten:[],bg:null});
+function blank(){return{v:2,codering:'cados',
+ project:{naam:'',adres:'',klant:'',installateur:'Casentis',tekenaar:'',organisme:'',ean:'',datum:new Date().toISOString().slice(0,10),net:NETTEN[0],voeding:'EXVB 4x10',aarding:'< 30 Ω'},
+ borden:[newBord()],plannen:[newPlan()],kamers:[],print:{schema:true,plan:true,kringen:true,mat:false}}}
+const num=v=>parseInt(String(v??'').replace(/[^\d]/g,''),10)||'';
+const kabFmt=s=>String(s||'').trim().toUpperCase().replace('.',',');
+
+/* ---- import uit CaDos (project_elektro_dossiers.data) : zelfde groeps- en codelogica als CaDos ---- */
+function cadosCodes(rijen){
+ const L='ABCDEFGHIJKLMNOPQRSTUVWXYZ',flat=[],byId={},groupOf={},codes={},letterOf={};
+ rijen.forEach(r=>(r.items||[]).forEach(m=>{flat.push(m);byId[m.id]=m}));
+ rijen.forEach(r=>{let last=null;(r.items||[]).forEach(m=>{
+  if(m.categorie==='Differentieel')last=m;
+  else if(m.categorie==='Automaat'&&m.isRem)last=null;
+  else if(m.categorie==='Automaat'){const l=m.linkedDiffId&&byId[m.linkedDiffId];groupOf[m.id]=(l&&l.categorie==='Differentieel')?l:last}
+  else last=null})});
+ const hi=flat.findIndex(m=>m.categorie==='Differentieel'&&m.isHoofd);let di=-1,pi=-1;
+ flat.forEach((m,i)=>{if(!(m.categorie==='Differentieel'||(m.categorie==='Automaat'&&!m.isRem&&!groupOf[m.id])))return;
+  if(hi!==-1&&i<hi){pi++;letterOf[m.id]='X'+(L[pi]||('Z'+pi))}else{di++;letterOf[m.id]=L[di]||('Z'+di)}});
+ const sub={};let rem=0;
+ flat.forEach(m=>{if(m.categorie==='Differentieel')codes[m.id]=letterOf[m.id];
+  else if(m.categorie==='Automaat'&&m.isRem){rem++;codes[m.id]='R'+rem}
+  else if(m.categorie==='Automaat'){const d=groupOf[m.id];if(d){const n=sub[d.id]||0;codes[m.id]=letterOf[d.id]+(L[n]||n);sub[d.id]=n+1}else codes[m.id]=letterOf[m.id]}});
+ return{codes,groupOf,flat}}
+function fromCaDos(src){
+ const d=(src&&src.data&&src.data.zekeringen)?src.data:src;
+ if(!d||!d.zekeringen||!Array.isArray(d.zekeringen.kasten))throw new Error('Geen CaDos-dossier herkend (zekeringen.kasten ontbreekt).');
+ const st=blank(),ins=d.instellingen||{};
+ Object.assign(st.project,{naam:ins.project||'',adres:ins.adres||'',klant:ins.klant||'',installateur:ins.installateur||'Casentis',datum:ins.datum||st.project.datum});
+ const mono=/mono/i.test(ins.spanning||'');
+ st.project.net=mono?NETTEN[2]:/3\s*x\s*230/i.test(ins.spanning||'')?NETTEN[1]:NETTEN[0];
+ st.kamers=(d.kamers||[]).filter(Boolean);
+ const vd=(d.verdiepingen||[]).filter(v=>v&&v.label);
+ if(vd.length)st.plannen=vd.map(v=>newPlan(v.label));
+ st.borden=[];let over=0;
+ d.zekeringen.kasten.forEach((kast,ki)=>{
+  const {codes,groupOf,flat}=cadosCodes(kast.rijen||[]);
+  const b=newBord({naam:kast.naam||('Zekeringkast '+(ki+1)),kastId:kast.id});b.hoofd.polen=mono?'2P':'4P';
+  const direct=b.groepen[0],gmap={};let hoofd=false;
+  flat.forEach(it=>{const x=it.cadraw||{};
+   if(it.categorie==='Differentieel'){
+    if(it.isHoofd&&!hoofd){hoofd=true;b.hoofd={mA:num(it.mA)||300,A:num(it.A)||40,polen:it.polen||b.hoofd.polen,type:it.diffType||x.type||'A',bron:it.id};direct.letter=codes[it.id];gmap[it.id]=direct}
+    else{const g=newGroep({mA:num(it.mA)||30,A:num(it.A)||40,polen:it.polen||'2P',type:it.diffType||x.type||'A',bron:it.id,letter:codes[it.id]});b.groepen.push(g);gmap[it.id]=g}
+   }else if(it.categorie==='Automaat'){
+    const A=num(it.A)||20,kab=kabFmt(it.kabelType)||kabFmt(x.kabel),gd=groupOf[it.id],g=(gd&&gmap[gd.id])||direct;
+    g.kringen.push(newKring({naam:it.naam||'',polen:it.polen||'2P',A,curve:it.curve||x.curve||'C',kA:(it.kA!==undefined&&it.kA!=='')?parseFloat(String(it.kA).replace(',','.')):(x.kA??3),kabelType:x.mantel||'XVB',lengte:x.lengte??'',
+     kabel:kab||(A<=16?'3G1,5':'3G2,5'),kabelBron:kab?undefined:'standaard',bron:it.id,code:codes[it.id],rem:!!it.isRem,
+     punten:(x.punten||[]).map(p=>newPunt(p.type,{id:p.id||uid(),aantal:p.aantal||1,tekst:p.tekst||'',hw:!!p.hw}))}));
+   }else if(it.categorie!=='Leeg')over++;});
+  b.geenHoofd=!hoofd;st.borden.push(b)});
+ if(!st.borden.length)st.borden=[newBord()];
+ st._over=over;return st}
+/* behoudt CaDraw-gegevens (punten, curve, plannen...) wanneer CaDos opnieuw wordt ingelezen */
+function keep(old,fresh){
+ fresh.project=Object.assign({},fresh.project,old.project);fresh.codering=old.codering;fresh.plannen=old.plannen&&old.plannen.length?old.plannen:fresh.plannen;
+ const ok={},og={};old.borden.forEach(b=>{if(b.hoofd&&b.hoofd.bron)og[b.hoofd.bron]=b.hoofd;b.groepen.forEach(g=>{if(g.bron)og[g.bron]=g;g.kringen.forEach(k=>{if(k.bron)ok[k.bron]=k})})});
+ const seen=new Set();
+ fresh.borden.forEach(b=>{if(og[b.hoofd.bron])b.hoofd.type=og[b.hoofd.bron].type||b.hoofd.type;
+  const ob=old.borden.find(x=>x.kastId&&x.kastId===b.kastId);if(ob)b.id=ob.id;
+  b.groepen.forEach(g=>{const o=og[g.bron];if(o&&g.sub){g.id=o.id;g.type=o.type||g.type}
+   g.kringen.forEach(k=>{const o=ok[k.bron];if(!o)return;seen.add(o.id);
+    Object.assign(k,{id:o.id,curve:o.curve,kA:o.kA,kabelType:o.kabelType,lengte:o.lengte,punten:o.punten,calc:o.calc});
+    if(k.kabelBron==='standaard'&&o.kabel){k.kabel=o.kabel;if(o.kabelBron!=='standaard')delete k.kabelBron}})})});
+ old.borden.forEach(ob=>{const b=fresh.borden.find(x=>x.kastId&&x.kastId===ob.kastId)||(!ob.kastId?null:fresh.borden[0]);
+  if(!ob.kastId&&ob.groepen.some(g=>g.kringen.length)){fresh.borden.push(ob);return}
+  if(!b)return;
+  ob.groepen.forEach(og2=>og2.kringen.forEach(k=>{if(k.bron||seen.has(k.id))return;
+   const g=b.groepen.find(x=>x.bron&&x.bron===og2.bron)||b.groepen.find(x=>!x.sub);delete k.code;g.kringen.push(k)}))});
+ return fresh}
+/* ---- structuur van de CaDos-kast aanpassen (zelfde regels als CaDos: rijbreedte, max. 8 automaten per gewoon
+   differentieel, letters via computeZekeringCodesVoorRijen, kamgeleiders en bedrading van het uitvoeringsplan) ---- */
+const AO=["2A","4A","6A","10A","13A","16A","20A","25A","32A","40A","50A","63A","80A","100A","125A"],MO=["10mA","30mA","100mA","300mA"],PN={'1P':1,'2P':2,'3P':3,'4P':4},MAX_PER_DIFF=8;
+const modW=m=>{const n=parseInt(m.breedte);return Number.isNaN(n)?1:n};
+const kastVan=(d,id)=>((d&&d.zekeringen&&d.zekeringen.kasten)||[]).find(k=>k.id===id);
+function posVan(kast,id){for(let ri=0;ri<kast.rijen.length;ri++){const r=kast.rijen[ri],i=(r.items||[]).findIndex(x=>x.id===id);if(i>=0)return{r,i,ri}}return null}
+const vrijIn=(kast,r)=>(+kast.maat||24)-(r.items||[]).reduce((t,x)=>t+modW(x),0);
+function pruneLeeg(r){const it=r.items;while(it.length&&it[it.length-1].categorie==='Leeg'&&it[it.length-1].isAutoGap)it.pop();
+ for(let i=it.length-2;i>=0;i--)if(it[i].categorie==='Leeg'&&it[i].isAutoGap&&it[i+1].categorie==='Leeg'&&it[i+1].isAutoGap){it[i].breedte=modW(it[i])+modW(it[i+1]);it.splice(i+1,1)}}
+function nieuwAutomaat(k){const pol=PN[k.polen]?k.polen:'2P';
+ return{id:uid(),categorie:'Automaat',type:'',polen:pol,mA:'',A:AO.includes(k.A+'A')?k.A+'A':'20A',breedte:PN[pol],naam:k.naam||'',isRem:false,kabelOpKlemmen:false,kabelType:'',kabelAantal:1,curve:k.curve||'',kA:k.kA===''||k.kA==null?'':String(k.kA)}}
+const rijNaam=(kast,ri)=>`rij ${ri+1} van ${kast.naam||'de zekeringkast'}`;
+function kastOp(d,op){const fail=msg=>({ok:false,msg}),kast=kastVan(d,op.kastId);
+ if(!kast)return fail('Deze zekeringkast bestaat niet meer in CaDos. Lees CaDos opnieuw in (tabblad Document).');
+ if(op.t==='ins'){const m=nieuwAutomaat(op.kring);let p=null,idx;
+  if(op.voor&&(p=posVan(kast,op.voor)))idx=p.i;else if(op.na&&(p=posVan(kast,op.na)))idx=p.i+1;else if(op.groep&&(p=posVan(kast,op.groep)))idx=p.i+1;
+  else{if(!kast.rijen.length)kast.rijen.push({id:uid(),items:[]});const r=kast.rijen[kast.rijen.length-1];p={r,i:r.items.length,ri:kast.rijen.length-1};idx=r.items.length}
+  const v=vrijIn(kast,p.r),maat=+kast.maat||24;
+  if(v<modW(m))return fail(`${rijNaam(kast,p.ri)[0].toUpperCase()+rijNaam(kast,p.ri).slice(1)} zit vol (${maat-v} van ${maat} modules gebruikt, deze automaat heeft er ${modW(m)} nodig).\n\nDe kring kan hier niet logisch tussengevoegd worden op het schema: dan zou de volgorde van de letters niet meer overeenkomen met de kast. Maak eerst plaats in CaDos (module verplaatsen, rij toevoegen of de kast groter maken) en voeg de kring daarna toe.`);
+  if(op.groep){const{groupOf,codes}=cadosCodes(kast.rijen),gd=kast.rijen.flatMap(r=>r.items).find(x=>x.id===op.groep);
+   if(gd&&!gd.isHoofd){const n=kast.rijen.flatMap(r=>r.items).filter(x=>x.categorie==='Automaat'&&!x.isRem&&groupOf[x.id]&&groupOf[x.id].id===gd.id).length;
+    if(n>=MAX_PER_DIFF)return fail(`Differentieel ${codes[gd.id]||''} heeft al ${n} automaten. CaDos laat er hoogstens ${MAX_PER_DIFF} toe achter een differentieel dat geen hoofddifferentieel is.\n\nVoeg eerst een nieuw differentieel toe, of zet de kring achter een ander differentieel.`)}}
+  p.r.items.splice(idx,0,m);
+  if(op.groep){const g2=cadosCodes(kast.rijen).groupOf;if(!g2[m.id]||g2[m.id].id!==op.groep)m.linkedDiffId=op.groep}
+  const L=p.r.items[idx-1],R=p.r.items[idx+1];
+  (kast.kamgeleiders||[]).forEach(k=>{if(L&&R&&k.rijId===p.r.id&&k.moduleIds.includes(L.id)&&k.moduleIds.includes(R.id))k.moduleIds.splice(k.moduleIds.indexOf(L.id)+1,0,m.id)});
+  return{ok:true,id:m.id,kam:(kast.kamgeleiders||[]).some(k=>k.moduleIds.includes(m.id))}}
+ if(op.t==='swap'){const pa=posVan(kast,op.a),pb=posVan(kast,op.b);if(!pa||!pb)return fail('Deze automaat bestaat niet meer in CaDos. Lees CaDos opnieuw in.');
+  const A_=pa.r.items[pa.i],B_=pb.r.items[pb.i],g0=cadosCodes(kast.rijen).groupOf,ga=g0[A_.id],gb=g0[B_.id];
+  if(pa.r!==pb.r){const wa=modW(A_),wb=modW(B_);if(vrijIn(kast,pa.r)+wa-wb<0||vrijIn(kast,pb.r)+wb-wa<0)return fail(`Wisselen lukt niet: ${wa>wb?rijNaam(kast,pb.ri):rijNaam(kast,pa.ri)} zit vol.`)}
+  pa.r.items[pa.i]=B_;pb.r.items[pb.i]=A_;
+  const g1=cadosCodes(kast.rijen).groupOf;[[A_,ga],[B_,gb]].forEach(([m,g])=>{if(g&&(!g1[m.id]||g1[m.id].id!==g.id))m.linkedDiffId=g.id});
+  (kast.kamgeleiders||[]).forEach(k=>{const ia=k.moduleIds.indexOf(A_.id),ib=k.moduleIds.indexOf(B_.id);if(ia>=0&&ib<0)k.moduleIds[ia]=B_.id;else if(ib>=0&&ia<0)k.moduleIds[ib]=A_.id});
+  return{ok:true}}
+ if(op.t==='del'){const p=posVan(kast,op.id);if(!p)return{ok:true};p.r.items.splice(p.i,1);pruneLeeg(p.r);const id=op.id;
+  kast.bedrading=(kast.bedrading||[]).filter(w=>!(w.a&&w.a.m===id)&&!(w.b&&w.b.m===id));
+  kast.kamgeleiders=(kast.kamgeleiders||[]).map(k=>Object.assign(k,{moduleIds:(k.moduleIds||[]).filter(x=>x!==id)})).filter(k=>k.moduleIds.length);
+  (function walk(o){if(Array.isArray(o)){for(let i=o.length-1;i>=0;i--){if(o[i]===id)o.splice(i,1);else if(o[i]&&typeof o[i]==='object')walk(o[i])}}
+   else for(const k in o){if(k==='id')continue;const v=o[k];if(v===id)o[k]='';else if(v&&typeof v==='object')walk(v)}})(d);
+  return{ok:true}}
+ if(op.t==='diff'){const g=op.groep,pol=PN[g.polen]?g.polen:'2P',m={id:uid(),categorie:'Differentieel',type:'',polen:pol,mA:MO.includes(g.mA+'mA')?g.mA+'mA':'30mA',A:AO.includes(g.A+'A')?g.A+'A':'40A',breedte:Math.max(2,PN[pol]),naam:'',isHoofd:false,diffType:g.type||'',kabelOpKlemmen:false,kabelType:'',kabelAantal:1};
+  kast.rijen.push({id:uid(),items:[m]});return{ok:true,id:m.id,rij:kast.rijen.length}}
+ return fail('Onbekende bewerking')}
+/* velden van gekoppelde automaten/differentielen naar het CaDos-dossier; geeft terug wat niet paste */
+function syncVelden(d){const byId={},rowOf={},kastOf={};(d.zekeringen.kasten||[]).forEach(k=>(k.rijen||[]).forEach(r=>(r.items||[]).forEach(it=>{byId[it.id]=it;rowOf[it.id]=r;kastOf[it.id]=k})));
+ let n=0;const terug=[],set=(o,k,v)=>{if(JSON.stringify(o[k]??null)!==JSON.stringify(v??null)){o[k]=v;n++}};
+ const polen=(it,p,obj)=>{if(!PN[p]||it.polen===p)return;const r=rowOf[it.id],kast=kastOf[it.id],ob=modW(it),nb=PN[p];
+  if(PN[it.polen]===ob||!it.polen){if(vrijIn(kast,r)+ob-nb<0){terug.push({obj,oud:it.polen||'2P',msg:`${obj.naam||'Differentieel'}: ${p} past niet in ${rijNaam(kast,kast.rijen.indexOf(r))} (rij vol). Polen teruggezet naar ${it.polen||'2P'}.`});return}it.breedte=nb}
+  it.polen=p;n++};
+ const diff=(it,h)=>{if(!it||it.categorie!=='Differentieel')return;if(MO.includes(h.mA+'mA'))set(it,'mA',h.mA+'mA');if(AO.includes(h.A+'A'))set(it,'A',h.A+'A');polen(it,h.polen,h);set(it,'diffType',h.type||'')};
+ S.borden.forEach(b=>{if(!b.kastId)return;diff(byId[b.hoofd.bron],b.hoofd);b.groepen.forEach(g=>{if(g.sub)diff(byId[g.bron],g);
+  g.kringen.forEach(k=>{const it=byId[k.bron];if(!it||it.categorie!=='Automaat')return;
+   set(it,'naam',k.naam||'');if(AO.includes(k.A+'A'))set(it,'A',k.A+'A');polen(it,k.polen,k);
+   set(it,'curve',k.curve||'');set(it,'kA',k.kA===''||k.kA==null?'':String(k.kA));
+   if((it.kabelOpKlemmen||it.kabelType)&&k.kabel&&kabFmt(it.kabelType)!==kabFmt(k.kabel))set(it,'kabelType',k.kabel);
+   set(it,'cadraw',{mantel:k.kabelType,kabel:k.kabel,lengte:k.lengte,punten:k.punten.map(p=>({id:p.id,type:p.type,aantal:p.aantal,tekst:p.tekst,hw:!!p.hw}))})})})});
+ return{n,terug}}
+/* letters van CaDraw gelijkzetten met CaDos */
+function syncCodes(d){S.borden.forEach(b=>{const kast=kastVan(d,b.kastId);if(!kast)return;const{codes}=cadosCodes(kast.rijen);
+ if(b.hoofd.bron&&codes[b.hoofd.bron])b.groepen.filter(g=>!g.sub).forEach(g=>g.letter=codes[b.hoofd.bron]);
+ b.groepen.forEach(g=>{if(g.bron&&codes[g.bron])g.letter=codes[g.bron];g.kringen.forEach(k=>{if(k.bron){if(codes[k.bron])k.code=codes[k.bron];delete k.vast}})})})}
+/* ---- CaCalc (project_cacalc_data.data.boards) ---- */
+function calcKring(eg){const pol=eg.polen||'2P',n={ '1P':3,'2P':3,'1P+N':3,'3P':4,'3P+N':5,'4P':5}[pol]||3;
+ return{A:+eg.In||'',curve:String(eg.curve||'C').replace(/-?curve/i,'').trim()||'C',polen:pol,kA:eg.icu===''||eg.icu==null?'':+eg.icu,kabelType:eg.mantel||'XVB',
+  kabel:eg.sectie?`${n}G${String(eg.sectie).replace('.',',')}`:'',lengte:eg.lengte??''}}
+function mergeCaCalc(st,calc){let n=0;const boards=(calc&&calc.boards)||[];
+ st.borden.forEach(b=>{let cb=boards.find(x=>norm(x.naam)===norm(b.naam));
+  if(!cb){const c=boards.filter(x=>(x.eindgroepen||[]).length);if(c.length===1&&st.borden.length===1)cb=c[0]}
+  if(!cb)return;const m={};(cb.eindgroepen||[]).forEach(e=>{m[norm(e.naam)]=e});
+  b.groepen.forEach(g=>g.kringen.forEach(k=>{const e=m[norm(k.naam)];if(!e||!norm(k.naam))return;const c=calcKring(e);
+   Object.keys(c).forEach(f=>{if(c[f]!==''&&c[f]!=null)k[f]=c[f]});delete k.kabelBron;k.calc=true;n++}))});
+ return n}
+function fromCaCalc(calc){const st=blank();st.borden=[];
+ (calc.boards||[]).filter(b=>(b.eindgroepen||[]).length).forEach(cb=>{const b=newBord({naam:cb.naam||'Bord'}),dm={};
+  (cb.differentielen||[]).forEach((d,i)=>{if(i===0&&+d.mA>=100){b.hoofd={mA:+d.mA,A:+d.stroom||40,polen:d.polen||'4P',type:d.type||'A'};dm[d.id]=b.groepen[0]}
+   else{const g=newGroep({mA:+d.mA||30,A:+d.stroom||40,polen:d.polen||'2P',type:d.type||'A'});b.groepen.push(g);dm[d.id]=g}});
+  (cb.eindgroepen||[]).forEach(e=>(dm[e.differentieelId]||b.groepen[0]).kringen.push(newKring(Object.assign({naam:e.naam||'',calc:true},calcKring(e)))));
+  st.borden.push(b)});
+ if(!st.borden.length)throw new Error('Geen borden met eindgroepen gevonden in de CaCalc-gegevens.');return st}
+function sample(){
+ const A=(naam,a=20,kabel='')=>({categorie:'Automaat',id:uid(),naam,A:a+'A',polen:'2P',breedte:2,kabelType:kabel,kabelOpKlemmen:!!kabel,kabelAantal:1,type:'',mA:'',isRem:false});
+ const D=(mA,hoofd)=>({categorie:'Differentieel',id:uid(),mA:mA+'mA',A:'63A',polen:'2P',breedte:2,isHoofd:!!hoofd,type:'',naam:'',kabelType:'',kabelAantal:1,kabelOpKlemmen:false});
+ const dos={instellingen:{project:'Voorbeeldwoning',adres:'Voorbeeldstraat 1, 9000 Gent',klant:'Fam. Voorbeeld',spanning:'Mono',installateur:'Casentis'},
+  kamers:['Leefruimte','Keuken','Badkamer','Slaapkamer 1','Slaapkamer 2','Nachthal','Wasplaats','Terras'],verdiepingen:[{code:'G',label:'Gelijkvloers'},{code:'V1',label:'Verdieping 1'}],
+  zekeringen:{kasten:[{id:'k1',naam:'Zekeringkast 1',maat:24,rijen:[
+   {items:[D(300,1),A('KNX voeding',16),A('Patchkast'),A('Koelkast'),A('Diepvries'),A('Dampkap'),A('Oven'),A('Kookplaat',32,'3g6'),A('CV ketel'),A('Reserve'),A('Reserve'),A('Reserve')]},
+   {items:[D(30),A('Vaatwas'),A('Droogkast'),A('Wasmachine'),A('Ventilatie',20,'3g2.5'),A('Stopcontacten leefruimte'),A('Stopcontacten badkamer'),A('Stopcontacten slaapkamer 1'),A('Technische ruimte')]},
+   {items:[D(30),A('Verlichting leefruimte',16),A('Verlichting nachthal',16),A('Stopcontacten slaapkamer 2'),A('Stopcontacten keuken'),A('Buitenkeuken'),A('Laadpaal',32,'3g6'),A('Reserve')]},
+   {items:[D(10),A('Handdoekradiator badkamer 1',20,'3g2,5'),A('Handdoekradiator badkamer 2',20,'3g2.5')]}
+  ]}]}};
+ dos.zekeringen.kasten[0].rijen.forEach((r,i)=>r.id='r'+(i+1));
+ dos.muziek={items:[{id:'mz1',naam:'Leefruimte',kamer:'Leefruimte',info:'',leeg:false,manueelNummer:''},{id:'mz2',naam:'Keuken',kamer:'Keuken',info:'',leeg:false,manueelNummer:''},{id:'mz3',naam:'Terras',kamer:'Terras',info:'',leeg:false,manueelNummer:''}]};
+ dos.alarmCentrale={merk:'Ajax',type:'Hub 2 Plus',zekeringModuleId:''};
+ dos.alarm=[{omschrijving:'Inkomhal',toestelType:'PIR'},{omschrijving:'Leefruimte',toestelType:'PIR'},{omschrijving:'Voordeur',toestelType:'Magneet'},{omschrijving:'Achterdeur',toestelType:'Magneet'},{omschrijving:'Nachthal',toestelType:'Brand'},{omschrijving:'Buitensirene',toestelType:'Sirene'},{omschrijving:'Bediening inkom',toestelType:'Bus'}].map(r=>Object.assign({van:'',naar:'',kabeltype:'',aders:[]},r));
+ while(dos.alarm.length<20)dos.alarm.push({omschrijving:'',toestelType:'',van:'',naar:'',kabeltype:'',aders:[]});
+ dos.patchkast={kasten:[{id:'pk1',maxU:12,items:[{id:'pp1',categorie:'Patchpaneel',naam:'Patchpaneel 1',hoogte:1,poorten:[{id:'po1',omschrijving:'TV leefruimte'},{id:'po2',omschrijving:'TV leefruimte'},{id:'po3',omschrijving:'Bureau'},{id:'po4',omschrijving:'AP nachthal'},{id:'po5',omschrijving:'AP leefruimte'},{id:'po6',omschrijving:'Camera oprit'},{id:'po7',omschrijving:''},{id:'po8',omschrijving:''}]}]}],internetProvider:{}};
+ dos.camerabewaking={items:[{id:'cam1',naam:'Oprit',kamer:'Buiten',leeg:false,manueelNummer:'',patchpaneelPoortId:'po6'},{id:'cam2',naam:'Tuin',kamer:'Buiten',leeg:false,manueelNummer:'',patchpaneelPoortId:''}]};
+ const st=fromCaDos(dos);st.cadosLokaal=dos;
+ const P=(t,o)=>newPunt(t,o),set=(naam,pts)=>st.borden[0].groepen.forEach(g=>g.kringen.forEach(k=>{if(k.naam===naam)k.punten=pts()}));
+ set('KNX voeding',()=>[P('dom',{tekst:'KNX'})]);
+ set('Patchkast',()=>[P('sc_ak',{aantal:2,tekst:'Patchkast'})]);
+ set('Koelkast',()=>[P('sc_ak',{tekst:'Keuken'}),P('t_koel')]);
+ set('Diepvries',()=>[P('sc_ak',{tekst:'Berging'}),P('t_vries')]);
+ set('Dampkap',()=>[P('sc_ak',{tekst:'Keuken'}),P('t_vent',{tekst:'Dampkap'})]);
+ set('Oven',()=>[P('t_oven',{tekst:'Keuken'})]);
+ set('Kookplaat',()=>[P('t_kook',{tekst:'Keuken'})]);
+ set('CV ketel',()=>[P('t_gen',{tekst:'CV'})]);
+ set('Vaatwas',()=>[P('sc_ak',{tekst:'Keuken'}),P('t_vaat')]);
+ set('Droogkast',()=>[P('sc_ak',{tekst:'Wasplaats'}),P('t_droog')]);
+ set('Wasmachine',()=>[P('sc_ak',{tekst:'Wasplaats'}),P('t_was')]);
+ set('Ventilatie',()=>[P('t_vent',{tekst:'Systeem D'})]);
+ set('Stopcontacten leefruimte',()=>[P('sc_ak',{aantal:2,tekst:'TV-wand'}),P('sc_ak',{aantal:3,tekst:'TV-wand'}),P('sc_ak',{tekst:'Zithoek'}),P('sc_ak',{tekst:'Zithoek'}),P('sc_ak',{aantal:2,tekst:'Eettafel'}),P('sc_ak',{tekst:'Inkom'})]);
+ set('Stopcontacten badkamer',()=>[P('sc_ak',{aantal:2,tekst:'Lavabo',hw:true}),P('sc_ak',{tekst:'Badkamer 2',hw:true})]);
+ set('Stopcontacten slaapkamer 1',()=>[P('sc_ak',{aantal:2,tekst:'Bed links'}),P('sc_ak',{aantal:2,tekst:'Bed rechts'}),P('sc_ak',{tekst:'Dressing'})]);
+ set('Technische ruimte',()=>[P('sc_ak',{aantal:2}),P('li'),P('sw1')]);
+ set('Verlichting leefruimte',()=>[P('sww',{tekst:'Inkom'}),P('sww',{tekst:'Keuken'}),P('li_spot',{aantal:6,tekst:'Spots zithoek'}),P('dim',{tekst:'Eettafel'}),P('li',{tekst:'Pendel eettafel'}),P('swd',{tekst:'Keuken'}),P('li_spot',{aantal:4,tekst:'Spots keuken'}),P('li_w',{aantal:2,tekst:'Wand'})]);
+ set('Verlichting nachthal',()=>[P('bm',{tekst:'Nachthal'}),P('li',{aantal:3,tekst:'Nachthal'}),P('dk',{tekst:'Toilet'}),P('li',{tekst:'Toilet'}),P('li_n',{tekst:'Trap'})]);
+ set('Stopcontacten slaapkamer 2',()=>[P('sc_ak',{aantal:2}),P('sc_ak'),P('sc_ak')]);
+ set('Stopcontacten keuken',()=>[P('sc_ak',{aantal:2,tekst:'Werkblad'}),P('sc_ak',{aantal:2,tekst:'Werkblad'}),P('sc_ak',{tekst:'Eiland'}),P('t_micro')]);
+ set('Buitenkeuken',()=>[P('sc_ak',{aantal:2,tekst:'Terras',hw:true}),P('li_w',{tekst:'Terras',hw:true})]);
+ set('Laadpaal',()=>[P('t_ev',{tekst:'Oprit 7,4 kW'})]);
+ set('Handdoekradiator badkamer 1',()=>[P('t_verw',{tekst:'Badkamer 1'})]);
+ set('Handdoekradiator badkamer 2',()=>[P('t_verw',{tekst:'Badkamer 2'})]);
+ st.borden.forEach(b=>b.groepen.forEach(g=>g.kringen.forEach(k=>{delete k.kabelBron})));
+ const pl=st.plannen[0];pl.muren=[[120,110,880,110],[880,110,880,600],[880,600,120,600],[120,600,120,110],[520,110,520,380],[520,380,700,380],[760,380,880,380]];
+ const kr=n=>st.borden[0].groepen.flatMap(g=>g.kringen).find(k=>k.naam===n),put=(n,i,x,y,rot)=>pl.items.push({id:uid(),pid:kr(n).punten[i].id,x,y,rot});
+ put('Stopcontacten leefruimte',0,124,220,0);put('Stopcontacten leefruimte',1,124,300,0);put('Stopcontacten leefruimte',2,250,596,3);put('Stopcontacten leefruimte',4,516,250,2);
+ put('Verlichting leefruimte',0,160,596,3);put('Verlichting leefruimte',2,300,330,0);put('Verlichting leefruimte',4,420,220,0);
+ put('Stopcontacten keuken',0,640,114,1);put('Stopcontacten keuken',1,760,114,1);put('Oven',0,876,200,2);put('Kookplaat',0,876,280,2);put('Vaatwas',1,600,376,3);
+ delete st._over;return st}
+
+/* ---- instellingen (per browser): voorgevormde kringen = automaat + kabel + symbolen in één klik ---- */
+const DEF_PRESETS=()=>[
+ {naam:'Stopcontacten',polen:'2P',curve:'C',A:20,kA:3,kabelType:'XVB',kabel:'3G2,5',s:['sc_ak','']},
+ {naam:'Verlichting',polen:'2P',curve:'C',A:16,kA:3,kabelType:'XVB',kabel:'3G1,5',s:['li','']},
+ {naam:'Gemengde kring',polen:'2P',curve:'C',A:20,kA:3,kabelType:'XVB',kabel:'3G2,5',s:['sc_ak','li']},
+ {naam:'Wasmachine',polen:'2P',curve:'C',A:20,kA:3,kabelType:'XVB',kabel:'3G2,5',s:['sc_ak','t_was']},
+ {naam:'Droogkast',polen:'2P',curve:'C',A:20,kA:3,kabelType:'XVB',kabel:'3G2,5',s:['sc_ak','t_droog']},
+ {naam:'Vaatwasmachine',polen:'2P',curve:'C',A:20,kA:3,kabelType:'XVB',kabel:'3G2,5',s:['sc_ak','t_vaat']},
+ {naam:'Oven',polen:'2P',curve:'C',A:20,kA:3,kabelType:'XVB',kabel:'3G2,5',s:['t_oven','']},
+ {naam:'Kookplaat',polen:'2P',curve:'C',A:32,kA:3,kabelType:'XVB',kabel:'3G6',s:['t_kook','']},
+ {naam:'Laadstation',polen:'2P',curve:'C',A:32,kA:3,kabelType:'XVB',kabel:'3G6',s:['t_ev','']},
+ {naam:'Automaat + kabel',polen:'2P',curve:'C',A:20,kA:3,kabelType:'XVB',kabel:'3G2,5',s:['','']}];
+const normPreset=q=>{if(!Array.isArray(q.punten))q.punten=(q.s||[]).filter(t=>TYPES[t]).map(t=>({type:t,aantal:1,tekst:'',hw:false}));delete q.s;q.punten=q.punten.filter(p=>TYPES[p.type]);return q};
+let CFG=(()=>{try{const j=JSON.parse(localStorage.getItem('cadraw-instellingen'));if(j&&Array.isArray(j.presets)){j.presets.forEach(normPreset);return j}}catch(e){}return{presets:DEF_PRESETS().map(normPreset)}})();
+const CFG_KEY='cadraw_voorgevormde_kringen';let cfgT=null;
+const saveCfg=()=>{try{localStorage.setItem('cadraw-instellingen',JSON.stringify(CFG))}catch(e){}
+ if(CLOUD&&cloud.sb){clearTimeout(cfgT);cfgT=setTimeout(async()=>{const r=await cloud.sb.from('elektro_cados_instellingen').upsert({sleutel:CFG_KEY,waarde:{presets:CFG.presets},updated_at:new Date().toISOString()},{onConflict:'sleutel'});if(r.error)toast('Voorgevormde kringen niet gedeeld: '+r.error.message)},800)}};
+const presetKring=i=>{const q=CFG.presets[i];if(!q)return newKring();return newKring({naam:q.naam==='Automaat + kabel'?'':q.naam,polen:q.polen,curve:q.curve,A:q.A,kA:q.kA,kabelType:q.kabelType,kabel:q.kabel,punten:(q.punten||[]).map(p=>newPunt(p.type,{aantal:p.aantal||1,tekst:p.tekst||'',hw:!!p.hw}))})};
+const presetUitKring=(k,naam)=>({naam,polen:k.polen,curve:k.curve,A:k.A,kA:k.kA,kabelType:k.kabelType,kabel:k.kabel,punten:k.punten.map(p=>({type:p.type,aantal:p.aantal||1,tekst:p.tekst||'',hw:!!p.hw}))});
+
+/* ================= toestand ================= */
+let S=CLOUD?blank():loadLocal(),tab='schema',zoom=1,undoStack=[],bi=0;const open=new Set();
+const E={mode:'teken',sym:'sc_ak',sel:null,q:'',recent:[]};
+const P={laag:'elektro',toon:{elektro:true,muziek:true,alarm:true,netwerk:true},rot:0,last:null,mode:'teken',wat:'punt',sel:null,kring:'',punt:'',zoom:1,pi:0,draw:null,drag:null,grid:true,snapGrid:true,snapMuur:true,transp:false};
+const ptool=()=>P.mode==='sel'?'hand':P.mode==='gom'?'gom':P.wat;
+const geplaatst=()=>new Set(S.plannen.flatMap(p=>p.items.map(i=>i.pid)));
+/* zoals Trikker: het volgende nog niet geplaatste component staat meteen klaar (eerst in de huidige kring, dan de volgende letters) */
+function autoPunt(vanaf){const pls=geplaatst(),gs=laagGroepen(P.laag);if(!gs.length){P.punt='';return null}
+ let st=gs.findIndex(g=>g.id===(vanaf||P.kring));if(st<0)st=0;
+ for(let i=0;i<gs.length;i++){const g=gs[(st+i)%gs.length],n=g.comps.find(c=>!pls.has(c.id));if(n){P.kring=g.id;P.punt='pid:'+n.id;return g}}
+ const g0=gs.find(g=>g.id===P.kring)||gs[0];P.kring=g0.id;P.punt=(g0.nieuw==='muziek'&&!g0.comps.length)?'new:ls':'';return null}
+function ghostHtml(pl){if(!P.punt||ptool()!=='punt')return'';const g=laagGroepen(P.laag).find(x=>x.id===P.kring);if(!g)return'';
+ let ix,pid;if(P.punt.startsWith('pid:')){ix=pindex(S);pid=P.punt.slice(4)}else{pid='__nieuw';ix={__nieuw:{p:{type:P.punt.slice(4),aantal:1,tekst:''},k:{id:g.id},nr:P.laag==='elektro'?g.comps.length+1:'',code:g.code}}}
+ const r=itemOps(pl,{pid,x:0,y:0,rot:P.rot},ix);return r?opsSVG(r.ops):''}
+function migrate(j){if(!j.borden&&j.groepen){j.borden=[newBord({hoofd:j.hoofd,groepen:j.groepen})];delete j.groepen;delete j.hoofd}
+ if(!j.plannen||!j.plannen.length)j.plannen=[newPlan()];if(!j.print)j.print={schema:true,plan:true,kringen:true,mat:false};if(!j.kamers)j.kamers=[];j.borden.forEach(b=>{if(!b.groepen.some(g=>!g.sub))b.groepen.unshift({id:uid(),sub:false,kringen:[]})});return j}
+function loadLocal(){try{const j=JSON.parse(localStorage.getItem(KEY));if(j&&(j.borden||j.groepen))return migrate(j)}catch(e){}return sample()}
+function persist(){gc();
+ if(CLOUD){cloud.dirty=true;cloud.status('Wijzigingen...');clearTimeout(cloud.t);cloud.t=setTimeout(()=>cloud.save(),1800);return}
+ if(S.cadosLokaal){const{terug}=syncVelden(S.cadosLokaal);if(terug.length){terug.forEach(t=>{t.obj.polen=t.oud});setTimeout(()=>{render();melding('Past niet in de kast',terug.map(t=>t.msg).join('\n'))})}}
+ try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){try{const c=JSON.parse(JSON.stringify(S));c.plannen.forEach(p=>{if(p.bg)p.bg.data=''});localStorage.setItem(KEY,JSON.stringify(c))}catch(e2){}}}
+function snap(){undoStack.push(JSON.stringify(S));if(undoStack.length>25)undoStack.shift()}
+const B=()=>S.borden[bi=clamp(bi,0,S.borden.length-1)];
+const allKringen=()=>S.borden.flatMap((b,bx)=>b.groepen.flatMap((g,gi)=>g.kringen.map((k,ki)=>({b,bx,g,gi,k,ki}))));
+function gc(){const ids=new Set(),heeftDos=!!dosData();S.borden.forEach(b=>b.groepen.forEach(g=>g.kringen.forEach(k=>k.punten.forEach(p=>ids.add(p.id)))));
+ if(heeftDos)['muziek','alarm','netwerk'].forEach(l=>laagGroepen(l).forEach(g=>g.comps.forEach(c=>ids.add(c.id))));
+ S.plannen.forEach(p=>{p.items=p.items.filter(i=>laagVan(i)!=='elektro'&&!heeftDos?true:ids.has(i.pid))})}
+
+/* codes: CaDos-codes waar ze bestaan, anders aanvullen in dezelfde stijl */
+function codes(st){const km={},gm={};
+ st.borden.forEach(b=>{
+  if(st.codering!=='cados'){let n=0;b.groepen.forEach(g=>{gm[g.id]='';g.kringen.forEach(k=>{km[k.id]=k.vast||letters(n++)})});return}
+  const link=!!b.kastId,usedG=new Set(link?b.groepen.map(g=>g.letter).filter(Boolean):[]);let gi=0;
+  b.groepen.forEach(g=>{let L=link&&g.letter;if(!L){while(usedG.has(letters(gi)))gi++;L=letters(gi);usedG.add(L)}gm[g.id]=L;
+   const used=new Set(g.kringen.map(k=>k.vast||(link&&k.code)).filter(Boolean));let ki=0;
+   g.kringen.forEach(k=>{const f=k.vast||(link&&k.code);if(f){km[k.id]=f;return}while(used.has(L+letters(ki)))ki++;km[k.id]=L+letters(ki);used.add(L+letters(ki))})})});
+ return{k:km,g:gm}}
+const sect=s=>{const m=/[Gx]\s*(\d+(?:[.,]\d+)?)/i.exec(String(s||''));return m?parseFloat(m[1].replace(',','.')):0};
+const gLabel=(b,g)=>g.sub?`Δ${g.mA}mA ${g.polen} ${g.A}A`:`hoofddifferentieel Δ${b.hoofd.mA}mA`;
+
+/* ================= tekenen: display list (mm) ================= */
+let PW=297,PH=210,R0=164,R1=134;const M=7,TOP=13,CW=26,TBH=24;
+const FORMATEN={A4:[297,210],A3:[420,297],A2:[594,420]};
+function setFormaat(st){const f=FORMATEN[(st&&st.print&&st.print.formaat)||'A4']||FORMATEN.A4;PW=f[0];PH=f[1];R0=PH-M-TBH-15;R1=R0-30}
+function mk(){const o=[];return{o,
+ L:(x1,y1,x2,y2,w=.25,d=0)=>o.push(['L',x1,y1,x2,y2,w,d]),
+ C:(x,y,r,f='w',w=.25)=>o.push(['C',x,y,r,f,w]),
+ R:(x,y,w,h,f='w',sw=.25)=>o.push(['R',x,y,w,h,f,sw]),
+ F:(...p)=>o.push(['F',...p]),
+ T:(x,y,s,q={})=>{if(s!==''&&s!=null)o.push(['T',x,y,String(s),q.z||2.4,q.a||'s',q.r||0,q.b?1:0,q.i?1:0])},
+ H:(x,y,w,h,id)=>o.push(['H',x,y,w,h,id]),
+ A:(x,y,id)=>o.push(['A',x,y,id])}}
+function arc(d,cx,cy,r,a0,a1,w=.25,n=14){let px,py;for(let i=0;i<=n;i++){const a=(a0+(a1-a0)*i/n)*Math.PI/180,x=cx+r*Math.cos(a),y=cy-r*Math.sin(a);if(i)d.L(px,py,x,y,w);px=x;py=y}}
+/* Symbolen volgens de AREI-symbolenlijst. Oorsprong = aansluitpunt links, symbool naar rechts. */
+function sym(d,t,x,y,s,txt,aantal){
+ const X=v=>x+v*s,Y=v=>y+v*s,L=(a,b,c,e,w=.25)=>d.L(X(a),Y(b),X(c),Y(e),w*Math.max(.7,s)),C=(a,b,r,f)=>d.C(X(a),Y(b),r*s,f,.25*Math.max(.7,s));
+ const A=(cx,cy,r,a0,a1,w=.3)=>arc(d,X(cx),Y(cy),r*s,a0,a1,w*Math.max(.7,s));
+ const BX=3,BW=6.6,BH=3.3,cx=BX+BW/2;
+ const box=(w=BW,h=BH)=>{L(0,0,BX,0);d.R(X(BX),Y(-h),w*s,2*h*s,'w',.3*Math.max(.7,s))};
+ const lev=(ang,ticks,side=1)=>{const a=ang*Math.PI/180,ca=Math.cos(a),sa=-Math.sin(a);L(4+1.1*ca,1.1*sa,4+5.6*ca,5.6*sa,.3);
+  const b=(ang-90*side)*Math.PI/180,tx=Math.cos(b)*1.6,ty=-Math.sin(b)*1.6;
+  for(let i=0;i<ticks;i++){const r=5.6-i*1.2;L(4+r*ca,r*sa,4+r*ca+tx,r*sa+ty,.3)}};
+ const star=(a,b,r=1)=>{for(const g of[90,30,150]){const q=g*Math.PI/180;L(a-r*Math.cos(q),b-r*Math.sin(q),a+r*Math.cos(q),b+r*Math.sin(q),.25)}};
+ const wave=(x0,x1,yy,am=.55)=>{let px,py;for(let i=0;i<=12;i++){const u=i/12,xx=x0+(x1-x0)*u,y2=yy-am*Math.sin(u*2*Math.PI);if(i)L(px,py,xx,y2,.22);px=xx;py=y2}};
+ const tx=(a,b,str,z,bold)=>d.T(X(a),Y(b),str,{z:z*s,a:'m',b:bold});
+ const c=(TYPES[t]||TYPES.t_gen).c;
+ if(c==='sc'){const n=clamp(+aantal||1,1,5),st=3.5;L(0,0,2.2+st*(n-1),0);
+  for(let i=0;i<n;i++){const o=i*st;A(5.2+o,0,3,90,270,.32);
+   if(t!=='sc')L(2.2+o,-3,2.2+o,3,.34);
+   if(t==='sc_ak'){L(5.2+o,-3,5.2+o,-4.1,.32);L(5.2+o,3,5.2+o,4.1,.32)}}}
+ else if(t==='li'||t==='li_w'||t==='li_nc'){L(0,0,5,0);L(2.8,-2.2,7.2,2.2,.3);L(2.8,2.2,7.2,-2.2,.3);
+  if(t==='li_w')L(2.8,3.5,7.2,3.5,.45);if(t==='li_nc')C(5,0,1.5,'b')}
+ else if(t==='li_n'){L(0,0,2.6,0);d.R(X(2.6),Y(-2.9),5.8*s,5.8*s,'w',.4*Math.max(.7,s));L(3.3,-2.2,7.7,2.2,.3);L(3.3,2.2,7.7,-2.2,.3);C(5.5,0,1.5,'b')}
+ else if(t==='li_spot'){L(0,0,2.2,0);A(5.4,0,3.2,100,260,.32);C(5.6,0,1.5,'w');L(4.55,-1.05,6.65,1.05,.22);L(4.55,1.05,6.65,-1.05,.22)}
+ else if(t==='li_tl'){L(0,0,2,0);L(2,-1.3,2,1.3,.35);L(2,0,10,0,.4);L(10,-1.3,10,1.3,.35)}
+ else if(t==='dk'){L(0,0,2,0);C(4.6,0,2.6);C(4.6,0,1,'n')}
+ else if(t==='bm'){box();A(4.6,-1.1,1.3,-55,55,.25);A(5.9,-1.1,1.3,-55,55,.25);L(BX,.9,BX+BW,.9,.22);tx(cx,2.7,'IR',1.7)}
+ else if(c==='sw'){L(0,0,2.9,0);C(4,0,1.1);
+  if(t==='sw1')lev(60,1);else if(t==='sw2')lev(60,2);
+  else if(t==='sww'){lev(60,1);lev(240,1)}
+  else if(t==='swd'){lev(60,1);lev(120,1,-1)}
+  else if(t==='swk'){lev(60,1);lev(120,1,-1);lev(240,1);lev(300,1,-1)}
+  else if(t==='dim'){lev(60,1);L(4.7,-3.9,4.7,-2.2,.22);L(4.7,-2.2,7.6,-2.2,.22);L(7.6,-2.2,4.7,-3.9,.22)}}
+ else if(t==='af'){L(0,0,2.5,0);C(5.1,0,2.6);C(5.1,0,1.3,'b')}
+ else if(t==='ls'||t==='sub'){L(0,0,3,0);d.R(X(3),Y(-1.7),2.4*s,3.4*s,'w',.3*Math.max(.7,s));L(5.4,-1.7,8.6,-3.6,.3);L(8.6,-3.6,8.6,3.6,.3);L(8.6,3.6,5.4,1.7,.3);if(t==='sub')tx(7,-4.6,'SUB',1.7,1)}
+ else if(t==='ls_p'){L(0,0,2.4,0);C(6,0,3.6);d.R(X(4.2),Y(-1),1.4*s,2*s,'w',.25);L(5.6,-1,7.4,-2.2,.25);L(7.4,-2.2,7.4,2.2,.25);L(7.4,2.2,5.6,1,.25)}
+ else if(t==='mz_kp'||t==='mz_bron'||t==='al_cen'||t==='al_bus'||t==='al_gen'||t==='nw_tst'){box();tx(cx,.8,{mz_kp:'BED',mz_bron:'BRON',al_cen:'CEN',al_bus:'BUS',al_gen:'AL',nw_tst:'NW'}[t],1.9,1)}
+ else if(t==='al_pir'||t==='al_rook'||t==='al_sens'){L(0,0,3.3,0);C(6.3,0,3);tx(6.3,.8,{al_pir:'PIR',al_rook:'BR',al_sens:'S'}[t],t==='al_pir'?1.9:2.3,1)}
+ else if(t==='al_mc'){L(0,0,3,0);d.R(X(3),Y(-2),2.6*s,4*s,'w',.3);d.R(X(6.4),Y(-2),2.6*s,4*s,'w',.3);tx(7.8,-3,'MC',1.7,1)}
+ else if(t==='al_sir'){L(0,0,3,0);d.R(X(3),Y(-1.6),2.2*s,3.2*s,'w',.3);L(5.2,-1.6,8.8,-3.6,.3);L(8.8,-3.6,8.8,3.6,.3);L(8.8,3.6,5.2,1.6,.3);L(9.8,-2.4,10.8,-3.2,.25);L(9.8,0,11,0,.25);L(9.8,2.4,10.8,3.2,.25)}
+ else if(t==='nw_rj'){L(0,0,3,0);L(3,-3.2,3,3.2,.35);L(3,-3.2,8.6,0,.35);L(8.6,0,3,3.2,.35);tx(4.8,.75,'D',1.9,1)}
+ else if(t==='nw_ap'){L(0,0,3,0);C(6,0,3);tx(6,.75,'AP',1.9,1);A(6,0,4.3,30,150,.22);A(6,0,5.4,40,140,.22)}
+ else if(t==='nw_cam'){L(0,0,3,0);d.R(X(3),Y(-2),5.2*s,4*s,'w',.3);L(8.2,-1,10.6,-2.4,.3);L(10.6,-2.4,10.6,2.4,.3);L(10.6,2.4,8.2,1,.3)}
+ else if(t==='ap'){L(0,0,3,0);C(4,0,1)}
+ else if(t==='dom'){L(0,0,BX,0);d.R(X(BX),Y(-1.7),7.4*s,3.4*s,'w',.3*Math.max(.7,s));tx(BX+3.7,.75,String(txt||'').slice(0,5),1.9)}
+ else if(t==='t_boiler'){L(0,0,3.5,0);C(6.5,0,3);for(const q of[-2,-1,0,1,2]){const h=Math.sqrt(9-q*q);L(6.5+q,-h,6.5+q,h,.2)}}
+ else if(t==='t_motor'){L(0,0,3.6,0);C(6.2,0,2.6);tx(6.2,1,'M',2.8,1)}
+ else if(t==='t_trafo'){L(0,0,3,0);C(5,0,2,'n');C(7.4,0,2,'n')}
+ else if(t==='t_bel'){L(0,0,3,0);L(3,-2.6,3,2.6,.32);A(3,0,2.6,-90,90,.32)}
+ else if(t==='t_verw'){L(0,0,BX,0);d.R(X(BX),Y(-3),8.4*s,6*s,'w',.3*Math.max(.7,s));for(let q=BX+.9;q<BX+8.2;q+=.9)L(q,-3,q,3,.18)}
+ else if(t==='t_pv'){L(0,0,BX,0);d.R(X(BX),Y(-3),8.4*s,6*s,'w',.3*Math.max(.7,s));L(BX,3,BX+8.4,-3,.22);wave(BX+1,BX+3.6,-1.3,.6);L(BX+5,1.2,BX+7.6,1.2,.22);L(BX+5,2,BX+7.6,2,.22)}
+ else{box();
+  if(t==='t_was'){C(cx,0,2.1,'n');C(cx,0,.7,'b')}
+  else if(t==='t_droog'){C(cx-1.15,-1.1,1.15,'n');C(cx+1.15,-1.1,1.15,'n');C(cx,1.6,.75,'b')}
+  else if(t==='t_vaat'){L(BX,-BH,BX+BW,BH);L(BX,BH,BX+BW,-BH);C(cx,0,1.9,'w')}
+  else if(t==='t_kook'){C(cx-1.6,-1.6,.65,'b');C(cx+1.6,-1.6,.65,'b');C(cx+1.6,1.5,.65,'b')}
+  else if(t==='t_oven'){L(BX,-1.8,BX+BW,-1.8);C(cx,1.1,.75,'b')}
+  else if(t==='t_micro'){for(const q of[-1.9,0,1.9])wave(cx-1.9,cx+1.9,q)}
+  else if(t==='t_koel')star(cx,0,1.4);
+  else if(t==='t_vries'){star(cx-1.9,0,.85);star(cx,0,.85);star(cx+1.9,0,.85)}
+  else if(t==='t_vent'){C(cx-1.3,0,1.3,'n');C(cx+1.3,0,1.3,'n')}
+  else if(t==='t_ev')tx(cx,.9,'EV',2.4,1);
+  else tx(cx,.8,String(txt||'').slice(0,4),2);}
+}
+const symW=(t,a)=>t&&TYPES[t]&&TYPES[t].c==='sc'?8.2+3.5*(clamp(+a||1,1,5)-1):t==='nw_cam'||t==='al_sir'?11.5:11;
+const wrap=(s,n,max)=>{const out=[];let cur='';String(s||'').split(/\s+/).forEach(w=>{while(w.length>n){if(cur){out.push(cur);cur=''}out.push(w.slice(0,n-1)+'-');w=w.slice(n-1)}
+ if((cur+' '+w).trim().length>n){out.push(cur);cur=w}else cur=(cur+' '+w).trim()});if(cur)out.push(cur);
+ if(out.length>max){out.length=max;out[max-1]=out[max-1].slice(0,n-2)+'..'}return out};
+/* automatische schakelaar / differentieel: mes met verdikt uiteinde */
+function breakerV(d,x,yb){d.L(x,yb,x,yb-3,.3);d.L(x,yb-3,x-2.9,yb-10.2,.4);d.L(x-2.35,yb-8.85,x-2.9,yb-10.2,1.05);d.L(x,yb-11,x,yb-11.2,.3)}
+function column(d,x,yb,k,code){
+ d.C(x,yb,.7,'b');d.T(x-1.6,yb+4.6,code,{z:code.length>2?2.8:3.3,b:1,a:'e'});
+ breakerV(d,x,yb);
+ d.T(x+3.3,yb-7.4,`${k.polen||''} - ${k.curve||''} ${k.A||'?'}A`,{z:2.3});
+ if(k.kA){const kt=String(Math.round(k.kA*1000));d.R(x+3.1,yb-6.2,kt.length*1.2+1.1,2.7,'n',.15);d.T(x+3.65,yb-4.2,kt,{z:2})}
+ d.T(x-1.5,yb-13,`${k.kabelType||''} ${k.kabel||''}`.trim(),{z:2.3,r:90});
+ const nm=wrap(k.naam,14,3);nm.forEach((l,i)=>d.T(x+3.3,yb-13.5-(nm.length-1-i)*2.7,l,{z:2.1,i:1}));
+ const n=k.punten.length,yp0=yb-28,RH=n?clamp((yp0-TOP)/n,5.6,11):11,s=clamp(RH/11,.5,1)*.9;
+ let ytop=yb-22;
+ k.punten.forEach((p,i)=>{const yc=yp0-RH*(i+.5);ytop=yc;const isSc=(TYPES[p.type]||{}).c==='sc';
+  d.T(x-1.5,yc+.9*s,i+1,{z:2.5*s,a:'e'});
+  sym(d,p.type,x,yc,s,p.tekst,p.aantal);
+  const t=[(p.aantal>1&&!(isSc&&p.aantal<=5))?'x'+p.aantal:'',p.hw?'h':'',p.tekst||''].filter(Boolean).join(' '),tt=t.length>19?t.slice(0,18)+'.':t;
+  if(p.type==='swk')d.T(x+9.6*s,yc+.8*s,tt.slice(0,11),{z:2.1*s});else if(p.type==='sww')d.T(x+5.8*s,yc+RH*.47,tt.slice(0,15),{z:2.1*s});
+  else d.T(x+1.4,yc+RH*.48,tt,{z:2.1*s});
+  d.H(x-7,yc-RH/2,CW-2,RH,'p:'+p.id);});
+ d.L(x,yb-11,x,ytop,.3);
+ d.H(x-8,yb-27,CW,33,'k:'+k.id);
+ d.A(x,Math.max(TOP-2.5,n?ytop-RH*.5-3:yb-27),'p:'+k.id);
+}
+function feed(d,st,b,gl){const y=R0,a=M,h=b.hoofd,hx=a+27;
+ d.T(a+5,y-34,st.project.net,{z:2.8,b:1});d.T(a+5,y-30,'Voeding: '+(st.project.voeding||''),{z:2.2});
+ d.L(a+5,y,hx,y,.5);d.L(hx+9,y,a+52,y,.5);
+ d.R(a+8,y-4,11,8,'w',.3);d.L(a+8,y-2.1,a+19,y-2.1,.25);d.T(a+13.5,y+2.2,'kWh',{a:'m',z:2.5});
+ d.C(hx,y,.6,'b');d.L(hx,y,hx+7.6,y-3,.4);d.L(hx+6.2,y-2.45,hx+7.6,y-3,1.05);
+ d.T(hx-1,y-10.5,'Δ'+h.mA+'mA - type '+h.type,{z:2.4,b:1});d.T(hx-1,y-7.2,`${h.polen} - ${h.A}A`,{z:2.3});
+ if(gl)d.T(hx+4,y+4.6,gl,{z:3.3,b:1,a:'m'});
+ const ex=a+38;d.L(ex,y+2,ex,y+5,.3);d.L(ex-2.2,y+5,ex+2.2,y+5,.35);d.L(ex-1.4,y+6,ex+1.4,y+6,.35);d.L(ex-.6,y+7,ex+.6,y+7,.35);
+ d.T(ex+3.2,y+6.6,st.project.aarding||'',{z:2.2});
+ d.H(hx-3,y-16,24,22,'h:'+b.id);
+ if(!b.groepen[0].kringen.length)d.A(a+60,y+3.4,'k:'+b.groepen[0].id);
+}
+function titleBlock(d,st,pi,n,soort,sub){const ty=PH-M-TBH,p=st.project;
+ d.R(M,M,PW-2*M,PH-2*M,'n',.35);d.L(M,ty,PW-M,ty,.35);d.L(M+105,ty,M+105,PH-M,.25);d.L(M+212,ty,M+212,PH-M,.25);
+ d.T(M+3,ty+4.6,'Plaats van de elektrische installatie',{z:2.2,b:1});
+ d.T(M+3,ty+9.2,p.naam,{z:3,b:1});d.T(M+3,ty+13.6,p.adres,{z:2.5});d.T(M+3,ty+17.6,p.klant,{z:2.5});
+ d.T(M+108,ty+4.6,'Installateur',{z:2.2,b:1});d.T(M+108,ty+9.2,p.installateur,{z:3,b:1});
+ d.T(M+108,ty+13.6,p.tekenaar?'Getekend door: '+p.tekenaar:'',{z:2.5});d.T(M+108,ty+17.6,p.ean?'EAN '+p.ean:'',{z:2.5});d.T(M+108,ty+21.6,p.organisme?'Controleorganisme: '+p.organisme:'',{z:2.3});
+ d.T(PW-M-3,ty+4.6,`p. ${pi+1}/${n}`,{z:2.4,a:'e'});
+ d.T(M+215,ty+4.6,soort,{z:2.6,b:1});d.T(M+215,ty+9.2,sub||'',{z:2.5});d.T(M+215,ty+13.6,p.net,{z:2.3});d.T(M+215,ty+17.6,p.datum?'Datum: '+p.datum:'',{z:2.3});
+ d.T(M+215,ty+21.6,'CaDraw testversie - symbolen nog te valideren',{z:1.8,i:1});
+}
+function bordPages(st,b){
+ const cd=codes(st),slots=[];
+ b.groepen.forEach((g,gi)=>{if(!g.kringen.length){if(g.sub)slots.push({g,gi,k:null,first:true})}else g.kringen.forEach((k,ki)=>slots.push({g,gi,k,first:ki===0}))});
+ const capF=x0=>Math.max(1,Math.floor((PW-M-20-x0-8)/CW)+1),pages=[];let i=0;do{const cap=pages.length?capF(M+10):capF(M+52);pages.push(slots.slice(i,i+cap));i+=cap}while(i<slots.length);
+ return pages.map((sl,pi)=>draw=>{const d=draw.d,n=pages.length;
+  const x0=pi?M+10:M+52,xs=j=>x0+j*CW+8,more=pi<n-1;
+  const prev=pi?pages[pi-1][pages[pi-1].length-1]:null,next=more?pages[pi+1][0]:null;
+  if(pi===0)feed(d,st,b,st.codering==='cados'?cd.g[b.groepen[0].id]:'');
+  let le=-1;sl.forEach((s,j)=>{if(!s.g.sub||s.first)le=j});
+  if(more||le>=0||!pi)d.L(pi?M+3:M+52,R0,more?PW-M-3:(le>=0?xs(le):x0),R0,.5);
+  if(pi&&(more||le>=0))d.T(M+4,R0-1.6,'vervolg',{z:1.9,i:1});
+  if(more)d.T(PW-M-4,R0-1.6,'vervolg op volgende pagina',{z:1.9,i:1,a:'e'});
+  for(let a=0;a<sl.length;){let e=a;while(e+1<sl.length&&sl[e+1].gi===sl[a].gi)e++;const g=sl[a].g;
+   if(g.sub){const cf=a===0&&prev&&prev.gi===sl[a].gi,ct=e===sl.length-1&&next&&next.gi===sl[a].gi;
+    d.L(cf?M+3:xs(a),R1,ct?PW-M-3:xs(e),R1,.5);
+    if(cf)d.T(M+4,R1+8.5,'vervolg '+gLabel(b,g),{z:1.9,i:1});}
+   if(!(e===sl.length-1&&next&&next.gi===sl[a].gi))d.A(xs(e)+13,(g.sub?R1:R0)+3.4,'k:'+g.id);
+   a=e+1}
+  sl.forEach((s,j)=>{const x=xs(j),g=s.g;
+   if(s.first&&g.sub){d.C(x,R0,.7,'b');d.L(x,R0,x,R0-5,.3);breakerV(d,x,R0-2);d.L(x,R0-13.2,x,R1,.3);d.C(x,R1,.7,'b');
+    d.T(x+3.3,R0-12.5,'Δ'+g.mA+'mA - type '+g.type,{z:2.3,b:1});d.T(x+3.3,R0-9.3,`${g.polen} - ${g.A}A`,{z:2.3});
+    if(st.codering==='cados')d.T(x,R0+4.6,cd.g[g.id],{z:3.3,b:1,a:'m'});d.H(x-8,R0-21,CW,27,'g:'+g.id);}
+   if(s.k){const yb=g.sub?R1:R0;column(d,x,yb,s.k,cd.k[s.k.id]);if(s.first)d.A(x-6,yb-4,'i:'+s.k.id);else d.A(x-13,yb+3.4,'i:'+s.k.id)}});});
+}
+/* ---- situatieplan ---- */
+function pindex(st){const cd=codes(st),m={};st.borden.forEach(b=>b.groepen.forEach(g=>g.kringen.forEach(k=>k.punten.forEach((p,i)=>{m[p.id]={p,k,nr:i+1,code:cd.k[k.id],laag:'elektro'}}))));
+ ['muziek','alarm','netwerk'].forEach(l=>laagGroepen(l,st).forEach(g=>g.comps.forEach(c=>{m[c.id]={p:{type:c.type,aantal:1,tekst:c.tekst},k:{id:g.id},nr:'',code:c.label,laag:l}})));return m}
+/* gegevens uit CaDos voor muziek/alarm/netwerk: online het geladen dossier, lokaal het voorbeelddossier */
+const dosData=()=>CLOUD?(cloud.dos||null):(S.cadosLokaal||null);
+const nrCodes=(items,pre)=>{const c={};let h=0;(items||[]).forEach(z=>{const o=parseInt(z.manueelNummer);const n=(z.manueelNummer!==''&&z.manueelNummer!=null&&!Number.isNaN(o))?o:h+1;h=n;c[z.id]=pre+n});return c};
+/* één lijst per laag: groepen (letters links) met componenten (te plaatsen symbolen) */
+function laagGroepen(laag,st){st=st||S;
+ if(laag==='elektro'){const cd=codes(st),out=[];st.borden.forEach(b=>b.groepen.forEach(g=>g.kringen.forEach(k=>out.push({id:k.id,code:cd.k[k.id],naam:k.naam,kop:(st.borden.length>1?b.naam+' - ':'')+(g.sub?'Diff ':'Hoofd ')+(cd.g[g.id]||''),k,
+  comps:k.punten.map((p,i)=>({id:p.id,type:p.type,tekst:p.tekst,aantal:p.aantal,hw:p.hw,label:cd.k[k.id]+(i+1)}))}))));return out}
+ const d=st===S?dosData():null;if(!d)return[];const out=[];
+ if(laag==='muziek'){const items=((d.muziek&&d.muziek.items)||[]).filter(z=>!z.leeg),c=nrCodes((d.muziek&&d.muziek.items)||[],'M'),mp=st.muziekPunten||{};
+  items.forEach(z=>out.push({id:'mz:'+z.id,ref:z.id,code:c[z.id],naam:[z.naam,z.kamer].filter(Boolean).join(' - '),kop:'Muziekzones',nieuw:'muziek',
+   comps:(mp[z.id]||[]).map(x=>({id:x.id,type:x.type,tekst:x.tekst||z.kamer||z.naam||'',label:c[z.id]}))}))}
+ if(laag==='alarm'){const ac=d.alarmCentrale||{},rows=Array.isArray(d.alarm)?d.alarm:[],per={};
+  out.push({id:'al:centrale',code:'CEN',naam:[ac.merk,ac.type].filter(Boolean).join(' ')||'Alarmcentrale',kop:'Centrale',comps:[{id:'al:centrale',type:'al_cen',tekst:[ac.merk,ac.type].filter(Boolean).join(' '),label:'CEN'}]});
+  rows.forEach((r,i)=>{if(!r||!(r.omschrijving||r.toestelType))return;const tt=ALARM_TYPE[r.toestelType]||['al_gen',r.toestelType?r.toestelType.slice(0,3).toUpperCase():'AL'],key=tt[1];
+   (per[key]=per[key]||{id:'alt:'+key,code:key,naam:r.toestelType||'Zonder type',kop:'Toestellen',comps:[]}).comps.push({id:'al:'+(i+1)+'A',type:tt[0],tekst:r.omschrijving||'',label:(i+1)+'A'})});
+  Object.values(per).forEach(g=>out.push(g))}
+ if(laag==='netwerk'){const camPoort=new Set(((d.camerabewaking&&d.camerabewaking.items)||[]).map(c=>c.patchpaneelPoortId).filter(Boolean));let pn=0;
+  ((d.patchkast&&d.patchkast.kasten)||[]).forEach(k=>(k.items||[]).forEach(it=>{if(it.categorie!=='Patchpaneel')return;pn++;const nr=pn;
+   const comps=(it.poorten||[]).map((po,i)=>({po,i})).filter(x=>x.po.omschrijving&&!camPoort.has(x.po.id)).map(x=>({id:'np:'+x.po.id,type:/\b(ap|wifi|wi-fi|access ?point)\b/i.test(x.po.omschrijving)?'nw_ap':'nw_rj',tekst:x.po.omschrijving,label:nr+'.'+String(x.i+1).padStart(2,'0')}));
+   out.push({id:'pp:'+it.id,code:'P'+nr,naam:it.naam||('Patchpaneel '+nr),kop:'Patchpanelen',comps})}));
+  const cams=((d.camerabewaking&&d.camerabewaking.items)||[]).filter(c=>!c.leeg),cc=nrCodes((d.camerabewaking&&d.camerabewaking.items)||[],'C');
+  if(cams.length)out.push({id:'cams',code:'CAM',naam:"Camera's",kop:'Camerabewaking',comps:cams.map(c=>({id:'nc:'+c.id,type:'nw_cam',tekst:c.naam||c.kamer||'',label:cc[c.id]}))})}
+ return out}
+const laagVan=it=>it.laag||'elektro';
+function xform(ops,rot,s,tx,ty){const pt=(x,y)=>{for(let i=0;i<rot;i++){const t=x;x=-y;y=t}return[x*s+tx,y*s+ty]};
+ return ops.map(o=>{const t=o[0];
+  if(t==='L'){const a=pt(o[1],o[2]),b=pt(o[3],o[4]);return['L',a[0],a[1],b[0],b[1],o[5]*s,o[6],o[7]]}
+  if(t==='C'){const a=pt(o[1],o[2]);return['C',a[0],a[1],o[3]*s,o[4],o[5]*s]}
+  if(t==='R'){const a=pt(o[1],o[2]),b=pt(o[1]+o[3],o[2]+o[4]);return['R',Math.min(a[0],b[0]),Math.min(a[1],b[1]),Math.abs(b[0]-a[0]),Math.abs(b[1]-a[1]),o[5],o[6]*s]}
+  if(t==='F'){const a=pt(o[1],o[2]),b=pt(o[3],o[4]),c=pt(o[5],o[6]);return['F',...a,...b,...c]}
+  if(t==='T'){const a=pt(o[1],o[2]);return['T',a[0],a[1]+(rot%2?o[4]*s*.35:0),o[3],o[4]*s,rot?'m':o[5],rot?0:o[6],o[7],o[8],o[9]]}
+  return o})}
+function itemOps(pl,it,ix){const e=ix[it.pid];if(!e)return null;const d=mk(),s=pl.sym||3,rot=((it.rot||0)%4+4)%4;
+ sym(d,e.p.type,0,0,1,e.p.tekst,e.p.aantal);
+ const ops=xform(d.o,rot,s,it.x,it.y),w=symW(e.p.type,e.p.aantal),lb=e.code+e.nr+(e.p.aantal>1&&!((TYPES[e.p.type]||{}).c==='sc'&&e.p.aantal<=5)?' x'+e.p.aantal:'')+(e.p.hw?' h':'');
+ const lp=[[w/2,-5.4],[5.6,w/2],[-w/2,-5.4],[-5.6,-w/2]][rot],an=['m','s','m','e'][rot];
+ ops.push(['T',it.x+lp[0]*s,it.y+lp[1]*s+(rot%2?1*s:0),lb,2.5*s,an,0,1,0]);
+ const c=[[w/2,0],[0,w/2],[-w/2,0],[0,-w/2]][rot];
+ return{ops,cx:it.x+c[0]*s,cy:it.y+c[1]*s,r:(w/2+2.5)*s,lb}}
+function planFlat(st,pl,laag){const ix=pindex(st),o=[];cadOps(pl,o);pl.muren.forEach(m=>o.push(['L',m[0],m[1],m[2],m[3],pl.mw||3.2,0]));pl.items.forEach(it=>{if(laag&&laagVan(it)!==laag)return;const r=itemOps(pl,it,ix);if(r)o.push(...r.ops)});(pl.teksten||[]).forEach(t=>o.push(['T',t.x,t.y,t.t,t.z||12,'s',0,0,0]));return o}
+
+/* alle pagina's voor PDF/voorbeeld; parts = {schema,plan,kringen,mat} */
+function tablePages(soort,cols,rows){const out=[],per=Math.max(10,Math.floor((PH-2*M-TBH-14)/4.4));for(let i=0;i<Math.max(1,rows.length);i+=per)out.push({soort,sub:'',f:draw=>{const d=draw.d;let y=M+9;
+  cols.forEach(c=>d.T(M+4+c[1],y,c[0],{z:2.5,b:1,a:c[3]||'s'}));d.L(M+3,y+1.6,PW-M-3,y+1.6,.3);
+  rows.slice(i,i+per).forEach(r=>{y+=4.4;r.forEach((v,j)=>{const c=cols[j],t=String(v??'');d.T(M+4+c[1],y,t.length>c[2]?t.slice(0,c[2]-1)+'.':t,{z:2.4,a:c[3]||'s',b:j===0&&cols[0][4]})})})}});return out}
+function allPages(st,parts){parts=parts||{schema:true,plan:true};setFormaat(st);const out=[],cd=codes(st);
+ if(parts.schema)st.borden.forEach(b=>bordPages(st,b).forEach(f=>out.push({soort:'Eendraadschema',sub:b.naam,f})));
+ const planKey={elektro:'plan',muziek:'planMuziek',alarm:'planAlarm',netwerk:'planNetwerk'};
+ LAGEN.forEach(([laag,naam])=>{if(!parts[planKey[laag]])return;st.plannen.forEach(pl=>{const heeft=pl.items.some(i=>laagVan(i)===laag);
+  if(laag==='elektro'?(!heeft&&!pl.muren.length&&!(pl.teksten||[]).length&&!(pl.bg&&pl.bg.data)&&!pl.cad):!heeft)return;
+  out.push({soort:'Situatieplan '+naam.toLowerCase(),sub:pl.naam,pl,f:draw=>{const H=pl.h||707,k=Math.min((PW-2*M-6)/1000,(PH-2*M-TBH-6)/H),ox=M+3+((PW-2*M-6)-1000*k)/2,oy=M+3;
+   draw.bg={data:pl.bg&&pl.bg.data,x:ox,y:oy,w:1000*k,h:H*k};draw.d.o.push(...xform(planFlat(st,pl,laag),0,k,ox,oy))}})})});
+ if(parts.kringen)out.push(...tablePages('Lijst met kringen',[['Kring',0,8,'s',1],['Benaming',16,46],['Beveiliging',104,18],['Kabel',136,22],['Lengte',178,8],['Differentieel',196,30],['Punten',276,5,'e']],
+  st.borden.flatMap(b=>b.groepen.flatMap(g=>g.kringen.map(k=>[cd.k[k.id],(st.borden.length>1?b.naam+' - ':'')+k.naam,`${k.polen} ${k.curve}${k.A}A ${k.kA?k.kA+'kA':''}`,`${k.kabelType} ${k.kabel}`,k.lengte?k.lengte+' m':'',`${g.sub?g.mA:b.hoofd.mA} mA - ${g.sub?g.A:b.hoofd.A}A type ${g.sub?g.type:b.hoofd.type}`,k.punten.length])))));
+ if(parts.mat)out.push(...tablePages('Materiaallijst',[['Omschrijving',0,110],['Aantal',276,10,'e']],materials(st)));
+ return out.map((p,i)=>{const d=mk(),draw={d,bg:null};p.f(draw);titleBlock(d,st,i,out.length,p.soort,p.sub);return{ops:d.o,bg:draw.bg,soort:p.soort}})}
+/* SVG backend */
+function opsSVG(ops,edit){const f={n:'none',w:'#fff',b:'#000'};let s='',top='';
+ for(const o of ops){const t=o[0];
+  if(t==='L')s+=`<line x1="${o[1].toFixed(2)}" y1="${o[2].toFixed(2)}" x2="${o[3].toFixed(2)}" y2="${o[4].toFixed(2)}" stroke="${o[7]||'#000'}" stroke-width="${(+o[5]).toFixed(2)}" stroke-linecap="round"/>`;
+  else if(t==='C')s+=`<circle cx="${o[1].toFixed(2)}" cy="${o[2].toFixed(2)}" r="${o[3].toFixed(2)}" fill="${f[o[4]]}" stroke="#000" stroke-width="${(+o[5]).toFixed(2)}"/>`;
+  else if(t==='R')s+=`<rect x="${o[1].toFixed(2)}" y="${o[2].toFixed(2)}" width="${o[3].toFixed(2)}" height="${o[4].toFixed(2)}" fill="${f[o[5]]}" stroke="#000" stroke-width="${(+o[6]).toFixed(2)}"/>`;
+  else if(t==='F')s+=`<polygon points="${o.slice(1).map(v=>v.toFixed(2)).join(' ')}" fill="#000"/>`;
+  else if(t==='T')s+=`<text x="${o[1].toFixed(2)}" y="${o[2].toFixed(2)}" font-size="${o[4].toFixed(2)}" text-anchor="${{s:'start',m:'middle',e:'end'}[o[5]]}"${o[6]?` transform="rotate(${-o[6]} ${o[1].toFixed(2)} ${o[2].toFixed(2)})"`:''}${o[7]?' font-weight="700"':''}${o[8]?' font-style="italic"':''}${o[9]?` fill="${o[9]}"`:''}>${esc(o[3])}</text>`;
+  else if(t==='H'&&edit)s+=`<rect class="hit${E.sel===o[5]?' sel':''}" data-h="${o[5]}" x="${o[1].toFixed(2)}" y="${o[2].toFixed(2)}" width="${o[3]}" height="${o[4].toFixed(2)}"/>`;
+  else if(t==='A'&&edit&&E.mode==='teken'&&((o[3][0]==='p')===!!TYPES[E.sym]))top+=`<g class="addm" data-add="${o[3]}" transform="translate(${o[1].toFixed(2)} ${o[2].toFixed(2)})"><circle r="2.3"/><path d="M-1.2 0H1.2M0 -1.2V1.2"/></g>`;}
+ return s+top}
+const pageSVG=(p,edit)=>`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${PW} ${PH}" style="width:${Math.round(1000*zoom)}px">${p.bg&&p.bg.data?`<image href="${p.bg.data}" x="${p.bg.x}" y="${p.bg.y}" width="${p.bg.w}" height="${p.bg.h}" opacity=".55" preserveAspectRatio="none"/>`:''}${opsSVG(p.ops,edit===true)}</svg>`;
+/* PDF backend (jsPDF, vectorieel) */
+function buildPdf(st,parts){
+ const J=window.jspdf&&window.jspdf.jsPDF;if(!J)throw new Error('PDF-bibliotheek niet geladen');
+ const fm=((st.print&&st.print.formaat)||'A4').toLowerCase(),doc=new J({orientation:'landscape',unit:'mm',format:fm}),pt=72/25.4;
+ allPages(st,parts).forEach((pg,pi)=>{if(pi)doc.addPage(fm,'landscape');
+  if(pg.bg&&pg.bg.data){try{if(doc.GState)doc.setGState(new doc.GState({opacity:.55}));doc.addImage(pg.bg.data,'JPEG',pg.bg.x,pg.bg.y,pg.bg.w,pg.bg.h);if(doc.GState)doc.setGState(new doc.GState({opacity:1}))}catch(e){}}
+  for(const o of pg.ops){const t=o[0];
+   if(t==='L'){doc.setLineWidth(o[5]);doc.setLineCap(1);doc.setDrawColor(o[7]||'#000000');doc.line(o[1],o[2],o[3],o[4])}
+   else if(t==='C'){doc.setLineWidth(o[5]);doc.setDrawColor(0);if(o[4]==='b'){doc.setFillColor(0);doc.circle(o[1],o[2],o[3],'FD')}else if(o[4]==='w'){doc.setFillColor(255,255,255);doc.circle(o[1],o[2],o[3],'FD')}else doc.circle(o[1],o[2],o[3],'S')}
+   else if(t==='R'){doc.setLineWidth(o[6]);doc.setDrawColor(0);if(o[5]==='w'){doc.setFillColor(255,255,255);doc.rect(o[1],o[2],o[3],o[4],'FD')}else doc.rect(o[1],o[2],o[3],o[4],'S')}
+   else if(t==='F'){doc.setFillColor(0);doc.triangle(o[1],o[2],o[3],o[4],o[5],o[6],'F')}
+   else if(t==='T'){let str=o[3].replace(/Ω/g,'Ohm'),x=o[1];const z=o[4];
+    doc.setFont('helvetica',o[7]&&o[8]?'bolditalic':o[7]?'bold':o[8]?'italic':'normal');doc.setFontSize(z*pt);doc.setTextColor(o[9]||'#000000');
+    if(str[0]==='Δ'){doc.setLineWidth(.18+.12*o[7]);doc.setDrawColor(0);doc.triangle(x,o[2],x+.66*z,o[2],x+.33*z,o[2]-.72*z,'S');x+=.8*z;str=str.slice(1)}
+    str=str.replace(/Δ/g,'d');
+    if(o[6])doc.text(str,x,o[2],{angle:o[6]});else doc.text(str,x,o[2],{align:{s:'left',m:'center',e:'right'}[o[5]]});}
+  }});
+ return doc}
+
+/* ================= lijsten & controles ================= */
+function materials(st){const m=new Map(),add=(k,n=1)=>m.set(k,(m.get(k)||0)+n);
+ st.borden.forEach(b=>{add(`Differentieelschakelaar ${b.hoofd.polen} ${b.hoofd.A}A Δ${b.hoofd.mA}mA type ${b.hoofd.type}`);
+  b.groepen.forEach(g=>{if(g.sub)add(`Differentieelschakelaar ${g.polen} ${g.A}A Δ${g.mA}mA type ${g.type}`);
+   g.kringen.forEach(k=>{add(`Automaat ${k.polen} ${k.curve}${k.A}A ${k.kA||''}kA`);
+    const kab=`Kabel ${k.kabelType} ${k.kabel}`;if(+k.lengte>0)add(kab+' (meter)',+k.lengte);else add(kab+' (kringen zonder lengte)');
+    k.punten.forEach(p=>add((TYPES[p.type]||TYPES.t_gen).l+(p.hw?' halfwaterdicht':''),Math.max(1,+p.aantal||1)))})})});
+ return[...m].sort((a,b)=>a[0].localeCompare(b[0],'nl'))}
+function checks(st){const w=[],cd=codes(st),add=(lvl,msg,kid)=>w.push({lvl,msg,kid}),geplaatst=new Set(st.plannen.flatMap(p=>p.items.map(i=>i.pid)));
+ st.borden.forEach(b=>{const bn=st.borden.length>1?b.naam+' - ':'';
+  if(b.geenHoofd)add('i',`${bn}in CaDos is geen hoofddifferentieel aangeduid; CaDraw tekent een standaard Δ${b.hoofd.mA}mA.`);
+  if(+b.hoofd.mA>300)add('w',`${bn}hoofddifferentieel ${b.hoofd.mA} mA: maximaal 300 mA aan het begin van de installatie.`);
+  if(+b.hoofd.A<40)add('w',`${bn}hoofddifferentieel ${b.hoofd.A}A: in een woning minstens 40A.`);
+  [b.hoofd,...b.groepen.filter(g=>g.sub)].forEach(x=>{if(x.type==='AC')add('w',`${bn}differentieel Δ${x.mA}mA type AC: in een woning minstens type A.`)});
+  if(!b.groepen.some(g=>g.sub&&+g.mA<=30)&&+b.hoofd.mA>30&&b.groepen.some(g=>g.kringen.length))add('w',`${bn}geen differentieel van max. 30 mA na het hoofddifferentieel.`);
+  b.groepen.forEach(g=>{const prot=g.sub?+g.mA:+b.hoofd.mA;
+  if(g.sub&&prot<=30&&g.kringen.length>8)add('w',`${bn}${gLabel(b,g)}: ${g.kringen.length} kringen achter één differentieel van max. 30 mA (maximaal 8 eindstroombanen).`,g.kringen[0].id);
+  g.kringen.forEach(k=>{const c=`${bn}${cd.k[k.id]} ${k.naam||''}`.trim(),cat=p=>(TYPES[p.type]||{}).c,sc=k.punten.filter(p=>cat(p)==='sc').length,li=k.punten.filter(p=>cat(p)==='li').length,mm=sect(k.kabel),res=/reserve/i.test(k.naam);
+   if(b.kastId&&!k.bron)add('w',`${c}: bestaat niet in de zekeringkast van CaDos (letters kunnen afwijken). Open de kring en kies "In CaDos aanmaken".`,k.id);
+   if(!res&&!k.kabel)add('i',`${c}: kabel niet ingevuld.`,k.id);
+   if(!res&&k.kabelBron==='standaard')add('i',`${c}: kabel ${k.kabel} is een standaardwaarde (niet ingevuld in CaDos of CaCalc) - nakijken.`,k.id);
+   if(!res&&!k.punten.length)add('i',`${c}: nog geen aftakpunten.`,k.id);
+   const np=k.punten.filter(p=>!geplaatst.has(p.id)).length;if(np&&geplaatst.size)add('i',`${c}: ${np} punt(en) nog niet op een situatieplan geplaatst.`,k.id);
+   if(sc>8)add('w',`${c}: ${sc} contactdozen op één kring (maximaal 8 enkelvoudige of meervoudige).`,k.id);
+   else if(sc&&li&&sc+li>8)add('w',`${c}: gemengde kring met ${sc+li} punten (stopcontacten + lichtpunten, maximaal 8).`,k.id);
+   if(mm===1.5&&+k.A>16)add('w',`${c}: 1,5 mm² beveiligd met ${k.A}A (automaat maximaal 16A).`,k.id);
+   if(mm===2.5&&+k.A>20)add('w',`${c}: 2,5 mm² beveiligd met ${k.A}A (automaat maximaal 20A).`,k.id);
+   if(sc&&mm&&mm<2.5)add('w',`${c}: stopcontacten op ${String(mm).replace('.',',')} mm² (minimaal 2,5 mm²).`,k.id);
+   const nat=k.punten.some(p=>['t_was','t_droog','t_vaat'].includes(p.type))||/badkamer|douche|wasmachine|droogkast|vaatwas/i.test(k.naam);
+   if(nat&&prot>30)add('w',`${c}: badkamer/wasmachine/droogkast/vaatwas hoort achter een differentieel van max. 30 mA (nu ${prot} mA).`,k.id);
+   else if((sc||li)&&prot>30&&!(sc<=1&&!li&&k.punten.some(p=>cat(p)==='toe')))add('i',`${c}: stopcontacten/verlichting niet achter max. 30 mA - nakijken voor nieuwe installaties (AREI-wijziging 2023).`,k.id);
+  })})});
+ return w}
+
+/* ================= UI ================= */
+function get(path){return path.split('.').reduce((o,k)=>o==null?o:o[k],S)}
+function setPath(path,v){const p=path.split('.'),k=p.pop();const o=p.reduce((o,k)=>o[k],S);o[k]=v}
+function fld(label,path,q={}){let v=get(path);if(v==null)v='';
+ if(q.opts){const opts=q.opts.map(x=>Array.isArray(x)?x:[x,x]);if(v!==''&&!opts.some(o=>String(o[0])===String(v)))opts.push([v,v]);
+  return`<label class="f ${q.c||''}"><span>${label}</span><select data-b="${path}"${q.n?' data-n':''}>${opts.map(o=>`<option value="${esc(o[0])}"${String(o[0])===String(v)?' selected':''}>${esc(o[1])}</option>`).join('')}</select></label>`}
+ return`<label class="f ${q.c||''}"><span>${label}</span><input ${q.n?'type="number" step="any" inputmode="decimal" data-n':''} data-b="${path}" value="${esc(v)}"${q.ph?` placeholder="${esc(q.ph)}"`:''}${q.list?` list="${q.list}"`:''}></label>`}
+const typeOpts=(v,pre='')=>{const gs={};Object.entries(TYPES).forEach(([k,t])=>(gs[t.g]=gs[t.g]||[]).push(`<option value="${pre}${k}"${pre+k===v?' selected':''}>${t.l}</option>`));return Object.entries(gs).map(([g,o])=>`<optgroup label="${g}">${o.join('')}</optgroup>`).join('')};
+const kSum=(k,code)=>`<b class="lb">${code}</b><span class="kn">${esc(k.naam||'(naamloos)')}</span><small>${k.bron?'CaDos':'CaDraw'}${k.calc?' + CaCalc':''} &middot; ${esc(k.polen)} ${esc(k.curve)}${esc(k.A)}A &middot; ${esc(k.kabel||'kabel?')} &middot; ${k.punten.length} pt</small>`;
+const bordTabs=()=>S.borden.length>1?`<div class="row" style="margin:0 0 8px">${S.borden.map((b,i)=>`<button class="sm ${i===bi?'on2':''}" data-a="bord" data-i="${i}">${esc(b.naam)}</button>`).join('')}</div>`:'';
+
+function vDoc(){const b=B(),bp=`borden.${bi}`;
+ return`<div class="card"><h2>Project</h2>${CLOUD?`<div class="row" style="margin:0 0 10px"><button data-a="syncCados">Opnieuw inlezen uit CaDos</button><button data-a="syncCalc">Aanvullen uit CaCalc</button><span class="note">Wijzigingen aan gekoppelde kringen gaan automatisch terug naar CaDos.</span></div>`
+  :`<div class="row" style="margin:0 0 10px"><button data-a="sample">Voorbeeld laden</button><button data-a="leeg">Leeg beginnen</button><button data-a="showImp">CaDos / CaCalc importeren</button><button data-a="json">JSON bewaren</button></div>
+ <div id="imp" hidden><p class="note">Plak de JSON van een CaDos-dossier, van CaCalc, of een eerder bewaarde CaDraw-JSON. Op de CaSuite-site gebeurt dit automatisch per project.</p><textarea id="impTxt" rows="5" placeholder='{"zekeringen":{"kasten":[...]}}'></textarea><div class="row"><input type="file" id="impFile" accept=".json,application/json"><button class="pri" data-a="doImp">Importeren</button></div></div>`}
+ <div class="grid">${fld('Project','project.naam',{c:'w2'})}${fld('Adres installatie','project.adres',{c:'w2'})}${fld('Klant','project.klant')}${fld('Installateur','project.installateur')}${fld('Getekend door','project.tekenaar')}${fld('Controleorganisme','project.organisme')}${fld('EAN','project.ean')}${fld('Datum','project.datum')}${fld('Netspanning','project.net',{opts:NETTEN,c:'w2'})}${fld('Voedingskabel','project.voeding')}${fld('Aarding','project.aarding')}${fld('Codering','codering',{opts:[['cados','CaDos: A → AA, AB'],['klassiek','Doorlopend: A, B, C']]})}</div></div>
+ ${bordTabs()}<div class="card"><h2>Bord</h2><div class="grid">${fld('Naam',bp+'.naam',{c:'w2'})}</div><div class="row"><button class="sm" data-a="addB">+ bord</button>${S.borden.length>1&&!b.kastId?`<button class="sm danger" data-a="delB">Verwijder bord</button>`:''}</div></div>`}
+function vKring(){const cd=codes(S),b=B(),bp=`borden.${bi}`,w=checks(S);
+ let h=`<datalist id="kamers">${S.kamers.map(k=>`<option value="${esc(k)}">`).join('')}</datalist>
+ <div class="card"><h2>Nakijken <small>${w.filter(x=>x.lvl==='w').length} waarschuwingen &middot; ${w.filter(x=>x.lvl==='i').length} opmerkingen</small></h2><p class="note">Hulpmiddel bij het tekenen, geen keuring. Beperkte selectie van regels voor woningen; het AREI en de keurder blijven de referentie.</p><details${w.some(x=>x.lvl==='w')?' open':''}><summary style="cursor:pointer">Toon aandachtspunten</summary>${w.length?w.map(x=>`<div class="chk ${x.lvl}" data-a="goK" data-kid="${x.kid||''}"><b>${x.lvl==='w'?'⚠':'ℹ'}</b><span>${esc(x.msg)}</span></div>`).join(''):'<p>Geen aandachtspunten gevonden.</p>'}</details></div>
+ ${kringTabel()}
+ ${bordTabs()}`;
+ b.groepen.forEach((g,gi)=>{const p=`${bp}.groepen.${gi}`;
+  h+=`<div class="card"><h2>${S.codering==='cados'?`<span class="lb">${cd.g[g.id]}</span>`:''}${g.sub?'Differentieel':'Hoofddifferentieel'} <small>${g.sub?'achter het hoofddifferentieel':'begin van de installatie'} &middot; ${g.kringen.length} kringen</small></h2>
+  <div class="grid">${g.sub?fld('Gevoeligheid (mA)',p+'.mA',{n:1,opts:[10,30,100,300]})+fld('Stroom (A)',p+'.A',{n:1,opts:[25,40,63,80]})+fld('Polen',p+'.polen',{opts:POL})+fld('Type',p+'.type',{opts:['A','B','F','AC']})
+   :fld('Gevoeligheid (mA)',bp+'.hoofd.mA',{n:1,opts:[30,100,300]})+fld('Stroom (A)',bp+'.hoofd.A',{n:1,opts:[25,40,63,80,100]})+fld('Polen',bp+'.hoofd.polen',{opts:POL})+fld('Type',bp+'.hoofd.type',{opts:['A','B','F','AC']})}</div>`;
+  g.kringen.forEach((k,ki)=>{const kp=`${p}.kringen.${ki}`,dd=`data-g="${gi}" data-k="${ki}"`;
+   h+=`<details class="k" data-id="${k.id}"${open.has(k.id)?' open':''}><summary>${kSum(k,cd.k[k.id])}</summary><div class="in">
+   <div class="grid">${fld('Naam',kp+'.naam',{c:'w2'})}${fld('Polen',kp+'.polen',{opts:POL})}${fld('Curve',kp+'.curve',{opts:['B','C','D']})}${fld('Stroom (A)',kp+'.A',{n:1,opts:AMP})}${fld('Kortsluit (kA)',kp+'.kA',{n:1,opts:[3,4.5,6,10]})}${fld('Kabeltype',kp+'.kabelType',{opts:['XVB','EXVB','XGB','VOB','VVB','EXAVB','SVV']})}${fld('Geleiders',kp+'.kabel',{ph:'3G2,5'})}${fld('Lengte (m)',kp+'.lengte',{n:1})}</div>
+   ${k.punten.map((pt,pi)=>{const pp=`${kp}.punten.${pi}`;return`<div class="pt"><span class="no">${pi+1}</span><select data-b="${pp}.type">${typeOpts(pt.type)}</select><input type="number" min="1" data-n data-b="${pp}.aantal" value="${esc(pt.aantal)}" title="Aantal in één punt"><input class="tx" data-b="${pp}.tekst" value="${esc(pt.tekst)}" placeholder="kamer / info" list="kamers"><label class="hw" title="halfwaterdicht"><input type="checkbox" data-c="${pp}.hw"${pt.hw?' checked':''}>h</label><button class="sm" data-a="upP" ${dd} data-p="${pi}" title="omhoog">↑</button><button class="sm danger" data-a="delP" ${dd} data-p="${pi}" title="verwijderen">✕</button></div>`}).join('')}
+   <div class="row"><button class="sm" data-a="addP" data-t="sc_ak" ${dd}>+ stopcontact</button><button class="sm" data-a="addP" data-t="li" ${dd}>+ lichtpunt</button><button class="sm" data-a="addP" data-t="sw1" ${dd}>+ schakelaar</button><button class="sm" data-a="addP" data-t="t_gen" ${dd}>+ toestel</button>
+   <span style="flex:1"></span><button class="sm" data-a="upK" ${dd}>↑</button><button class="sm" data-a="dnK" ${dd}>↓</button><button class="sm" data-a="dupK" ${dd}>Dupliceer</button><button class="sm" data-a="saveAsPre" data-kid="${k.id}">★ Voorgevormd</button><button class="sm danger" data-a="delK" ${dd}>Verwijder kring</button></div></div></details>`});
+  h+=`<div class="row"><button class="pri sm" data-a="addK" data-g="${gi}">+ kring</button>${g.sub&&!g.bron?`<span style="flex:1"></span><button class="sm danger" data-a="delG" data-g="${gi}">Verwijder differentieel</button>`:''}</div></div>`});
+ return h+`<button data-a="addG">+ differentieel</button>`}
+function locate(id){if(!id)return null;const t=id[0],x=id.slice(2);
+ for(let bx=0;bx<S.borden.length;bx++){const b=S.borden[bx];if(t==='h'&&b.id===x)return{t,bx,b};
+  for(let gi=0;gi<b.groepen.length;gi++){const g=b.groepen[gi];if(t==='g'&&g.id===x)return{t,bx,gi,b,g};
+   for(let ki=0;ki<g.kringen.length;ki++){const k=g.kringen[ki];if(t==='k'&&k.id===x)return{t,bx,gi,ki,b,g,k};
+    if(t==='p'){const pi=k.punten.findIndex(q=>q.id===x);if(pi>=0)return{t,bx,gi,ki,pi,b,g,k,p:k.punten[pi]}}}}}
+ return null}
+function symIcon(t){const d=mk();
+ if(t.startsWith('pre:')){const q=CFG.presets[+t.slice(4)]||{punten:[]},ss=(q.punten||[]).map(p=>p.type).filter(x=>TYPES[x]).slice(0,3);d.L(0,0,2.5,0,.3);d.L(2.5,0,6.3,-1.9,.4);d.L(5.2,-1.35,6.3,-1.9,1);d.L(7,0,13,0,.3);d.C(10,-1.6,.75,'n',.2);
+  ss.forEach((x,i)=>sym(d,x,13+i*9.5,0,.8,'',1));if(ss.length>1)d.L(13,0,13+9.5*(ss.length-1),0,.3);
+  return`<svg viewBox="-1 -5.5 ${ss.length>2?43:34} 11" style="width:${ss.length>2?82:64}px">${opsSVG(d.o)}</svg>`}
+ if(TYPES[t]||LTYPES[t])sym(d,t,0,0,1,'',1);else breakerV(d,6,5.5);return`<svg viewBox="-1 -6.2 16 12.4">${opsSVG(d.o)}</svg>`}
+const CATS=[['Voorgevormde kringen','pre:0'],['Bord','kring'],['Stopcontacten','sc_ak'],['Schakelaars','sw1'],['Verlichting','li'],['Toestellen','t_kook'],['Overige','af'],['Laatst gebruikt','★']];
+function libAll(){return[...CFG.presets.map((x,i)=>['pre:'+i,`${x.naam} · ${x.polen} ${x.curve}${x.A}A · ${x.kabelType} ${x.kabel}${(x.punten||[]).length>2?` · ${x.punten.length} symbolen`:''}`,'Voorgevormde kringen']),['kring','Lege kring (automaat + leiding)','Bord'],['diff','Differentieel','Bord'],...Object.entries(TYPES).map(([k,t])=>[k,t.l,t.g])]}
+function libHtml(){const q=norm(E.q),all=libAll(),btn=e=>`<button class="sy${E.sym===e[0]?' on':''}" data-sym="${e[0]}">${symIcon(e[0])}<span>${esc(e[1])}</span></button>`;
+ if(q)return all.filter(e=>norm(e[1]).includes(q)).map(btn).join('')||'<p class="note" style="padding:8px">Geen symbool gevonden.</p>';
+ if(!E.cat)E.cat=CATS[0][0];
+ const list=E.cat==='Laatst gebruikt'?E.recent.map(k=>all.find(e=>e[0]===k)).filter(Boolean):all.filter(e=>e[2]===E.cat);
+ return`<h4>${E.cat}</h4>`+(list.map(btn).join('')||'<p class="note" style="padding:8px">Nog niets gebruikt.</p>')}
+const catsHtml=()=>CATS.map(c=>`<button class="ct${E.cat===c[0]&&!E.q?' on':''}" data-cat="${c[0]}" title="${c[0]}">${c[1]==='★'?'<span style="font-size:20px;line-height:1">★</span>':symIcon(c[1])}</button>`).join('');
+function vSide(){const cd=codes(S),L=locate(E.sel);if(E.sel&&!L)E.sel=null;
+ let h=`<div class="seg"><button data-a="mode" data-m="teken" class="${E.mode==='teken'?'on':''}">Tekenen</button><button data-a="mode" data-m="sel" class="${E.mode==='sel'?'on':''}">Selecteren</button></div><datalist id="kamers">${S.kamers.map(k=>`<option value="${esc(k)}">`).join('')}</datalist>`;
+ if(L){const bp=`borden.${L.bx}`,gp=`${bp}.groepen.${L.gi}`,kp=`${gp}.kringen.${L.ki}`,dd=`data-g="${L.gi}" data-k="${L.ki}"`;
+  if(L.t==='p'){const pp=`${kp}.punten.${L.pi}`;
+   h+=`<h2 style="font-size:14px;margin:12px 0 8px"><span class="lb">${cd.k[L.k.id]}${L.pi+1}</span> Eigenschappen symbool</h2><div class="grid">
+   <label class="f w2"><span>Symbool</span><select data-b="${pp}.type">${typeOpts(L.p.type)}</select></label>${fld('Aantal',pp+'.aantal',{n:1})}
+   <label class="f"><span>Halfwaterdicht</span><select data-b="${pp}.hw" data-bool><option value="">Nee</option><option value="1"${L.p.hw?' selected':''}>Ja</option></select></label>${fld('Tekst / kamer',pp+'.tekst',{c:'w2',list:'kamers'})}</div>
+   <div class="row"><button class="sm" data-a="upP" ${dd} data-p="${L.pi}" title="Vroeger in de kring">↓ lager</button><button class="sm" data-a="dnP" ${dd} data-p="${L.pi}" title="Verder in de kring">↑ hoger</button><button class="sm" data-a="dupP" ${dd} data-p="${L.pi}">Kopiëren</button><button class="sm danger" data-a="delP" ${dd} data-p="${L.pi}">Wissen</button></div>`}
+  else if(L.t==='k'){h+=`<h2 style="font-size:14px;margin:12px 0 8px"><span class="lb">${cd.k[L.k.id]}</span> Eigenschappen kring</h2><div class="grid">${fld('Benaming',kp+'.naam',{c:'w2'})}${fld('Polen',kp+'.polen',{opts:POL})}${fld('Curve',kp+'.curve',{opts:['B','C','D']})}${fld('Stroom (A)',kp+'.A',{n:1,opts:AMP})}${fld('Kortsluit (kA)',kp+'.kA',{n:1,opts:[3,4.5,6,10]})}${fld('Kabeltype',kp+'.kabelType',{opts:['XVB','EXVB','XGB','VOB','VVB','EXAVB','SVV']})}${fld('Geleiders',kp+'.kabel',{ph:'3G2,5'})}${fld('Lengte (m)',kp+'.lengte',{n:1})}${L.b.kastId?'':fld('Vaste letter',kp+'.vast',{ph:'automatisch'})}</div>
+   <div class="row"><button class="sm" data-a="upK" ${dd}>← links</button><button class="sm" data-a="dnK" ${dd}>rechts →</button><button class="sm" data-a="dupK" ${dd}>Kopiëren</button><button class="sm danger" data-a="delK" ${dd}>Wissen</button></div><div class="row"><button class="sm" data-a="saveAsPre" data-kid="${L.k.id}">★ Bewaar als voorgevormde kring</button></div><p class="note">${L.k.bron?'Gekoppeld aan CaDos: wijzigingen, tussenvoegen, verplaatsen en wissen gebeuren ook in de zekeringkast; de letter volgt CaDos.':L.b.kastId?`Deze kring bestaat nog niet in de zekeringkast van CaDos.</p><div class="row"><button class="sm pri" data-a="naarCados" ${dd}>In CaDos aanmaken</button></div><p class="note">`:'Alleen in CaDraw (bord niet gekoppeld aan CaDos).'}</p>`}
+  else if(L.t==='g'){h+=`<h2 style="font-size:14px;margin:12px 0 8px"><span class="lb">${cd.g[L.g.id]||'Δ'}</span> Eigenschappen differentieel</h2><div class="grid">${fld('Gevoeligheid (mA)',gp+'.mA',{n:1,opts:[10,30,100,300]})}${fld('Stroom (A)',gp+'.A',{n:1,opts:[25,40,63,80]})}${fld('Polen',gp+'.polen',{opts:POL})}${fld('Type',gp+'.type',{opts:['A','A-SI','B','F','AC']})}</div>${L.g.bron?'':`<div class="row"><button class="sm danger" data-a="delG" data-g="${L.gi}">Wissen</button></div>`}`}
+  else{h+=`<h2 style="font-size:14px;margin:12px 0 8px">Hoofddifferentieel</h2><div class="grid">${fld('Gevoeligheid (mA)',bp+'.hoofd.mA',{n:1,opts:[30,100,300]})}${fld('Stroom (A)',bp+'.hoofd.A',{n:1,opts:[25,40,63,80,100]})}${fld('Polen',bp+'.hoofd.polen',{opts:POL})}${fld('Type',bp+'.hoofd.type',{opts:['A','A-SI','B','F','AC']})}${fld('Voedingskabel','project.voeding')}${fld('Aarding','project.aarding')}</div>`}}
+ if(!E.cat)E.cat=CATS[0][0];
+ if(E.mode==='teken')h+=`<input id="libq" placeholder="Zoek symbool" value="${esc(E.q)}" style="margin-top:10px"><div class="libw"><div class="cats" id="libc">${catsHtml()}</div><div class="lib" id="libl">${libHtml()}</div></div>`;
+ else if(!L)h+=`<p class="note" style="margin-top:10px">Tik in het schema op een symbool, een automaat of een differentieel.</p>`;
+ return h}
+const schemaHtml=()=>allPages(S,{schema:true}).map(p=>pageSVG(p,true)).join('');
+function redrawSchema(){const el=$('#sch');if(el)el.innerHTML=schemaHtml()}
+function vSchema(){return`<div class="ws"><div class="side card" id="side">${vSide()}</div><div><div class="row" style="margin:0 0 8px"><button class="sm" data-a="zo">−</button><button class="sm" data-a="zi">+</button><span class="note">${E.mode==='teken'?(!TYPES[E.sym]?'Tik op een blauw toevoegpunt (+) onder een rail om de kring daar toe te voegen.':'Kies een symbool en tik op het blauwe toevoegpunt (+) boven een kring.'):'Tik op een onderdeel om het te selecteren.'}</span></div><div class="pages" id="sch">${schemaHtml()}</div></div></div>`}
+function vExtra(){const sel=(i,f,v,opts)=>`<select data-cfg="${i}.${f}">${opts.map(o=>{const[a,b]=Array.isArray(o)?o:[o,o];return`<option value="${esc(a)}"${String(a)===String(v)?' selected':''}>${esc(b)}</option>`}).join('')}</select>`,
+ ico=t=>{const d=mk();sym(d,t,0,0,1,'',1);return`<svg viewBox="-1 -6.2 16 12.4" style="width:30px;height:22px">${opsSVG(d.o)}</svg>`};
+ return`<div class="card"><h2>Voorgevormde kringen <small>automaat + kabel + symbolen in één klik, bovenaan in de symbolenbibliotheek</small></h2>
+ <p class="note" style="margin-top:0">Snelste manier: teken de kring in het eendraadschema, selecteer ze en kies <b>★ Bewaar als voorgevormde kring</b>. Tik hieronder op een symbool om het te verwijderen.</p>
+ <div class="tw"><table><tr><th></th><th>Naam</th><th>Polen</th><th>Curve</th><th>A</th><th>kA</th><th>Kabeltype</th><th>Geleiders</th><th>Symbolen (in volgorde)</th><th></th></tr>
+ ${CFG.presets.map((q,i)=>`<tr><td style="white-space:nowrap"><button class="sm" data-a="upPre" data-i="${i}" title="Hoger in de lijst"${i?'':' disabled'}>↑</button></td><td><input data-cfg="${i}.naam" value="${esc(q.naam)}" style="min-width:130px"></td><td>${sel(i,'polen',q.polen,POL)}</td><td>${sel(i,'curve',q.curve,['B','C','D'])}</td><td>${sel(i,'A',q.A,AMP)}</td><td>${sel(i,'kA',q.kA,[3,4.5,6,10])}</td><td>${sel(i,'kabelType',q.kabelType,['XVB','EXVB','XGB','VOB','VVB','EXAVB','SVV'])}</td><td><input data-cfg="${i}.kabel" value="${esc(q.kabel)}" style="width:80px"></td>
+  <td><div style="display:flex;flex-wrap:wrap;gap:3px;align-items:center;min-width:220px">${(q.punten||[]).map((p,j)=>`<button class="sm" data-a="preDelSym" data-i="${i}" data-j="${j}" title="${esc((TYPES[p.type]||{}).l)}${p.tekst?' - '+esc(p.tekst):''} (tik om te verwijderen)" style="padding:1px 3px;display:inline-flex;align-items:center;gap:2px">${ico(p.type)}${p.aantal>1?`<small>x${p.aantal}</small>`:''}</button>`).join('')}
+  <select data-cfgadd="${i}" style="width:auto;max-width:120px"><option value="">+ symbool</option>${typeOpts('')}</select></div></td>
+  <td><button class="sm danger" data-a="delPre" data-i="${i}" title="Verwijderen">✕</button></td></tr>`).join('')}</table></div>
+ <div class="row"><button class="sm pri" data-a="addPre">+ lege voorgevormde kring</button><button class="sm" data-a="resetPre">Standaardlijst herstellen</button><span class="note">${CLOUD?'Gedeeld met iedereen in CaSuite.':'Bewaard in deze browser.'}</span></div></div>`}
+function kringTabel(){const cd=codes(S);
+ const rows=S.borden.flatMap(b=>b.groepen.flatMap(g=>g.kringen.map(k=>`<tr data-a="goK" data-kid="${k.id}" style="cursor:pointer"><td><b>${cd.k[k.id]}</b></td><td>${S.borden.length>1?esc(b.naam)+' - ':''}${esc(k.naam)}</td><td>${esc(k.polen)} ${esc(k.curve)}${esc(k.A)}A</td><td>${esc(k.kabelType)} ${esc(k.kabel)}</td><td>Δ${g.sub?g.mA:b.hoofd.mA}mA</td><td class="n">${k.punten.length}</td></tr>`))).join('');
+ return`<div class="card"><h2>Lijst met kringen</h2><div class="tw"><table><tr><th>Kring</th><th>Benaming</th><th>Beveiliging</th><th>Kabel</th><th>Differentieel</th><th class="n">Punten</th></tr>${rows}</table></div></div>`}
+function vMat(){return`<div class="card"><h2>Materiaallijst <small>afgeleid uit het schema; kabellengtes uit het veld Lengte per kring</small><span style="flex:1"></span><button class="sm" data-a="csv">Exporteren naar Excel (CSV)</button></h2><div class="tw"><table><tr><th>Omschrijving</th><th class="n">Aantal</th></tr>${materials(S).map(m=>`<tr><td>${esc(m[0])}</td><td class="n">${m[1]}</td></tr>`).join('')}</table></div></div>`}
+function vPrint(){const pr=S.print||(S.print={schema:true,plan:true,kringen:true,mat:false}),pg=allPages(S,pr);if(!pr.formaat)pr.formaat='A4';
+ return`<div class="card"><h2>Dossier samenstellen</h2>${[['schema','Eendraadschema'],['plan','Situatieplan elektro'],['planMuziek','Situatieplan muziek'],['planAlarm','Situatieplan alarm'],['planNetwerk','Situatieplan netwerk'],['kringen','Lijst met kringen'],['mat','Materiaallijst']].map(x=>`<label class="chkl"><input type="checkbox" data-c="print.${x[0]}" data-r${pr[x[0]]?' checked':''}>${x[1]}</label>`).join('')}
+ <div class="row"><button class="pri" data-a="pdf">PDF maken (${pg.length} blad${pg.length===1?'':'en'})</button><button class="sm" data-a="zo">−</button><button class="sm" data-a="zi">+</button><label class="pck" style="margin-left:6px">Papier <select data-b="print.formaat" data-r style="width:auto">${Object.keys(FORMATEN).map(f=>`<option${pr.formaat===f?' selected':''}>${f}</option>`).join('')}</select> liggend</label><span class="note">Elke laag van het situatieplan komt op een eigen blad. Titelblok: zie tabblad Document.</span></div></div>
+ <div class="pages">${pg.map(p=>pageSVG(p,false)).join('')||'<p style="color:#fff;padding:20px">Niets geselecteerd.</p>'}</div>`}
+function vPlan(){P.pi=clamp(P.pi,0,S.plannen.length-1);const pl=S.plannen[P.pi],H=pl.h||707,ix=pindex(S),gs=laagGroepen(P.laag),cd=codes(S);if(!pl.teksten)pl.teksten=[];
+ if(!gs.some(g=>g.id===P.kring))P.kring=gs[0]?gs[0].id:'';
+ const placed=new Set(S.plannen.flatMap(p=>p.items.map(i=>i.pid))),kr=gs.find(g=>g.id===P.kring),tot=gs.reduce((n,g)=>n+g.comps.length,0),opLaag=new Set(gs.flatMap(g=>g.comps.map(c=>c.id)));
+ if(P.punt.startsWith('pid:')&&(!kr||!kr.comps.some(c=>'pid:'+c.id===P.punt&&!placed.has(c.id)))){const n=kr&&kr.comps.find(c=>!placed.has(c.id));P.punt=n?'pid:'+n.id:(kr&&kr.nieuw==='muziek'&&!kr.comps.length?'new:ls':'')}
+ const sel=pl.items.find(i=>i.id===P.sel),se=sel&&ix[sel.pid],st=pl.teksten.find(t=>t.id===P.sel),tl=ptool();
+ /* tekening */
+ let svg=`<svg id="plan" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 ${H}" style="width:${Math.round(1000*P.zoom)}px;touch-action:${tl==='hand'?'auto':'none'};cursor:${tl==='hand'?'default':'crosshair'}">
+ <defs><pattern id="g10" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M10 0H0V10" fill="none" stroke="#e4e7ec" stroke-width=".5"/></pattern><pattern id="g50" width="50" height="50" patternUnits="userSpaceOnUse"><rect width="50" height="50" fill="url(#g10)"/><path d="M50 0H0V50" fill="none" stroke="#cfd4db" stroke-width=".8"/></pattern></defs>
+ <rect width="1000" height="${H}" fill="#fff"/>`;
+ if(pl.bg&&pl.bg.data)svg+=`<image href="${pl.bg.data}" width="1000" height="${H}" opacity="${P.transp?.28:.55}" preserveAspectRatio="none"/>`;
+ else if(pl.bg)svg+=`<text x="500" y="40" font-size="14" text-anchor="middle" fill="#999">Achtergrond niet lokaal bewaard - opnieuw laden</text>`;
+ svg+=cadSvg(pl);
+ if(P.grid)svg+=`<rect width="1000" height="${H}" fill="url(#g50)" pointer-events="none"/>`;
+ pl.muren.forEach((m,i)=>{svg+=`<line x1="${m[0]}" y1="${m[1]}" x2="${m[2]}" y2="${m[3]}" stroke="#000" stroke-width="${pl.mw||3.2}" stroke-linecap="square"/><line class="wl" data-w="${i}" x1="${m[0]}" y1="${m[1]}" x2="${m[2]}" y2="${m[3]}"/>`});
+ pl.items.forEach(it=>{const l=laagVan(it);if(!P.toon[l]&&l!==P.laag)return;const r=itemOps(pl,it,ix);if(!r)return;const e2=ix[it.pid],hl=e2&&e2.k.id===P.kring,dim=l!==P.laag;svg+=`<g class="pi${it.id===P.sel?' sel':''}${dim?' dim':''}" data-it="${it.id}"${hl?' style="filter:drop-shadow(0 0 2px #0b6bcb)"':''}>${opsSVG(r.ops)}<circle class="hb" cx="${r.cx.toFixed(1)}" cy="${r.cy.toFixed(1)}" r="${r.r.toFixed(1)}"/></g>`});
+ pl.teksten.forEach(t=>{const z=t.z||12,w=Math.max(20,String(t.t).length*z*.56);svg+=`<g class="pi${t.id===P.sel?' sel':''}" data-tx="${t.id}"><text x="${t.x}" y="${t.y}" font-size="${z}">${esc(t.t)}</text><rect class="hb" x="${t.x-3}" y="${t.y-z}" width="${w+6}" height="${z*1.35}"/></g>`});
+ const gh=ghostHtml(pl);svg+=`<g id="ghost" pointer-events="none" opacity=".55" style="filter:drop-shadow(0 0 1.5px #0b6bcb)" visibility="${gh&&P.last?'visible':'hidden'}"${P.last?` transform="translate(${P.last[0]} ${P.last[1]})"`:''}>${gh}</g>`;
+ svg+=`<line id="prev" stroke="#0b6bcb" stroke-width="3" stroke-dasharray="6 5" visibility="hidden"/></svg>`;
+ /* linkerpaneel: letters + componenten */
+ let lets='',kop0=null;gs.forEach(g=>{if(g.kop!==kop0){kop0=g.kop;lets+=`<div class="plh" title="${esc(g.kop)}">${esc(g.kop)}</div>`}
+  const n=g.comps.filter(c=>!placed.has(c.id)).length,klaar=g.comps.length&&!n;
+  lets+=`<button class="plk${g.id===P.kring?' on':''}${klaar?' klaar':''}" data-a="pkr" data-kid="${esc(g.id)}" title="${esc(g.naam)}${n?` - nog ${n} te plaatsen`:klaar?' - alles geplaatst':' - nog niets'}">${esc(g.code)}${n?`<i>${n}</i>`:''}</button>`});
+ if(!gs.length)lets=`<p class="note" style="font-size:12px;padding:4px">${P.laag==='elektro'?'Nog geen kringen.':dosData()?'Niets in CaDos.':'Geen CaDos-dossier.'}</p>`;
+ const lt=t=>(TYPES[t]||LTYPES[t]||{}).l||'';
+ let comp='';if(kr){comp=`<div class="pch"><b class="lb">${esc(kr.code)}</b> ${esc(kr.naam||'')}</div>`+kr.comps.map(c=>{const op=placed.has(c.id);
+   return`<button class="pc${op?' gepl':''}${P.punt==='pid:'+c.id?' on':''}" data-a="ppick" data-pp="${esc(c.id)}" title="${op?'Geplaatst - tik om te tonen':'Tik en plaats op het plan'}">${symIcon(c.type)}<span><b>${esc(c.label)}</b> ${esc(c.tekst||lt(c.type))}${c.aantal>1?' x'+c.aantal:''}</span>${op?'<em>✓</em>':''}</button>`}).join('')
+  +(P.laag==='elektro'?`<select id="pnew" class="pnew"><option value="">+ nieuw symbool in ${esc(kr.code)}</option>${typeOpts(P.punt.startsWith('new:')?P.punt:'','new:')}</select>`
+   :kr.nieuw==='muziek'?`<select id="pnew" class="pnew"><option value="">+ luidspreker / bediening in ${esc(kr.code)}</option>${Object.entries(LTYPES).filter(([,v])=>v.laag==='muziek').map(([k,v])=>`<option value="new:${k}"${P.punt==='new:'+k?' selected':''}>${v.l}</option>`).join('')}</select>${kr.comps.length?'':`<p class="note" style="padding:0 8px;font-size:12px">Klik op het plan om de eerste luidspreker van ${esc(kr.code)} te plaatsen.</p>`}`
+   :`<p class="note" style="padding:6px 8px;font-size:12px">Komt uit CaDos (${P.laag==='alarm'?'tabblad Alarm':'tabbladen Data en Camerabewaking'}). Toevoegen of wijzigen doe je daar.</p>`)}
+ else comp=`<p class="note" style="padding:8px">${P.laag==='elektro'?'Nog geen kringen. Teken eerst het eendraadschema.':!dosData()?'Dit project heeft geen CaDos-dossier.':P.laag==='muziek'?'Nog geen muziekzones in CaDos (tabblad Muziek).':P.laag==='alarm'?'Nog geen alarmtoestellen in CaDos (tabblad Alarm).':'Nog geen patchpoorten met omschrijving of camera\'s in CaDos.'}</p>`;
+ const hint=tl==='muur'?'Sleep om een muur te tekenen; lijnen worden recht getrokken en klikken vast aan hoeken.':tl==='tekst'?'Tik op het plan om een tekst te plaatsen.':tl==='gom'?'Tik op een symbool, muur of tekst om het van het plan te halen.':tl==='hand'?'Tik op een symbool om het te selecteren; sleep om te verplaatsen.':(P.punt?'Klik links om te plaatsen, rechts om 90° te draaien. Het volgende component staat daarna meteen klaar.':'Alle componenten staan op het plan. Kies links een letter of "+ nieuw symbool".');
+ const ck=(k,l)=>`<label class="pck"><input type="checkbox" data-a="pck" data-k="${k}"${P[k]?' checked':''}>${l}</label>`;
+ const rotKnop=tl==='punt'&&P.punt?` <button class="sm" data-a="prot" title="Rechtermuisknop of R">↻ Draaien (${P.rot*90}°)</button>`:'';
+ return`<div class="card ptb"><div class="row" style="margin:0">
+  <div class="seg"><button data-a="pmode" data-m="teken" class="${P.mode==='teken'?'on':''}">✎ Tekenen</button><button data-a="pmode" data-m="sel" class="${P.mode==='sel'?'on':''}">↖ Selecteren</button><button data-a="pmode" data-m="gom" class="${P.mode==='gom'?'on':''}">✕ Wissen</button></div>
+  <span class="pzoom"><button class="sm" data-a="pzo">−</button><input type="range" id="pzr" min="30" max="400" value="${Math.round(P.zoom*100)}"><button class="sm" data-a="pzi">+</button></span>
+  <span class="pzoom"><button class="sm" data-a="ppg" data-d="-1"${P.pi?'':' disabled'}>‹</button><b style="min-width:120px;text-align:center">${esc(pl.naam)} <small style="color:var(--mut);font-weight:400">${P.pi+1}/${S.plannen.length}</small></b><button class="sm" data-a="ppg" data-d="1"${P.pi<S.plannen.length-1?'':' disabled'}>›</button><button class="sm" data-a="addPlan" title="Verdieping toevoegen">+</button></span>
+  <span class="pzoom">${ck('transp','Transparant')}${ck('grid','Toon grid')}${ck('snapGrid','Kleef aan grid')}${ck('snapMuur','Kleef aan muren')}</span>
+  <span class="pzoom"><b style="font-size:13px">Toon:</b>${LAGEN.map(([k,n])=>`<label class="pck"><input type="checkbox" data-a="ptoon" data-k="${k}"${P.toon[k]||P.laag===k?' checked':''}${P.laag===k?' disabled':''}>${n}</label>`).join('')}</span></div>
+ <div class="row"><input data-b="plannen.${P.pi}.naam" data-r value="${esc(pl.naam)}" style="width:140px" title="Naam verdieping">
+  <label class="sm filel">Achtergrond (AutoCAD, PDF, afbeelding)<input type="file" id="bgFile" accept=".dxf,.dwg,image/*,application/pdf" style="display:none"></label>${pl.cad?`<button class="sm" data-a="cadLagen">Lagen (${pl.cad.lagen.filter(l=>l.aan!==false).length}/${pl.cad.lagen.length})</button>`:''}
+  ${CLOUD&&cloud.plannen.length?`<select id="casnap" style="max-width:180px"><option value="">Plan uit CaSnap...</option>${cloud.plannen.map((p,i)=>`<option value="${i}">${esc(p.naam||'Naamloos plan')}</option>`).join('')}</select>`:''}
+  ${pl.bg?`<button class="sm" data-a="noBg">Achtergrond weg</button>`:''}
+  <select data-b="plannen.${P.pi}.sym" data-n data-r title="Symboolgrootte"><option value="2"${pl.sym==2?' selected':''}>Symbolen klein</option><option value="3"${pl.sym==3?' selected':''}>Symbolen normaal</option><option value="4.2"${pl.sym==4.2?' selected':''}>Symbolen groot</option></select>
+  <select data-b="plannen.${P.pi}.mw" data-n data-r title="Muurdikte"><option value="2"${pl.mw==2?' selected':''}>Muur dun</option><option value="3.2"${(pl.mw||3.2)==3.2?' selected':''}>Muur normaal</option><option value="6"${pl.mw==6?' selected':''}>Muur dik</option></select>
+  ${S.plannen.length>1?`<button class="sm danger" data-a="delPlan">Verwijder verdieping</button>`:''}<span style="flex:1"></span><span class="note">${LAGEN.find(x=>x[0]===P.laag)[1]}: ${[...opLaag].filter(x=>placed.has(x)).length} van ${tot} geplaatst</span></div>
+ ${se?`<div class="row"><b class="lb">${se.code}${se.nr}</b><span>${esc((TYPES[se.p.type]||LTYPES[se.p.type]||{}).l)}${se.p.tekst?' - '+esc(se.p.tekst):''}</span><button class="sm" data-a="rot">↻ Draaien</button>${se.laag==='elektro'?`<button class="sm" data-a="goK" data-kid="${se.k.id}">Naar kring</button>`:''}${se.laag==='muziek'?`<button class="sm danger" data-a="mzWeg" data-pp="${esc(sel.pid)}">Luidspreker wissen</button>`:''}<button class="sm danger" data-a="delIt">Van plan halen</button></div>`:''}
+ ${st?`<div class="row"><b>Tekst</b><input data-b="plannen.${P.pi}.teksten.${pl.teksten.indexOf(st)}.t" data-r value="${esc(st.t)}" style="width:200px"><select data-b="plannen.${P.pi}.teksten.${pl.teksten.indexOf(st)}.z" data-n data-r><option value="9"${st.z==9?' selected':''}>klein</option><option value="12"${(st.z||12)==12?' selected':''}>normaal</option><option value="18"${st.z==18?' selected':''}>groot</option></select><button class="sm danger" data-a="delTx">Wissen</button></div>`:''}</div>
+ <div class="pws"><div class="pside card">
+  <div class="seg plg">${LAGEN.map(([k,n])=>`<button data-a="plaag" data-l="${k}" class="${P.laag===k?'on':''}">${n}</button>`).join('')}</div>
+  <div class="ptools"><button class="${P.mode==='teken'&&P.wat==='muur'?'on':''}" data-a="pwat" data-w="muur" title="Muren tekenen">⌂<small>Muren</small></button><button class="${P.mode==='teken'&&P.wat==='tekst'?'on':''}" data-a="pwat" data-w="tekst" title="Tekst plaatsen"><i style="font-family:serif">abc</i><small>Tekst</small></button></div>
+  <div class="pcols"><div class="plet">${lets}</div><div class="pcomp">${comp}</div></div></div>
+ <div><p class="note" style="margin:0 0 6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span>${hint}</span>${rotKnop}</p><div class="pages">${svg}</div></div></div>`}
+function render(){gc();const nw=checks(S).filter(x=>x.lvl==='w').length;
+ $('#tabs').innerHTML=[['doc','Document'],['schema','Eendraadschema'],['plan','Situatieplan'],['kring','Kringen'+(nw?`<span class="badge">${nw}</span>`:'')],['mat','Materiaallijst'],['print','Afdrukken'],['extra','Extra']].map(t=>`<button data-tab="${t[0]}" class="${tab===t[0]?'on':''}">${t[1]}</button>`).join('');
+ const sc=document.querySelector('.pages'),sx=sc?sc.scrollLeft:0,sy=sc?sc.scrollTop:0,sd=$('.lib'),ls=sd?sd.scrollTop:0;
+ $('#v').innerHTML=tab==='doc'?vDoc():tab==='kring'?vKring():tab==='mat'?vMat():tab==='print'?vPrint():tab==='extra'?vExtra():tab==='plan'?vPlan():vSchema();
+ const s2=document.querySelector('.pages');if(s2&&sc){s2.scrollLeft=sx;s2.scrollTop=sy}const l2=$('.lib');if(l2)l2.scrollTop=ls}
+let tt;function toast(msg,undo){$('#tmsg').textContent=msg;$('#tundo').style.display=undo?'':'none';$('#toast').style.display='flex';clearTimeout(tt);tt=setTimeout(()=>$('#toast').style.display='none',undo?7000:3800)}
+function goKring(id){if(!id)return;const x=allKringen().find(x=>x.k.id===id);if(x)bi=x.bx;open.add(id);tab='kring';render();const el=document.querySelector(`details[data-id="${id}"]`);if(el)el.scrollIntoView({block:'center'})}
+async function saveFile(filename,data){
+ let dl=null;try{dl=window.claude&&await window.claude.use('downloads')}catch(e){}
+ if(dl){try{await dl.save({filename,data});toast('Bewaard: '+filename)}catch(e){if(!e||e.code!=='declined')toast('Bewaren lukt hier niet ('+((e&&e.code)||'fout')+')')}return}
+ try{const b=data instanceof Blob?data:new Blob([data]),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=filename;document.body.appendChild(a);a.click();a.remove();if(window.claude)toast('Downloaden is in deze weergave niet beschikbaar')}catch(e){toast('Downloaden lukt hier niet')}}
+const fname=ext=>'cadraw-'+((S.project.naam||'project').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'project')+'.'+ext;
+const mut=(msg,fn)=>{snap();fn();persist();render();if(msg)toast(msg,true)};
+function melding(titel,tekst){const o=$('#ovl');o.innerHTML=`<div class="card"><h2>${esc(titel)}</h2><p style="white-space:pre-line;margin:0">${esc(tekst)}</p><div class="row"><button class="pri" data-a="closeOvl">OK</button></div></div>`;o.style.display='flex'}
+function bevestig(titel,tekst,ja='Ja'){return new Promise(ok=>{const o=$('#ovl');o.innerHTML=`<div class="card"><h2>${esc(titel)}</h2><p style="white-space:pre-line;margin:0">${esc(tekst)}</p><div class="row"><button class="pri" id="bvja">${esc(ja)}</button><button id="bvnee">Annuleren</button></div></div>`;o.style.display='flex';
+ const done=v=>{o.style.display='none';o.innerHTML='';ok(v)};$('#bvja').onclick=()=>done(true);$('#bvnee').onclick=()=>done(false)})}
+/* voert een structuurwijziging uit op CaDos (online of lokaal) en past daarna CaDraw aan; alles of niets */
+let bezig=false;
+async function struct(op,naCaDraw,okMsg){if(bezig)return false;bezig=true;
+ try{let r;if(CLOUD)r=await cloud.kastOp(op);else{const d=JSON.parse(JSON.stringify(S.cadosLokaal));r=kastOp(d,op);if(r.ok){S.cadosLokaal=d;r.data=d}}
+  if(!r.ok){melding('Niet mogelijk in de kast',r.msg);return false}
+  undoStack=[];naCaDraw(r);syncCodes(r.data);persist();render();toast((okMsg||'Aangepast')+' - ook in CaDos'+(r.kam?' (mee op de kamgeleider)':''));return true}
+ catch(err){melding('CaDos niet bijgewerkt',String(err.message||err));return false}
+ finally{bezig=false}}
+const groepBron=(b,g)=>g.sub?g.bron:b.hoofd.bron;
+/* kring invoegen op positie idx in groep g (van bord b); in CaDos op dezelfde plaats */
+function voegKringIn(b,g,idx,k){bi=S.borden.indexOf(b);
+ if(!b.kastId)return mut('',()=>{g.kringen.splice(idx,0,k);E.sel='k:'+k.id;open.add(k.id)});
+ const ks=g.kringen,voor=(ks.slice(idx).find(x=>x.bron)||{}).bron,na=voor?null:([...ks.slice(0,idx)].reverse().find(x=>x.bron)||{}).bron;
+ return struct({t:'ins',kastId:b.kastId,kring:k,voor,na,groep:groepBron(b,g)},r=>{k.bron=r.id;delete k.vast;g.kringen.splice(idx,0,k);E.sel='k:'+k.id;open.add(k.id)},'Kring tussengevoegd')}
+function verplaatsKring(L,dir){const j=L.ki+dir,ks=L.g.kringen;if(j<0||j>=ks.length)return;const A_=ks[L.ki],B_=ks[j],wissel=()=>{ks[L.ki]=B_;ks[j]=A_};
+ if(!L.b.kastId||!A_.bron||!B_.bron)return mut('',wissel);
+ return struct({t:'swap',kastId:L.b.kastId,a:A_.bron,b:B_.bron},wissel,'Kring verplaatst')}
+async function wisKring(L){const k=L.k;
+ if(!L.b.kastId||!k.bron)return mut('Kring verwijderd',()=>{L.g.kringen.splice(L.ki,1);E.sel=null});
+ if(!await bevestig('Kring wissen',`${codes(S).k[k.id]} ${k.naam||''} wordt ook uit de zekeringkast in CaDos verwijderd. Verwijzingen ernaar (driverkast, patchkast, laadpaal, verwarming, alarm) en draden in het uitvoeringsplan worden losgekoppeld. De letters erna schuiven op.`,'Wissen'))return;
+ return struct({t:'del',kastId:L.b.kastId,id:k.bron},()=>{L.g.kringen.splice(L.ki,1);E.sel=null},'Kring gewist')}
+function voegDiffToe(b){const g=newGroep();bi=S.borden.indexOf(b);
+ if(!b.kastId)return mut('Differentieel toegevoegd',()=>{b.groepen.push(g);E.sel='g:'+g.id});
+ return struct({t:'diff',kastId:b.kastId,groep:g},r=>{g.bron=r.id;b.groepen.push(g);E.sel='g:'+g.id},'Differentieel toegevoegd op een nieuwe rij')}
+const nieuweKring=()=>E.sym.startsWith('pre:')?presetKring(+E.sym.slice(4)):newKring();
+function loadScript(src){return new Promise((ok,no)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>no(new Error('Kon '+src+' niet laden'));document.head.appendChild(s)})}
+
+/* ---- AutoCAD (DXF) als achterliggende laag: vectoren per laag, kiesbare uitsnede, lagen aan/uit, muren om aan te kleven ---- */
+const CAD_KLEUR='#8a9099';
+const cadPaths=d=>{const out=[];let cur=null;String(d).replace(/([ML])([-\d.]+) ([-\d.]+)/g,(m,c,x,y)=>{x=+x;y=+y;if(c==='M'){cur=[[x,y]];out.push(cur)}else if(cur)cur.push([x,y])});return out};
+const cadCache=new WeakMap();
+function cadSegs(pl){if(!pl.cad)return[];let c=cadCache.get(pl.cad);if(c)return c;c=[];pl.cad.lagen.forEach(l=>{if(!l.snap||l.aan===false)return;cadPaths(l.d).forEach(pts=>{for(let i=1;i<pts.length;i++)c.push([pts[i-1][0],pts[i-1][1],pts[i][0],pts[i][1]])})});cadCache.set(pl.cad,c);return c}
+function cadOps(pl,o){if(!pl.cad)return;pl.cad.lagen.forEach(l=>{if(l.aan===false)return;cadPaths(l.d).forEach(pts=>{for(let i=1;i<pts.length;i++)o.push(['L',pts[i-1][0],pts[i-1][1],pts[i][0],pts[i][1],.6,0,CAD_KLEUR])})});
+ (pl.cad.tekst||[]).forEach(t=>{const l=pl.cad.lagen.find(x=>x.n===t.l);if(l&&l.aan===false)return;o.push(['T',t.x,t.y,t.t,t.z,'s',t.r||0,0,0,CAD_KLEUR])})}
+function cadSvg(pl){if(!pl.cad)return'';return`<g pointer-events="none" opacity="${P.transp?.4:1}"><g fill="none" stroke="${CAD_KLEUR}" stroke-width=".6" stroke-linejoin="round" stroke-linecap="round">${pl.cad.lagen.filter(l=>l.aan!==false).map(l=>`<path d="${l.d}"/>`).join('')}</g>`
+ +(pl.cad.tekst||[]).filter(t=>{const l=pl.cad.lagen.find(x=>x.n===t.l);return!l||l.aan!==false}).map(t=>`<text x="${t.x}" y="${t.y}" font-size="${t.z}" fill="${CAD_KLEUR}"${t.r?` transform="rotate(${-t.r} ${t.x} ${t.y})"`:''}>${esc(t.t)}</text>`).join('')+`</g>`}
+/* DXF lezen -> lagen met polylijnen in tekeningcoördinaten (blokken uitgeklapt, bogen benaderd) */
+function dxfLees(txt){const DP=window.DxfParser&&(window.DxfParser.default||window.DxfParser);const dxf=new DP().parseSync(txt);if(!dxf)throw new Error('Geen geldig DXF-bestand.');
+ const lagen={},blocks=dxf.blocks||{},I=[1,0,0,1,0,0],R=Math.PI/180;
+ const L=n=>lagen[n]||(lagen[n]={n,polys:[],tekst:[],aantal:0});
+ const mul=(a,b)=>[a[0]*b[0]+a[1]*b[2],a[0]*b[1]+a[1]*b[3],a[2]*b[0]+a[3]*b[2],a[2]*b[1]+a[3]*b[3],a[0]*b[4]+a[1]*b[5]+a[4],a[2]*b[4]+a[3]*b[5]+a[5]];
+ const tr=(m,x,y)=>[m[0]*x+m[1]*y+m[4],m[2]*x+m[3]*y+m[5]];
+ const boog=(cx,cy,r,a0,a1)=>{while(a1<=a0)a1+=2*Math.PI;const n=Math.max(4,Math.ceil((a1-a0)/(Math.PI/18))),o=[];for(let i=0;i<=n;i++){const a=a0+(a1-a0)*i/n;o.push([cx+r*Math.cos(a),cy+r*Math.sin(a)])}return o};
+ const bulge=(p,q,b)=>{const d=Math.hypot(q[0]-p[0],q[1]-p[1]);if(!b||d<1e-9)return[q];const th=4*Math.atan(b),r=d/(2*Math.sin(th/2)),mx=(p[0]+q[0])/2,my=(p[1]+q[1])/2,h=Math.sqrt(Math.max(0,r*r-d*d/4))*Math.sign(b)*(Math.abs(th)>Math.PI?-1:1),ux=(q[0]-p[0])/d,uy=(q[1]-p[1])/d,cx=mx-uy*h,cy=my+ux*h,a0=Math.atan2(p[1]-cy,p[0]-cx);
+  const n=Math.max(3,Math.ceil(Math.abs(th)/(Math.PI/18))),o=[];for(let i=1;i<=n;i++){const a=a0+th*i/n;o.push([cx+Math.abs(r)*Math.cos(a),cy+Math.abs(r)*Math.sin(a)])}return o};
+ const ext=e=>(e.extrusionDirectionZ<0||(e.extrusionDirection&&e.extrusionDirection.z<0))?[-1,0,0,1,0,0]:I;
+ const strip=t=>String(t||'').replace(/\\P/g,' ').replace(/\\[A-Za-z][^;\\{}]*;/g,'').replace(/[{}]/g,'').replace(/\\(.)/g,'$1').replace(/%%[cC]/g,'Ø').replace(/%%[dD]/g,'°').replace(/%%[pP]/g,'±').trim();
+ function walk(ents,m,ouder,diep){(ents||[]).forEach(e=>{if(e.inPaperSpace)return;let ln=e.layer||'0';if(ln==='0'&&ouder)ln=ouder;const l=L(ln);l.aantal++;const mm=mul(m,ext(e)),poly=(pts,dicht)=>{if(pts.length<2)return;const o=pts.map(q=>tr(mm,q[0],q[1]));if(dicht)o.push(o[0]);l.polys.push(o)};
+  switch(e.type){
+   case'LINE':poly(e.vertices.map(v=>[v.x,v.y]));break;
+   case'LWPOLYLINE':case'POLYLINE':{const v=(e.vertices||[]).filter(x=>x&&x.x!=null);if(v.length<2)break;const o=[[v[0].x,v[0].y]],dicht=e.shape||e.closed;
+    for(let i=0;i<v.length-(dicht?0:1);i++){const a=v[i],b=v[(i+1)%v.length];o.push(...bulge([a.x,a.y],[b.x,b.y],a.bulge||0))}poly(o);break}
+   case'CIRCLE':poly(boog(e.center.x,e.center.y,e.radius,0,2*Math.PI));break;
+   case'ARC':poly(boog(e.center.x,e.center.y,e.radius,e.startAngle,e.endAngle));break;
+   case'ELLIPSE':{const c=e.center,M=e.majorAxisEndPoint,ra=Math.hypot(M.x,M.y),rb=ra*(e.axisRatio||1),rot=Math.atan2(M.y,M.x);let a0=e.startAngle||0,a1=e.endAngle==null?2*Math.PI:e.endAngle;while(a1<=a0)a1+=2*Math.PI;const o=[];
+    for(let i=0;i<=36;i++){const a=a0+(a1-a0)*i/36,x=ra*Math.cos(a),y=rb*Math.sin(a);o.push([c.x+x*Math.cos(rot)-y*Math.sin(rot),c.y+x*Math.sin(rot)+y*Math.cos(rot)])}poly(o);break}
+   case'SPLINE':{const v=(e.fitPoints&&e.fitPoints.length?e.fitPoints:e.controlPoints)||[];poly(v.map(q=>[q.x,q.y]));break}
+   case'SOLID':case'3DFACE':{const v=(e.points||e.vertices||[]).map(q=>[q.x,q.y]);if(v.length>2)poly(e.type==='SOLID'&&v.length===4?[v[0],v[1],v[3],v[2]]:v,true);break}
+   case'TEXT':case'MTEXT':case'ATTRIB':{const t=strip(e.text);if(!t)break;const pos=e.type==='MTEXT'?e.position:(e.halign||e.valign)&&e.endPoint?e.endPoint:e.startPoint;if(!pos)break;
+    const h=(e.type==='MTEXT'?e.height:e.textHeight)||2.5,sc=Math.sqrt(Math.abs(mm[0]*mm[3]-mm[1]*mm[2]))||1,q=tr(mm,pos.x,pos.y);
+    let r=e.rotation||(e.directionVector?Math.atan2(e.directionVector.y,e.directionVector.x)/R:0);r+=Math.atan2(mm[2],mm[0])/R;l.tekst.push({x:q[0],y:q[1],t:t.slice(0,60),h:h*sc,r});break}
+   case'INSERT':{const b=blocks[e.name];if(!b||diep>8)break;const bp=b.position||{x:0,y:0},sx=e.xScale||1,sy=e.yScale||1,a=(e.rotation||0)*R,c=Math.cos(a),sn=Math.sin(a),
+    nc=Math.max(1,e.columnCount||1),nr=Math.max(1,e.rowCount||1);
+    for(let ci=0;ci<nc;ci++)for(let ri=0;ri<nr;ri++){const ox=ci*(e.columnSpacing||0),oy=ri*(e.rowSpacing||0),px=e.position.x+c*ox-sn*oy,py=e.position.y+sn*ox+c*oy;
+     const loc=mul([c,-sn,sn,c,px,py],mul([sx,0,0,sy,0,0],[1,0,0,1,-bp.x,-bp.y]));walk(b.entities,mul(mm,loc),ln,diep+1)}break}
+   case'DIMENSION':{const b=blocks[e.block];if(b&&diep<=8)walk(b.entities,mm,ln,diep+1);break}
+  }})}
+ walk(dxf.entities,I,null,0);
+ const lijst=Object.values(lagen).filter(l=>l.polys.length||l.tekst.length);if(!lijst.length)throw new Error('Geen tekening gevonden in de modelruimte van dit DXF-bestand.');
+ /* robuuste omhullende: verdwaalde objecten ver buiten het plan negeren */
+ const xs=[],ys=[];lijst.forEach(l=>l.polys.forEach(pp=>pp.forEach((q,i)=>{if(i%3===0){xs.push(q[0]);ys.push(q[1])}})));xs.sort((a,b)=>a-b);ys.sort((a,b)=>a-b);
+ const pc=(a,f)=>a[Math.min(a.length-1,Math.max(0,Math.floor(f*(a.length-1))))];let x0=pc(xs,.003),x1=pc(xs,.997),y0=pc(ys,.003),y1=pc(ys,.997);const mx=(x1-x0)*.03||1,my=(y1-y0)*.03||1;
+ return{lagen:lijst,box:{x0:x0-mx,x1:x1+mx,y0:y0-my,y1:y1+my},eenheid:dxf.header&&dxf.header.$INSUNITS}}
+/* dialoog: lagen kiezen (tonen / kleven) en eventueel een uitsnede slepen (bv. één verdieping uit een tekening met alle verdiepingen) */
+function cadDialoog(res,naam){return new Promise(ok=>{const o=$('#ovl'),b=res.box,W=560,k=W/(b.x1-b.x0),Hh=Math.min(380,Math.max(120,(b.y1-b.y0)*k)),kk=Math.min(k,Hh/(b.y1-b.y0)),px=x=>((x-b.x0)*kk).toFixed(1),py=y=>((b.y1-y)*kk).toFixed(1);
+ const uit=/maat|dim|arcer|hatch|kader|frame|viewport|vport|defpoints|tekenkader|cartouche/i,muur=/muur|mur|wall|wand|a-wall|gevel/i;
+ res.lagen.forEach(l=>{l.aan=!uit.test(l.n);l.snap=muur.test(l.n)});
+ const prev=()=>res.lagen.filter(l=>l.aan).map(l=>`<path d="${l.polys.map(pp=>'M'+pp.map(q=>px(q[0])+' '+py(q[1])).join('L')).join('')}"/>`).join('');
+ let sel=null;
+ o.innerHTML=`<div class="card" style="max-width:920px"><h2>AutoCAD-tekening: ${esc(naam)}</h2>
+  <p class="note" style="margin-top:0">Sleep in het voorbeeld een rechthoek rond het deel dat je wil gebruiken (bv. één verdieping). Zonder rechthoek wordt de hele tekening gebruikt.</p>
+  <div style="display:flex;gap:12px;flex-wrap:wrap"><div style="flex:1 1 560px;min-width:0"><svg id="cadpv" viewBox="0 0 ${W} ${(b.y1-b.y0)*kk}" style="width:100%;max-height:420px;border:1px solid var(--line);border-radius:8px;background:#fff;touch-action:none;cursor:crosshair"><g id="cadpvl" fill="none" stroke="#555" stroke-width=".6">${prev()}</g><rect id="cadsel" fill="rgba(11,107,203,.12)" stroke="#0b6bcb" stroke-width="1.2" visibility="hidden"/></svg></div>
+  <div style="flex:1 1 240px;max-height:420px;overflow:auto"><table><tr><th>Laag</th><th>Tonen</th><th title="Symbolen kleven aan lijnen op deze laag">Kleven</th></tr>${res.lagen.map((l,i)=>`<tr><td style="font-size:12.5px">${esc(l.n)}<br><small style="color:var(--mut)">${l.polys.length} lijnen${l.tekst.length?', '+l.tekst.length+' teksten':''}</small></td><td><input type="checkbox" data-cl="${i}" data-f="aan"${l.aan?' checked':''} style="width:auto"></td><td><input type="checkbox" data-cl="${i}" data-f="snap"${l.snap?' checked':''} style="width:auto"></td></tr>`).join('')}</table></div></div>
+  <div class="row"><button class="pri" id="cadok">Plaatsen als achtergrond</button><button id="cadwis">Uitsnede wissen</button><button id="cadno">Annuleren</button><span class="note" id="cadinfo"></span></div></div>`;
+ o.style.display='flex';const sv=$('#cadpv'),rc=$('#cadsel');let st=null;
+ const pt=e=>{const p=sv.createSVGPoint();p.x=e.clientX;p.y=e.clientY;const q=p.matrixTransform(sv.getScreenCTM().inverse());return[q.x,q.y]};
+ const toon=()=>{if(!sel){rc.setAttribute('visibility','hidden');return}rc.setAttribute('x',Math.min(sel[0],sel[2]));rc.setAttribute('y',Math.min(sel[1],sel[3]));rc.setAttribute('width',Math.abs(sel[2]-sel[0]));rc.setAttribute('height',Math.abs(sel[3]-sel[1]));rc.setAttribute('visibility','visible')};
+ sv.onpointerdown=e=>{st=pt(e);sel=[...st,...st];sv.setPointerCapture(e.pointerId);toon()};sv.onpointermove=e=>{if(!st)return;const q=pt(e);sel=[st[0],st[1],q[0],q[1]];toon()};
+ sv.onpointerup=()=>{st=null;if(sel&&(Math.abs(sel[2]-sel[0])<8||Math.abs(sel[3]-sel[1])<8))sel=null;toon()};
+ o.querySelectorAll('[data-cl]').forEach(c=>c.onchange=()=>{res.lagen[+c.dataset.cl][c.dataset.f]=c.checked;if(c.dataset.f==='aan')$('#cadpvl').innerHTML=prev()});
+ const done=v=>{o.style.display='none';o.innerHTML='';ok(v)};
+ $('#cadwis').onclick=()=>{sel=null;toon()};$('#cadno').onclick=()=>done(null);
+ $('#cadok').onclick=()=>{let box=b;if(sel){const xa=Math.min(sel[0],sel[2])/kk+b.x0,xb=Math.max(sel[0],sel[2])/kk+b.x0,ya=b.y1-Math.max(sel[1],sel[3])/kk,yb=b.y1-Math.min(sel[1],sel[3])/kk;box={x0:xa,x1:xb,y0:ya,y1:yb}}
+  if(!res.lagen.some(l=>l.aan)){$('#cadinfo').textContent='Zet minstens één laag aan.';return}done(box)}})}
+/* omzetten naar plancoördinaten (breedte 1000) en bijsnijden tot de uitsnede */
+function cadNaarPlan(res,box,naam){const k=1000/(box.x1-box.x0),H=Math.round((box.y1-box.y0)*k),X=x=>(x-box.x0)*k,Y=y=>(box.y1-y)*k,r1=v=>Math.round(v*10)/10;
+ const binnen=pp=>{let a=Infinity,b=-Infinity,c=Infinity,d=-Infinity;pp.forEach(q=>{a=Math.min(a,q[0]);b=Math.max(b,q[0]);c=Math.min(c,q[1]);d=Math.max(d,q[1])});return!(b<box.x0||a>box.x1||d<box.y0||c>box.y1)};
+ const lagen=[],tekst=[];
+ res.lagen.forEach(l=>{if(!l.aan)return;let d='';l.polys.forEach(pp=>{if(!binnen(pp))return;let vx=null,vy=null,s2='';pp.forEach((q,i)=>{const x=r1(X(q[0])),y=r1(Y(q[1]));if(i&&x===vx&&y===vy)return;s2+=(s2?'L':'M')+x+' '+y;vx=x;vy=y});if(s2.includes('L'))d+=s2});
+  if(d)lagen.push({n:l.n,d,snap:!!l.snap,aan:true});
+  l.tekst.forEach(t=>{if(t.x<box.x0||t.x>box.x1||t.y<box.y0||t.y>box.y1)return;tekst.push({l:l.n,x:r1(X(t.x)),y:r1(Y(t.y)),t:t.t,z:Math.max(2,r1(t.h*k)),r:Math.round(t.r||0)})})});
+ return{cad:{naam,lagen,tekst},h:Math.max(100,H)}}
+async function laadDxf(file){if(/\.dwg$/i.test(file.name)){melding('DWG kan niet rechtstreeks gelezen worden','DWG is het gesloten bestandsformaat van AutoCAD.\n\nSla de tekening op als DXF: in AutoCAD via Opslaan als → AutoCAD DXF (*.dxf), of vraag de architect om een DXF. Zonder AutoCAD kan het met de gratis ODA File Converter (DWG → DXF).\n\nKies daarna het DXF-bestand hier opnieuw.');return}
+ toast('AutoCAD-tekening lezen...');if(!window.DxfParser)await loadScript('https://cdn.jsdelivr.net/npm/dxf-parser@1.1.2/dist/dxf-parser.js');
+ const res=dxfLees(await file.text()),box=await cadDialoog(res,file.name);if(!box)return;
+ const{cad,h}=cadNaarPlan(res,box,file.name),kb=Math.round(JSON.stringify(cad).length/1024);
+ if(kb>4500){melding('Tekening te groot',`Deze uitsnede is ${Math.round(kb/1024*10)/10} MB aan lijnen. Zet lagen uit die je niet nodig hebt (meubels, arcering, maatlijnen) of kies een kleinere uitsnede.`);return}
+ const pl=S.plannen[P.pi],had=pl.items.length+pl.muren.length;
+ mut('',()=>{pl.cad=cad;pl.h=h;pl.bg=null;if(!pl.sym||pl.sym>3)pl.sym=3});
+ toast(`AutoCAD-tekening geplaatst (${cad.lagen.length} lagen, ${kb} kB)`+(had?' - controleer de plaats van wat er al op het plan stond':''))}
+function cadLagenDialoog(){const pl=S.plannen[P.pi];if(!pl.cad)return;const o=$('#ovl');
+ o.innerHTML=`<div class="card"><h2>Lagen van ${esc(pl.cad.naam||'de AutoCAD-tekening')}</h2><table><tr><th>Laag</th><th>Tonen</th><th>Kleven</th></tr>${pl.cad.lagen.map((l,i)=>`<tr><td>${esc(l.n)}</td><td><input type="checkbox" data-cl2="${i}" data-f="aan"${l.aan!==false?' checked':''} style="width:auto"></td><td><input type="checkbox" data-cl2="${i}" data-f="snap"${l.snap?' checked':''} style="width:auto"></td></tr>`).join('')}</table>
+ <div class="row"><button class="pri" data-a="closeOvl">Klaar</button><button class="sm danger" data-a="cadWeg">AutoCAD-laag verwijderen</button></div></div>`;o.style.display='flex';
+ o.querySelectorAll('[data-cl2]').forEach(c=>c.onchange=()=>{const l=pl.cad.lagen[+c.dataset.cl2];l[c.dataset.f]=c.checked;cadCache.delete(pl.cad);persist();render()})}
+/* ---- achtergrond: afbeelding of pdf -> jpeg dataURL ---- */
+function canvasToBg(cv){const max=1800,k=Math.min(1,max/Math.max(cv.width,cv.height)),c=document.createElement('canvas');c.width=Math.round(cv.width*k);c.height=Math.round(cv.height*k);
+ const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(cv,0,0,c.width,c.height);return{data:c.toDataURL('image/jpeg',.82),w:c.width,h:c.height}}
+async function blobToBg(blob){
+ if(blob.type==='application/pdf'||/\.pdf$/i.test(blob.name||'')){
+  if(!window.pdfjsLib){await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.5.141/pdf.min.js');window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.5.141/pdf.worker.min.js'}
+  const pdf=await window.pdfjsLib.getDocument({data:await blob.arrayBuffer()}).promise;let nr=1;
+  if(pdf.numPages>1){nr=clamp(parseInt(await ask(`Deze PDF heeft ${pdf.numPages} pagina's. Welke pagina?`,'1'),10)||1,1,pdf.numPages)}
+  const page=await pdf.getPage(nr),v0=page.getViewport({scale:1}),vp=page.getViewport({scale:1800/Math.max(v0.width,v0.height)}),cv=document.createElement('canvas');cv.width=vp.width;cv.height=vp.height;
+  await page.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise;return canvasToBg(cv)}
+ const img=await new Promise((ok,no)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=()=>no(new Error('Afbeelding niet leesbaar'));i.src=URL.createObjectURL(blob)});
+ const cv=document.createElement('canvas');cv.width=img.naturalWidth;cv.height=img.naturalHeight;cv.getContext('2d').drawImage(img,0,0);return canvasToBg(cv)}
+function setBg(bg){mut('Achtergrond geplaatst',()=>{const pl=S.plannen[P.pi],oh=pl.h||707,nh=Math.round(1000*bg.h/bg.w);pl.bg=bg;pl.h=nh;delete pl.cad;
+ if(pl.items.length||pl.muren.length){const f=nh/oh;if(nh<oh){pl.items.forEach(i=>i.y=Math.min(i.y,nh-10));pl.muren.forEach(m=>{m[1]=Math.min(m[1],nh);m[3]=Math.min(m[3],nh)})}void f}})}
+/* eenvoudige dialoog (prompt() werkt niet overal) */
+function ask(vraag,def=''){return new Promise(ok=>{const o=$('#ovl');o.innerHTML=`<div class="card"><h2>${esc(vraag)}</h2><input id="askv" value="${esc(def)}"><div class="row"><button class="pri" id="asko">OK</button><button id="askc">Annuleren</button></div></div>`;o.style.display='flex';
+ const done=v=>{o.style.display='none';o.innerHTML='';ok(v)};$('#asko').onclick=()=>done($('#askv').value);$('#askc').onclick=()=>done(null);$('#askv').focus()})}
+
+/* ---- gebeurtenissen ---- */
+document.addEventListener('input',e=>{const t=e.target;
+ if(t.id==='pzoek'){cloud.picker(t.value);return}
+ if(t.id==='libq'){E.q=t.value;$('#libl').innerHTML=libHtml();$('#libc').innerHTML=catsHtml();return}
+ if(t.dataset.cfg){const[i,f]=t.dataset.cfg.split('.'),q=CFG.presets[+i];q[f]=(f==='A'||f==='kA')?+t.value:t.value;saveCfg();return}
+ if(t.dataset.cfgadd!==undefined){if(!t.value)return;CFG.presets[+t.dataset.cfgadd].punten.push({type:t.value,aantal:1,tekst:'',hw:false});saveCfg();render();return}
+ if(t.dataset.b){let v=t.value;if(t.dataset.n!==undefined)v=v===''?'':+v;if(t.dataset.bool!==undefined)v=!!v;setPath(t.dataset.b,v);if(/\.kabel$/.test(t.dataset.b))delete get(t.dataset.b.replace(/\.kabel$/,'')).kabelBron;
+  if(/\.vast$/.test(t.dataset.b)&&!String(v).trim())delete get(t.dataset.b.replace(/\.vast$/,'')).vast;persist();if(t.closest('#side'))redrawSchema()}
+ else if(t.dataset.c){setPath(t.dataset.c,t.checked);persist()}});
+document.addEventListener('change',async e=>{const t=e.target;
+ if(t.id==='pnew'){if(t.value){P.punt=t.value;P.mode='teken';P.wat='punt';render()}return}
+ if(t.id==='pzr'){P.zoom=clamp(+t.value/100,.3,4);render();return}
+ if(t.id==='bgFile'&&t.files[0]){const f=t.files[0];t.value='';if(/\.(dxf|dwg)$/i.test(f.name)){try{await laadDxf(f)}catch(err){melding('AutoCAD-tekening niet gelezen',String(err.message||err))}return}
+  try{toast('Achtergrond verwerken...');setBg(await blobToBg(f))}catch(err){toast('Achtergrond mislukt: '+err.message+' - probeer een PNG of JPG.')}return}
+ if(t.id==='casnap'&&t.value!==''){try{toast('Plan ophalen...');const r=await fetch(cloud.plannen[+t.value].afbeelding_url);if(!r.ok)throw new Error('HTTP '+r.status);setBg(await blobToBg(await r.blob()))}catch(err){toast('Plan ophalen mislukt: '+err.message)}return}
+ if(!(t.dataset.b||t.dataset.c))return;
+ if(t.dataset.b==='codering'||t.dataset.r!==undefined||/^borden\.\d+\.naam$/.test(t.dataset.b)||/^plannen\.\d+\.naam$/.test(t.dataset.b)){render();return}
+ const cd=codes(S);allKringen().forEach(({k})=>{const s=document.querySelector(`details[data-id="${k.id}"]>summary`);if(s)s.innerHTML=kSum(k,cd.k[k.id])})});
+document.addEventListener('toggle',e=>{const t=e.target;if(t.matches&&t.matches('details.k')){t.open?open.add(t.dataset.id):open.delete(t.dataset.id)}},true);
+document.addEventListener('click',async e=>{
+ const hit=e.target.closest('.hit');if(hit){E.sel=hit.dataset.h;const L=locate(E.sel);if(L)bi=L.bx;render();return}
+ const ad=e.target.closest('[data-add]');if(ad){const id=ad.dataset.add;
+  if(id[0]==='i'){const L=locate('k:'+id.slice(2));if(L)await voegKringIn(L.b,L.g,L.ki,nieuweKring());return}
+  const L=locate((id[0]==='p'?'k:':'g:')+id.slice(2));if(!L&&id[0]==='k'){const b=S.borden.find(b=>b.groepen.some(g=>g.id===id.slice(2)));if(b){const g=b.groepen.find(g=>g.id===id.slice(2));await voegKringIn(b,g,g.kringen.length,nieuweKring())}return}
+  if(!L)return;bi=L.bx;
+  if(id[0]==='p')mut('',()=>{const last=L.k.punten[L.k.punten.length-1],p=newPunt(E.sym,{tekst:last?last.tekst:''});L.k.punten.push(p);E.sel='p:'+p.id;E.recent=[E.sym,...E.recent.filter(x=>x!==E.sym)].slice(0,8)});
+  else await voegKringIn(L.b,L.g,L.g.kringen.length,nieuweKring());return}
+ const ct=e.target.closest('[data-cat]');if(ct){E.cat=ct.dataset.cat;E.q='';const q=$('#libq');if(q)q.value='';$('#libl').innerHTML=libHtml();$('#libl').scrollTop=0;$('#libc').innerHTML=catsHtml();return}
+ const sy=e.target.closest('[data-sym]');if(sy){E.sym=sy.dataset.sym;E.mode='teken';
+  if(E.sym==='diff'){E.sym='kring';await voegDiffToe(B())}else render();return}
+ const tb=e.target.closest('[data-tab]');if(tb){tab=tb.dataset.tab;if(tab==='plan'&&P.mode==='teken'&&P.wat==='punt'&&!P.punt)autoPunt();render();window.scrollTo(0,0);return}
+ const pr=e.target.closest('[data-pid]');if(pr){cloud.open(pr.dataset.pid);return}
+ const b=e.target.closest('[data-a]');if(!b)return;const a=b.dataset.a,gi=+b.dataset.g,ki=+b.dataset.k,pi=+b.dataset.p,G=B().groepen[gi],K=G&&G.kringen[ki],pl=S.plannen[P.pi];
+ if(a==='undo'){if(undoStack.length){S=JSON.parse(undoStack.pop());persist();render();toast('Teruggezet')}}
+ else if(a==='addK')await voegKringIn(B(),G,G.kringen.length,newKring());
+ else if(a==='delK')await wisKring(locate('k:'+K.id));
+ else if(a==='dupK'){const c=JSON.parse(JSON.stringify(K));c.id=uid();c.punten.forEach(p=>p.id=uid());delete c.bron;delete c.code;delete c.vast;await voegKringIn(B(),G,ki+1,c)}
+ else if(a==='upK'&&ki>0)await verplaatsKring(locate('k:'+K.id),-1);
+ else if(a==='dnK'&&ki<G.kringen.length-1)await verplaatsKring(locate('k:'+K.id),1);
+ else if(a==='naarCados'){const L=locate('k:'+K.id);if(L){const k=L.k;L.g.kringen.splice(L.ki,1);const ok=await voegKringIn(L.b,L.g,L.ki,k);if(!ok){L.g.kringen.splice(L.ki,0,k);render()}}}
+ else if(a==='addP')mut('',()=>{const last=K.punten[K.punten.length-1];K.punten.push(newPunt(b.dataset.t,{tekst:last?last.tekst:''}))});
+ else if(a==='delP')mut('Punt verwijderd',()=>K.punten.splice(pi,1));
+ else if(a==='upP'&&pi>0)mut('',()=>K.punten.splice(pi-1,0,K.punten.splice(pi,1)[0]));
+ else if(a==='dnP'&&pi<K.punten.length-1)mut('',()=>K.punten.splice(pi+1,0,K.punten.splice(pi,1)[0]));
+ else if(a==='dupP')mut('',()=>{const c=Object.assign({},K.punten[pi],{id:uid()});K.punten.splice(pi+1,0,c);E.sel='p:'+c.id});
+ else if(a==='mode'){E.mode=b.dataset.m;render()}
+ else if(a==='addPre'){CFG.presets.push({naam:'Nieuwe kring',polen:'2P',curve:'C',A:20,kA:3,kabelType:'XVB',kabel:'3G2,5',punten:[]});saveCfg();render()}
+ else if(a==='upPre'){const i=+b.dataset.i;if(i>0){CFG.presets.splice(i-1,0,CFG.presets.splice(i,1)[0]);saveCfg();if(E.sym.startsWith('pre:'))E.sym='kring';render()}}
+ else if(a==='preDelSym'){CFG.presets[+b.dataset.i].punten.splice(+b.dataset.j,1);saveCfg();render()}
+ else if(a==='saveAsPre'){const L=locate('k:'+(b.dataset.kid||''));if(!L)return;let naam=await ask('Naam van de voorgevormde kring',(L.k.naam||'Nieuwe kring').trim());if(naam==null)return;naam=naam.trim()||'Nieuwe kring';
+  const j=CFG.presets.findIndex(q=>q.naam.toLowerCase()===naam.toLowerCase());
+  if(j>=0&&!await bevestig('Bestaat al',`Er is al een voorgevormde kring "${CFG.presets[j].naam}". Vervangen door deze kring?`,'Vervangen'))return;
+  const q=presetUitKring(L.k,naam);if(j>=0)CFG.presets[j]=q;else CFG.presets.push(q);saveCfg();
+  E.cat='Voorgevormde kringen';E.q='';E.sym='pre:'+(j>=0?j:CFG.presets.length-1);E.mode='teken';render();
+  toast(`"${naam}" bewaard als voorgevormde kring (${q.punten.length} symbolen)${CLOUD?' - voor iedereen':''}`)}
+ else if(a==='delPre'){const q=CFG.presets[+b.dataset.i];if(!await bevestig('Voorgevormde kring verwijderen',`"${q.naam}" verwijderen${CLOUD?' (voor iedereen)':''}?`,'Verwijderen'))return;CFG.presets.splice(+b.dataset.i,1);saveCfg();if(E.sym.startsWith('pre:'))E.sym='kring';render()}
+ else if(a==='resetPre'){if(!await bevestig('Standaardlijst herstellen','Alle eigen voorgevormde kringen worden vervangen door de standaardlijst'+(CLOUD?', voor iedereen':'')+'.','Herstellen'))return;CFG.presets=DEF_PRESETS().map(normPreset);saveCfg();if(E.sym.startsWith('pre:'))E.sym='kring';render();toast('Standaardlijst hersteld')}
+ else if(a==='addG')await voegDiffToe(B());
+ else if(a==='delG')mut('Differentieel verwijderd',()=>B().groepen.splice(gi,1));
+ else if(a==='addB')mut('',()=>{S.borden.push(newBord({naam:'Zekeringkast '+(S.borden.length+1)}));bi=S.borden.length-1});
+ else if(a==='delB')mut('Bord verwijderd',()=>{S.borden.splice(bi,1);bi=0});
+ else if(a==='bord'){bi=+b.dataset.i;render()}
+ else if(a==='sample')mut('Voorbeeld geladen',()=>{S=sample();bi=0});
+ else if(a==='leeg')mut('Leeg schema',()=>{S=blank();bi=0});
+ else if(a==='showImp'){const el=$('#imp');el.hidden=!el.hidden}
+ else if(a==='doImp'){try{let txt=$('#impTxt').value.trim();const f=$('#impFile').files[0];if(!txt&&f)txt=await f.text();if(!txt)throw new Error('Niets om te importeren.');
+   let j=JSON.parse(txt);if(Array.isArray(j))j=j[0];const jd=j.data&&(j.data.boards||j.data.zekeringen)?j.data:j;let msg;
+   if(jd.boards){const hasK=allKringen().length&&!/Voorbeeldwoning/.test(S.project.naam);if(hasK){snap();const n=mergeCaCalc(S,jd);persist();render();toast(`CaCalc: ${n} kringen aangevuld`,true);return}j=fromCaCalc(jd);msg='CaCalc geïmporteerd'}
+   else if(j.borden||j.groepen)j=migrate(j);else{j=fromCaDos(jd);j.cadosLokaal=JSON.parse(JSON.stringify(jd));msg=`CaDos geïmporteerd${j._over?', '+j._over+' andere modules overgeslagen':''}`;delete j._over}
+   mut('',()=>{S=j;bi=0});toast(msg||'Geïmporteerd',true)}catch(err){toast('Import mislukt: '+err.message)}}
+ else if(a==='json')saveFile(fname('json'),JSON.stringify(S,null,1));
+ else if(a==='csv')saveFile(fname('csv'),'﻿Omschrijving;Aantal\r\n'+materials(S).map(m=>`"${m[0].replace(/"/g,'""')}";${m[1]}`).join('\r\n'));
+ else if(a==='pdf'){try{const pr=S.print||{schema:true,plan:true};if(!allPages(S,pr).length){toast('Kies onder Afdrukken minstens één onderdeel met inhoud.');return}saveFile(fname('pdf'),buildPdf(S,pr).output('blob'))}catch(err){toast(err.message)}}
+ else if(a==='zi'||a==='zo'){zoom=clamp(zoom*(a==='zi'?1.25:.8),.35,3);render()}
+ else if(a==='pzi'||a==='pzo'){P.zoom=clamp(P.zoom*(a==='pzi'?1.25:.8),.3,4);render()}
+ else if(a==='goK')goKring(b.dataset.kid);
+ else if(a==='pmode'){P.mode=b.dataset.m;if(P.mode==='teken'&&P.wat!=='muur'&&P.wat!=='tekst'){P.wat='punt';if(!P.punt)autoPunt()}P.sel=null;render()}
+ else if(a==='prot'){P.rot=(P.rot+1)%4;render()}
+ else if(a==='pwat'){const w=b.dataset.w;if(P.mode==='teken'&&P.wat===w)P.wat='punt';else{P.mode='teken';P.wat=w}P.sel=null;render()}
+ else if(a==='pck'){P[b.dataset.k]=b.checked;render()}
+ else if(a==='ppg'){P.pi=clamp(P.pi+(+b.dataset.d),0,S.plannen.length-1);P.sel=null;render()}
+ else if(a==='pkr'){P.kring=b.dataset.kid;const pls=geplaatst(),g=laagGroepen(P.laag).find(x=>x.id===P.kring),n=g&&g.comps.find(c=>!pls.has(c.id));P.punt=n?'pid:'+n.id:(g&&g.nieuw==='muziek'&&!g.comps.length?'new:ls':'');P.mode='teken';P.wat='punt';P.sel=null;render()}
+ else if(a==='plaag'){P.laag=b.dataset.l;P.kring='';P.punt='';P.sel=null;P.mode='teken';P.wat='punt';autoPunt();render()}
+ else if(a==='ptoon'){P.toon[b.dataset.k]=b.checked;render()}
+ else if(a==='mzWeg'){const id=b.dataset.pp;mut('Luidspreker gewist',()=>{Object.values(S.muziekPunten||{}).forEach(l=>{const i=l.findIndex(x=>x.id===id);if(i>=0)l.splice(i,1)});S.plannen.forEach(p=>{p.items=p.items.filter(x=>x.pid!==id)});P.sel=null})}
+ else if(a==='ppick'){const pid=b.dataset.pp,pi2=S.plannen.findIndex(p=>p.items.some(i=>i.pid===pid));
+  if(pi2>=0){P.pi=pi2;P.sel=S.plannen[pi2].items.find(i=>i.pid===pid).id;P.mode='sel';render();const g=document.querySelector(`[data-it="${P.sel}"]`);if(g)g.scrollIntoView({block:'center',inline:'center'})}
+  else{P.punt='pid:'+pid;P.mode='teken';P.wat='punt';P.sel=null;render()}}
+ else if(a==='delTx')mut('Tekst gewist',()=>{pl.teksten=pl.teksten.filter(t=>t.id!==P.sel);P.sel=null});
+ else if(a==='addPlan'){const n=await ask('Naam van de verdieping','Verdieping '+S.plannen.length);if(n)mut('',()=>{S.plannen.push(newPlan(n));P.pi=S.plannen.length-1})}
+ else if(a==='delPlan')mut('Verdieping verwijderd',()=>{S.plannen.splice(P.pi,1);P.pi=0});
+ else if(a==='noBg')mut('Achtergrond verwijderd',()=>{pl.bg=null});
+ else if(a==='cadLagen')cadLagenDialoog();
+ else if(a==='cadWeg'){$('#ovl').style.display='none';mut('AutoCAD-laag verwijderd',()=>{delete pl.cad})}
+ else if(a==='rot'){const it=pl.items.find(i=>i.id===P.sel);if(it)mut('',()=>{it.rot=((it.rot||0)+1)%4})}
+ else if(a==='delIt')mut('Van het plan gehaald',()=>{pl.items=pl.items.filter(i=>i.id!==P.sel);P.sel=null});
+ else if(a==='proj')cloud.picker('');
+ else if(a==='closeOvl'){$('#ovl').style.display='none'}
+ else if(a==='syncCados')cloud.resync();
+ else if(a==='syncCalc')cloud.calc();
+});
+/* ---- situatieplan: aanwijzer ---- */
+function svgPt(e){const s=$('#plan'),p=s.createSVGPoint();p.x=e.clientX;p.y=e.clientY;const q=p.matrixTransform(s.getScreenCTM().inverse());return[Math.round(q.x),Math.round(q.y)]}
+function snapPt(pl,x,y,skip){let best=null,bd=14;[...pl.muren,...cadSegs(pl)].forEach(m=>{[[m[0],m[1]],[m[2],m[3]]].forEach(c=>{const dd=Math.hypot(c[0]-x,c[1]-y);if(dd<bd){bd=dd;best=c}})});return best||[x,y]}
+function wallSnap(pl,x,y){let best=null,bd=16;[...pl.muren,...cadSegs(pl)].forEach(m=>{const dx=m[2]-m[0],dy=m[3]-m[1],l2=dx*dx+dy*dy;if(!l2)return;const t=clamp(((x-m[0])*dx+(y-m[1])*dy)/l2,0,1),px=m[0]+t*dx,py=m[1]+t*dy,dd=Math.hypot(px-x,py-y);if(dd<bd){bd=dd;best=[Math.round(px),Math.round(py)]}});return best||[x,y]}
+const gridR=(v,st)=>P.snapGrid?Math.round(v/st)*st:v;
+function plaatsPunt(pl,x0,y0){let[x,y]=[x0,y0];if(P.snapMuur){const w=wallSnap(pl,x0,y0);if(w[0]!==x0||w[1]!==y0)return w}return[gridR(x,5),gridR(y,5)]}
+document.addEventListener('pointerdown',e=>{const s=e.target.closest&&e.target.closest('#plan');if(!s||e.button===2)return;const pl=S.plannen[P.pi],[x,y]=svgPt(e),tl=ptool();
+ if(tl==='muur'){const a=P.snapMuur?snapPt(pl,x,y):[x,y],a2=(a[0]===x&&a[1]===y)?[gridR(x,10),gridR(y,10)]:a;P.draw={x1:a2[0],y1:a2[1],x2:a2[0],y2:a2[1]};s.setPointerCapture(e.pointerId);e.preventDefault()}
+ else if(tl==='hand'){const g=e.target.closest('[data-it],[data-tx]');
+  if(g){const it=g.dataset.it?pl.items.find(i=>i.id===g.dataset.it):pl.teksten.find(t=>t.id===g.dataset.tx);P.sel=it.id;P.drag={it,g,tx:!!g.dataset.tx,sx:x,sy:y,ox:it.x,oy:it.y,moved:false};g.setPointerCapture(e.pointerId);e.preventDefault()}
+  else if(P.sel){P.sel=null;render()}}});
+document.addEventListener('pointermove',e=>{
+ if(!P.draw&&!P.drag&&ptool()==='punt'&&e.pointerType!=='touch'){const g=$('#ghost');if(g&&g.firstChild&&e.target.closest&&e.target.closest('#plan')){const pl=S.plannen[P.pi],[x0,y0]=svgPt(e),q=plaatsPunt(pl,x0,y0);P.last=q;g.setAttribute('transform',`translate(${q[0]} ${q[1]})`);g.setAttribute('visibility','visible')}else if(g)g.setAttribute('visibility','hidden')}
+ if(P.draw){let[x,y]=svgPt(e);const d=P.draw,dx=Math.abs(x-d.x1),dy=Math.abs(y-d.y1);if(dx<dy*.18)x=d.x1;else if(dy<dx*.18)y=d.y1;
+  let a=P.snapMuur?snapPt(S.plannen[P.pi],x,y):[x,y];if(a[0]===x&&a[1]===y)a=[d.x1===x?x:gridR(x,10),d.y1===y?y:gridR(y,10)];d.x2=a[0];d.y2=a[1];
+  const pv=$('#prev');if(pv){pv.setAttribute('x1',d.x1);pv.setAttribute('y1',d.y1);pv.setAttribute('x2',d.x2);pv.setAttribute('y2',d.y2);pv.setAttribute('visibility','visible')}}
+ else if(P.drag){const[x,y]=svgPt(e),g=P.drag;if(Math.hypot(x-g.sx,y-g.sy)>3)g.moved=true;if(g.moved)g.g.setAttribute('transform',`translate(${x-g.sx} ${y-g.sy})`);g.nx=g.ox+x-g.sx;g.ny=g.oy+y-g.sy}});
+document.addEventListener('pointerup',async e=>{if(e.button===2)return;const pl=S.plannen[P.pi];
+ if(P.draw){const d=P.draw;P.draw=null;if(Math.hypot(d.x2-d.x1,d.y2-d.y1)>10)mut('',()=>pl.muren.push([d.x1,d.y1,d.x2,d.y2]));else render();return}
+ if(P.drag){const g=P.drag;P.drag=null;if(g.moved){snap();const w=g.tx?[gridR(g.nx,5),gridR(g.ny,5)]:plaatsPunt(pl,g.nx,g.ny);g.it.x=clamp(w[0],0,1000);g.it.y=clamp(w[1],0,pl.h||707);persist()}render();return}
+ const s=e.target.closest&&e.target.closest('#plan');if(!s)return;const tl=ptool();
+ if(tl==='gom'){const w=e.target.closest('[data-w]'),g=e.target.closest('[data-it]'),t=e.target.closest('[data-tx]');
+  if(g)mut('Van het plan gehaald',()=>{pl.items=pl.items.filter(i=>i.id!==g.dataset.it)});else if(t)mut('Tekst gewist',()=>{pl.teksten=pl.teksten.filter(x=>x.id!==t.dataset.tx)});else if(w)mut('Muur gewist',()=>pl.muren.splice(+w.dataset.w,1))}
+ else if(tl==='tekst'){const[x,y]=svgPt(e);const t=await ask('Tekst op het plan','');if(t&&t.trim())mut('',()=>{if(!pl.teksten)pl.teksten=[];const o={id:uid(),x:gridR(x,5),y:gridR(y,5),t:t.trim(),z:12};pl.teksten.push(o)})}
+ else if(tl==='punt'){const g=laagGroepen(P.laag).find(x=>x.id===P.kring);if(!g){toast(P.laag==='elektro'?'Teken eerst een kring in het eendraadschema.':'Niets te plaatsen in deze laag.');return}
+  if(!P.punt){toast(`Alles van ${g.code} staat op het plan. Kies links een andere letter${g.nieuw||P.laag==='elektro'?' of "+ nieuw"':''}.`);return}
+  const[x0,y0]=svgPt(e),[x,y]=plaatsPunt(pl,x0,y0),laag=P.laag;
+  mut('',()=>{let pid;if(P.punt.startsWith('pid:'))pid=P.punt.slice(4);
+   else if(laag==='elektro'){const p=newPunt(P.punt.slice(4),{tekst:''});g.k.punten.push(p);pid=p.id}
+   else{const mp=S.muziekPunten||(S.muziekPunten={}),l=mp[g.ref]||(mp[g.ref]=[]),c={id:'mzp_'+uid(),type:P.punt.slice(4),tekst:''};l.push(c);pid=c.id}
+   const it={id:uid(),pid,x,y,rot:P.rot};if(laag!=='elektro')it.laag=laag;pl.items.push(it);P.sel=null;P.last=[x,y];
+   if(P.punt.startsWith('pid:')){const pls=geplaatst(),g2=laagGroepen(laag).find(z=>z.id===g.id),n=g2&&g2.comps.find(c=>!pls.has(c.id));
+    if(n)P.punt='pid:'+n.id;else{const van=g.code,nx=autoPunt(g.id);setTimeout(()=>toast(nx?`${van} volledig geplaatst - verder met ${nx.code}`:`${van} geplaatst - alles van deze laag staat op het plan`))}}})}});
+document.addEventListener('contextmenu',e=>{const s=e.target.closest&&e.target.closest('#plan');if(!s)return;e.preventDefault();const pl=S.plannen[P.pi],tl=ptool();
+ if(tl==='punt'&&P.punt){P.rot=(P.rot+1)%4;const g=$('#ghost');if(g)g.innerHTML=ghostHtml(pl);const kb=$('[data-a=prot]');if(kb)kb.textContent=`↻ Draaien (${P.rot*90}°)`;return}
+ const g=e.target.closest('[data-it]');if(g){const it=pl.items.find(i=>i.id===g.dataset.it);if(it)mut('',()=>{it.rot=((it.rot||0)+1)%4;P.sel=it.id})}});
+document.addEventListener('keydown',e=>{if(tab!=='plan'||/INPUT|SELECT|TEXTAREA/.test((document.activeElement||{}).tagName||''))return;
+ if(e.key==='r'||e.key==='R'){if(ptool()==='punt'&&P.punt){P.rot=(P.rot+1)%4;const g=$('#ghost');if(g)g.innerHTML=ghostHtml(S.plannen[P.pi]);const kb=$('[data-a=prot]');if(kb)kb.textContent=`↻ Draaien (${P.rot*90}°)`}
+  else if(P.sel){const it=S.plannen[P.pi].items.find(i=>i.id===P.sel);if(it)mut('',()=>{it.rot=((it.rot||0)+1)%4})}}
+ else if(e.key==='Escape'){P.mode='sel';P.sel=null;render()}
+ else if((e.key==='Delete'||e.key==='Backspace')&&P.sel){const pl=S.plannen[P.pi];mut('Van het plan gehaald',()=>{pl.items=pl.items.filter(i=>i.id!==P.sel);pl.teksten=(pl.teksten||[]).filter(t=>t.id!==P.sel);P.sel=null})}});
+
+/* ================= CaSuite-koppeling (Supabase) ================= */
+const cloud={sb:null,pid:null,proj:null,projecten:[],plannen:[],dirty:false,t:null,who:'',backup:false,saving:false,
+ status(s){$('#cst').textContent=s},
+ async init(){
+  $('#bproj').style.display='';this.status('Verbinden...');
+  try{if(EMB){this.sb=EMB.sb;$('#bproj').style.display='none'}else{await loadScript('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js');
+   this.sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY)}
+   const{data}=await this.sb.auth.getSession();
+   if(!data.session){this.status('Niet aangemeld');$('#v').innerHTML=`<div class="card"><h2>Aanmelden</h2><p>CaDraw gebruikt je aanmelding van CaSuite. Open eerst <a href="./index.html">CaSuite</a>, meld je daar aan en kom dan terug naar deze pagina.</p><button onclick="location.reload()">Opnieuw proberen</button></div>`;$('#tabs').innerHTML='';return}
+   const u=data.session.user;this.who=((u.user_metadata&&(u.user_metadata.full_name||u.user_metadata.name||u.user_metadata.email))||u.email||'onbekend')+' (CaDraw)';
+   try{const c=await this.sb.from('elektro_cados_instellingen').select('waarde').eq('sleutel',CFG_KEY).maybeSingle();
+    if(c.data&&c.data.waarde&&Array.isArray(c.data.waarde.presets)){CFG.presets=c.data.waarde.presets.map(normPreset);try{localStorage.setItem('cadraw-instellingen',JSON.stringify(CFG))}catch(e){}}else if(!c.error)saveCfg()}catch(e){}
+   const r=await this.sb.from('projecten').select('id,naam,projectnummer,klant,locatie,actief').order('naam');if(r.error)throw r.error;this.projecten=r.data||[];
+   if(EMB){const id=EMB.projectId();if(id&&this.projecten.some(p=>p.id===id))await this.open(id);else this.geenProject();return}
+   const want=new URLSearchParams(location.search).get('project')||(()=>{try{return localStorage.getItem('cadraw-project')}catch(e){return null}})();
+   if(want&&this.projecten.some(p=>p.id===want))await this.open(want);else{this.status('');this.picker('')}
+  }catch(err){this.status('Fout');$('#v').innerHTML=`<div class="card"><h2>Verbinding mislukt</h2><p>${esc(err.message||err)}</p><button onclick="location.reload()">Opnieuw proberen</button></div>`}},
+ geenProject(){this.pid=null;this.status('');$('#tabs').innerHTML='';$('#v').innerHTML='<div class="card"><h2>Kies een project</h2><p>Kies bovenaan in CaSuite het project waarvan je het eendraadschema en situatieplan wil tekenen. CaDraw leest de zekeringkast, verlichting, muziek, alarm en netwerk uit het CaDos-dossier van dat project.</p></div>'},
+ picker(q){if(EMB)return;const o=$('#ovl'),f=norm(q),list=this.projecten.filter(p=>p.actief!==false&&(!f||norm(p.naam+' '+(p.projectnummer||'')+' '+(p.klant||'')).includes(f)));
+  const html=list.slice(0,80).map(p=>`<div class="pl" data-pid="${p.id}"><span><b>${esc(p.naam)}</b>${p.klant?'<br><small>'+esc(p.klant)+'</small>':''}</span><small>${esc(p.projectnummer||'')}</small></div>`).join('')||'<p class="note">Geen projecten gevonden.</p>';
+  if($('#plist')){$('#plist').innerHTML=html;return}
+  o.innerHTML=`<div class="card"><h2>Project kiezen<span style="flex:1"></span>${this.pid?'<button class="sm" data-a="closeOvl">Sluiten</button>':''}</h2><input id="pzoek" placeholder="Zoek op naam, nummer of klant" value="${esc(q)}"><div id="plist" style="margin-top:8px;max-height:60vh;overflow:auto">${html}</div></div>`;o.style.display='flex'},
+ async open(pid){if(this.dirty)await this.save();$('#ovl').style.display='none';$('#ovl').innerHTML='';this.status('Laden...');
+  try{const sb=this.sb,[own,dos,pls]=await Promise.all([sb.from('project_cadraw_data').select('*').eq('project_id',pid).maybeSingle(),sb.from('project_elektro_dossiers').select('*').eq('project_id',pid).maybeSingle(),sb.from('project_plannen').select('id,naam,afbeelding_url').eq('project_id',pid).order('created_at',{ascending:true})]);
+   if(own.error)throw own.error;if(dos.error)throw dos.error;
+   this.pid=pid;this.proj=this.projecten.find(p=>p.id===pid);this.plannen=(pls.data||[]).filter(p=>p.afbeelding_url);this.backup=false;
+   try{localStorage.setItem('cadraw-project',pid)}catch(e){}
+   let st=own.data&&own.data.data&&own.data.data.borden?migrate(own.data.data):null,nieuw=!st,msg='';
+   if(dos.data&&dos.data.data&&dos.data.data.zekeringen){const fresh=fromCaDos(dos.data.data);delete fresh._over;st=st?keep(st,fresh):fresh}
+   if(!st)st=blank();
+   if(nieuw){const p=this.proj||{};st.project.naam=st.project.naam||p.naam||'';st.project.adres=st.project.adres||p.locatie||'';st.project.klant=st.project.klant||p.klant||'';
+    const c=await sb.from('project_cacalc_data').select('data').eq('project_id',pid).maybeSingle();
+    if(c.data&&c.data.data){if(allK(st))msg=' - er is ook een CaCalc-berekening (knop "Aanvullen uit CaCalc" onder Document)';else{try{const f=fromCaCalc(c.data.data);f.project=st.project;f.plannen=st.plannen;st=f;msg=', opgebouwd uit CaCalc'}catch(e){}}}
+    msg=(dos.data?'Opgebouwd uit CaDos':'Nieuw CaDraw-dossier')+msg}
+   S=st;bi=0;P.pi=0;P.sel=null;undoStack=[];E.sel=null;this.dirty=false;$('#bproj').textContent=(this.proj?this.proj.naam:'Project')+' ▾';this.status(nieuw?'Nog niet bewaard':'Geladen');render();
+   if(msg)toast(msg);
+  }catch(err){this.status('Fout');toast('Laden mislukt: '+(err.message||err))}},
+ lock:Promise.resolve(),
+ excl(fn){const p=this.lock.then(fn,fn);this.lock=p.catch(()=>{});return p},
+ save(){return this.excl(()=>this._save())},
+ async _save(){if(!this.pid)return;clearTimeout(this.t);this.dirty=false;this.status('Bewaren...');
+  try{const nu=new Date().toISOString(),r=await this.sb.from('project_cadraw_data').upsert({project_id:this.pid,data:S,updated_at:nu,bijgewerkt_door:this.who},{onConflict:'project_id'}).select('id');
+   if(r.error)throw r.error;if(!r.data||!r.data.length)throw new Error('geen rij bewaard (rechten?)');
+   const n=await this.push();this.status('Bewaard '+new Date().toLocaleTimeString('nl-BE',{hour:'2-digit',minute:'2-digit'})+(n?` · ${n} waarden naar CaDos`:''));
+  }catch(err){this.dirty=true;this.status('Niet bewaard!');toast('Bewaren mislukt: '+(err.message||err))}
+  if(this.dirty){clearTimeout(this.t);this.t=setTimeout(()=>this.save(),4000)}},
+ /* schrijft gewijzigde waarden van gekoppelde automaten/differentielen terug in het CaDos-dossier */
+ async schrijfDossier(wijzig,tries=0){if(EMB&&!tries&&EMB.flushCados){try{await EMB.flushCados()}catch(e){}}const sb=this.sb,q=await sb.from('project_elektro_dossiers').select('*').eq('project_id',this.pid).maybeSingle();
+  if(q.error)throw q.error;if(!q.data||!q.data.data||!q.data.data.zekeringen)return{ok:false,msg:'Dit project heeft geen CaDos-dossier met een zekeringkast.'};
+  const row=q.data,d=JSON.parse(JSON.stringify(row.data)),r=wijzig(d);if(!r.ok||!r.n)return Object.assign(r,{data:d});
+  if(!this.backup){const bk=await sb.from('dossier_backups').insert({dossier_id:row.id,data:row.data,reden:'CaDraw: voor terugschrijven'});if(bk.error)throw new Error('back-up van CaDos-dossier mislukt, niets teruggeschreven: '+bk.error.message);this.backup=true}
+  const u=await sb.from('project_elektro_dossiers').update({data:d,updated_at:new Date().toISOString(),bijgewerkt_door:this.who}).eq('id',row.id).eq('updated_at',row.updated_at).select('id');
+  if(u.error)throw u.error;if(!u.data||!u.data.length){if(tries<2)return this.schrijfDossier(wijzig,tries+1);throw new Error('Het CaDos-dossier werd intussen elders gewijzigd; probeer opnieuw.')}
+  if(EMB&&EMB.cadosGewijzigd)try{EMB.cadosGewijzigd(this.pid)}catch(e){}
+  return Object.assign(r,{data:d})},
+ async push(){const r=await this.schrijfDossier(d=>{const x=syncVelden(d);return{ok:true,n:x.n,terug:x.terug}});
+  if(r.terug&&r.terug.length){r.terug.forEach(t=>{t.obj.polen=t.oud});this.dirty=true;render();melding('Past niet in de kast',r.terug.map(t=>t.msg).join('\n'))}
+  return r.n||0},
+ kastOp(op){return this.excl(async()=>{if(this.dirty)await this._save();this.status('CaDos bijwerken...');
+  const r=await this.schrijfDossier(d=>{const x=kastOp(d,op);if(x.ok){const v=syncVelden(d);x.n=1+v.n}return x});
+  this.status(r.ok?'CaDos bijgewerkt':'');if(r.ok)this.dirty=true;return r})},
+ async resync(){await this.save();await this.open(this.pid);toast('CaDos opnieuw ingelezen')},
+ async calc(){try{const c=await this.sb.from('project_cacalc_data').select('data').eq('project_id',this.pid).maybeSingle();if(!c.data||!c.data.data){toast('Dit project heeft geen CaCalc-berekening.');return}
+  snap();const n=mergeCaCalc(S,c.data.data);persist();render();toast(n?`${n} kringen aangevuld uit CaCalc (koppeling op naam)`:'Geen kringen met dezelfde naam gevonden in CaCalc',!!n)}catch(err){toast('CaCalc lezen mislukt: '+(err.message||err))}}
+};
+const allK=st=>st.borden.reduce((n,b)=>n+b.groepen.reduce((m,g)=>m+g.kringen.length,0),0);
+window.addEventListener('beforeunload',e=>{if(CLOUD&&(cloud.dirty||bezig)){cloud.save();e.preventDefault();e.returnValue=''}});
+document.addEventListener('visibilitychange',()=>{if(CLOUD&&document.hidden&&cloud.dirty)cloud.save()});
+/* haken voor de hoofdsite (CaSuite): project wisselen, opnieuw inlezen bij terugkeer naar dit tabblad, wachtende wijzigingen bewaren */
+window.CaDrawEmbed={
+ async project(id){if(!cloud.sb)return;if(!id){if(cloud.dirty)await cloud.save();cloud.geenProject();return}
+  if(!cloud.projecten.some(p=>p.id===id)){const r=await cloud.sb.from('projecten').select('id,naam,projectnummer,klant,locatie,actief').order('naam');if(!r.error)cloud.projecten=r.data||[]}
+  if(!cloud.projecten.some(p=>p.id===id)){cloud.geenProject();return}
+  if(id===cloud.pid&&(cloud.dirty||bezig))return;await cloud.open(id);if(!$('#tabs').innerHTML)render()},
+ isDirty:()=>cloud.dirty||bezig,
+ flush:()=>cloud.dirty?cloud.save():Promise.resolve()};
+if(CLOUD)cloud.init();else render();
+</script>
+</body>
+</html>
