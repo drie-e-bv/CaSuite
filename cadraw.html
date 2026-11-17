@@ -93,6 +93,8 @@ th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertic
 th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--mut)}
 td.n,th.n{text-align:right;white-space:nowrap}
 .tw{overflow-x:auto}
+.tw td select{min-width:68px;padding-right:22px}
+.tw td select[data-cfg$='.kabelType']{min-width:88px}
 .chk{border-radius:8px;padding:9px 11px;margin-top:7px;display:flex;gap:9px;align-items:flex-start;cursor:pointer;border:1px solid transparent}
 .chk.w{background:var(--warnbg);border-color:#f5d6ad}
 .chk.i{background:var(--infobg);border-color:#cfe0fb}
@@ -386,9 +388,13 @@ const DEF_PRESETS=()=>[
  {naam:'Kookplaat',polen:'2P',curve:'C',A:32,kA:3,kabelType:'XVB',kabel:'3G6',s:['t_kook','']},
  {naam:'Laadstation',polen:'2P',curve:'C',A:32,kA:3,kabelType:'XVB',kabel:'3G6',s:['t_ev','']},
  {naam:'Automaat + kabel',polen:'2P',curve:'C',A:20,kA:3,kabelType:'XVB',kabel:'3G2,5',s:['','']}];
-let CFG=(()=>{try{const j=JSON.parse(localStorage.getItem('cadraw-instellingen'));if(j&&Array.isArray(j.presets))return j}catch(e){}return{presets:DEF_PRESETS()}})();
-const saveCfg=()=>{try{localStorage.setItem('cadraw-instellingen',JSON.stringify(CFG))}catch(e){}};
-const presetKring=i=>{const q=CFG.presets[i];if(!q)return newKring();return newKring({naam:q.naam==='Automaat + kabel'?'':q.naam,polen:q.polen,curve:q.curve,A:q.A,kA:q.kA,kabelType:q.kabelType,kabel:q.kabel,punten:(q.s||[]).filter(t=>TYPES[t]).map(t=>newPunt(t))})};
+const normPreset=q=>{if(!Array.isArray(q.punten))q.punten=(q.s||[]).filter(t=>TYPES[t]).map(t=>({type:t,aantal:1,tekst:'',hw:false}));delete q.s;q.punten=q.punten.filter(p=>TYPES[p.type]);return q};
+let CFG=(()=>{try{const j=JSON.parse(localStorage.getItem('cadraw-instellingen'));if(j&&Array.isArray(j.presets)){j.presets.forEach(normPreset);return j}}catch(e){}return{presets:DEF_PRESETS().map(normPreset)}})();
+const CFG_KEY='cadraw_voorgevormde_kringen';let cfgT=null;
+const saveCfg=()=>{try{localStorage.setItem('cadraw-instellingen',JSON.stringify(CFG))}catch(e){}
+ if(CLOUD&&cloud.sb){clearTimeout(cfgT);cfgT=setTimeout(async()=>{const r=await cloud.sb.from('elektro_cados_instellingen').upsert({sleutel:CFG_KEY,waarde:{presets:CFG.presets},updated_at:new Date().toISOString()},{onConflict:'sleutel'});if(r.error)toast('Voorgevormde kringen niet gedeeld: '+r.error.message)},800)}};
+const presetKring=i=>{const q=CFG.presets[i];if(!q)return newKring();return newKring({naam:q.naam==='Automaat + kabel'?'':q.naam,polen:q.polen,curve:q.curve,A:q.A,kA:q.kA,kabelType:q.kabelType,kabel:q.kabel,punten:(q.punten||[]).map(p=>newPunt(p.type,{aantal:p.aantal||1,tekst:p.tekst||'',hw:!!p.hw}))})};
+const presetUitKring=(k,naam)=>({naam,polen:k.polen,curve:k.curve,A:k.A,kA:k.kA,kabelType:k.kabelType,kabel:k.kabel,punten:k.punten.map(p=>({type:p.type,aantal:p.aantal||1,tekst:p.tekst||'',hw:!!p.hw}))});
 
 /* ================= toestand ================= */
 let S=CLOUD?blank():loadLocal(),tab='schema',zoom=1,undoStack=[],bi=0;const open=new Set();
@@ -681,7 +687,7 @@ function vKring(){const cd=codes(S),b=B(),bp=`borden.${bi}`,w=checks(S);
    <div class="grid">${fld('Naam',kp+'.naam',{c:'w2'})}${fld('Polen',kp+'.polen',{opts:POL})}${fld('Curve',kp+'.curve',{opts:['B','C','D']})}${fld('Stroom (A)',kp+'.A',{n:1,opts:AMP})}${fld('Kortsluit (kA)',kp+'.kA',{n:1,opts:[3,4.5,6,10]})}${fld('Kabeltype',kp+'.kabelType',{opts:['XVB','EXVB','XGB','VOB','VVB','EXAVB','SVV']})}${fld('Geleiders',kp+'.kabel',{ph:'3G2,5'})}${fld('Lengte (m)',kp+'.lengte',{n:1})}</div>
    ${k.punten.map((pt,pi)=>{const pp=`${kp}.punten.${pi}`;return`<div class="pt"><span class="no">${pi+1}</span><select data-b="${pp}.type">${typeOpts(pt.type)}</select><input type="number" min="1" data-n data-b="${pp}.aantal" value="${esc(pt.aantal)}" title="Aantal in één punt"><input class="tx" data-b="${pp}.tekst" value="${esc(pt.tekst)}" placeholder="kamer / info" list="kamers"><label class="hw" title="halfwaterdicht"><input type="checkbox" data-c="${pp}.hw"${pt.hw?' checked':''}>h</label><button class="sm" data-a="upP" ${dd} data-p="${pi}" title="omhoog">↑</button><button class="sm danger" data-a="delP" ${dd} data-p="${pi}" title="verwijderen">✕</button></div>`}).join('')}
    <div class="row"><button class="sm" data-a="addP" data-t="sc_ak" ${dd}>+ stopcontact</button><button class="sm" data-a="addP" data-t="li" ${dd}>+ lichtpunt</button><button class="sm" data-a="addP" data-t="sw1" ${dd}>+ schakelaar</button><button class="sm" data-a="addP" data-t="t_gen" ${dd}>+ toestel</button>
-   <span style="flex:1"></span><button class="sm" data-a="upK" ${dd}>↑</button><button class="sm" data-a="dnK" ${dd}>↓</button><button class="sm" data-a="dupK" ${dd}>Dupliceer</button><button class="sm danger" data-a="delK" ${dd}>Verwijder kring</button></div></div></details>`});
+   <span style="flex:1"></span><button class="sm" data-a="upK" ${dd}>↑</button><button class="sm" data-a="dnK" ${dd}>↓</button><button class="sm" data-a="dupK" ${dd}>Dupliceer</button><button class="sm" data-a="saveAsPre" data-kid="${k.id}">★ Voorgevormd</button><button class="sm danger" data-a="delK" ${dd}>Verwijder kring</button></div></div></details>`});
   h+=`<div class="row"><button class="pri sm" data-a="addK" data-g="${gi}">+ kring</button>${g.sub&&!g.bron?`<span style="flex:1"></span><button class="sm danger" data-a="delG" data-g="${gi}">Verwijder differentieel</button>`:''}</div></div>`});
  return h+`<button data-a="addG">+ differentieel</button>`}
 function locate(id){if(!id)return null;const t=id[0],x=id.slice(2);
@@ -691,12 +697,12 @@ function locate(id){if(!id)return null;const t=id[0],x=id.slice(2);
     if(t==='p'){const pi=k.punten.findIndex(q=>q.id===x);if(pi>=0)return{t,bx,gi,ki,pi,b,g,k,p:k.punten[pi]}}}}}
  return null}
 function symIcon(t){const d=mk();
- if(t.startsWith('pre:')){const q=CFG.presets[+t.slice(4)]||{s:[]},ss=(q.s||[]).filter(x=>TYPES[x]);d.L(0,0,2.5,0,.3);d.L(2.5,0,6.3,-1.9,.4);d.L(5.2,-1.35,6.3,-1.9,1);d.L(7,0,13,0,.3);d.C(10,-1.6,.75,'n',.2);
-  ss.forEach((x,i)=>sym(d,x,13+i*9.5,0,.8,'',1));if(ss.length>1)d.L(13,0,13+9.5,0,.3);
-  return`<svg viewBox="-1 -5.5 34 11" style="width:64px">${opsSVG(d.o)}</svg>`}
+ if(t.startsWith('pre:')){const q=CFG.presets[+t.slice(4)]||{punten:[]},ss=(q.punten||[]).map(p=>p.type).filter(x=>TYPES[x]).slice(0,3);d.L(0,0,2.5,0,.3);d.L(2.5,0,6.3,-1.9,.4);d.L(5.2,-1.35,6.3,-1.9,1);d.L(7,0,13,0,.3);d.C(10,-1.6,.75,'n',.2);
+  ss.forEach((x,i)=>sym(d,x,13+i*9.5,0,.8,'',1));if(ss.length>1)d.L(13,0,13+9.5*(ss.length-1),0,.3);
+  return`<svg viewBox="-1 -5.5 ${ss.length>2?43:34} 11" style="width:${ss.length>2?82:64}px">${opsSVG(d.o)}</svg>`}
  if(TYPES[t])sym(d,t,0,0,1,'',1);else breakerV(d,6,5.5);return`<svg viewBox="-1 -6.2 16 12.4">${opsSVG(d.o)}</svg>`}
 const CATS=[['Voorgevormde kringen','pre:0'],['Bord','kring'],['Stopcontacten','sc_ak'],['Schakelaars','sw1'],['Verlichting','li'],['Toestellen','t_kook'],['Overige','af'],['Laatst gebruikt','★']];
-function libAll(){return[...CFG.presets.map((x,i)=>['pre:'+i,`${x.naam} · ${x.polen} ${x.curve}${x.A}A · ${x.kabelType} ${x.kabel}`,'Voorgevormde kringen']),['kring','Lege kring (automaat + leiding)','Bord'],['diff','Differentieel','Bord'],...Object.entries(TYPES).map(([k,t])=>[k,t.l,t.g])]}
+function libAll(){return[...CFG.presets.map((x,i)=>['pre:'+i,`${x.naam} · ${x.polen} ${x.curve}${x.A}A · ${x.kabelType} ${x.kabel}${(x.punten||[]).length>2?` · ${x.punten.length} symbolen`:''}`,'Voorgevormde kringen']),['kring','Lege kring (automaat + leiding)','Bord'],['diff','Differentieel','Bord'],...Object.entries(TYPES).map(([k,t])=>[k,t.l,t.g])]}
 function libHtml(){const q=norm(E.q),all=libAll(),btn=e=>`<button class="sy${E.sym===e[0]?' on':''}" data-sym="${e[0]}">${symIcon(e[0])}<span>${esc(e[1])}</span></button>`;
  if(q)return all.filter(e=>norm(e[1]).includes(q)).map(btn).join('')||'<p class="note" style="padding:8px">Geen symbool gevonden.</p>';
  if(!E.cat)E.cat=CATS[0][0];
@@ -712,7 +718,7 @@ function vSide(){const cd=codes(S),L=locate(E.sel);if(E.sel&&!L)E.sel=null;
    <label class="f"><span>Halfwaterdicht</span><select data-b="${pp}.hw" data-bool><option value="">Nee</option><option value="1"${L.p.hw?' selected':''}>Ja</option></select></label>${fld('Tekst / kamer',pp+'.tekst',{c:'w2',list:'kamers'})}</div>
    <div class="row"><button class="sm" data-a="upP" ${dd} data-p="${L.pi}" title="Vroeger in de kring">↓ lager</button><button class="sm" data-a="dnP" ${dd} data-p="${L.pi}" title="Verder in de kring">↑ hoger</button><button class="sm" data-a="dupP" ${dd} data-p="${L.pi}">Kopiëren</button><button class="sm danger" data-a="delP" ${dd} data-p="${L.pi}">Wissen</button></div>`}
   else if(L.t==='k'){h+=`<h2 style="font-size:14px;margin:12px 0 8px"><span class="lb">${cd.k[L.k.id]}</span> Eigenschappen kring</h2><div class="grid">${fld('Benaming',kp+'.naam',{c:'w2'})}${fld('Polen',kp+'.polen',{opts:POL})}${fld('Curve',kp+'.curve',{opts:['B','C','D']})}${fld('Stroom (A)',kp+'.A',{n:1,opts:AMP})}${fld('Kortsluit (kA)',kp+'.kA',{n:1,opts:[3,4.5,6,10]})}${fld('Kabeltype',kp+'.kabelType',{opts:['XVB','EXVB','XGB','VOB','VVB','EXAVB','SVV']})}${fld('Geleiders',kp+'.kabel',{ph:'3G2,5'})}${fld('Lengte (m)',kp+'.lengte',{n:1})}${L.b.kastId?'':fld('Vaste letter',kp+'.vast',{ph:'automatisch'})}</div>
-   <div class="row"><button class="sm" data-a="upK" ${dd}>← links</button><button class="sm" data-a="dnK" ${dd}>rechts →</button><button class="sm" data-a="dupK" ${dd}>Kopiëren</button><button class="sm danger" data-a="delK" ${dd}>Wissen</button></div><p class="note">${L.k.bron?'Gekoppeld aan CaDos: wijzigingen, tussenvoegen, verplaatsen en wissen gebeuren ook in de zekeringkast; de letter volgt CaDos.':L.b.kastId?`Deze kring bestaat nog niet in de zekeringkast van CaDos.</p><div class="row"><button class="sm pri" data-a="naarCados" ${dd}>In CaDos aanmaken</button></div><p class="note">`:'Alleen in CaDraw (bord niet gekoppeld aan CaDos).'}</p>`}
+   <div class="row"><button class="sm" data-a="upK" ${dd}>← links</button><button class="sm" data-a="dnK" ${dd}>rechts →</button><button class="sm" data-a="dupK" ${dd}>Kopiëren</button><button class="sm danger" data-a="delK" ${dd}>Wissen</button></div><div class="row"><button class="sm" data-a="saveAsPre" data-kid="${L.k.id}">★ Bewaar als voorgevormde kring</button></div><p class="note">${L.k.bron?'Gekoppeld aan CaDos: wijzigingen, tussenvoegen, verplaatsen en wissen gebeuren ook in de zekeringkast; de letter volgt CaDos.':L.b.kastId?`Deze kring bestaat nog niet in de zekeringkast van CaDos.</p><div class="row"><button class="sm pri" data-a="naarCados" ${dd}>In CaDos aanmaken</button></div><p class="note">`:'Alleen in CaDraw (bord niet gekoppeld aan CaDos).'}</p>`}
   else if(L.t==='g'){h+=`<h2 style="font-size:14px;margin:12px 0 8px"><span class="lb">${cd.g[L.g.id]||'Δ'}</span> Eigenschappen differentieel</h2><div class="grid">${fld('Gevoeligheid (mA)',gp+'.mA',{n:1,opts:[10,30,100,300]})}${fld('Stroom (A)',gp+'.A',{n:1,opts:[25,40,63,80]})}${fld('Polen',gp+'.polen',{opts:POL})}${fld('Type',gp+'.type',{opts:['A','A-SI','B','F','AC']})}</div>${L.g.bron?'':`<div class="row"><button class="sm danger" data-a="delG" data-g="${L.gi}">Wissen</button></div>`}`}
   else{h+=`<h2 style="font-size:14px;margin:12px 0 8px">Hoofddifferentieel</h2><div class="grid">${fld('Gevoeligheid (mA)',bp+'.hoofd.mA',{n:1,opts:[30,100,300]})}${fld('Stroom (A)',bp+'.hoofd.A',{n:1,opts:[25,40,63,80,100]})}${fld('Polen',bp+'.hoofd.polen',{opts:POL})}${fld('Type',bp+'.hoofd.type',{opts:['A','A-SI','B','F','AC']})}${fld('Voedingskabel','project.voeding')}${fld('Aarding','project.aarding')}</div>`}}
  if(!E.cat)E.cat=CATS[0][0];
@@ -723,11 +729,15 @@ const schemaHtml=()=>allPages(S,{schema:true}).map(p=>pageSVG(p,true)).join('');
 function redrawSchema(){const el=$('#sch');if(el)el.innerHTML=schemaHtml()}
 function vSchema(){return`<div class="ws"><div class="side card" id="side">${vSide()}</div><div><div class="row" style="margin:0 0 8px"><button class="sm" data-a="zo">−</button><button class="sm" data-a="zi">+</button><span class="note">${E.mode==='teken'?(!TYPES[E.sym]?'Tik op een blauw toevoegpunt (+) onder een rail om de kring daar toe te voegen.':'Kies een symbool en tik op het blauwe toevoegpunt (+) boven een kring.'):'Tik op een onderdeel om het te selecteren.'}</span></div><div class="pages" id="sch">${schemaHtml()}</div></div></div>`}
 function vExtra(){const sel=(i,f,v,opts)=>`<select data-cfg="${i}.${f}">${opts.map(o=>{const[a,b]=Array.isArray(o)?o:[o,o];return`<option value="${esc(a)}"${String(a)===String(v)?' selected':''}>${esc(b)}</option>`}).join('')}</select>`,
- so=[['','(geen)'],...Object.entries(TYPES).map(([k,t])=>[k,t.l])];
+ ico=t=>{const d=mk();sym(d,t,0,0,1,'',1);return`<svg viewBox="-1 -6.2 16 12.4" style="width:30px;height:22px">${opsSVG(d.o)}</svg>`};
  return`<div class="card"><h2>Voorgevormde kringen <small>automaat + kabel + symbolen in één klik, bovenaan in de symbolenbibliotheek</small></h2>
- <div class="tw"><table><tr><th>Naam</th><th>Polen</th><th>Curve</th><th>A</th><th>kA</th><th>Kabeltype</th><th>Geleiders</th><th>Symbool 1</th><th>Symbool 2</th><th></th></tr>
- ${CFG.presets.map((q,i)=>`<tr><td><input data-cfg="${i}.naam" value="${esc(q.naam)}" style="min-width:130px"></td><td>${sel(i,'polen',q.polen,POL)}</td><td>${sel(i,'curve',q.curve,['B','C','D'])}</td><td>${sel(i,'A',q.A,AMP)}</td><td>${sel(i,'kA',q.kA,[3,4.5,6,10])}</td><td>${sel(i,'kabelType',q.kabelType,['XVB','EXVB','XGB','VOB','VVB','EXAVB','SVV'])}</td><td><input data-cfg="${i}.kabel" value="${esc(q.kabel)}" style="width:80px"></td><td>${sel(i,'s.0',(q.s||[])[0]||'',so)}</td><td>${sel(i,'s.1',(q.s||[])[1]||'',so)}</td><td><button class="sm danger" data-a="delPre" data-i="${i}">✕</button></td></tr>`).join('')}</table></div>
- <div class="row"><button class="sm pri" data-a="addPre">+ voorgevormde kring</button><button class="sm" data-a="resetPre">Standaardlijst herstellen</button><span class="note">Deze instellingen worden bewaard in deze browser.</span></div></div>`}
+ <p class="note" style="margin-top:0">Snelste manier: teken de kring in het eendraadschema, selecteer ze en kies <b>★ Bewaar als voorgevormde kring</b>. Tik hieronder op een symbool om het te verwijderen.</p>
+ <div class="tw"><table><tr><th></th><th>Naam</th><th>Polen</th><th>Curve</th><th>A</th><th>kA</th><th>Kabeltype</th><th>Geleiders</th><th>Symbolen (in volgorde)</th><th></th></tr>
+ ${CFG.presets.map((q,i)=>`<tr><td style="white-space:nowrap"><button class="sm" data-a="upPre" data-i="${i}" title="Hoger in de lijst"${i?'':' disabled'}>↑</button></td><td><input data-cfg="${i}.naam" value="${esc(q.naam)}" style="min-width:130px"></td><td>${sel(i,'polen',q.polen,POL)}</td><td>${sel(i,'curve',q.curve,['B','C','D'])}</td><td>${sel(i,'A',q.A,AMP)}</td><td>${sel(i,'kA',q.kA,[3,4.5,6,10])}</td><td>${sel(i,'kabelType',q.kabelType,['XVB','EXVB','XGB','VOB','VVB','EXAVB','SVV'])}</td><td><input data-cfg="${i}.kabel" value="${esc(q.kabel)}" style="width:80px"></td>
+  <td><div style="display:flex;flex-wrap:wrap;gap:3px;align-items:center;min-width:220px">${(q.punten||[]).map((p,j)=>`<button class="sm" data-a="preDelSym" data-i="${i}" data-j="${j}" title="${esc((TYPES[p.type]||{}).l)}${p.tekst?' - '+esc(p.tekst):''} (tik om te verwijderen)" style="padding:1px 3px;display:inline-flex;align-items:center;gap:2px">${ico(p.type)}${p.aantal>1?`<small>x${p.aantal}</small>`:''}</button>`).join('')}
+  <select data-cfgadd="${i}" style="width:auto;max-width:120px"><option value="">+ symbool</option>${typeOpts('')}</select></div></td>
+  <td><button class="sm danger" data-a="delPre" data-i="${i}" title="Verwijderen">✕</button></td></tr>`).join('')}</table></div>
+ <div class="row"><button class="sm pri" data-a="addPre">+ lege voorgevormde kring</button><button class="sm" data-a="resetPre">Standaardlijst herstellen</button><span class="note">${CLOUD?'Gedeeld met iedereen in CaSuite.':'Bewaard in deze browser.'}</span></div></div>`}
 function kringTabel(){const cd=codes(S);
  const rows=S.borden.flatMap(b=>b.groepen.flatMap(g=>g.kringen.map(k=>`<tr data-a="goK" data-kid="${k.id}" style="cursor:pointer"><td><b>${cd.k[k.id]}</b></td><td>${S.borden.length>1?esc(b.naam)+' - ':''}${esc(k.naam)}</td><td>${esc(k.polen)} ${esc(k.curve)}${esc(k.A)}A</td><td>${esc(k.kabelType)} ${esc(k.kabel)}</td><td>Δ${g.sub?g.mA:b.hoofd.mA}mA</td><td class="n">${k.punten.length}</td></tr>`))).join('');
  return`<div class="card"><h2>Lijst met kringen</h2><div class="tw"><table><tr><th>Kring</th><th>Benaming</th><th>Beveiliging</th><th>Kabel</th><th>Differentieel</th><th class="n">Punten</th></tr>${rows}</table></div></div>`}
@@ -829,7 +839,8 @@ function ask(vraag,def=''){return new Promise(ok=>{const o=$('#ovl');o.innerHTML
 document.addEventListener('input',e=>{const t=e.target;
  if(t.id==='pzoek'){cloud.picker(t.value);return}
  if(t.id==='libq'){E.q=t.value;$('#libl').innerHTML=libHtml();$('#libc').innerHTML=catsHtml();return}
- if(t.dataset.cfg){const[i,f,j]=t.dataset.cfg.split('.'),q=CFG.presets[+i];if(f==='s'){q.s=q.s||['',''];q.s[+j]=t.value}else q[f]=(f==='A'||f==='kA')?+t.value:t.value;saveCfg();return}
+ if(t.dataset.cfg){const[i,f]=t.dataset.cfg.split('.'),q=CFG.presets[+i];q[f]=(f==='A'||f==='kA')?+t.value:t.value;saveCfg();return}
+ if(t.dataset.cfgadd!==undefined){if(!t.value)return;CFG.presets[+t.dataset.cfgadd].punten.push({type:t.value,aantal:1,tekst:'',hw:false});saveCfg();render();return}
  if(t.dataset.b){let v=t.value;if(t.dataset.n!==undefined)v=v===''?'':+v;if(t.dataset.bool!==undefined)v=!!v;setPath(t.dataset.b,v);if(/\.kabel$/.test(t.dataset.b))delete get(t.dataset.b.replace(/\.kabel$/,'')).kabelBron;
   if(/\.vast$/.test(t.dataset.b)&&!String(v).trim())delete get(t.dataset.b.replace(/\.vast$/,'')).vast;persist();if(t.closest('#side'))redrawSchema()}
  else if(t.dataset.c){setPath(t.dataset.c,t.checked);persist()}});
@@ -869,9 +880,17 @@ document.addEventListener('click',async e=>{
  else if(a==='dnP'&&pi<K.punten.length-1)mut('',()=>K.punten.splice(pi+1,0,K.punten.splice(pi,1)[0]));
  else if(a==='dupP')mut('',()=>{const c=Object.assign({},K.punten[pi],{id:uid()});K.punten.splice(pi+1,0,c);E.sel='p:'+c.id});
  else if(a==='mode'){E.mode=b.dataset.m;render()}
- else if(a==='addPre'){CFG.presets.push({naam:'Nieuwe kring',polen:'2P',curve:'C',A:20,kA:3,kabelType:'XVB',kabel:'3G2,5',s:['','']});saveCfg();render()}
- else if(a==='delPre'){CFG.presets.splice(+b.dataset.i,1);saveCfg();if(E.sym.startsWith('pre:'))E.sym='sc_ak';render()}
- else if(a==='resetPre'){CFG.presets=DEF_PRESETS();saveCfg();render();toast('Standaardlijst hersteld')}
+ else if(a==='addPre'){CFG.presets.push({naam:'Nieuwe kring',polen:'2P',curve:'C',A:20,kA:3,kabelType:'XVB',kabel:'3G2,5',punten:[]});saveCfg();render()}
+ else if(a==='upPre'){const i=+b.dataset.i;if(i>0){CFG.presets.splice(i-1,0,CFG.presets.splice(i,1)[0]);saveCfg();if(E.sym.startsWith('pre:'))E.sym='kring';render()}}
+ else if(a==='preDelSym'){CFG.presets[+b.dataset.i].punten.splice(+b.dataset.j,1);saveCfg();render()}
+ else if(a==='saveAsPre'){const L=locate('k:'+(b.dataset.kid||''));if(!L)return;let naam=await ask('Naam van de voorgevormde kring',(L.k.naam||'Nieuwe kring').trim());if(naam==null)return;naam=naam.trim()||'Nieuwe kring';
+  const j=CFG.presets.findIndex(q=>q.naam.toLowerCase()===naam.toLowerCase());
+  if(j>=0&&!await bevestig('Bestaat al',`Er is al een voorgevormde kring "${CFG.presets[j].naam}". Vervangen door deze kring?`,'Vervangen'))return;
+  const q=presetUitKring(L.k,naam);if(j>=0)CFG.presets[j]=q;else CFG.presets.push(q);saveCfg();
+  E.cat='Voorgevormde kringen';E.q='';E.sym='pre:'+(j>=0?j:CFG.presets.length-1);E.mode='teken';render();
+  toast(`"${naam}" bewaard als voorgevormde kring (${q.punten.length} symbolen)${CLOUD?' - voor iedereen':''}`)}
+ else if(a==='delPre'){const q=CFG.presets[+b.dataset.i];if(!await bevestig('Voorgevormde kring verwijderen',`"${q.naam}" verwijderen${CLOUD?' (voor iedereen)':''}?`,'Verwijderen'))return;CFG.presets.splice(+b.dataset.i,1);saveCfg();if(E.sym.startsWith('pre:'))E.sym='kring';render()}
+ else if(a==='resetPre'){if(!await bevestig('Standaardlijst herstellen','Alle eigen voorgevormde kringen worden vervangen door de standaardlijst'+(CLOUD?', voor iedereen':'')+'.','Herstellen'))return;CFG.presets=DEF_PRESETS().map(normPreset);saveCfg();if(E.sym.startsWith('pre:'))E.sym='kring';render();toast('Standaardlijst hersteld')}
  else if(a==='addG')await voegDiffToe(B());
  else if(a==='delG')mut('Differentieel verwijderd',()=>B().groepen.splice(gi,1));
  else if(a==='addB')mut('',()=>{S.borden.push(newBord({naam:'Zekeringkast '+(S.borden.length+1)}));bi=S.borden.length-1});
@@ -937,6 +956,8 @@ const cloud={sb:null,pid:null,proj:null,projecten:[],plannen:[],dirty:false,t:nu
    const{data}=await this.sb.auth.getSession();
    if(!data.session){this.status('Niet aangemeld');$('#v').innerHTML=`<div class="card"><h2>Aanmelden</h2><p>CaDraw gebruikt je aanmelding van CaSuite. Open eerst <a href="./index.html">CaSuite</a>, meld je daar aan en kom dan terug naar deze pagina.</p><button onclick="location.reload()">Opnieuw proberen</button></div>`;$('#tabs').innerHTML='';return}
    const u=data.session.user;this.who=((u.user_metadata&&(u.user_metadata.full_name||u.user_metadata.name||u.user_metadata.email))||u.email||'onbekend')+' (CaDraw)';
+   try{const c=await this.sb.from('elektro_cados_instellingen').select('waarde').eq('sleutel',CFG_KEY).maybeSingle();
+    if(c.data&&c.data.waarde&&Array.isArray(c.data.waarde.presets)){CFG.presets=c.data.waarde.presets.map(normPreset);try{localStorage.setItem('cadraw-instellingen',JSON.stringify(CFG))}catch(e){}}else if(!c.error)saveCfg()}catch(e){}
    const r=await this.sb.from('projecten').select('id,naam,projectnummer,klant,locatie,actief').order('naam');if(r.error)throw r.error;this.projecten=r.data||[];
    const want=new URLSearchParams(location.search).get('project')||(()=>{try{return localStorage.getItem('cadraw-project')}catch(e){return null}})();
    if(want&&this.projecten.some(p=>p.id===want))await this.open(want);else{this.status('');this.picker('')}
