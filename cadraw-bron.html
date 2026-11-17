@@ -329,17 +329,24 @@ function kastOp(d,op){const fail=msg=>({ok:false,msg}),kast=kastVan(d,op.kastId)
   kast.rijen.push({id:uid(),items:[m]});return{ok:true,id:m.id,rij:kast.rijen.length}}
  return fail('Onbekende bewerking')}
 /* velden van gekoppelde automaten/differentielen naar het CaDos-dossier; geeft terug wat niet paste */
-function syncVelden(d){const byId={},rowOf={},kastOf={};(d.zekeringen.kasten||[]).forEach(k=>(k.rijen||[]).forEach(r=>(r.items||[]).forEach(it=>{byId[it.id]=it;rowOf[it.id]=r;kastOf[it.id]=k})));
+/* BASIS = de waarden zoals CaDraw ze uit CaDos las. syncVelden schrijft een veld enkel terug als het in CaDraw
+   gewijzigd werd t.o.v. BASIS: zo overschrijft CaDraw nooit een wijziging die intussen in CaDos gebeurde. */
+let BASIS=null;
+function basisVan(st){const m={};st.borden.forEach(b=>{if(!b.kastId)return;const d=h=>({mA:h.mA,A:h.A,polen:h.polen,type:h.type||''});
+ if(b.hoofd.bron)m[b.hoofd.bron]=d(b.hoofd);b.groepen.forEach(g=>{if(g.sub&&g.bron)m[g.bron]=d(g);
+ g.kringen.forEach(k=>{if(k.bron)m[k.bron]={naam:k.naam||'',A:k.A,polen:k.polen,curve:k.curve||'',kA:k.kA===''||k.kA==null?'':String(k.kA),kabel:k.kabel}})})});return JSON.parse(JSON.stringify(m))}
+function syncVelden(d){const gw=(bron,k,v)=>{const b=BASIS&&BASIS[bron];return!b||!(k in b)||JSON.stringify(b[k]??null)!==JSON.stringify(v??null)};const byId={},rowOf={},kastOf={};(d.zekeringen.kasten||[]).forEach(k=>(k.rijen||[]).forEach(r=>(r.items||[]).forEach(it=>{byId[it.id]=it;rowOf[it.id]=r;kastOf[it.id]=k})));
  let n=0;const terug=[],set=(o,k,v)=>{if(JSON.stringify(o[k]??null)!==JSON.stringify(v??null)){o[k]=v;n++}};
  const polen=(it,p,obj)=>{if(!PN[p]||it.polen===p)return;const r=rowOf[it.id],kast=kastOf[it.id],ob=modW(it),nb=PN[p];
   if(PN[it.polen]===ob||!it.polen){if(vrijIn(kast,r)+ob-nb<0){terug.push({obj,oud:it.polen||'2P',msg:`${obj.naam||'Differentieel'}: ${p} past niet in ${rijNaam(kast,kast.rijen.indexOf(r))} (rij vol). Polen teruggezet naar ${it.polen||'2P'}.`});return}it.breedte=nb}
   it.polen=p;n++};
- const diff=(it,h)=>{if(!it||it.categorie!=='Differentieel')return;if(MO.includes(h.mA+'mA'))set(it,'mA',h.mA+'mA');if(AO.includes(h.A+'A'))set(it,'A',h.A+'A');polen(it,h.polen,h);set(it,'diffType',h.type||'')};
+ const diff=(it,h)=>{if(!it||it.categorie!=='Differentieel')return;const g=(k,v)=>gw(it.id,k,v);if(MO.includes(h.mA+'mA')&&g('mA',h.mA))set(it,'mA',h.mA+'mA');if(AO.includes(h.A+'A')&&g('A',h.A))set(it,'A',h.A+'A');if(g('polen',h.polen))polen(it,h.polen,h);if(g('type',h.type||''))set(it,'diffType',h.type||'')};
  S.borden.forEach(b=>{if(!b.kastId)return;diff(byId[b.hoofd.bron],b.hoofd);b.groepen.forEach(g=>{if(g.sub)diff(byId[g.bron],g);
   g.kringen.forEach(k=>{const it=byId[k.bron];if(!it||it.categorie!=='Automaat')return;
-   set(it,'naam',k.naam||'');if(AO.includes(k.A+'A'))set(it,'A',k.A+'A');polen(it,k.polen,k);
-   set(it,'curve',k.curve||'');set(it,'kA',k.kA===''||k.kA==null?'':String(k.kA));
-   if((it.kabelOpKlemmen||it.kabelType)&&k.kabel&&kabFmt(it.kabelType)!==kabFmt(k.kabel))set(it,'kabelType',k.kabel);
+   const g=(x,v)=>gw(it.id,x,v),kA=k.kA===''||k.kA==null?'':String(k.kA);
+   if(g('naam',k.naam||''))set(it,'naam',k.naam||'');if(AO.includes(k.A+'A')&&g('A',k.A))set(it,'A',k.A+'A');if(g('polen',k.polen))polen(it,k.polen,k);
+   if(g('curve',k.curve||''))set(it,'curve',k.curve||'');if(g('kA',kA))set(it,'kA',kA);
+   if((it.kabelOpKlemmen||it.kabelType)&&k.kabel&&g('kabel',k.kabel)&&kabFmt(it.kabelType)!==kabFmt(k.kabel))set(it,'kabelType',k.kabel);
    set(it,'cadraw',{mantel:k.kabelType,kabel:k.kabel,lengte:k.lengte,punten:k.punten.map(p=>({id:p.id,type:p.type,aantal:p.aantal,tekst:p.tekst,hw:!!p.hw}))})})})});
  return{n,terug}}
 /* letters van CaDraw gelijkzetten met CaDos */
@@ -1214,7 +1221,7 @@ const cloud={sb:null,pid:null,proj:null,projecten:[],plannen:[],dirty:false,t:nu
     const c=await sb.from('project_cacalc_data').select('data').eq('project_id',pid).maybeSingle();
     if(c.data&&c.data.data){if(allK(st))msg=' - er is ook een CaCalc-berekening (knop "Aanvullen uit CaCalc" onder Document)';else{try{const f=fromCaCalc(c.data.data);f.project=st.project;f.plannen=st.plannen;st=f;msg=', opgebouwd uit CaCalc'}catch(e){}}}
     msg=(dos.data?'Opgebouwd uit CaDos':'Nieuw CaDraw-dossier')+msg}
-   S=st;bi=0;P.pi=0;P.sel=null;undoStack=[];E.sel=null;this.dirty=false;$('#bproj').textContent=(this.proj?this.proj.naam:'Project')+' ▾';this.status(nieuw?'Nog niet bewaard':'Geladen');render();
+   S=st;BASIS=dos.data&&dos.data.data&&dos.data.data.zekeringen?basisVan(S):null;bi=0;P.pi=0;P.sel=null;undoStack=[];E.sel=null;this.dirty=false;$('#bproj').textContent=(this.proj?this.proj.naam:'Project')+' ▾';this.status(nieuw?'Nog niet bewaard':'Geladen');render();
    if(msg)toast(msg);
   }catch(err){this.status('Fout');toast('Laden mislukt: '+(err.message||err))}},
  lock:Promise.resolve(),
@@ -1237,6 +1244,7 @@ const cloud={sb:null,pid:null,proj:null,projecten:[],plannen:[],dirty:false,t:nu
   return Object.assign(r,{data:d})},
  async push(){const r=await this.schrijfDossier(d=>{const x=syncVelden(d);return{ok:true,n:x.n,terug:x.terug}});
   if(r.terug&&r.terug.length){r.terug.forEach(t=>{t.obj.polen=t.oud});this.dirty=true;render();melding('Past niet in de kast',r.terug.map(t=>t.msg).join('\n'))}
+  if(r.ok!==false)BASIS=basisVan(S);
   return r.n||0},
  kastOp(op){return this.excl(async()=>{if(this.dirty)await this._save();this.status('CaDos bijwerken...');
   const r=await this.schrijfDossier(d=>{const x=kastOp(d,op);if(x.ok){const v=syncVelden(d);x.n=1+v.n}return x});

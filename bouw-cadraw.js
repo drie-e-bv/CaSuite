@@ -20,9 +20,9 @@ const schrijf = (f, s) => { fs.writeFileSync(path.join(DIR, f), s, 'utf-8'); con
 
 let index = lees('index.html');
 const b64 = Buffer.from(lees('cadraw-bron.html'), 'utf-8').toString('base64');
-const re = /<!--CADRAW-BEGIN-->[\s\S]*?<!--CADRAW-END-->/;
+const re = /(id="cadraw-bron">)<!--CADRAW-BEGIN-->[\s\S]*?<!--CADRAW-END-->/;
 if (!re.test(index)) { console.error('Markering <!--CADRAW-BEGIN--> niet gevonden in index.html'); process.exit(1); }
-index = index.replace(re, () => '<!--CADRAW-BEGIN-->' + b64 + '<!--CADRAW-END-->');
+index = index.replace(re, (_, kop) => kop + '<!--CADRAW-BEGIN-->' + b64 + '<!--CADRAW-END-->');
 schrijf('index.html', index);
 
 const JSPDF = '<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/';
