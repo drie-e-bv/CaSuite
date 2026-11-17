@@ -60,6 +60,23 @@ details.k .in{padding:2px 10px 10px}
 .pages svg text{font-family:Helvetica,Arial,sans-serif;fill:#000;user-select:none}
 .pages svg .hit{fill:transparent;cursor:pointer}
 .pages svg .hit:hover{fill:rgba(11,107,203,.08)}
+.pages svg .hit.sel{fill:rgba(11,107,203,.13);stroke:#0b6bcb;stroke-width:.3}
+.pages svg .addm{cursor:pointer}
+.pages svg .addm circle{fill:#0b6bcb;stroke:#fff;stroke-width:.3}
+.pages svg .addm path{stroke:#fff;stroke-width:.5;stroke-linecap:round}
+.pages svg .addm:hover circle{fill:#084f97}
+.ws{display:grid;grid-template-columns:300px minmax(0,1fr);gap:12px;align-items:start}
+.ws .side{position:sticky;top:52px;max-height:calc(100vh - 64px);overflow:auto}
+.lib{overflow:auto;max-height:46vh;border:1px solid var(--line);border-radius:8px;margin-top:8px}
+@media(max-width:860px){.ws{grid-template-columns:minmax(0,1fr)}.ws .side{position:static;max-height:none}.lib{max-height:200px}}
+.lib h4{margin:0;padding:5px 8px;font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--mut);background:#f4f5f7;position:sticky;top:0}
+.sy{display:flex;align-items:center;gap:8px;width:100%;border:0;border-radius:0;border-bottom:1px solid #eef0f3;padding:5px 8px;text-align:left;font-size:13.5px}
+.sy svg{flex:none;width:44px;height:30px}
+.sy.on{background:#e3effc;box-shadow:inset 3px 0 0 var(--acc)}
+.seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{flex:1;border:0;border-radius:0;font-weight:600;color:var(--mut)}
+.seg button.on{background:var(--acc);color:#fff}
+.chkl{display:flex;align-items:center;gap:8px;padding:6px 0}.chkl input{width:auto}
 #plan .pi{cursor:grab;touch-action:none}
 #plan .pi .hb{fill:transparent}
 #plan .pi.sel .hb{fill:rgba(11,107,203,.14);stroke:#0b6bcb;stroke-width:.8}
@@ -158,8 +175,8 @@ const newGroep=(o={})=>Object.assign({id:uid(),sub:true,mA:30,A:40,polen:'2P',ty
 const newBord=(o={})=>Object.assign({id:uid(),naam:'Zekeringkast 1',hoofd:{mA:300,A:40,polen:'4P',type:'A'},groepen:[{id:uid(),sub:false,kringen:[]}]},o);
 const newPlan=(naam='Gelijkvloers')=>({id:uid(),naam,h:707,sym:3,muren:[],items:[],bg:null});
 function blank(){return{v:2,codering:'cados',
- project:{naam:'',adres:'',klant:'',installateur:'Casentis',tekenaar:'',ean:'',datum:new Date().toISOString().slice(0,10),net:NETTEN[0],voeding:'EXVB 4x10',aarding:'< 30 Ω'},
- borden:[newBord()],plannen:[newPlan()],kamers:[]}}
+ project:{naam:'',adres:'',klant:'',installateur:'Casentis',tekenaar:'',organisme:'',ean:'',datum:new Date().toISOString().slice(0,10),net:NETTEN[0],voeding:'EXVB 4x10',aarding:'< 30 Ω'},
+ borden:[newBord()],plannen:[newPlan()],kamers:[],print:{schema:true,plan:true,kringen:true,mat:false}}}
 const num=v=>parseInt(String(v??'').replace(/[^\d]/g,''),10)||'';
 const kabFmt=s=>String(s||'').trim().toUpperCase().replace('.',',');
 
@@ -289,9 +306,10 @@ function sample(){
 
 /* ================= toestand ================= */
 let S=CLOUD?blank():loadLocal(),tab='schema',zoom=1,undoStack=[],bi=0;const open=new Set();
+const E={mode:'teken',sym:'sc_ak',sel:null,q:'',recent:[]};
 const P={tool:'hand',sel:null,kring:'',punt:'new:sc_ak',zoom:1,pi:0,draw:null,drag:null};
 function migrate(j){if(!j.borden&&j.groepen){j.borden=[newBord({hoofd:j.hoofd,groepen:j.groepen})];delete j.groepen;delete j.hoofd}
- if(!j.plannen||!j.plannen.length)j.plannen=[newPlan()];if(!j.kamers)j.kamers=[];j.borden.forEach(b=>{if(!b.groepen.some(g=>!g.sub))b.groepen.unshift({id:uid(),sub:false,kringen:[]})});return j}
+ if(!j.plannen||!j.plannen.length)j.plannen=[newPlan()];if(!j.print)j.print={schema:true,plan:true,kringen:true,mat:false};if(!j.kamers)j.kamers=[];j.borden.forEach(b=>{if(!b.groepen.some(g=>!g.sub))b.groepen.unshift({id:uid(),sub:false,kringen:[]})});return j}
 function loadLocal(){try{const j=JSON.parse(localStorage.getItem(KEY));if(j&&(j.borden||j.groepen))return migrate(j)}catch(e){}return sample()}
 function persist(){gc();
  if(CLOUD){cloud.dirty=true;cloud.status('Wijzigingen...');clearTimeout(cloud.t);cloud.t=setTimeout(()=>cloud.save(),1800);return}
@@ -321,7 +339,8 @@ function mk(){const o=[];return{o,
  R:(x,y,w,h,f='w',sw=.25)=>o.push(['R',x,y,w,h,f,sw]),
  F:(...p)=>o.push(['F',...p]),
  T:(x,y,s,q={})=>{if(s!==''&&s!=null)o.push(['T',x,y,String(s),q.z||2.4,q.a||'s',q.r||0,q.b?1:0,q.i?1:0])},
- H:(x,y,w,h,id)=>o.push(['H',x,y,w,h,id])}}
+ H:(x,y,w,h,id)=>o.push(['H',x,y,w,h,id]),
+ A:(x,y,id)=>o.push(['A',x,y,id])}}
 function arc(d,cx,cy,r,a0,a1,w=.25,n=14){let px,py;for(let i=0;i<=n;i++){const a=(a0+(a1-a0)*i/n)*Math.PI/180,x=cx+r*Math.cos(a),y=cy-r*Math.sin(a);if(i)d.L(px,py,x,y,w);px=x;py=y}}
 /* Symbolen volgens de AREI-symbolenlijst. Oorsprong = aansluitpunt links, symbool naar rechts. */
 function sym(d,t,x,y,s,txt,aantal){
@@ -395,9 +414,11 @@ function column(d,x,yb,k,code){
   sym(d,p.type,x,yc,s,p.tekst,p.aantal);
   const t=[(p.aantal>1&&!(isSc&&p.aantal<=5))?'x'+p.aantal:'',p.hw?'h':'',p.tekst||''].filter(Boolean).join(' '),tt=t.length>19?t.slice(0,18)+'.':t;
   if(p.type==='swk')d.T(x+9.6*s,yc+.8*s,tt.slice(0,11),{z:2.1*s});else if(p.type==='sww')d.T(x+5.8*s,yc+RH*.47,tt.slice(0,15),{z:2.1*s});
-  else d.T(x+1.4,yc+RH*.48,tt,{z:2.1*s});});
+  else d.T(x+1.4,yc+RH*.48,tt,{z:2.1*s});
+  d.H(x-7,yc-RH/2,CW-2,RH,'p:'+p.id);});
  d.L(x,yb-11,x,ytop,.3);
- d.H(x-8,TOP-3,CW,yb-TOP+9,k.id);
+ d.H(x-8,yb-27,CW,33,'k:'+k.id);
+ d.A(x,Math.max(TOP-2.5,n?ytop-RH*.5-3:yb-27),'p:'+k.id);
 }
 function feed(d,st,b,gl){const y=R0,a=M,h=b.hoofd,hx=a+27;
  d.T(a+5,y-34,st.project.net,{z:2.8,b:1});d.T(a+5,y-30,'Voeding: '+(st.project.voeding||''),{z:2.2});
@@ -408,13 +429,15 @@ function feed(d,st,b,gl){const y=R0,a=M,h=b.hoofd,hx=a+27;
  if(gl)d.T(hx+4,y+4.6,gl,{z:3.3,b:1,a:'m'});
  const ex=a+38;d.L(ex,y+2,ex,y+5,.3);d.L(ex-2.2,y+5,ex+2.2,y+5,.35);d.L(ex-1.4,y+6,ex+1.4,y+6,.35);d.L(ex-.6,y+7,ex+.6,y+7,.35);
  d.T(ex+3.2,y+6.6,st.project.aarding||'',{z:2.2});
+ d.H(hx-3,y-16,24,22,'h:'+b.id);
+ if(!b.groepen[0].kringen.length)d.A(a+60,y+3.4,'k:'+b.groepen[0].id);
 }
 function titleBlock(d,st,pi,n,soort,sub){const ty=PH-M-TBH,p=st.project;
  d.R(M,M,PW-2*M,PH-2*M,'n',.35);d.L(M,ty,PW-M,ty,.35);d.L(M+105,ty,M+105,PH-M,.25);d.L(M+212,ty,M+212,PH-M,.25);
  d.T(M+3,ty+4.6,'Plaats van de elektrische installatie',{z:2.2,b:1});
  d.T(M+3,ty+9.2,p.naam,{z:3,b:1});d.T(M+3,ty+13.6,p.adres,{z:2.5});d.T(M+3,ty+17.6,p.klant,{z:2.5});
  d.T(M+108,ty+4.6,'Installateur',{z:2.2,b:1});d.T(M+108,ty+9.2,p.installateur,{z:3,b:1});
- d.T(M+108,ty+13.6,p.tekenaar?'Getekend door: '+p.tekenaar:'',{z:2.5});d.T(M+108,ty+17.6,p.ean?'EAN '+p.ean:'',{z:2.5});
+ d.T(M+108,ty+13.6,p.tekenaar?'Getekend door: '+p.tekenaar:'',{z:2.5});d.T(M+108,ty+17.6,p.ean?'EAN '+p.ean:'',{z:2.5});d.T(M+108,ty+21.6,p.organisme?'Controleorganisme: '+p.organisme:'',{z:2.3});
  d.T(PW-M-3,ty+4.6,`p. ${pi+1}/${n}`,{z:2.4,a:'e'});
  d.T(M+215,ty+4.6,soort,{z:2.6,b:1});d.T(M+215,ty+9.2,sub||'',{z:2.5});d.T(M+215,ty+13.6,p.net,{z:2.3});d.T(M+215,ty+17.6,p.datum?'Datum: '+p.datum:'',{z:2.3});
  d.T(M+215,ty+21.6,'CaDraw testversie - symbolen nog te valideren',{z:1.8,i:1});
@@ -435,11 +458,12 @@ function bordPages(st,b){
    if(g.sub){const cf=a===0&&prev&&prev.gi===sl[a].gi,ct=e===sl.length-1&&next&&next.gi===sl[a].gi;
     d.L(cf?M+3:xs(a),R1,ct?PW-M-3:xs(e),R1,.5);
     if(cf)d.T(M+4,R1+8.5,'vervolg '+gLabel(b,g),{z:1.9,i:1});}
+   if(!(e===sl.length-1&&next&&next.gi===sl[a].gi))d.A(xs(e)+13,(g.sub?R1:R0)+3.4,'k:'+g.id);
    a=e+1}
   sl.forEach((s,j)=>{const x=xs(j),g=s.g;
    if(s.first&&g.sub){d.C(x,R0,.7,'b');d.L(x,R0,x,R0-5,.3);breakerV(d,x,R0-2);d.L(x,R0-13.2,x,R1,.3);d.C(x,R1,.7,'b');
     d.T(x+3.3,R0-14.5,'Δ'+g.mA+'mA',{z:2.4,b:1});d.T(x+3.3,R0-11.5,`${g.polen} - ${g.A}A`,{z:2.3});d.T(x+3.3,R0-8.7,'type '+g.type,{z:2});
-    if(st.codering==='cados')d.T(x,R0+4.6,cd.g[g.id],{z:3.3,b:1,a:'m'});}
+    if(st.codering==='cados')d.T(x,R0+4.6,cd.g[g.id],{z:3.3,b:1,a:'m'});d.H(x-8,R0-21,CW,27,'g:'+g.id);}
    if(s.k)column(d,x,g.sub?R1:R0,s.k,cd.k[s.k.id]);});});
 }
 /* ---- situatieplan ---- */
@@ -461,29 +485,36 @@ function itemOps(pl,it,ix){const e=ix[it.pid];if(!e)return null;const d=mk(),s=p
  return{ops,cx:it.x+c[0]*s,cy:it.y+c[1]*s,r:(w/2+2.5)*s,lb}}
 function planFlat(st,pl){const ix=pindex(st),o=[];pl.muren.forEach(m=>o.push(['L',m[0],m[1],m[2],m[3],3.2,0]));pl.items.forEach(it=>{const r=itemOps(pl,it,ix);if(r)o.push(...r.ops)});return o}
 
-/* alle pagina's voor PDF/voorbeeld */
-function allPages(st,welke='alles'){const out=[];
- if(welke!=='plan')st.borden.forEach(b=>bordPages(st,b).forEach(f=>out.push({soort:'Eendraadschema',sub:b.naam,f})));
- if(welke!=='schema')st.plannen.forEach(pl=>{if(!pl.items.length&&!pl.muren.length&&!(pl.bg&&pl.bg.data))return;
+/* alle pagina's voor PDF/voorbeeld; parts = {schema,plan,kringen,mat} */
+function tablePages(soort,cols,rows){const out=[],per=34;for(let i=0;i<Math.max(1,rows.length);i+=per)out.push({soort,sub:'',f:draw=>{const d=draw.d;let y=M+9;
+  cols.forEach(c=>d.T(M+4+c[1],y,c[0],{z:2.5,b:1,a:c[3]||'s'}));d.L(M+3,y+1.6,PW-M-3,y+1.6,.3);
+  rows.slice(i,i+per).forEach(r=>{y+=4.4;r.forEach((v,j)=>{const c=cols[j],t=String(v??'');d.T(M+4+c[1],y,t.length>c[2]?t.slice(0,c[2]-1)+'.':t,{z:2.4,a:c[3]||'s',b:j===0&&cols[0][4]})})})}});return out}
+function allPages(st,parts){parts=parts||{schema:true,plan:true};const out=[],cd=codes(st);
+ if(parts.schema)st.borden.forEach(b=>bordPages(st,b).forEach(f=>out.push({soort:'Eendraadschema',sub:b.naam,f})));
+ if(parts.plan)st.plannen.forEach(pl=>{if(!pl.items.length&&!pl.muren.length&&!(pl.bg&&pl.bg.data))return;
   out.push({soort:'Situatieplan',sub:pl.naam,pl,f:draw=>{const H=pl.h||707,k=Math.min((PW-2*M-6)/1000,(PH-2*M-TBH-6)/H),ox=M+3+((PW-2*M-6)-1000*k)/2,oy=M+3;
    draw.bg={data:pl.bg&&pl.bg.data,x:ox,y:oy,w:1000*k,h:H*k};draw.d.o.push(...xform(planFlat(st,pl),0,k,ox,oy))}})});
+ if(parts.kringen)out.push(...tablePages('Lijst met kringen',[['Kring',0,8,'s',1],['Benaming',16,46],['Beveiliging',104,18],['Kabel',136,22],['Lengte',178,8],['Differentieel',196,30],['Punten',276,5,'e']],
+  st.borden.flatMap(b=>b.groepen.flatMap(g=>g.kringen.map(k=>[cd.k[k.id],(st.borden.length>1?b.naam+' - ':'')+k.naam,`${k.polen} ${k.curve}${k.A}A ${k.kA?k.kA+'kA':''}`,`${k.kabelType} ${k.kabel}`,k.lengte?k.lengte+' m':'',`${g.sub?g.mA:b.hoofd.mA} mA - ${g.sub?g.A:b.hoofd.A}A type ${g.sub?g.type:b.hoofd.type}`,k.punten.length])))));
+ if(parts.mat)out.push(...tablePages('Materiaallijst',[['Omschrijving',0,110],['Aantal',276,10,'e']],materials(st)));
  return out.map((p,i)=>{const d=mk(),draw={d,bg:null};p.f(draw);titleBlock(d,st,i,out.length,p.soort,p.sub);return{ops:d.o,bg:draw.bg,soort:p.soort}})}
 /* SVG backend */
-function opsSVG(ops){const f={n:'none',w:'#fff',b:'#000'};let s='';
+function opsSVG(ops,edit){const f={n:'none',w:'#fff',b:'#000'};let s='',top='';
  for(const o of ops){const t=o[0];
   if(t==='L')s+=`<line x1="${o[1].toFixed(2)}" y1="${o[2].toFixed(2)}" x2="${o[3].toFixed(2)}" y2="${o[4].toFixed(2)}" stroke="#000" stroke-width="${(+o[5]).toFixed(2)}" stroke-linecap="round"/>`;
   else if(t==='C')s+=`<circle cx="${o[1].toFixed(2)}" cy="${o[2].toFixed(2)}" r="${o[3].toFixed(2)}" fill="${f[o[4]]}" stroke="#000" stroke-width="${(+o[5]).toFixed(2)}"/>`;
   else if(t==='R')s+=`<rect x="${o[1].toFixed(2)}" y="${o[2].toFixed(2)}" width="${o[3].toFixed(2)}" height="${o[4].toFixed(2)}" fill="${f[o[5]]}" stroke="#000" stroke-width="${(+o[6]).toFixed(2)}"/>`;
   else if(t==='F')s+=`<polygon points="${o.slice(1).map(v=>v.toFixed(2)).join(' ')}" fill="#000"/>`;
   else if(t==='T')s+=`<text x="${o[1].toFixed(2)}" y="${o[2].toFixed(2)}" font-size="${o[4].toFixed(2)}" text-anchor="${{s:'start',m:'middle',e:'end'}[o[5]]}"${o[6]?` transform="rotate(${-o[6]} ${o[1].toFixed(2)} ${o[2].toFixed(2)})"`:''}${o[7]?' font-weight="700"':''}${o[8]?' font-style="italic"':''}>${esc(o[3])}</text>`;
-  else if(t==='H')s+=`<rect class="hit" data-kid="${o[5]}" x="${o[1].toFixed(2)}" y="${o[2].toFixed(2)}" width="${o[3]}" height="${o[4].toFixed(2)}"/>`;}
- return s}
-const pageSVG=p=>`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${PW} ${PH}" style="width:${Math.round(1000*zoom)}px">${p.bg&&p.bg.data?`<image href="${p.bg.data}" x="${p.bg.x}" y="${p.bg.y}" width="${p.bg.w}" height="${p.bg.h}" opacity=".55" preserveAspectRatio="none"/>`:''}${opsSVG(p.ops)}</svg>`;
+  else if(t==='H'&&edit)s+=`<rect class="hit${E.sel===o[5]?' sel':''}" data-h="${o[5]}" x="${o[1].toFixed(2)}" y="${o[2].toFixed(2)}" width="${o[3]}" height="${o[4].toFixed(2)}"/>`;
+  else if(t==='A'&&edit&&E.mode==='teken'&&((o[3][0]==='p')===!!TYPES[E.sym]))top+=`<g class="addm" data-add="${o[3]}" transform="translate(${o[1].toFixed(2)} ${o[2].toFixed(2)})"><circle r="2.3"/><path d="M-1.2 0H1.2M0 -1.2V1.2"/></g>`;}
+ return s+top}
+const pageSVG=(p,edit)=>`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${PW} ${PH}" style="width:${Math.round(1000*zoom)}px">${p.bg&&p.bg.data?`<image href="${p.bg.data}" x="${p.bg.x}" y="${p.bg.y}" width="${p.bg.w}" height="${p.bg.h}" opacity=".55" preserveAspectRatio="none"/>`:''}${opsSVG(p.ops,edit===true)}</svg>`;
 /* PDF backend (jsPDF, vectorieel) */
-function buildPdf(st,welke){
+function buildPdf(st,parts){
  const J=window.jspdf&&window.jspdf.jsPDF;if(!J)throw new Error('PDF-bibliotheek niet geladen');
  const doc=new J({orientation:'landscape',unit:'mm',format:'a4'}),pt=72/25.4;
- allPages(st,welke).forEach((pg,pi)=>{if(pi)doc.addPage('a4','landscape');
+ allPages(st,parts).forEach((pg,pi)=>{if(pi)doc.addPage('a4','landscape');
   if(pg.bg&&pg.bg.data){try{if(doc.GState)doc.setGState(new doc.GState({opacity:.55}));doc.addImage(pg.bg.data,'JPEG',pg.bg.x,pg.bg.y,pg.bg.w,pg.bg.h);if(doc.GState)doc.setGState(new doc.GState({opacity:1}))}catch(e){}}
   for(const o of pg.ops){const t=o[0];
    if(t==='L'){doc.setLineWidth(o[5]);doc.setLineCap(1);doc.setDrawColor(0);doc.line(o[1],o[2],o[3],o[4])}
@@ -509,6 +540,10 @@ function materials(st){const m=new Map(),add=(k,n=1)=>m.set(k,(m.get(k)||0)+n);
 function checks(st){const w=[],cd=codes(st),add=(lvl,msg,kid)=>w.push({lvl,msg,kid}),geplaatst=new Set(st.plannen.flatMap(p=>p.items.map(i=>i.pid)));
  st.borden.forEach(b=>{const bn=st.borden.length>1?b.naam+' - ':'';
   if(b.geenHoofd)add('i',`${bn}in CaDos is geen hoofddifferentieel aangeduid; CaDraw tekent een standaard Δ${b.hoofd.mA}mA.`);
+  if(+b.hoofd.mA>300)add('w',`${bn}hoofddifferentieel ${b.hoofd.mA} mA: maximaal 300 mA aan het begin van de installatie.`);
+  if(+b.hoofd.A<40)add('w',`${bn}hoofddifferentieel ${b.hoofd.A}A: in een woning minstens 40A.`);
+  [b.hoofd,...b.groepen.filter(g=>g.sub)].forEach(x=>{if(x.type==='AC')add('w',`${bn}differentieel Δ${x.mA}mA type AC: in een woning minstens type A.`)});
+  if(!b.groepen.some(g=>g.sub&&+g.mA<=30)&&+b.hoofd.mA>30&&b.groepen.some(g=>g.kringen.length))add('w',`${bn}geen differentieel van max. 30 mA na het hoofddifferentieel.`);
   b.groepen.forEach(g=>{const prot=g.sub?+g.mA:+b.hoofd.mA;
   if(g.sub&&prot<=30&&g.kringen.length>8)add('w',`${bn}${gLabel(b,g)}: ${g.kringen.length} kringen achter één differentieel van max. 30 mA (maximaal 8 eindstroombanen).`,g.kringen[0].id);
   g.kringen.forEach(k=>{const c=`${bn}${cd.k[k.id]} ${k.naam||''}`.trim(),cat=p=>(TYPES[p.type]||{}).c,sc=k.punten.filter(p=>cat(p)==='sc').length,li=k.punten.filter(p=>cat(p)==='li').length,mm=sect(k.kabel),res=/reserve/i.test(k.naam);
@@ -523,7 +558,7 @@ function checks(st){const w=[],cd=codes(st),add=(lvl,msg,kid)=>w.push({lvl,msg,k
    if(sc&&mm&&mm<2.5)add('w',`${c}: stopcontacten op ${String(mm).replace('.',',')} mm² (minimaal 2,5 mm²).`,k.id);
    const nat=k.punten.some(p=>['t_was','t_droog','t_vaat'].includes(p.type))||/badkamer|douche|wasmachine|droogkast|vaatwas/i.test(k.naam);
    if(nat&&prot>30)add('w',`${c}: badkamer/wasmachine/droogkast/vaatwas hoort achter een differentieel van max. 30 mA (nu ${prot} mA).`,k.id);
-   else if((sc||li)&&prot>30)add('i',`${c}: stopcontacten/verlichting niet achter max. 30 mA - nakijken voor nieuwe installaties (AREI-wijziging 2023).`,k.id);
+   else if((sc||li)&&prot>30&&!(sc<=1&&!li&&k.punten.some(p=>cat(p)==='toe')))add('i',`${c}: stopcontacten/verlichting niet achter max. 30 mA - nakijken voor nieuwe installaties (AREI-wijziging 2023).`,k.id);
   })})});
  return w}
 
@@ -538,13 +573,17 @@ const typeOpts=(v,pre='')=>{const gs={};Object.entries(TYPES).forEach(([k,t])=>(
 const kSum=(k,code)=>`<b class="lb">${code}</b><span class="kn">${esc(k.naam||'(naamloos)')}</span><small>${k.bron?'CaDos':'CaDraw'}${k.calc?' + CaCalc':''} &middot; ${esc(k.polen)} ${esc(k.curve)}${esc(k.A)}A &middot; ${esc(k.kabel||'kabel?')} &middot; ${k.punten.length} pt</small>`;
 const bordTabs=()=>S.borden.length>1?`<div class="row" style="margin:0 0 8px">${S.borden.map((b,i)=>`<button class="sm ${i===bi?'on2':''}" data-a="bord" data-i="${i}">${esc(b.naam)}</button>`).join('')}</div>`:'';
 
-function vEdit(){const cd=codes(S),b=B(),bp=`borden.${bi}`;
- let h=`<datalist id="kamers">${S.kamers.map(k=>`<option value="${esc(k)}">`).join('')}</datalist>
- <div class="card"><h2>Project</h2>${CLOUD?`<div class="row" style="margin:0 0 10px"><button data-a="syncCados">Opnieuw inlezen uit CaDos</button><button data-a="syncCalc">Aanvullen uit CaCalc</button><span class="note">Wijzigingen aan gekoppelde kringen gaan automatisch terug naar CaDos.</span></div>`
+function vDoc(){const b=B(),bp=`borden.${bi}`;
+ return`<div class="card"><h2>Project</h2>${CLOUD?`<div class="row" style="margin:0 0 10px"><button data-a="syncCados">Opnieuw inlezen uit CaDos</button><button data-a="syncCalc">Aanvullen uit CaCalc</button><span class="note">Wijzigingen aan gekoppelde kringen gaan automatisch terug naar CaDos.</span></div>`
   :`<div class="row" style="margin:0 0 10px"><button data-a="sample">Voorbeeld laden</button><button data-a="leeg">Leeg beginnen</button><button data-a="showImp">CaDos / CaCalc importeren</button><button data-a="json">JSON bewaren</button></div>
  <div id="imp" hidden><p class="note">Plak de JSON van een CaDos-dossier, van CaCalc, of een eerder bewaarde CaDraw-JSON. Op de CaSuite-site gebeurt dit automatisch per project.</p><textarea id="impTxt" rows="5" placeholder='{"zekeringen":{"kasten":[...]}}'></textarea><div class="row"><input type="file" id="impFile" accept=".json,application/json"><button class="pri" data-a="doImp">Importeren</button></div></div>`}
- <div class="grid">${fld('Project','project.naam',{c:'w2'})}${fld('Adres installatie','project.adres',{c:'w2'})}${fld('Klant','project.klant')}${fld('Installateur','project.installateur')}${fld('Getekend door','project.tekenaar')}${fld('EAN','project.ean')}${fld('Datum','project.datum')}${fld('Netspanning','project.net',{opts:NETTEN,c:'w2'})}${fld('Voedingskabel','project.voeding')}${fld('Aarding','project.aarding')}${fld('Codering','codering',{opts:[['cados','CaDos: A → AA, AB'],['klassiek','Doorlopend: A, B, C']]})}</div></div>
- ${bordTabs()}<div class="card"><h2>Bord</h2><div class="grid">${fld('Naam',bp+'.naam',{c:'w2'})}</div><div class="row"><button class="sm" data-a="addB">+ bord</button>${S.borden.length>1&&!b.kastId?`<button class="sm danger" data-a="delB">Verwijder bord</button>`:''}</div></div>`;
+ <div class="grid">${fld('Project','project.naam',{c:'w2'})}${fld('Adres installatie','project.adres',{c:'w2'})}${fld('Klant','project.klant')}${fld('Installateur','project.installateur')}${fld('Getekend door','project.tekenaar')}${fld('Controleorganisme','project.organisme')}${fld('EAN','project.ean')}${fld('Datum','project.datum')}${fld('Netspanning','project.net',{opts:NETTEN,c:'w2'})}${fld('Voedingskabel','project.voeding')}${fld('Aarding','project.aarding')}${fld('Codering','codering',{opts:[['cados','CaDos: A → AA, AB'],['klassiek','Doorlopend: A, B, C']]})}</div></div>
+ ${bordTabs()}<div class="card"><h2>Bord</h2><div class="grid">${fld('Naam',bp+'.naam',{c:'w2'})}</div><div class="row"><button class="sm" data-a="addB">+ bord</button>${S.borden.length>1&&!b.kastId?`<button class="sm danger" data-a="delB">Verwijder bord</button>`:''}</div></div>`}
+function vKring(){const cd=codes(S),b=B(),bp=`borden.${bi}`,w=checks(S);
+ let h=`<datalist id="kamers">${S.kamers.map(k=>`<option value="${esc(k)}">`).join('')}</datalist>
+ <div class="card"><h2>Nakijken <small>${w.filter(x=>x.lvl==='w').length} waarschuwingen &middot; ${w.filter(x=>x.lvl==='i').length} opmerkingen</small></h2><p class="note">Hulpmiddel bij het tekenen, geen keuring. Beperkte selectie van regels voor woningen; het AREI en de keurder blijven de referentie.</p><details${w.some(x=>x.lvl==='w')?' open':''}><summary style="cursor:pointer">Toon aandachtspunten</summary>${w.length?w.map(x=>`<div class="chk ${x.lvl}" data-a="goK" data-kid="${x.kid||''}"><b>${x.lvl==='w'?'⚠':'ℹ'}</b><span>${esc(x.msg)}</span></div>`).join(''):'<p>Geen aandachtspunten gevonden.</p>'}</details></div>
+ ${kringTabel()}
+ ${bordTabs()}`;
  b.groepen.forEach((g,gi)=>{const p=`${bp}.groepen.${gi}`;
   h+=`<div class="card"><h2>${S.codering==='cados'?`<span class="lb">${cd.g[g.id]}</span>`:''}${g.sub?'Differentieel':'Hoofddifferentieel'} <small>${g.sub?'achter het hoofddifferentieel':'begin van de installatie'} &middot; ${g.kringen.length} kringen</small></h2>
   <div class="grid">${g.sub?fld('Gevoeligheid (mA)',p+'.mA',{n:1,opts:[10,30,100,300]})+fld('Stroom (A)',p+'.A',{n:1,opts:[25,40,63,80]})+fld('Polen',p+'.polen',{opts:POL})+fld('Type',p+'.type',{opts:['A','B','F','AC']})
@@ -557,7 +596,44 @@ function vEdit(){const cd=codes(S),b=B(),bp=`borden.${bi}`;
    <span style="flex:1"></span><button class="sm" data-a="upK" ${dd}>↑</button><button class="sm" data-a="dnK" ${dd}>↓</button><button class="sm" data-a="dupK" ${dd}>Dupliceer</button><button class="sm danger" data-a="delK" ${dd}>Verwijder kring</button></div></div></details>`});
   h+=`<div class="row"><button class="pri sm" data-a="addK" data-g="${gi}">+ kring</button>${g.sub&&!g.bron?`<span style="flex:1"></span><button class="sm danger" data-a="delG" data-g="${gi}">Verwijder differentieel</button>`:''}</div></div>`});
  return h+`<button data-a="addG">+ differentieel</button>`}
-function vSchema(){return`<div class="row" style="margin:0 0 8px"><button class="sm" data-a="zo">−</button><button class="sm" data-a="zi">+</button><span class="note">Tik op een kring om ze te bewerken.</span></div><div class="pages">${allPages(S,'schema').map(pageSVG).join('')}</div>`}
+function locate(id){if(!id)return null;const t=id[0],x=id.slice(2);
+ for(let bx=0;bx<S.borden.length;bx++){const b=S.borden[bx];if(t==='h'&&b.id===x)return{t,bx,b};
+  for(let gi=0;gi<b.groepen.length;gi++){const g=b.groepen[gi];if(t==='g'&&g.id===x)return{t,bx,gi,b,g};
+   for(let ki=0;ki<g.kringen.length;ki++){const k=g.kringen[ki];if(t==='k'&&k.id===x)return{t,bx,gi,ki,b,g,k};
+    if(t==='p'){const pi=k.punten.findIndex(q=>q.id===x);if(pi>=0)return{t,bx,gi,ki,pi,b,g,k,p:k.punten[pi]}}}}}
+ return null}
+function symIcon(t){const d=mk();if(TYPES[t])sym(d,t,0,0,1,'',1);else breakerV(d,6,5.5);return`<svg viewBox="-1 -6.2 16 12.4">${opsSVG(d.o)}</svg>`}
+function libHtml(){const q=norm(E.q),all=[['kring','Kring (automaat + leiding)','Bord'],['diff','Differentieel','Bord'],...Object.entries(TYPES).map(([k,t])=>[k,t.l,t.g])],gs={};
+ const btn=e=>`<button class="sy${E.sym===e[0]?' on':''}" data-sym="${e[0]}">${symIcon(e[0])}<span>${esc(e[1])}</span></button>`;
+ all.filter(e=>!q||norm(e[1]).includes(q)).forEach(e=>(gs[e[2]]=gs[e[2]]||[]).push(btn(e)));
+ const rec=!q&&E.recent.length?`<h4>Laatst gebruikt</h4>${E.recent.map(k=>all.find(e=>e[0]===k)).filter(Boolean).map(btn).join('')}`:'';
+ return rec+(Object.entries(gs).map(([g,o])=>`<h4>${g}</h4>${o.join('')}`).join('')||'<p class="note" style="padding:8px">Geen symbool gevonden.</p>')}
+function vSide(){const cd=codes(S),L=locate(E.sel);if(E.sel&&!L)E.sel=null;
+ let h=`<div class="seg"><button data-a="mode" data-m="teken" class="${E.mode==='teken'?'on':''}">Tekenen</button><button data-a="mode" data-m="sel" class="${E.mode==='sel'?'on':''}">Selecteren</button></div><datalist id="kamers">${S.kamers.map(k=>`<option value="${esc(k)}">`).join('')}</datalist>`;
+ if(L){const bp=`borden.${L.bx}`,gp=`${bp}.groepen.${L.gi}`,kp=`${gp}.kringen.${L.ki}`,dd=`data-g="${L.gi}" data-k="${L.ki}"`;
+  if(L.t==='p'){const pp=`${kp}.punten.${L.pi}`;
+   h+=`<h2 style="font-size:14px;margin:12px 0 8px"><span class="lb">${cd.k[L.k.id]}${L.pi+1}</span> Eigenschappen symbool</h2><div class="grid">
+   <label class="f w2"><span>Symbool</span><select data-b="${pp}.type">${typeOpts(L.p.type)}</select></label>${fld('Aantal',pp+'.aantal',{n:1})}
+   <label class="f"><span>Halfwaterdicht</span><select data-b="${pp}.hw" data-bool><option value="">Nee</option><option value="1"${L.p.hw?' selected':''}>Ja</option></select></label>${fld('Tekst / kamer',pp+'.tekst',{c:'w2',list:'kamers'})}</div>
+   <div class="row"><button class="sm" data-a="upP" ${dd} data-p="${L.pi}" title="Vroeger in de kring">↓ lager</button><button class="sm" data-a="dnP" ${dd} data-p="${L.pi}" title="Verder in de kring">↑ hoger</button><button class="sm" data-a="dupP" ${dd} data-p="${L.pi}">Kopiëren</button><button class="sm danger" data-a="delP" ${dd} data-p="${L.pi}">Wissen</button></div>`}
+  else if(L.t==='k'){h+=`<h2 style="font-size:14px;margin:12px 0 8px"><span class="lb">${cd.k[L.k.id]}</span> Eigenschappen kring</h2><div class="grid">${fld('Benaming',kp+'.naam',{c:'w2'})}${fld('Polen',kp+'.polen',{opts:POL})}${fld('Curve',kp+'.curve',{opts:['B','C','D']})}${fld('Stroom (A)',kp+'.A',{n:1,opts:AMP})}${fld('Kortsluit (kA)',kp+'.kA',{n:1,opts:[3,4.5,6,10]})}${fld('Kabeltype',kp+'.kabelType',{opts:['XVB','EXVB','XGB','VOB','VVB','EXAVB','SVV']})}${fld('Geleiders',kp+'.kabel',{ph:'3G2,5'})}${fld('Lengte (m)',kp+'.lengte',{n:1})}${fld('Vaste letter',kp+'.code',{ph:'automatisch'})}</div>
+   <div class="row"><button class="sm" data-a="upK" ${dd}>← links</button><button class="sm" data-a="dnK" ${dd}>rechts →</button><button class="sm" data-a="dupK" ${dd}>Kopiëren</button><button class="sm danger" data-a="delK" ${dd}>Wissen</button></div><p class="note">${L.k.bron?'Gekoppeld aan CaDos: wijzigingen gaan terug naar het dossier.':'Alleen in CaDraw (niet in CaDos).'}</p>`}
+  else if(L.t==='g'){h+=`<h2 style="font-size:14px;margin:12px 0 8px"><span class="lb">${cd.g[L.g.id]||'Δ'}</span> Eigenschappen differentieel</h2><div class="grid">${fld('Gevoeligheid (mA)',gp+'.mA',{n:1,opts:[10,30,100,300]})}${fld('Stroom (A)',gp+'.A',{n:1,opts:[25,40,63,80]})}${fld('Polen',gp+'.polen',{opts:POL})}${fld('Type',gp+'.type',{opts:['A','B','F','AC']})}</div>${L.g.bron?'':`<div class="row"><button class="sm danger" data-a="delG" data-g="${L.gi}">Wissen</button></div>`}`}
+  else{h+=`<h2 style="font-size:14px;margin:12px 0 8px">Hoofddifferentieel</h2><div class="grid">${fld('Gevoeligheid (mA)',bp+'.hoofd.mA',{n:1,opts:[30,100,300]})}${fld('Stroom (A)',bp+'.hoofd.A',{n:1,opts:[25,40,63,80,100]})}${fld('Polen',bp+'.hoofd.polen',{opts:POL})}${fld('Type',bp+'.hoofd.type',{opts:['A','B','F','AC']})}${fld('Voedingskabel','project.voeding')}${fld('Aarding','project.aarding')}</div>`}}
+ if(E.mode==='teken')h+=`<input id="libq" placeholder="Zoek symbool" value="${esc(E.q)}" style="margin-top:10px"><div class="lib" id="libl">${libHtml()}</div>`;
+ else if(!L)h+=`<p class="note" style="margin-top:10px">Tik in het schema op een symbool, een automaat of een differentieel.</p>`;
+ return h}
+const schemaHtml=()=>allPages(S,{schema:true}).map(p=>pageSVG(p,true)).join('');
+function redrawSchema(){const el=$('#sch');if(el)el.innerHTML=schemaHtml()}
+function vSchema(){return`<div class="ws"><div class="side card" id="side">${vSide()}</div><div><div class="row" style="margin:0 0 8px"><button class="sm" data-a="zo">−</button><button class="sm" data-a="zi">+</button><span class="note">${E.mode==='teken'?(E.sym==='kring'?'Tik op een blauw toevoegpunt (+) naast een rail om een kring toe te voegen.':'Kies een symbool en tik op het blauwe toevoegpunt (+) boven een kring.'):'Tik op een onderdeel om het te selecteren.'}</span></div><div class="pages" id="sch">${schemaHtml()}</div></div></div>`}
+function kringTabel(){const cd=codes(S);
+ const rows=S.borden.flatMap(b=>b.groepen.flatMap(g=>g.kringen.map(k=>`<tr data-a="goK" data-kid="${k.id}" style="cursor:pointer"><td><b>${cd.k[k.id]}</b></td><td>${S.borden.length>1?esc(b.naam)+' - ':''}${esc(k.naam)}</td><td>${esc(k.polen)} ${esc(k.curve)}${esc(k.A)}A</td><td>${esc(k.kabelType)} ${esc(k.kabel)}</td><td>Δ${g.sub?g.mA:b.hoofd.mA}mA</td><td class="n">${k.punten.length}</td></tr>`))).join('');
+ return`<div class="card"><h2>Lijst met kringen</h2><div class="tw"><table><tr><th>Kring</th><th>Benaming</th><th>Beveiliging</th><th>Kabel</th><th>Differentieel</th><th class="n">Punten</th></tr>${rows}</table></div></div>`}
+function vMat(){return`<div class="card"><h2>Materiaallijst <small>afgeleid uit het schema; kabellengtes uit het veld Lengte per kring</small><span style="flex:1"></span><button class="sm" data-a="csv">Exporteren naar Excel (CSV)</button></h2><div class="tw"><table><tr><th>Omschrijving</th><th class="n">Aantal</th></tr>${materials(S).map(m=>`<tr><td>${esc(m[0])}</td><td class="n">${m[1]}</td></tr>`).join('')}</table></div></div>`}
+function vPrint(){const pr=S.print||(S.print={schema:true,plan:true,kringen:true,mat:false}),pg=allPages(S,pr);
+ return`<div class="card"><h2>Dossier samenstellen</h2>${[['schema','Eendraadschema'],['plan','Situatieplan'],['kringen','Lijst met kringen'],['mat','Materiaallijst']].map(x=>`<label class="chkl"><input type="checkbox" data-c="print.${x[0]}" data-r${pr[x[0]]?' checked':''}>${x[1]}</label>`).join('')}
+ <div class="row"><button class="pri" data-a="pdf">PDF maken (${pg.length} blad${pg.length===1?'':'en'})</button><button class="sm" data-a="zo">−</button><button class="sm" data-a="zi">+</button><span class="note">A4 liggend. Titelblok: zie tabblad Document.</span></div></div>
+ <div class="pages">${pg.map(p=>pageSVG(p,false)).join('')||'<p style="color:#fff;padding:20px">Niets geselecteerd.</p>'}</div>`}
 function vPlan(){P.pi=clamp(P.pi,0,S.plannen.length-1);const pl=S.plannen[P.pi],H=pl.h||707,ix=pindex(S),ks=allKringen(),cd=codes(S);
  if(!ks.some(x=>x.k.id===P.kring))P.kring=ks[0]?ks[0].k.id:'';
  const placed=new Set(S.plannen.flatMap(p=>p.items.map(i=>i.pid))),kr=ks.find(x=>x.k.id===P.kring),tot=ks.reduce((n,x)=>n+x.k.punten.length,0);
@@ -586,19 +662,13 @@ function vPlan(){P.pi=clamp(P.pi,0,S.plannen.length-1);const pl=S.plannen[P.pi],
   <select data-b="plannen.${P.pi}.sym" data-n data-r title="Symboolgrootte"><option value="2"${pl.sym==2?' selected':''}>Symbolen klein</option><option value="3"${pl.sym==3?' selected':''}>Symbolen normaal</option><option value="4.2"${pl.sym==4.2?' selected':''}>Symbolen groot</option></select>
   ${S.plannen.length>1?`<button class="sm danger" data-a="delPlan">Verwijder verdieping</button>`:''}<span style="flex:1"></span><span class="note">${placed.size} van ${tot} punten geplaatst</span></div></div>
  <div class="pages">${svg}</div>`}
-function vLists(){const cd=codes(S);
- const rows=S.borden.flatMap(b=>b.groepen.flatMap(g=>g.kringen.map(k=>`<tr><td><b>${cd.k[k.id]}</b></td><td>${S.borden.length>1?esc(b.naam)+' - ':''}${esc(k.naam)}</td><td>${esc(k.polen)} ${esc(k.curve)}${esc(k.A)}A</td><td>${esc(k.kabelType)} ${esc(k.kabel)}</td><td>Δ${g.sub?g.mA:b.hoofd.mA}mA</td><td class="n">${k.punten.length}</td></tr>`))).join('');
- return`<div class="card"><h2>Kringenlijst</h2><div class="tw"><table><tr><th>Code</th><th>Kring</th><th>Beveiliging</th><th>Kabel</th><th>Differentieel</th><th class="n">Punten</th></tr>${rows}</table></div></div>
- <div class="card"><h2>Materiaallijst <small>afgeleid uit het schema</small><span style="flex:1"></span><button class="sm" data-a="csv">CSV bewaren</button></h2><div class="tw"><table><tr><th>Omschrijving</th><th class="n">Aantal</th></tr>${materials(S).map(m=>`<tr><td>${esc(m[0])}</td><td class="n">${m[1]}</td></tr>`).join('')}</table></div></div>`}
-function vChecks(){const w=checks(S);
- return`<div class="card"><h2>Aandachtspunten <small>${w.filter(x=>x.lvl==='w').length} waarschuwingen &middot; ${w.filter(x=>x.lvl==='i').length} opmerkingen</small></h2><p class="note">Hulpmiddel bij het tekenen, geen keuring. De regels zijn een beperkte selectie voor huishoudelijke installaties; het AREI en de keurder blijven de referentie.</p>${w.length?w.map(x=>`<div class="chk ${x.lvl}" data-a="goK" data-kid="${x.kid||''}"><b>${x.lvl==='w'?'⚠':'ℹ'}</b><span>${esc(x.msg)}</span></div>`).join(''):'<p>Geen aandachtspunten gevonden.</p>'}</div>`}
 function render(){gc();const nw=checks(S).filter(x=>x.lvl==='w').length;
- $('#tabs').innerHTML=[['schema','Eendraad'],['plan','Situatieplan'],['edit','Bewerken'],['lists','Lijsten'],['checks','Controles'+(nw?`<span class="badge">${nw}</span>`:'')]].map(t=>`<button data-tab="${t[0]}" class="${tab===t[0]?'on':''}">${t[1]}</button>`).join('');
- const sc=document.querySelector('.pages'),sx=sc?sc.scrollLeft:0,sy=sc?sc.scrollTop:0;
- $('#v').innerHTML=tab==='edit'?vEdit():tab==='lists'?vLists():tab==='checks'?vChecks():tab==='plan'?vPlan():vSchema();
- const s2=document.querySelector('.pages');if(s2&&sc){s2.scrollLeft=sx;s2.scrollTop=sy}}
+ $('#tabs').innerHTML=[['doc','Document'],['schema','Eendraadschema'],['plan','Situatieplan'],['kring','Kringen'+(nw?`<span class="badge">${nw}</span>`:'')],['mat','Materiaallijst'],['print','Afdrukken']].map(t=>`<button data-tab="${t[0]}" class="${tab===t[0]?'on':''}">${t[1]}</button>`).join('');
+ const sc=document.querySelector('.pages'),sx=sc?sc.scrollLeft:0,sy=sc?sc.scrollTop:0,sd=$('.lib'),ls=sd?sd.scrollTop:0;
+ $('#v').innerHTML=tab==='doc'?vDoc():tab==='kring'?vKring():tab==='mat'?vMat():tab==='print'?vPrint():tab==='plan'?vPlan():vSchema();
+ const s2=document.querySelector('.pages');if(s2&&sc){s2.scrollLeft=sx;s2.scrollTop=sy}const l2=$('.lib');if(l2)l2.scrollTop=ls}
 let tt;function toast(msg,undo){$('#tmsg').textContent=msg;$('#tundo').style.display=undo?'':'none';$('#toast').style.display='flex';clearTimeout(tt);tt=setTimeout(()=>$('#toast').style.display='none',undo?7000:3800)}
-function goKring(id){if(!id)return;const x=allKringen().find(x=>x.k.id===id);if(x)bi=x.bx;open.add(id);tab='edit';render();const el=document.querySelector(`details[data-id="${id}"]`);if(el)el.scrollIntoView({block:'center'})}
+function goKring(id){if(!id)return;const x=allKringen().find(x=>x.k.id===id);if(x)bi=x.bx;open.add(id);tab='kring';render();const el=document.querySelector(`details[data-id="${id}"]`);if(el)el.scrollIntoView({block:'center'})}
 async function saveFile(filename,data){
  let dl=null;try{dl=window.claude&&await window.claude.use('downloads')}catch(e){}
  if(dl){try{await dl.save({filename,data});toast('Bewaard: '+filename)}catch(e){if(!e||e.code!=='declined')toast('Bewaren lukt hier niet ('+((e&&e.code)||'fout')+')')}return}
@@ -628,7 +698,9 @@ function ask(vraag,def=''){return new Promise(ok=>{const o=$('#ovl');o.innerHTML
 /* ---- gebeurtenissen ---- */
 document.addEventListener('input',e=>{const t=e.target;
  if(t.id==='pzoek'){cloud.picker(t.value);return}
- if(t.dataset.b){let v=t.value;if(t.dataset.n!==undefined)v=v===''?'':+v;setPath(t.dataset.b,v);if(/\.kabel$/.test(t.dataset.b))delete get(t.dataset.b.replace(/\.kabel$/,'')).kabelBron;persist()}
+ if(t.id==='libq'){E.q=t.value;$('#libl').innerHTML=libHtml();return}
+ if(t.dataset.b){let v=t.value;if(t.dataset.n!==undefined)v=v===''?'':+v;if(t.dataset.bool!==undefined)v=!!v;setPath(t.dataset.b,v);if(/\.kabel$/.test(t.dataset.b))delete get(t.dataset.b.replace(/\.kabel$/,'')).kabelBron;
+  if(/\.code$/.test(t.dataset.b)&&!String(v).trim())delete get(t.dataset.b.replace(/\.code$/,'')).code;persist();if(t.closest('#side'))redrawSchema()}
  else if(t.dataset.c){setPath(t.dataset.c,t.checked);persist()}});
 document.addEventListener('change',async e=>{const t=e.target;
  if(t.id==='pkring'){P.kring=t.value;P.punt='pid:';render();return}
@@ -640,7 +712,13 @@ document.addEventListener('change',async e=>{const t=e.target;
  const cd=codes(S);allKringen().forEach(({k})=>{const s=document.querySelector(`details[data-id="${k.id}"]>summary`);if(s)s.innerHTML=kSum(k,cd.k[k.id])})});
 document.addEventListener('toggle',e=>{const t=e.target;if(t.matches&&t.matches('details.k')){t.open?open.add(t.dataset.id):open.delete(t.dataset.id)}},true);
 document.addEventListener('click',async e=>{
- const hit=e.target.closest('.hit');if(hit){goKring(hit.dataset.kid);return}
+ const hit=e.target.closest('.hit');if(hit){E.sel=hit.dataset.h;const L=locate(E.sel);if(L)bi=L.bx;render();return}
+ const ad=e.target.closest('[data-add]');if(ad){const id=ad.dataset.add,L=locate((id[0]==='p'?'k:':'g:')+id.slice(2));if(!L&&id[0]==='k'){const b=S.borden.find(b=>b.groepen.some(g=>g.id===id.slice(2)));if(b){const g=b.groepen.find(g=>g.id===id.slice(2));bi=S.borden.indexOf(b);mut('',()=>{const k=newKring();g.kringen.push(k);E.sel='k:'+k.id})}return}
+  if(!L)return;bi=L.bx;
+  if(id[0]==='p')mut('',()=>{const last=L.k.punten[L.k.punten.length-1],p=newPunt(E.sym,{tekst:last?last.tekst:''});L.k.punten.push(p);E.sel='p:'+p.id;E.recent=[E.sym,...E.recent.filter(x=>x!==E.sym)].slice(0,5)});
+  else mut('',()=>{const k=newKring();L.g.kringen.push(k);E.sel='k:'+k.id});return}
+ const sy=e.target.closest('[data-sym]');if(sy){E.sym=sy.dataset.sym;E.mode='teken';
+  if(E.sym==='diff'){mut('Differentieel toegevoegd',()=>{const g=newGroep();B().groepen.push(g);E.sel='g:'+g.id;E.sym='kring'})}else render();return}
  const tb=e.target.closest('[data-tab]');if(tb){tab=tb.dataset.tab;render();window.scrollTo(0,0);return}
  const pr=e.target.closest('[data-pid]');if(pr){cloud.open(pr.dataset.pid);return}
  const b=e.target.closest('[data-a]');if(!b)return;const a=b.dataset.a,gi=+b.dataset.g,ki=+b.dataset.k,pi=+b.dataset.p,G=B().groepen[gi],K=G&&G.kringen[ki],pl=S.plannen[P.pi];
@@ -653,6 +731,9 @@ document.addEventListener('click',async e=>{
  else if(a==='addP')mut('',()=>{const last=K.punten[K.punten.length-1];K.punten.push(newPunt(b.dataset.t,{tekst:last?last.tekst:''}))});
  else if(a==='delP')mut('Punt verwijderd',()=>K.punten.splice(pi,1));
  else if(a==='upP'&&pi>0)mut('',()=>K.punten.splice(pi-1,0,K.punten.splice(pi,1)[0]));
+ else if(a==='dnP'&&pi<K.punten.length-1)mut('',()=>K.punten.splice(pi+1,0,K.punten.splice(pi,1)[0]));
+ else if(a==='dupP')mut('',()=>{const c=Object.assign({},K.punten[pi],{id:uid()});K.punten.splice(pi+1,0,c);E.sel='p:'+c.id});
+ else if(a==='mode'){E.mode=b.dataset.m;render()}
  else if(a==='addG')mut('',()=>B().groepen.push(newGroep()));
  else if(a==='delG')mut('Differentieel verwijderd',()=>B().groepen.splice(gi,1));
  else if(a==='addB')mut('',()=>{S.borden.push(newBord({naam:'Zekeringkast '+(S.borden.length+1)}));bi=S.borden.length-1});
@@ -668,7 +749,7 @@ document.addEventListener('click',async e=>{
    mut('',()=>{S=j;bi=0});toast(msg||'Geïmporteerd',true)}catch(err){toast('Import mislukt: '+err.message)}}
  else if(a==='json')saveFile(fname('json'),JSON.stringify(S,null,1));
  else if(a==='csv')saveFile(fname('csv'),'﻿Omschrijving;Aantal\r\n'+materials(S).map(m=>`"${m[0].replace(/"/g,'""')}";${m[1]}`).join('\r\n'));
- else if(a==='pdf'){try{saveFile(fname('pdf'),buildPdf(S,'alles').output('blob'))}catch(err){toast(err.message)}}
+ else if(a==='pdf'){try{const pr=S.print||{schema:true,plan:true};if(!allPages(S,pr).length){toast('Kies onder Afdrukken minstens één onderdeel met inhoud.');return}saveFile(fname('pdf'),buildPdf(S,pr).output('blob'))}catch(err){toast(err.message)}}
  else if(a==='zi'||a==='zo'){zoom=clamp(zoom*(a==='zi'?1.25:.8),.35,3);render()}
  else if(a==='pzi'||a==='pzo'){P.zoom=clamp(P.zoom*(a==='pzi'?1.25:.8),.3,4);render()}
  else if(a==='goK')goKring(b.dataset.kid);
@@ -736,9 +817,9 @@ const cloud={sb:null,pid:null,proj:null,projecten:[],plannen:[],dirty:false,t:nu
    if(!st)st=blank();
    if(nieuw){const p=this.proj||{};st.project.naam=st.project.naam||p.naam||'';st.project.adres=st.project.adres||p.locatie||'';st.project.klant=st.project.klant||p.klant||'';
     const c=await sb.from('project_cacalc_data').select('data').eq('project_id',pid).maybeSingle();
-    if(c.data&&c.data.data){if(allK(st))msg=' - er is ook een CaCalc-berekening (knop "Aanvullen uit CaCalc" onder Bewerken)';else{try{const f=fromCaCalc(c.data.data);f.project=st.project;f.plannen=st.plannen;st=f;msg=', opgebouwd uit CaCalc'}catch(e){}}}
+    if(c.data&&c.data.data){if(allK(st))msg=' - er is ook een CaCalc-berekening (knop "Aanvullen uit CaCalc" onder Document)';else{try{const f=fromCaCalc(c.data.data);f.project=st.project;f.plannen=st.plannen;st=f;msg=', opgebouwd uit CaCalc'}catch(e){}}}
     msg=(dos.data?'Opgebouwd uit CaDos':'Nieuw CaDraw-dossier')+msg}
-   S=st;bi=0;P.pi=0;P.sel=null;undoStack=[];this.dirty=false;$('#bproj').textContent=(this.proj?this.proj.naam:'Project')+' ▾';this.status(nieuw?'Nog niet bewaard':'Geladen');render();
+   S=st;bi=0;P.pi=0;P.sel=null;undoStack=[];E.sel=null;this.dirty=false;$('#bproj').textContent=(this.proj?this.proj.naam:'Project')+' ▾';this.status(nieuw?'Nog niet bewaard':'Geladen');render();
    if(msg)toast(msg);
   }catch(err){this.status('Fout');toast('Laden mislukt: '+(err.message||err))}},
  async save(){if(!this.pid||this.saving)return;this.saving=true;clearTimeout(this.t);this.dirty=false;this.status('Bewaren...');

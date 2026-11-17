@@ -4,6 +4,13 @@ Bestand: cadraw.html (losstaand, GEEN onderdeel van src2.html / build-apps.js; n
 Adres:   .../CaSuite/cadraw.html   (optioneel ?project=<project-id>)
 Login:   gebruikt de bestaande CaSuite-aanmelding (zelfde site). Niet aangemeld -> verwijst naar index.html.
 
+Werkwijze (17/11/2026: opgezet zoals Trikker)
+- Zes tabbladen: Document, Eendraadschema, Situatieplan, Kringen, Materiaallijst, Afdrukken.
+- Eendraadschema: symbool kiezen in de bibliotheek en op een blauw toevoegpunt (+) tikken; de opmaak en de
+  kringletters worden automatisch berekend. Tekenen/Selecteren-schakelaar; eigenschappenpaneel voor symbool,
+  kring (met vaste letter), differentieel en hoofddifferentieel.
+- Afdrukken: dossier samenstellen (schema, plan, lijst met kringen, materiaallijst) met voorbeeld en PDF.
+
 Gegevens
 - Eigen tabel project_cadraw_data (1 rij per project, zie supabase/migrations/20261116_project_cadraw_data.sql).
 - Leest project_elektro_dossiers (CaDos): zekeringen.kasten -> borden, differentielen -> groepen, automaten -> kringen.
