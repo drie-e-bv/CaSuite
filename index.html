@@ -6501,6 +6501,7 @@ body.print-patchkast #printExport{display:block !important;}
   .cd-act-export{--ico:var(--i-download);}
   .cd-act-import{--ico:var(--i-upload);}
   .cd-act-offerte{--ico:var(--i-file-plus);}
+  #cados-app .ak-badge{display:inline-block;min-width:18px;padding:0 6px;margin-left:4px;border-radius:9px;background:#e8a33d;color:#fff;font-size:11px;font-weight:700;line-height:18px;text-align:center;}
   .cd-act-new{--ico:var(--i-trash);}
   #cc-btn-new{--ico:var(--i-file-plus);}
   #cc-btn-load{--ico:var(--i-folder);}
@@ -7293,6 +7294,11 @@ function ontkoppelZekeringModule(moduleId){
   state.laadpalen.items.forEach(lp=>{ if(lp.zekeringModuleId===moduleId) lp.zekeringModuleId=""; });
   state.verwarming.items.forEach(z=>{ if(z.zekeringModuleId===moduleId) z.zekeringModuleId=""; });
   if(state.alarmCentrale.zekeringModuleId===moduleId) state.alarmCentrale.zekeringModuleId="";
+  // 19/11/2026: ook kringen, verlichting 230V, motoren en zonnepanelen
+  state.kringen.items.forEach(k=>{ if(k.zekeringModuleId===moduleId) k.zekeringModuleId=""; });
+  state.verlichting.items.forEach(v=>{ if(v.zekeringModuleId===moduleId) v.zekeringModuleId=""; });
+  ((state.motoren&&state.motoren.items)||[]).forEach(m=>{ if(m.zekeringModuleId===moduleId) m.zekeringModuleId=""; });
+  (state.zonnepanelen.items||[]).forEach(p=>{ if(p.zekeringModuleId===moduleId) p.zekeringModuleId=""; });
 }
 function pruneLeegZekering(rij){
   while(rij.items.length && rij.items[rij.items.length-1].categorie==="Leeg" && rij.items[rij.items.length-1].isAutoGap){
@@ -7851,7 +7857,8 @@ function migrate(s){
   (s.driverkast?.kasten||[]).forEach(kast=>{
     (kast.items||[]).forEach(d=>{ if(d.kringId===undefined) d.kringId = ""; if(d.zekeringModuleId===undefined) d.zekeringModuleId = ""; });
   });
-  (s.verlichting?.items||[]).forEach(v=>{ if(v.kringId===undefined) v.kringId = ""; });
+  (s.verlichting?.items||[]).forEach(v=>{ if(v.kringId===undefined) v.kringId = ""; if(v.zekeringModuleId===undefined) v.zekeringModuleId = ""; });
+  (s.kringen?.items||[]).forEach(k=>{ if(k.zekeringModuleId===undefined) k.zekeringModuleId = ""; });
   if(!s.knoppen || !Array.isArray(s.knoppen.items)){
     s.knoppen = { items: [] };
   } else {
@@ -8568,6 +8575,8 @@ function renderZekeringen(){
                 <label>Modules per rij (hele kast)</label>
                 <select class="kast-maat">${ZEKERING_MAAT_OPTIES.map(m=>`<option value="${m}" ${kast.maat===m?"selected":""}>${m} modules</option>`).join("")}</select>
                 <button class="btn" id="exportZekering">Exporteer voor werf (PDF)</button>
+                <button class="btn" id="zkToewijzen" title="Alles wat stroom nodig heeft aan een automaat koppelen">⚡ Automaten toewijzen${(()=>{ const n = azLijstMetStroom().filter(r=>!azAutomaatVan(r.obj)).length; return n ? ` <span class="ak-badge">${n}</span>` : ""; })()}</button>
+                <button class="btn" id="zkKoppelvoorstel" title="Lege koppelingen automatisch invullen">🔗 Koppelvoorstel</button>
                 <button class="btn" id="toggleSelect">Selecteren</button>
               </div>
               <div class="toolbar-settings">
@@ -8861,6 +8870,8 @@ function renderZekeringen(){
     save(); rebuild();
   });
   wrap.querySelector("#exportZekering").addEventListener("click", exportZekeringVoorWerf);
+  wrap.querySelector("#zkToewijzen").addEventListener("click", ()=> azOpen());
+  wrap.querySelector("#zkKoppelvoorstel").addEventListener("click", ()=> kvOpen());
   wrap.querySelector("#toggleSelect").addEventListener("click", toggleSelectMode);
 
   wrap.querySelector("#addModuleGlobal").addEventListener("click", ()=>{
@@ -10596,13 +10607,38 @@ function computeDriverMatch(driver, sturing){
     const cat = armatuurLookup(a.naam);
     return s + (cat ? cat.wattage*(parseFloat(a.aantal)||0) : 0);
   }, 0);
-  let naam = "";
+  let naam = "", reden = "";
+  // 19/11/2026 (Peter: "Dit zou 350mA driver moeten zijn"): vroeger telde enkel wattage + sturing,
+  // waardoor een 350mA-spot een 12V-voeding kreeg. Nu moet ook de stroom/spanning van de armaturen
+  // (info in de Armaturen-catalogus, bv. "350mA" / "24VDC") gelijk zijn aan die van de driver.
+  const nodig = driverBenodigdeStroom(driver);
   if(totaal>0){
-    const match = state.driver.find(d=> totaal>=d.min && totaal<=d.max && d.sturing===sturing);
-    naam = match ? match.naam : "Geen overeenkomst";
+    if(nodig.length>1){
+      naam = "Geen overeenkomst"; reden = "armaturen met verschillende stroom ("+nodig.join(" + ")+")";
+    } else {
+      const kandidaten = state.driver.filter(d=> d.sturing===sturing && (!nodig.length || normStroom(d.info)===nodig[0]));
+      const match = kandidaten.find(d=> totaal>=d.min && totaal<=d.max);
+      naam = match ? match.naam : "Geen overeenkomst";
+      if(!match) reden = kandidaten.length
+        ? "geen "+(nodig[0]||"")+" "+sturing+"-driver voor "+(Math.round(totaal*10)/10)+"W in de catalogus"
+        : "geen "+(nodig[0]||"")+" "+sturing+"-driver in de catalogus";
+    }
   }
-  return { naam, wattage: totaal };
+  return { naam, wattage: totaal, stroom: nodig[0]||"", reden };
 }
+// "350 mA" -> "350mA", "24vdc"/"24 VDC" -> "24V"; leeg als er niets herkenbaars in staat
+function normStroom(s){
+  const t = String(s||"").toLowerCase().replace(/\s+/g,"");
+  let m = t.match(/(\d+)ma\b/); if(m) return m[1]+"mA";
+  m = t.match(/(\d+)v(dc)?\b/); if(m) return m[1]+"V";
+  return "";
+}
+function driverBenodigdeStroom(driver){
+  const set = new Set();
+  (driver.armaturen||[]).forEach(a=>{ const c = armatuurLookup(a.naam); const n = c ? normStroom(c.info) : ""; if(n) set.add(n); });
+  return [...set];
+}
+function kastVanDriver(driver){ return state.driverkast.kasten.find(k=> k.items.includes(driver)); }
 // Herberekent de automatische driverkeuze en slaat die op (naam blijft dus
 // altijd de laatst berekende match, niet iets wat je zelf intikt).
 function herberekenDriver(driver, sturing){
@@ -10617,7 +10653,11 @@ function driverItemSpecText(driver){
   }, 0);
   const bits = [];
   if(totaal>0) bits.push(`${Math.round(totaal*100)/100}W`);
-  if(driver.naam) bits.push(driver.naam==="Geen overeenkomst" ? "⚠ geen match" : driver.naam);
+  if(driver.naam==="Geen overeenkomst"){
+    const k = kastVanDriver(driver);
+    const r = k ? computeDriverMatch(driver, k.sturing).reden : "";
+    bits.push("⚠ " + (r || "geen match"));
+  } else if(driver.naam) bits.push(driver.naam);
   else if(totaal>0) bits.push("nog geen match");
   return bits.join(" · ");
 }
@@ -10832,9 +10872,11 @@ function renderDriverkast(){
         <div class="toolbar-row">
           <button class="addbtn" id="addDriverkast">+ Kast toevoegen</button>
           <button class="btn" id="exportDriverkast">Exporteer voor werf (PDF)</button>
+          <button class="btn" id="dkKoppel" title="Armaturen zonder match koppelen aan de catalogus">🔗 Armaturen koppelen${(()=>{ const n = akOngekoppeld().length; return n ? ` <span class="ak-badge">${n}</span>` : ""; })()}</button>
         </div>
       </div>
     </div>
+    <div id="dkHerkies"></div>
     <div class="kastenwrap" id="dkKastenwrap"></div>
     <div id="dkOverzicht"></div>
     <datalist id="dl-kamers"></datalist>
@@ -10955,6 +10997,21 @@ function renderDriverkast(){
     save(); rebuild();
   });
   wrap.querySelector("#exportDriverkast").addEventListener("click", exportDriverkastVoorWerf);
+  // 19/11/2026: drivers die eerder zonder stroomcontrole gekozen werden -> voorstel om opnieuw te kiezen
+  (()=>{
+    const fout = [];
+    state.driverkast.kasten.forEach(k=> k.items.forEach(d=>{ if(d.leeg || !d.armaturen || !d.armaturen.length) return;
+      const nieuw = computeDriverMatch(d, k.sturing).naam; if(nieuw && nieuw!==d.naam) fout.push({d, k}); }));
+    const slot = wrap.querySelector("#dkHerkies");
+    if(!fout.length) return;
+    slot.innerHTML = `<div class="conflict-banner" style="margin:10px 0;"><div class="conflict-head">⚠ ${fout.length} driver(s) passen niet bij de stroom/spanning van hun armaturen (bv. een 12V-voeding voor 350mA-spots).</div>
+      <div class="conflict-item" style="cursor:pointer;"><b>Opnieuw kiezen uit de catalogus</b> — houdt nu rekening met wattage, sturing én stroom.</div></div>`;
+    slot.querySelector(".conflict-item").addEventListener("click", ()=>{
+      fout.forEach(({d,k})=>{ d.naam = computeDriverMatch(d, k.sturing).naam; });
+      save(); selectTab("driverkast"); toast(fout.length+" driver(s) opnieuw gekozen");
+    });
+  })();
+  wrap.querySelector("#dkKoppel").addEventListener("click", ()=> akOpen());
 
   return wrap;
 }
@@ -11309,7 +11366,7 @@ function renderArmatuurEditor(arm, driver, sturing, rebuildAll, selectItem, code
    (zonder Driver-laag: hier gaat het rechtstreeks over het armatuur zelf).
    ========================================================================= */
 function newVerlichtingItem(){
-  return {id:cryptoId(), naam:"", kamer:"", typeKabel:"", info:"", manueelNummer:"", kringId:"", leeg:false};
+  return {id:cryptoId(), naam:"", kamer:"", typeKabel:"", info:"", manueelNummer:"", kringId:"", zekeringModuleId:"", leeg:false};
 }
 // Doorlopende nummering vanaf 100 — een item mag een handmatig nummer krijgen,
 // alles daarna telt gewoon automatisch verder vanaf dát nummer (zelfde principe
@@ -11428,6 +11485,7 @@ function renderVerlichting(){
         <div class="toolbar-row">
           <button class="addbtn" id="vlAdd">+ Armatuur toevoegen</button>
           <button class="btn" id="exportVerlichting">Exporteer voor werf (PDF)</button>
+          <button class="btn" id="vlKoppel" title="Armaturen zonder match koppelen aan de catalogus">🔗 Armaturen koppelen${(()=>{ const n = akOngekoppeld().length; return n ? ` <span class="ak-badge">${n}</span>` : ""; })()}</button>
         </div>
       </div>
     </div>
@@ -11533,6 +11591,7 @@ function renderVerlichting(){
     if(el2 && el2.scrollIntoView) el2.scrollIntoView({behavior:"smooth", block:"center", inline:"center"});
   });
   wrap.querySelector("#exportVerlichting").addEventListener("click", exportVerlichtingVoorWerf);
+  wrap.querySelector("#vlKoppel").addEventListener("click", ()=> akOpen());
 
   return wrap;
 }
@@ -11592,9 +11651,11 @@ function renderVerlichtingEditor(item, rebuildAll, selectItem, code, onDelete){
       <div class="field"><label>Nummer (handmatig, optioneel)</label><input class="ve-nummer" type="number" value="${escapeHtml(item.manueelNummer)}" placeholder="automatisch"></div>
       <div class="field"><label>Schakelkring</label><select class="ve-kring"><option value="">— geen —</option>${(()=>{const kc=computeKringCodes(); return state.kringen.items.map(k=>`<option value="${k.id}" ${item.kringId===k.id?"selected":""}>${escapeHtml(kringLabel(k, kc[k.id]))}</option>`).join("");})()}</select></div>
     </div>
+    <div class="field-grid"><div class="field wide"><label>Gevoed door automaat</label><select class="ve-zekering"><option value="">${(()=>{ const k = azKring(item.kringId); return k && k.zekeringModuleId ? "via kring: "+escapeHtml(azAutomaatLabel(k.zekeringModuleId)) : "— geen —"; })()}</option>${alleZekeringAutomaten().map(a=>`<option value="${a.id}" ${item.zekeringModuleId===a.id?"selected":""}>${escapeHtml([a.code, a.naam, a.A, a.polen].filter(Boolean).join(" "))}</option>`).join("")}</select></div></div>
     <div class="hint" style="margin:6px 0 2px;">Laat leeg voor automatische nummering (telt door vanaf het vorige item). Vul je hier iets in, dan tellen alle volgende items automatisch verder vanaf dát nummer.</div>
     <button class="btn small ghost me-delete" style="margin-top:10px;">Verwijderen</button>
   </div>`);
+  box.querySelector(".ve-zekering").addEventListener("change", e=>{ item.zekeringModuleId=e.target.value; save(); });
   box.querySelector(".ve-kring").addEventListener("change", e=>{ item.kringId=e.target.value; save(); rebuildAll(); });
   box.querySelector(".me-close").addEventListener("click", ()=> selectItem(item.id));
   box.querySelector(".me-delete").addEventListener("click", ()=>{ onDelete(); selectItem(item.id); save(); rebuildAll(); });
@@ -12178,7 +12239,7 @@ function letterCode(n){
   }
   return s;
 }
-function newKringItem(){ return {id:cryptoId(), kamer:"", verdieping:"", manueelNummer:"", info:"", leeg:false}; }
+function newKringItem(){ return {id:cryptoId(), kamer:"", verdieping:"", manueelNummer:"", info:"", zekeringModuleId:"", leeg:false}; }
 // Doorlopende letters (A, B...) — zelfde principe als bij driver-nummers: een
 // handmatige letter laat alles erna automatisch verder tellen vanaf die letter.
 function computeKringCodes(){
@@ -12349,6 +12410,9 @@ function renderKringen(){
         <div class="toolbar-row">
           <button class="addbtn" id="krAdd">+ Kring toevoegen</button>
           <button class="btn" id="exportKringen">Exporteer voor werf (PDF)</button>
+          <button class="btn" id="krSamenvoegen" title="Meerdere kringen tot één kring maken">⇢ Kringen samenvoegen</button>
+          <button class="btn" id="krToewijzen" title="Automaten toewijzen">⚡ Automaten</button>
+          <button class="btn" id="krKoppelvoorstel" title="Knoppen en actoren automatisch aan kringen koppelen">🔗 Koppelvoorstel</button>
         </div>
       </div>
     </div>
@@ -12449,6 +12513,9 @@ function renderKringen(){
     if(el2 && el2.scrollIntoView) el2.scrollIntoView({behavior:"smooth", block:"center", inline:"center"});
   });
   wrap.querySelector("#exportKringen").addEventListener("click", exportKringenVoorWerf);
+  wrap.querySelector("#krSamenvoegen").addEventListener("click", ()=> ksOpen());
+  wrap.querySelector("#krToewijzen").addEventListener("click", ()=> azOpen());
+  wrap.querySelector("#krKoppelvoorstel").addEventListener("click", ()=> kvOpen());
 
   return wrap;
 }
@@ -12506,6 +12573,7 @@ function renderKringEditor(kring, rebuildAll, selectItem, code, onDelete){
       <div class="field"><label>Verdieping</label>${verdiepingSelectHtml(kring.verdieping, "kr-verdieping")}</div>
       <div class="field"><label>Letter (handmatig, optioneel)</label><input class="kr-nummer" value="${escapeHtml(kring.manueelNummer)}" placeholder="automatisch"></div>
       <div class="field wide"><label>Extra info</label><input class="kr-info" value="${escapeHtml(kring.info)}"></div>
+      <div class="field wide"><label>Gevoed door automaat (geldt voor alles op deze kring zonder eigen automaat)</label><select class="kr-zekering"><option value="">— geen —</option>${alleZekeringAutomaten().map(a=>`<option value="${a.id}" ${kring.zekeringModuleId===a.id?"selected":""}>${escapeHtml([a.code, a.naam, a.A, a.polen].filter(Boolean).join(" "))}</option>`).join("")}</select></div>
     </div>
     <div class="hint" style="margin:6px 0 10px;">Laat de letter leeg voor automatische lettering (A, B... telt door vanaf de vorige kring). Vul je hier zelf een letter in, dan tellen alle volgende kringen automatisch verder vanaf die letter.</div>
     <div class="kring-koppelingen"></div>
@@ -12601,6 +12669,7 @@ function renderKringEditor(kring, rebuildAll, selectItem, code, onDelete){
   box.querySelector(".kr-verdieping").addEventListener("change", e=>{ kring.verdieping=e.target.value; save(); });
   box.querySelector(".kr-nummer").addEventListener("change", e=>{ kring.manueelNummer=e.target.value; save(); rebuildAll(); });
   box.querySelector(".kr-info").addEventListener("input", e=>{ kring.info=e.target.value; save(); updateKringVisual(kring); });
+  box.querySelector(".kr-zekering").addEventListener("change", e=>{ kring.zekeringModuleId=e.target.value; save(); });
 
   return box;
 }
@@ -22680,7 +22749,10 @@ function ofVerdeel(lijst, n){
     return g;
   });
 }
-function ofArmNaam(oms){ return oms.replace(/^armatuur\s*:\s*/i,"").trim(); }
+function ofArmNaam(oms){
+  const n = oms.replace(/^armatuur\s*:\s*/i,"").trim();
+  return (typeof akBekendeKoppeling==="function" && akBekendeKoppeling(n)) || n; // eerder gekoppeld -> catalogusnaam
+}
 function ofAlarmType(t){
   t = t.toLowerCase();
   if(/pir|bewegings/.test(t)) return "PIR";
@@ -22691,7 +22763,19 @@ function ofAlarmType(t){
   return "Sensor";
 }
 
+const OF_REGELS_SLEUTEL = "offerte_vertaalregels";
+const OF_REGELS_STANDAARD = {kringPer:"lijn", polenToestel:"2P", polen3F:"4P", laadpaalA:"", kanalenSchakel:8, kanalenVerwarming:6,
+  kanalenRolluik:4, motorSoort:"Rolluik", koppelvoorstel:true, eigen:[]};
+const OF_DOELEN = [
+  ["overslaan","Overslaan"], ["verlichting","Lichtpunt 230V"], ["knop","Drukknop"], ["bewegingsmelder","Bewegingsmelder"],
+  ["toestel","Automaat (toestel)"], ["toestel3f","Automaat 3-fase"], ["data","Datapunt"], ["camera","Camera"],
+  ["alarm","Alarmtoestel"], ["toegang","Toegangscontrole"], ["patch","Patchkast-toestel"], ["muziek","Muziek (luidspreker)"]];
+function ofRegels(){
+  const r = (typeof cadosInst==="object" && cadosInst && cadosInst[OF_REGELS_SLEUTEL]) || {};
+  return Object.assign({}, OF_REGELS_STANDAARD, r, {eigen: Array.isArray(r.eigen) ? r.eigen : []});
+}
 function ofBouwVoorstel(off){
+  const R = ofRegels();
   const {kop, posten} = off;
   const V = {kop, onderdelen:{}, overgeslagen:{}, nietHerkend:[], kamers:[]};
   OF_ONDERDELEN.forEach(o=>{ V.onderdelen[o.key] = {items:[], regels:[]}; });
@@ -22752,6 +22836,25 @@ function ofBouwVoorstel(off){
       const d = p.oms.toLowerCase();
       const q = p.aantal;
       let m;
+      // eigen vertaalregels gaan voor op de standaardherkenning
+      const er = R.eigen.find(e=> e && e.trefwoord && d.includes(String(e.trefwoord).toLowerCase()));
+      if(er){
+        const n = Math.max(1, Math.round(q));
+        switch(er.doel){
+          case "overslaan": skip("Eigen regel: overslaan", p); return;
+          case "verlichting": nieuweLicht("230", p); licht.armaturen.push({naam:ofArmNaam(p.oms), aantal:n}); return;
+          case "knop": slots.knop.prod.push({naam:p.oms, aantal:n}); kamerGebruikt = true; return;
+          case "bewegingsmelder": slots.beweging.prod.push({naam:p.oms, aantal:n}); kamerGebruikt = true; return;
+          case "toestel": for(let i=0;i<n;i++) automaat((kamer||sec.naam)+" - "+p.oms+(n>1?" "+(i+1):""), ((d.match(/(\d+)\s*a\b/)||[0,"16"])[1])+"A", R.polenToestel); return;
+          case "toestel3f": for(let i=0;i<n;i++) automaat((kamer||sec.naam)+" - "+p.oms+(n>1?" "+(i+1):""), ((d.match(/(\d+)\s*a\b/)||[0,"32"])[1])+"A", R.polen3F); return;
+          case "data": for(let i=0;i<n;i++) dataPoorten.push({kamer, wat:p.oms}); kamerGebruikt = true; return;
+          case "camera": for(let i=0;i<n;i++){ const c = newCameraItem(); c.kamer = kamer; c.naam = p.oms; O.camerabewaking.items.push(c); } O.camerabewaking.regels.push(n+"× "+p.oms); return;
+          case "alarm": for(let i=0;i<n;i++) O.alarm.items.push({omschrijving:p.oms+(kamer?" — "+kamer:""), toestelType:ofAlarmType(p.oms)}); O.alarm.regels.push(n+"× "+p.oms); return;
+          case "toegang": for(let i=0;i<n;i++) O.toegangscontrole.items.push({omschrijving:p.oms+(kamer?" — "+kamer:"")}); return;
+          case "patch": for(let i=0;i<n;i++){ const o = newPatchItem("Overig"); o.naam = p.oms; patch.items.push(o); } O.data.regels.push(n+"× "+p.oms); return;
+          case "muziek": muz.producten.push(n+"× "+p.oms); muz.speakers += n; kamerGebruikt = true; return;
+        }
+      }
       // ---- verlichting ----
       if(/^(wand)?lichtpunt\s+\d+\s*ma\b.*serie/.test(d)){
         const g = [...lichtGroepen].reverse().find(g=>g.soort==="driver"); if(g) g.serie += Math.round(q); return;
@@ -22796,7 +22899,7 @@ function ofBouwVoorstel(off){
       if(/^voeding\s+toestel\s*(\d+)\s*a/.test(d)){
         const A = d.match(/(\d+)\s*a\b/)[1]+"A";
         for(let i=0;i<Math.round(q);i++){
-          const a = automaat((kamer||sec.naam)+" - toestel"+(q>1?" "+(i+1):""), A, "2P");
+          const a = automaat((kamer||sec.naam)+" - toestel"+(q>1?" "+(i+1):""), A, R.polenToestel);
           if(/^alarm/i.test(sec.naam) && !alarmCentraleZekering) alarmCentraleZekering = a;
         }
         kamerGebruikt = !!kamer; return;
@@ -22804,7 +22907,7 @@ function ofBouwVoorstel(off){
       if(/^driefasige\s+voeding/.test(d)){
         const A = (d.match(/(\d+)\s*a\b/)||[0,"32"])[1]+"A";
         const extra = p.oms.split(/\)\s*-\s*/)[1] || "";
-        for(let i=0;i<Math.round(q);i++) automaat((kamer||sec.naam)+" - 3F voeding"+(extra?" "+extra:"")+(q>1?" "+(i+1):""), A, "4P");
+        for(let i=0;i<Math.round(q);i++) automaat((kamer||sec.naam)+" - 3F voeding"+(extra?" "+extra:"")+(q>1?" "+(i+1):""), A, R.polen3F);
         kamerGebruikt = !!kamer; return;
       }
       if(/^aansluiting\s+(voor\s+)?laadstation/.test(d)){
@@ -22812,7 +22915,7 @@ function ofBouwVoorstel(off){
         for(let i=0;i<Math.round(q);i++){
           const lp = newLaadpaalItem(); lp.kamer = kamer; lp.naam = "Laadpaal "+(O.laadpalen.items.length+1); lp.aantalFasen = "3";
           lp.info = p.oms;
-          const a = automaat("Laadpaal "+(O.laadpalen.items.length+1), A, "4P");
+          const a = automaat("Laadpaal "+(O.laadpalen.items.length+1), R.laadpaalA || A, R.polen3F);
           lp.zekeringModuleId = a.id;
           if(/data/.test(d)){ const dp = {kamer, wat:"laadpaal", laadpaal:lp}; dataPoorten.push(dp); }
           O.laadpalen.items.push(lp);
@@ -22837,6 +22940,7 @@ function ofBouwVoorstel(off){
         for(let i=0;i<Math.round(q);i++){
           const mo = newMotorItem(); mo.kamer = kamer; mo.naam = (kamer||"Motor")+(q>1?" "+(i+1):"");
           if(isKnxMotor){ mo.sturing = "knx"; mo.kabel = motorSturing("knx").kabel; }
+          if(R.motorSoort) mo.soort = R.motorSoort;
           mo.info = "Uit offerte: "+p.oms+" — soort nog na te kijken";
           O.motoren.items.push(mo);
         }
@@ -22902,8 +23006,14 @@ function ofBouwVoorstel(off){
       if(/knx.*voeding|voeding.*knx/.test(d)){ for(let i=0;i<Math.round(q);i++) domoModule("Voeding", p.oms, 2); return; }
       if(/basalte\s*server|core\s*plus|centrale|server/.test(d) && technisch){ for(let i=0;i<Math.round(q);i++) domoModule("Centrale", p.oms, 4); return; }
       if(/dali\s*module|dali\s*gateway|dali-interface/.test(d)){ for(let i=0;i<Math.round(q);i++) domoModule("DALI", p.oms, 4); return; }
-      if(/verwarmingsa[ck]tor|hvac.*module|modules\s+sturing\s+zones/.test(d)){ for(let i=0;i<Math.round(q);i++) domoModule("HVAC", p.oms, 4); return; }
-      if(/schakela[ck]tor|rolluika[ck]tor|motora[ck]tor|relais/.test(d)){ for(let i=0;i<Math.round(q);i++) domoModule("Relais", p.oms, 4); return; }
+      if(/verwarmingsa[ck]tor|hvac.*module|modules\s+sturing\s+zones/.test(d)){ for(let i=0;i<Math.round(q);i++){ const mo = domoModule("HVAC", p.oms, 4);
+        mo.uitgangen = Array.from({length:parseInt(R.kanalenVerwarming)||0}, ()=>({id:cryptoId(), type:"verwarming", targetId:""})); } return; }
+      if(/rolluika[ck]tor|motora[ck]tor|jalouzie/.test(d)){ const kan = parseInt((d.match(/(\d+)\s*kan/)||[])[1]) || parseInt(R.kanalenRolluik) || 0;
+        for(let i=0;i<Math.round(q);i++){ const mo = domoModule("Relais", p.oms, 4);
+          mo.uitgangen = Array.from({length:kan*2}, (_,j)=>({id:cryptoId(), type:"motor", targetId:"", rol: j%2 ? "neer" : "op"})); } return; }
+      if(/schakela[ck]tor|relais/.test(d)){ const kan = parseInt((d.match(/(\d+)\s*(kan|voudig|x)/)||[])[1]) || parseInt(R.kanalenSchakel) || 0;
+        for(let i=0;i<Math.round(q);i++){ const mo = domoModule("Relais", p.oms, 4);
+          mo.uitgangen = Array.from({length:kan}, ()=>({id:cryptoId(), type:"kring", targetId:""})); } return; }
       if(/lijnkoppelaar|ip\s*router\s*knx|knx\s*ip/.test(d)){ for(let i=0;i<Math.round(q);i++) domoModule("Overig", p.oms, 2); return; }
       if(/overspanning/.test(d)){ const mo = domoModule("Overig", p.oms, 2); mo.__vooraan = true; return; }
       if(/aarding|tellerkast|smartphone|schema|keuring|programmatie|adresseren|te bepalen|te bespreken|wachtbuizen|exclusief|uitbreiding elektrisch bord|thermostaat|sturing zone|^technieken$/.test(d)){ skip("Algemene posten", p); return; }
@@ -22915,7 +23025,8 @@ function ofBouwVoorstel(off){
       const sturingInfo = g.soort==="driver" ? ("Spots "+g.stroom+(g.watt?" "+g.watt:"")) : g.soort==="24v" ? ("Ledstrip "+(g.spanning||"24Vdc")) : g.soort==="track" ? "DALI track" : g.soort==="kast" ? "Kastverlichting" : "Lichtpunt 230V";
       if(g.soort==="driver" || g.soort==="24v" || g.soort==="track"){
         const n = Math.max(1, g.aantal);
-        const kr = nieuweKring(kamer, sturingInfo + (n>1?" ("+n+" drivers)":"") + (g.koppel?" — gekoppeld":""));
+        const perLp = R.kringPer==="lichtpunt" && !g.koppel;
+        const kr = perLp ? null : nieuweKring(kamer, sturingInfo + (n>1?" ("+n+" drivers)":"") + (g.koppel?" — gekoppeld":""));
         let stukken;
         if(g.soort==="driver") stukken = ofVerdeel(g.armaturen, n);
         else if(g.armaturen.length===1 && n>1){
@@ -22928,7 +23039,7 @@ function ofBouwVoorstel(off){
         for(let i=0;i<n;i++){
           const dr = newDriverItem();
           dr.type = sturingInfo + " (uit offerte)";
-          dr.kringId = kr.id;
+          dr.kringId = kr ? kr.id : nieuweKring(kamer, sturingInfo).id;
           dr.armaturen = stukken[i].map(a=>{ const x = newDriverArmatuur(); x.naam = a.naam; x.ruimte = kamer; x.aantal = a.aantal; return x; });
           O.driverkast.items.push(dr);
         }
@@ -22936,11 +23047,12 @@ function ofBouwVoorstel(off){
         O.driverkast.regels.push((kamer||sec.naam)+": "+n+"× driver "+sturingInfo+(tot ? ", "+tot+(g.soort==="24v" ? " m ledstrip" : " armatu"+(tot===1?"ur":"ren")) : ""));
       } else {
         const n = Math.max(g.aantal, g.soort==="230" && g.aantal===0 ? 1 : 0);
-        const kr = nieuweKring(kamer, sturingInfo + (n>1?" ("+n+"×)":""));
+        const perLp = R.kringPer==="lichtpunt" && g.soort!=="kast";
+        const kr = perLp ? null : nieuweKring(kamer, sturingInfo + (n>1?" ("+n+"×)":""));
         const stukken = ofVerdeel(g.armaturen, Math.max(1,n));
         for(let i=0;i<Math.max(1,n);i++){
           const it = newVerlichtingItem();
-          it.kamer = kamer; it.kringId = kr.id;
+          it.kamer = kamer; it.kringId = kr ? kr.id : nieuweKring(kamer, sturingInfo).id;
           it.naam = g.soort==="kast" ? "Kastverlichting" : (stukken[i].map(a=> (a.aantal>1?a.aantal+"× ":"")+a.naam).join(" + ") || "");
           it.info = g.soort==="kast" ? (g.info || "Voeding 230V kastverlichting") : (g.info || "");
           O.verlichting.items.push(it);
@@ -23068,7 +23180,7 @@ function ofPasToe(V, keuze){
     if(!kast){ kast = newDriverKast(); state.driverkast.kasten.push(kast); }
     O.driverkast.items.forEach(dr=>{
       kast.items.push(dr); reg(dr);
-      try{ dr.naam = computeDriverMatch(dr, kast.sturing).naam; if(dr.naam==="Geen overeenkomst") dr.naam = ""; }catch(e){}
+      try{ dr.naam = computeDriverMatch(dr, kast.sturing).naam; }catch(e){}
     });
     gedaan.push(O.driverkast.items.length+" driver(s)");
   }
@@ -23130,6 +23242,9 @@ function ofPasToe(V, keuze){
   O.laadpalen.items.forEach(l=>{ schoon(l,"zekeringModuleId"); schoon(l,"patchpaneelPoortId"); });
   // modules aanzetten waar nu gegevens in staan
   OF_ONDERDELEN.forEach(o=>{ if(o.module && aan(o.key) && state.modules) state.modules[o.module] = true; });
+  if(ofRegels().koppelvoorstel){
+    try{ const kv = kvPasToe(); if(kv.length) gedaan.push(kv.length+" koppeling(en) voorgesteld (knoppen, muziek, actoren)"); }catch(e){ console.warn("CaDos: koppelvoorstel mislukt", e); }
+  }
   if(!Array.isArray(state.offerteImports)) state.offerteImports = [];
   state.offerteImports.push({nummer:V.kop.nummer||"", versie:V.kop.versie||"", datum:V.kop.datum||"", ingelezen:new Date().toISOString(), onderdelen:Object.keys(keuze).filter(k=>keuze[k])});
   return gedaan;
@@ -23170,9 +23285,11 @@ function ofStart(gekozenBestand){
     ofToonModal(`<p>Offerte <b>${escapeHtml(file.name)}</b> wordt gelezen…</p>`, `<button class="btn btn-ghost" id="of-annul">Annuleren</button>`)
       .querySelector("#of-annul").addEventListener("click", ofSluit);
     try{
+      try{ await laadCadosInst(); if(window.dbListCatalogArmaturen) state.armaturen = await window.dbListCatalogArmaturen(); }catch(e){}
       const off = await ofLeesOfferte(await file.arrayBuffer());
       if(!off.posten.length) throw new Error("Geen offerteposten gevonden. Is dit een Casentis-offerte uit Plenion?");
-      ofToonVoorstel(ofBouwVoorstel(off), file.name);
+      const V = ofBouwVoorstel(off); V.off = off;
+      ofToonVoorstel(V, file.name);
     }catch(e){
       console.error("CaDos: offerte inlezen mislukt", e);
       ofToonModal(`<p>De offerte kon niet gelezen worden.</p><p class="hint">${escapeHtml(e.message||String(e))}</p>`, `<button class="btn btn-primary" id="of-ok">Sluiten</button>`)
@@ -23188,6 +23305,54 @@ function ofStart(gekozenBestand){
   });
   document.body.appendChild(inp);
   inp.click();
+}
+function ofToonRegels(V, bestandsnaam){
+  const R = ofRegels();
+  const sel = (cls, opts, w)=> `<select class="${cls}">${opts.map(([v,l])=>`<option value="${v}" ${String(w)===String(v)?"selected":""}>${l}</option>`).join("")}</select>`;
+  const eigenRij = e=> `<div class="of-eigen" style="display:grid;grid-template-columns:1fr 200px 32px;gap:6px;margin:4px 0;">
+      <input class="of-e-woord" placeholder="trefwoord in de omschrijving, bv. miro" value="${escapeHtml(e.trefwoord||"")}">
+      ${sel("of-e-doel", OF_DOELEN, e.doel||"overslaan")}<button class="btn btn-ghost of-e-weg" title="wissen">✕</button></div>`;
+  const nh = (V.nietHerkend||[]).slice(0,8).map(p=>`<button class="btn btn-ghost of-nh" data-w="${escapeHtml(p.oms.split(/\s+-\s+|:/)[0].trim().toLowerCase())}" style="font-size:12px;padding:3px 8px;">+ ${escapeHtml(p.oms.slice(0,40))}</button>`).join(" ");
+  const html = `<p class="hint">Deze regels gelden voor iedereen (gedeeld) en voor elke volgende offerte. Na bewaren wordt het voorbeeld opnieuw berekend.</p>
+    <div class="field-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="field"><label>Kringen voor verlichting</label>${sel("of-r-kring", [["lijn","1 kring per offertelijn"],["lichtpunt","1 kring per lichtpunt/driver"]], R.kringPer)}</div>
+      <div class="field"><label>Motoren: standaard soort</label>${sel("of-r-motor", MOTOR_SOORTEN.map(s=>[s,s]), R.motorSoort)}</div>
+      <div class="field"><label>Automaat toestel 230V: polen</label>${sel("of-r-pt", POLEN_OPTIES.map(p=>[p,p]), R.polenToestel)}</div>
+      <div class="field"><label>Automaat 3-fase / laadpaal: polen</label>${sel("of-r-p3", POLEN_OPTIES.map(p=>[p,p]), R.polen3F)}</div>
+      <div class="field"><label>Laadpaal: stroom automaat</label>${sel("of-r-la", [["","zoals in de offerte"], ...A_OPTIES.filter(Boolean).map(a=>[a,a])], R.laadpaalA)}</div>
+      <div class="field"><label>Uitgangen per schakelactor</label><input class="of-r-ks" type="number" min="0" value="${escapeHtml(R.kanalenSchakel)}"></div>
+      <div class="field"><label>Uitgangen per verwarmingsactor</label><input class="of-r-kv" type="number" min="0" value="${escapeHtml(R.kanalenVerwarming)}"></div>
+      <div class="field"><label>Kanalen per rolluikactor (als de offerte het niet zegt)</label><input class="of-r-kr" type="number" min="0" value="${escapeHtml(R.kanalenRolluik)}"></div>
+      <div class="field" style="grid-column:1/-1"><label style="display:flex;gap:8px;align-items:center;"><input type="checkbox" class="of-r-kvp" style="width:auto" ${R.koppelvoorstel?"checked":""}> Na het toevoegen meteen koppelen: knoppen → kringen, muziekzones → versterker, verwarming/motoren/230V-kringen → actoren (enkel lege koppelingen)</label></div>
+    </div>
+    <div class="of-sub">Eigen vertalingen</div>
+    <p class="hint">Bevat de omschrijving van een post dit trefwoord, dan wordt hij zo vertaald (gaat voor op de standaardherkenning).</p>
+    <div class="of-eigen-lijst">${R.eigen.map(eigenRij).join("")}</div>
+    <button class="btn btn-ghost of-e-plus">+ regel</button>
+    ${nh ? `<div class="hint" style="margin-top:8px;">Snel toevoegen uit "niet herkend": ${nh}</div>` : ""}`;
+  const ov = ofToonModal(html, `<button class="btn btn-ghost" id="of-terug">Terug</button><button class="btn btn-ghost" id="of-standaard">Standaard herstellen</button><button class="btn btn-primary" id="of-bewaar">Bewaren &amp; opnieuw berekenen</button>`);
+  ov.querySelector("h2").textContent = "Vertaalregels offerte → CaDos";
+  const lijst = ov.querySelector(".of-eigen-lijst");
+  const wire = r=> r.querySelector(".of-e-weg").addEventListener("click", ()=> r.remove());
+  lijst.querySelectorAll(".of-eigen").forEach(wire);
+  const voegToe = e=>{ lijst.insertAdjacentHTML("beforeend", eigenRij(e||{})); const r = lijst.lastElementChild; wire(r); return r; };
+  ov.querySelector(".of-e-plus").addEventListener("click", ()=> voegToe().querySelector("input").focus());
+  ov.querySelectorAll(".of-nh").forEach(b=> b.addEventListener("click", ()=>{ voegToe({trefwoord:b.dataset.w, doel:"overslaan"}).querySelector("select").focus(); b.remove(); }));
+  ov.querySelector("#of-terug").addEventListener("click", ()=> ofToonVoorstel(V, bestandsnaam));
+  const bewaar = async (regels)=>{
+    try{ await bewaarCadosInst(OF_REGELS_SLEUTEL, regels); }
+    catch(e){ console.error(e); toast("⚠️ Vertaalregels bewaren mislukt"); return; }
+    const V2 = ofBouwVoorstel(V.off); V2.off = V.off;
+    ofToonVoorstel(V2, bestandsnaam); toast("Vertaalregels bewaard");
+  };
+  ov.querySelector("#of-standaard").addEventListener("click", ()=>{ if(confirm("Alle vertaalregels terugzetten naar de standaard (ook de eigen vertalingen wissen)?")) bewaar(Object.assign({}, OF_REGELS_STANDAARD)); });
+  ov.querySelector("#of-bewaar").addEventListener("click", ()=>{
+    const eigen = [...lijst.querySelectorAll(".of-eigen")].map(r=>({trefwoord:r.querySelector(".of-e-woord").value.trim(), doel:r.querySelector(".of-e-doel").value})).filter(e=>e.trefwoord);
+    bewaar({ kringPer: ov.querySelector(".of-r-kring").value, motorSoort: ov.querySelector(".of-r-motor").value,
+      polenToestel: ov.querySelector(".of-r-pt").value, polen3F: ov.querySelector(".of-r-p3").value, laadpaalA: ov.querySelector(".of-r-la").value,
+      kanalenSchakel: parseInt(ov.querySelector(".of-r-ks").value)||0, kanalenVerwarming: parseInt(ov.querySelector(".of-r-kv").value)||0,
+      kanalenRolluik: parseInt(ov.querySelector(".of-r-kr").value)||0, koppelvoorstel: ov.querySelector(".of-r-kvp").checked, eigen });
+  });
 }
 function ofBestaandAantal(key){
   try{
@@ -23243,10 +23408,11 @@ function ofToonVoorstel(V, bestandsnaam){
       <details class="of-rij" open><summary><span>Posten die de lezer (nog) niet kent</span><span class="of-n">${V.nietHerkend.length}</span></summary>
       <div class="of-detail">${V.nietHerkend.map(p=>`<div>${escapeHtml((p.sectie?p.sectie+": ":"")+p.aantal+"× "+p.oms)}</div>`).join("")}</div></details>`;
   }
-  html += `<p class="hint" style="margin-top:12px;">Na het toevoegen nog na te kijken: verdiepingen per kamer, welke spots op welke driver hangen, soort motor (screen/rolluik), differentiëlen en stopcontactkringen in de zekeringkast.</p>`;
-  const ov = ofToonModal(html, `<button class="btn btn-ghost" id="of-annul">Annuleren</button><button class="btn btn-primary" id="of-ok">Toevoegen aan dossier</button>`);
+  html += `<p class="hint" style="margin-top:12px;">Na het toevoegen: automaten toewijzen (⚡), armaturen aan de catalogus koppelen (🔗), kringen samenvoegen waar nodig. Hoe posten vertaald worden pas je aan via ⚙ Vertaalregels.</p>`;
+  const ov = ofToonModal(html, `<button class="btn btn-ghost" id="of-regels" style="margin-right:auto">⚙ Vertaalregels</button><button class="btn btn-ghost" id="of-annul">Annuleren</button><button class="btn btn-primary" id="of-ok">Toevoegen aan dossier</button>`);
   ov.querySelectorAll("summary input").forEach(cb=> cb.addEventListener("click", e=> e.stopPropagation()));
   ov.querySelector("#of-annul").addEventListener("click", ofSluit);
+  ov.querySelector("#of-regels").addEventListener("click", ()=> ofToonRegels(V, bestandsnaam));
   ov.querySelector("#of-ok").addEventListener("click", async ()=>{
     const keuze = {};
     ov.querySelectorAll("summary input[data-key]").forEach(cb=>{ keuze[cb.dataset.key] = cb.checked && !cb.disabled; });
@@ -23268,8 +23434,10 @@ function ofToonVoorstel(V, bestandsnaam){
     save(); buildNav(); selectTab(currentTab||DEFAULT_TAB);
     const ov2 = ofToonModal(`<p><b>Toegevoegd aan het dossier:</b></p><ul>${gedaan.map(g=>`<li>${escapeHtml(g)}</li>`).join("")}</ul>
       <p class="hint">${backupOk ? "Er werd vooraf een back-up van het dossier bewaard." : "Er was nog geen bewaard dossier om een back-up van te maken."} Niet goed? Dan zet "Ongedaan maken" alles terug zoals het was.</p>`,
-      `<button class="btn btn-ghost" id="of-undo">Ongedaan maken</button><button class="btn btn-primary" id="of-ok">Sluiten</button>`);
+      `<button class="btn btn-ghost" id="of-undo">Ongedaan maken</button><button class="btn btn-secondary" id="of-toewijs">⚡ Automaten toewijzen</button>${akOngekoppeld().length ? `<button class="btn btn-secondary" id="of-koppel">🔗 Armaturen koppelen (${akOngekoppeld().length})</button>` : ""}<button class="btn btn-primary" id="of-ok">Sluiten</button>`);
     ov2.querySelector("#of-ok").addEventListener("click", ofSluit);
+    if(ov2.querySelector("#of-koppel")) ov2.querySelector("#of-koppel").addEventListener("click", ()=>{ ofSluit(); akOpen(); });
+    ov2.querySelector("#of-toewijs").addEventListener("click", ()=>{ ofSluit(); azOpen(); });
     ov2.querySelector("#of-undo").addEventListener("click", ()=>{
       state = JSON.parse(vorige);
       save(); buildNav(); selectTab(currentTab||DEFAULT_TAB);
@@ -23278,6 +23446,595 @@ function ofToonVoorstel(V, bestandsnaam){
   });
 }
 document.getElementById("btnOfferte") && document.getElementById("btnOfferte").addEventListener("click", ()=> ofStart());
+
+/* =========================================================================
+   ARMATUREN KOPPELEN AAN DE CATALOGUS (19/11/2026, op vraag van Peter na "Offerte inlezen": de
+   armaturen uit de offerte dragen de lange offertenaam en hebben dus "geen match in catalogus",
+   waardoor de driverkeuze leeg blijft). Eén venster: per verschillende offertenaam één rij, met een
+   voorstel uit de gedeelde Catalogus (tabel elektro_catalogus_armaturen), of meteen een nieuwe
+   catalogusregel. Toepassen = alle armaturen met die naam (driverkast + verlichting 230V) krijgen de
+   catalogusnaam, daarna kiest elke driver automatisch opnieuw. De koppelingen worden onthouden
+   (elektro_cados_instellingen, sleutel "offerte_armatuur_koppelingen"), zodat een volgende
+   offerte meteen de juiste catalogusnaam krijgt.
+   ========================================================================= */
+const AK_SLEUTEL = "offerte_armatuur_koppelingen";
+const AK_NEGEER = /te bepalen|volgens ontwerp|^kastverlichting$|^none$/i;
+const AK_STOP = new Set(["armatuur","spot","spots","trimless","richtbare","richtbaar","vaste","adjustable","long","short",
+  "brushed","bronze","brons","zwart","black","wit","white","antraciet","glass","gl","pc","met","en","de","het","voor","incl",
+  "excl","profiel","cover","uitsparing","inbouw","opbouw"]);
+function akTokens(s){
+  return String(s||"").toLowerCase()
+    .replace(/[()+,:/]/g," ").replace(/\s-\s/g," ")
+    .split(/\s+/).filter(t=> t && t.length>1 && !AK_STOP.has(t)
+      && !/^\d+k$/.test(t) && !/^\d+°/.test(t) && !/^cri\d*\+?$/.test(t) && !/^ip\d+$/.test(t) && !/^\d+(\.\d+)?$/.test(t));
+}
+// score 0..1: welk deel van de cataloguswoorden komt in de offertenaam voor (merk telt dubbel)
+function akScore(offerteNaam, catNaam){
+  const o = new Set(akTokens(offerteNaam));
+  const c = akTokens(catNaam);
+  if(!c.length) return 0;
+  let hit = 0, tot = 0;
+  c.forEach((t,i)=>{ const w = i===0 ? 2 : 1; tot += w; if(o.has(t)) hit += w; });
+  return hit/tot;
+}
+function akVoorstellen(offerteNaam){
+  return (state.armaturen||[])
+    .filter(a=> a.naam && a.naam!=="None")
+    .map(a=>({naam:a.naam, score:akScore(offerteNaam, a.naam), n:akTokens(a.naam).length}))
+    .filter(x=> x.score >= 0.5)
+    .sort((a,b)=> (b.score-a.score) || (b.n-a.n));
+}
+// stroom/spanning afleiden uit de drivers waarop de armatuur hangt (bv. "Spots 350mA 15W (uit offerte)")
+function akInfoVoor(naam){
+  for(const kast of state.driverkast.kasten) for(const d of kast.items){
+    if((d.armaturen||[]).some(a=>a.naam===naam)){
+      const m = (d.type||"").match(/(\d+\s*mA|\d+\s*V\s*dc)/i);
+      if(m) return m[1].replace(/\s+/g,"");
+    }
+  }
+  return "";
+}
+// alle armatuurnamen zonder catalogusmatch, gegroepeerd
+function akOngekoppeld(){
+  const map = new Map();
+  const voeg = (naam, aantal, kamer, waar)=>{
+    if(!naam || armatuurLookup(naam) || AK_NEGEER.test(naam)) return;
+    let g = map.get(naam);
+    if(!g){ g = {naam, stuks:0, kamers:new Set(), drivers:0, lichtpunten:0}; map.set(naam, g); }
+    g.stuks += parseFloat(aantal)||0;
+    if(kamer) g.kamers.add(kamer);
+    if(waar==="driver") g.drivers++; else g.lichtpunten++;
+  };
+  state.driverkast.kasten.forEach(k=> k.items.forEach(d=> (d.armaturen||[]).forEach(a=> voeg(a.naam, a.aantal, a.ruimte, "driver"))));
+  state.verlichting.items.forEach(v=> voeg(v.naam, 1, v.kamer, "verlichting"));
+  return [...map.values()].sort((a,b)=> b.stuks-a.stuks);
+}
+function akPasNamenToe(koppelingen){ // {offerteNaam: catalogusNaam}
+  let n = 0;
+  state.driverkast.kasten.forEach(kast=>{
+    kast.items.forEach(d=>{
+      let gewijzigd = false;
+      (d.armaturen||[]).forEach(a=>{ const nieuw = koppelingen[a.naam]; if(nieuw){ if(!a.offerteNaam) a.offerteNaam = a.naam; a.naam = nieuw; n++; gewijzigd = true; } });
+      if(gewijzigd) d.naam = computeDriverMatch(d, kast.sturing).naam;
+    });
+  });
+  state.verlichting.items.forEach(v=>{ const nieuw = koppelingen[v.naam]; if(nieuw){ if(!v.offerteNaam) v.offerteNaam = v.naam; v.naam = nieuw; n++; } });
+  return n;
+}
+async function akOnthoudKoppelingen(koppelingen){
+  try{
+    await laadCadosInst();
+    const oud = (cadosInst[AK_SLEUTEL] && typeof cadosInst[AK_SLEUTEL]==="object") ? cadosInst[AK_SLEUTEL] : {};
+    await bewaarCadosInst(AK_SLEUTEL, Object.assign({}, oud, koppelingen));
+    return true;
+  }catch(e){ console.warn("CaDos: koppelingen onthouden mislukt", e); return false; }
+}
+// gebruikt door Offerte inlezen: onthouden koppelingen meteen toepassen op de nieuwe armaturen
+function akBekendeKoppeling(offerteNaam){
+  const m = cadosInst && cadosInst[AK_SLEUTEL];
+  const doel = m && m[offerteNaam];
+  return (doel && armatuurLookup(doel)) ? doel : "";
+}
+
+function akCss(){
+  if(document.getElementById("ak-css")) return;
+  const st = document.createElement("style"); st.id = "ak-css";
+  st.textContent = `
+  #ak-modal .modal-box{max-width:980px;}
+  #ak-modal .ak-rij{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:12px;align-items:start;padding:10px 0;border-bottom:1px solid var(--line,#e3e8e5);}
+  #ak-modal .ak-rij.ak-klaar .ak-naam b{color:var(--green,#1d6b3e);}
+  #ak-modal .ak-naam b{display:block;font-size:14px;line-height:1.35;}
+  #ak-modal .ak-naam span{font-size:12px;color:var(--ink-soft,#5b6b63);}
+  #ak-modal select, #ak-modal input{width:100%;box-sizing:border-box;}
+  #ak-modal .ak-nieuw{display:none;grid-template-columns:1fr 80px 90px;gap:6px;margin-top:6px;}
+  #ak-modal .ak-nieuw.open{display:grid;}
+  #ak-modal .ak-nieuw label{font-size:11px;color:var(--ink-soft,#5b6b63);display:block;}
+  #ak-modal .ak-tip{font-size:12px;margin-top:4px;color:var(--ink-soft,#5b6b63);}
+  #ak-modal .ak-tip.ok{color:var(--green,#1d6b3e);}
+  #ak-modal .ak-kop{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:6px;}
+  #ak-modal .ak-kop input[type=search]{flex:1;min-width:200px;}
+  #ak-modal .ak-teller{font-size:13px;color:var(--ink-soft,#5b6b63);}
+  #ak-modal .ak-onthoud{display:flex;gap:8px;align-items:center;font-size:13px;margin-right:auto;}
+  #ak-modal .ak-onthoud input{width:auto;}
+  @media (max-width:720px){ #ak-modal .ak-rij{grid-template-columns:1fr;} }
+  `;
+  document.head.appendChild(st);
+}
+function akSluit(){ const m = document.getElementById("ak-modal"); if(m) m.remove(); }
+async function akOpen(){
+  if(!currentProjectId){ toast("Kies eerst een project."); return; }
+  // vers uit de gedeelde catalogus (kan intussen door iemand anders aangevuld zijn)
+  try{ if(window.dbListCatalogArmaturen) state.armaturen = await window.dbListCatalogArmaturen(); }catch(e){}
+  try{ await laadCadosInst(); }catch(e){}
+  const lijst = akOngekoppeld();
+  akCss(); akSluit();
+  const ov = document.createElement("div");
+  ov.className = "modal-overlay"; ov.id = "ak-modal";
+  if(!lijst.length){
+    ov.innerHTML = `<div class="modal-box"><h2>Armaturen koppelen</h2><div class="modal-body"><p>Alle armaturen in de driverkast en verlichting 230V hebben al een match in de catalogus. 👍</p></div>
+      <div class="modal-actions"><button class="btn btn-primary" id="ak-ok">Sluiten</button></div></div>`;
+    document.body.appendChild(ov);
+    ov.querySelector("#ak-ok").addEventListener("click", akSluit);
+    return;
+  }
+  const catOpties = (state.armaturen||[]).filter(a=>a.naam && a.naam!=="None")
+    .map(a=>`<option value="${escapeHtml(a.naam)}">${escapeHtml(a.naam)}${a.wattage?" — "+a.wattage+"W":""}${a.info?" · "+escapeHtml(a.info):""}</option>`).join("");
+  const onthouden = (cadosInst && cadosInst[AK_SLEUTEL]) || {};
+  const rijenHtml = lijst.map((g,i)=>{
+    const vs = akVoorstellen(g.naam);
+    const eerder = onthouden[g.naam] && armatuurLookup(onthouden[g.naam]) ? onthouden[g.naam] : "";
+    const keuze = eerder || (vs[0] && vs[0].score>=0.99 ? vs[0].naam : "");
+    const voorstelOpts = vs.slice(0,4).map(v=>`<option value="${escapeHtml(v.naam)}">★ ${escapeHtml(v.naam)}</option>`).join("");
+    const info = akInfoVoor(g.naam);
+    return `<div class="ak-rij" data-i="${i}">
+      <div class="ak-naam"><b>${escapeHtml(g.naam)}</b>
+        <span>${Math.round(g.stuks*10)/10}${/ledstrip|ledflex/i.test(g.naam)?" m":" st."} · ${g.drivers?g.drivers+" driver(s)":""}${g.drivers&&g.lichtpunten?" · ":""}${g.lichtpunten?g.lichtpunten+" lichtpunt(en) 230V":""} · ${escapeHtml([...g.kamers].slice(0,4).join(", "))}${g.kamers.size>4?" +"+(g.kamers.size-4):""}</span></div>
+      <div>
+        <select class="ak-keuze">
+          <option value="">— overslaan —</option>
+          ${voorstelOpts ? `<optgroup label="Voorstellen">${voorstelOpts}</optgroup>` : ""}
+          <option value="__nieuw">+ Nieuw in catalogus…</option>
+          <optgroup label="Hele catalogus">${catOpties}</optgroup>
+        </select>
+        <div class="ak-nieuw">
+          <div><label>Naam in catalogus</label><input class="ak-n-naam" value=""></div>
+          <div><label>Watt</label><input class="ak-n-watt" type="number" min="0" step="0.1" placeholder="W"></div>
+          <div><label>Info</label><input class="ak-n-info" value="${escapeHtml(info)}" placeholder="350mA"></div>
+        </div>
+        <div class="ak-tip">${eerder ? "eerder zo gekoppeld" : vs.length ? (keuze ? "voorstel overgenomen" : vs.length+" voorstel(len)") : "geen voorstel — kies uit de catalogus of maak een nieuwe aan"}</div>
+      </div></div>`;
+  }).join("");
+  ov.innerHTML = `<div class="modal-box"><h2>Armaturen koppelen aan de catalogus</h2><div class="modal-body">
+    <p class="hint">Per armatuur zonder match: kies de catalogusnaam (★ = voorstel) of maak een nieuwe catalogusregel. Alle armaturen met dezelfde naam in dit dossier volgen mee, en de drivers worden daarna automatisch opnieuw gekozen.</p>
+    <div class="ak-kop"><input type="search" class="ak-zoek" placeholder="Filter op naam of kamer…"><span class="ak-teller"></span></div>
+    <div class="ak-lijst">${rijenHtml}</div>
+  </div><div class="modal-actions">
+    <label class="ak-onthoud"><input type="checkbox" class="ak-onthoud-cb" checked> Onthouden voor volgende offertes</label>
+    <button class="btn btn-ghost" id="ak-annul">Annuleren</button><button class="btn btn-primary" id="ak-ok">Koppelen</button></div></div>`;
+  document.body.appendChild(ov);
+  const rijen = [...ov.querySelectorAll(".ak-rij")];
+  const teller = ov.querySelector(".ak-teller");
+  const telBij = ()=>{
+    const n = rijen.filter(r=> r.querySelector(".ak-keuze").value).length;
+    teller.textContent = n+" van "+rijen.length+" gekozen";
+    ov.querySelector("#ak-ok").textContent = n ? "Koppelen ("+n+")" : "Koppelen";
+  };
+  rijen.forEach(r=>{
+    const g = lijst[+r.dataset.i];
+    const sel = r.querySelector(".ak-keuze"), nieuw = r.querySelector(".ak-nieuw"), tip = r.querySelector(".ak-tip");
+    const eerder = onthouden[g.naam] && armatuurLookup(onthouden[g.naam]) ? onthouden[g.naam] : "";
+    const vs = akVoorstellen(g.naam);
+    sel.value = eerder || (vs[0] && vs[0].score>=0.99 ? vs[0].naam : "");
+    const upd = ()=>{
+      nieuw.classList.toggle("open", sel.value==="__nieuw");
+      r.classList.toggle("ak-klaar", !!sel.value && sel.value!=="__nieuw");
+      if(sel.value==="__nieuw"){
+        const ni = nieuw.querySelector(".ak-n-naam");
+        if(!ni.value) ni.value = g.naam.replace(/\s+-\s+\d{4}K\b.*$/i,"").replace(/\s+\d{4}K\b.*$/i,"").trim();
+        ni.focus();
+        tip.textContent = "wordt toegevoegd aan de gedeelde catalogus"; tip.className = "ak-tip";
+      } else if(sel.value){
+        const a = armatuurLookup(sel.value);
+        tip.textContent = a ? ("✓ "+(a.wattage?a.wattage+"W":"geen wattage")+(a.info?" · "+a.info:"")) : "";
+        tip.className = "ak-tip ok";
+      }
+      telBij();
+    };
+    sel.addEventListener("change", upd);
+    if(sel.value) upd();
+  });
+  telBij();
+  ov.querySelector(".ak-zoek").addEventListener("input", e=>{
+    const q = e.target.value.trim().toLowerCase();
+    rijen.forEach(r=>{ r.style.display = !q || r.querySelector(".ak-naam").textContent.toLowerCase().includes(q) ? "" : "none"; });
+  });
+  ov.querySelector("#ak-annul").addEventListener("click", akSluit);
+  ov.querySelector("#ak-ok").addEventListener("click", async ()=>{
+    const knop = ov.querySelector("#ak-ok");
+    const koppelingen = {}, nieuwe = [];
+    for(const r of rijen){
+      const g = lijst[+r.dataset.i];
+      const v = r.querySelector(".ak-keuze").value;
+      if(!v) continue;
+      if(v==="__nieuw"){
+        const naam = r.querySelector(".ak-n-naam").value.trim();
+        if(!naam){ r.querySelector(".ak-n-naam").focus(); toast("Geef een naam voor de nieuwe catalogusregel."); return; }
+        const watt = parseFloat(r.querySelector(".ak-n-watt").value);
+        nieuwe.push({naam, wattage: Number.isNaN(watt) ? 0 : watt, info: r.querySelector(".ak-n-info").value.trim()});
+        koppelingen[g.naam] = naam;
+      } else koppelingen[g.naam] = v;
+    }
+    if(!Object.keys(koppelingen).length){ toast("Niets gekozen."); return; }
+    knop.disabled = true; knop.textContent = "Bezig…";
+    // nieuwe catalogusregels (dubbele namen: bestaande gebruiken)
+    for(const n of nieuwe){
+      if(armatuurLookup(n.naam)) continue;
+      try{ if(window.dbAddCatalogArmatuur) await window.dbAddCatalogArmatuur(n); }
+      catch(e){ console.warn("CaDos: catalogusregel toevoegen mislukt", n.naam, e); }
+    }
+    try{ if(window.dbListCatalogArmaturen && nieuwe.length) state.armaturen = await window.dbListCatalogArmaturen(); }catch(e){}
+    nieuwe.forEach(n=>{ if(!armatuurLookup(n.naam)) state.armaturen.push({naam:n.naam, wattage:n.wattage, info:n.info}); });
+    const n = akPasNamenToe(koppelingen);
+    if(ov.querySelector(".ak-onthoud-cb").checked) await akOnthoudKoppelingen(koppelingen);
+    save(); akSluit(); selectTab(currentTab||DEFAULT_TAB);
+    const rest = akOngekoppeld().length;
+    toast(n+" armatu"+(n===1?"ur":"ren")+" gekoppeld"+(nieuwe.length?", "+nieuwe.length+" nieuw in catalogus":"")+(rest?" · nog "+rest+" zonder match":""));
+  });
+}
+
+/* =========================================================================
+   AUTOMATEN TOEWIJZEN + KOPPELVOORSTEL + KRINGEN SAMENVOEGEN (19/11/2026, op vraag van Peter:
+   "Alles van de import gaat ergens moeten linkbaar zijn. Automaten moeten kunnen toegewezen
+   worden. En het eerste ontwerp moet aanpasbaar zijn.")
+   - Kringen en Verlichting 230V kregen een eigen "Gevoed door automaat" (zekeringModuleId).
+     Een driver/lichtpunt zonder eigen automaat volgt die van zijn kring.
+   - Eén toewijslijst (Zekeringen-tab, knop "⚡ Automaten toewijzen"): alles wat stroom nodig heeft,
+     per kamer, meerdere rijen aanvinken -> bestaande automaat kiezen of meteen een nieuwe maken
+     (eventueel onder een differentieel).
+   - Koppelvoorstel: vult enkel LEGE koppelingen in (knoppen -> kringen van dezelfde kamer,
+     muziekzones -> versterkerkanalen, verwarmingszones/motoren/230V-kringen -> vrije uitgangen van
+     de actoren). Draait na "Offerte inlezen" en via de knop "🔗 Koppelvoorstel".
+   - Kringen samenvoegen (Kringen-tab): alle verwijzingen gaan mee naar de overblijvende kring.
+   ========================================================================= */
+
+// ---------- gemeenschappelijk ----------
+function azKring(id){ return id ? state.kringen.items.find(k=>k.id===id) : null; }
+function azAutomaatVan(obj){ return obj.zekeringModuleId || ((azKring(obj.kringId)||{}).zekeringModuleId) || ""; }
+function azAutomaatLabel(id, lijst){
+  if(!id) return "";
+  const a = (lijst || alleZekeringAutomaten()).find(x=>x.id===id);
+  return a ? [a.code, a.naam, a.A, a.polen].filter(Boolean).join(" ") : "?";
+}
+function azLijstMetStroom(){
+  const rijen = [];
+  const kc = computeKringCodes();
+  const dc = computeDriverCodes();
+  const vc = computeVerlichtingCodes();
+  const lc = computeLaadpaalCodes();
+  const mc = computeMotorCodes();
+  const wc = computeVerwarmingCodes();
+  state.kringen.items.forEach(k=>{ if(!k.leeg) rijen.push({soort:"Kring", code:kc[k.id], naam:k.info||"", kamer:k.kamer, obj:k}); });
+  state.driverkast.kasten.forEach(kast=> kast.items.forEach(d=>{ if(d.leeg) return;
+    const kamer = (d.armaturen||[]).map(a=>a.ruimte).find(Boolean) || kast.kamer || "";
+    rijen.push({soort:"Driver", code:dc[d.id], naam:d.naam || d.type || "", kamer, obj:d, viaKring:true}); }));
+  state.verlichting.items.forEach(v=>{ if(!v.leeg) rijen.push({soort:"Lichtpunt 230V", code:vc[v.id], naam:v.naam||v.info||"", kamer:v.kamer, obj:v, viaKring:true}); });
+  state.laadpalen.items.forEach(l=>{ if(!l.leeg) rijen.push({soort:"Laadpaal", code:lc[l.id], naam:l.naam, kamer:l.kamer, obj:l}); });
+  ((state.motoren&&state.motoren.items)||[]).forEach(m=> rijen.push({soort:"Motor", code:mc[m.id], naam:m.naam||m.soort, kamer:m.kamer, obj:m}));
+  state.verwarming.items.forEach(z=>{ if(!z.leeg) rijen.push({soort:"Verwarming", code:wc[z.id], naam:z.naam||z.info, kamer:z.kamer, obj:z}); });
+  state.zonnepanelen.items.forEach(p=>{ if(!p.leeg) rijen.push({soort:"Zonnepanelen", code:"", naam:p.naam, kamer:p.kamer, obj:p}); });
+  state.patchkast.kasten.forEach((kast,ki)=> kast.items.forEach(it=>{ if(it.categorie==="Leeg" || it.categorie==="Kabelgoot") return;
+    rijen.push({soort:"Patchkast", code:"", naam:it.naam || it.categorie, kamer:kast.kamer || "Patchkast "+(ki+1), obj:it}); }));
+  return rijen;
+}
+// nieuwe automaat in de zekeringkast; onder een differentieel = in diens rij als er plaats is, anders nieuwe rij met linkedDiffId
+function azNieuweAutomaat(naam, A, polen, diffId){
+  const kast = huidigeZekeringKast();
+  const maat = parseInt(kast.maat) || 24;
+  const m = {id:cryptoId(), categorie:"Automaat", type:"", polen:polen||"2P", mA:"", A:A||"16A",
+    breedte: polenToBreedte(polen||"2P"), naam:naam||"", isRem:false, kabelOpKlemmen:false, kabelType:"", kabelAantal:1};
+  const vrij = r=> maat - r.items.reduce((t,x)=> t + moduleBreedte(x), 0);
+  let rij = null;
+  if(diffId){
+    rij = kast.rijen.find(r=> r.items.some(x=>x.id===diffId));
+    if(rij && vrij(rij) < m.breedte) rij = null;
+    if(!rij){ rij = newRij(); kast.rijen.push(rij); }
+    m.linkedDiffId = diffId;
+  } else {
+    rij = [...kast.rijen].reverse().find(r=> r.items.length && r.items.every(x=>x.categorie==="Automaat") && vrij(r) >= m.breedte);
+    if(!rij){ rij = newRij(); kast.rijen.push(rij); }
+  }
+  rij.items.push(m);
+  return m;
+}
+
+// ---------- 1. toewijslijst ----------
+function azCss(){
+  if(document.getElementById("az-css")) return;
+  const st = document.createElement("style"); st.id = "az-css";
+  st.textContent = `
+  .az-modal .modal-box{max-width:1080px;}
+  .az-modal table{width:100%;border-collapse:collapse;font-size:13px;}
+  .az-modal th{position:sticky;top:0;background:var(--card,#fff);text-align:left;font-size:11px;text-transform:uppercase;color:var(--ink-soft,#5b6b63);padding:6px;border-bottom:1px solid var(--line,#dde3e0);z-index:1;}
+  .az-modal td{padding:5px 6px;border-bottom:1px solid var(--line,#eef1ef);vertical-align:middle;}
+  .az-modal tr.az-kamer td{background:var(--sunken,#f4f6f5);font-weight:700;}
+  .az-modal tr.az-kamer td label{display:flex;gap:8px;align-items:center;cursor:pointer;}
+  .az-modal input[type=checkbox]{width:auto;margin:0;}
+  .az-modal select{width:100%;min-width:150px;}
+  .az-modal .az-via{font-size:11px;color:var(--ink-soft,#5b6b63);}
+  .az-modal .az-leeg{color:#b26a00;}
+  .az-modal .az-balk{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 10px;background:var(--sunken,#f4f6f5);border-radius:10px;margin:8px 0;}
+  .az-modal .az-balk select, .az-modal .az-balk input{width:auto;min-width:0;}
+  .az-modal .az-balk .az-sep{width:1px;align-self:stretch;background:var(--line,#dde3e0);margin:0 4px;}
+  .az-modal .az-filter{display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:13px;}
+  .az-modal .az-filter input[type=search]{flex:1;min-width:180px;width:auto;}
+  .az-modal .az-filter label{display:flex;gap:6px;align-items:center;}
+  .az-modal .kv-lijst div{padding:3px 0;border-bottom:1px dashed var(--line,#e5e9e7);font-size:13px;}
+  .az-modal .az-kring-lijst label{display:flex;gap:8px;align-items:center;padding:4px 0;font-size:13px;}
+  `;
+  document.head.appendChild(st);
+}
+function azModal(id, titel, body, acties){
+  azCss();
+  const oud = document.getElementById(id); if(oud) oud.remove();
+  const ov = document.createElement("div");
+  ov.className = "modal-overlay az-modal"; ov.id = id;
+  ov.innerHTML = `<div class="modal-box"><h2>${titel}</h2><div class="modal-body">${body}</div><div class="modal-actions">${acties}</div></div>`;
+  document.body.appendChild(ov);
+  return ov;
+}
+function azOpen(){
+  if(!currentProjectId){ toast("Kies eerst een project."); return; }
+  const ov = azModal("az-modal", "Automaten toewijzen", `
+    <p class="hint">Vink rijen aan (of een hele kamer) en kies onderaan een automaat, of maak er meteen een nieuwe. Een driver of lichtpunt zonder eigen automaat volgt de automaat van zijn kring.</p>
+    <div class="az-filter"><input type="search" class="az-zoek" placeholder="Filter op kamer, code of naam…">
+      <label><input type="checkbox" class="az-enkel-leeg" checked> enkel zonder automaat</label>
+      <select class="az-soort"><option value="">alle soorten</option></select></div>
+    <div class="az-tabel"></div>`,
+    `<div class="az-balk" style="flex:1;margin:0;">
+       <span class="az-n">0 geselecteerd</span>
+       <select class="az-bestaand"></select><button class="btn btn-secondary az-toewijs">Toewijzen</button>
+       <span class="az-sep"></span>
+       <span>Nieuw:</span><input class="az-n-naam" placeholder="naam" style="width:150px">
+       <select class="az-n-A">${A_OPTIES.filter(Boolean).map(a=>`<option ${a==="16A"?"selected":""}>${a}</option>`).join("")}</select>
+       <select class="az-n-polen">${POLEN_OPTIES.map(p=>`<option ${p==="2P"?"selected":""}>${p}</option>`).join("")}</select>
+       <select class="az-n-diff"></select>
+       <button class="btn btn-secondary az-nieuw">+ Maak &amp; wijs toe</button>
+     </div>
+     <button class="btn btn-primary az-sluit">Klaar</button>`);
+  const tabelSlot = ov.querySelector(".az-tabel");
+  const gekozen = new Set();
+  const soortSel = ov.querySelector(".az-soort");
+  [...new Set(azLijstMetStroom().map(r=>r.soort))].forEach(s=> soortSel.insertAdjacentHTML("beforeend", `<option>${escapeHtml(s)}</option>`));
+  function vulKeuzes(){
+    const aut = alleZekeringAutomaten();
+    ov.querySelector(".az-bestaand").innerHTML = `<option value="">— kies automaat —</option><option value="__geen">(automaat wissen)</option>` +
+      aut.map(a=>`<option value="${a.id}">${escapeHtml([a.code, a.naam, a.A, a.polen].filter(Boolean).join(" "))}</option>`).join("");
+    const codes = computeZekeringCodes();
+    const diffs = []; huidigeZekeringKast().rijen.forEach(r=> r.items.forEach(m=>{ if(m.categorie==="Differentieel") diffs.push(m); }));
+    ov.querySelector(".az-n-diff").innerHTML = `<option value="">geen differentieel</option>` +
+      diffs.map(d=>`<option value="${d.id}">onder ${escapeHtml([codes[d.id], d.mA, d.naam].filter(Boolean).join(" "))}</option>`).join("");
+  }
+  function teken(){
+    const aut = alleZekeringAutomaten();
+    const opts = aut.map(a=>`<option value="${a.id}">${escapeHtml([a.code, a.naam, a.A].filter(Boolean).join(" "))}</option>`).join("");
+    const q = ov.querySelector(".az-zoek").value.trim().toLowerCase();
+    const enkelLeeg = ov.querySelector(".az-enkel-leeg").checked;
+    const soort = soortSel.value;
+    const rijen = azLijstMetStroom().filter(r=>{
+      if(soort && r.soort!==soort) return false;
+      if(enkelLeeg && azAutomaatVan(r.obj)) return false;
+      if(q && ![r.kamer, r.code, r.naam, r.soort].join(" ").toLowerCase().includes(q)) return false;
+      return true;
+    });
+    const perKamer = new Map();
+    rijen.forEach(r=>{ const k = r.kamer || "(geen kamer)"; if(!perKamer.has(k)) perKamer.set(k, []); perKamer.get(k).push(r); });
+    let html = `<table><thead><tr><th style="width:28px"></th><th>Soort</th><th>Code</th><th>Omschrijving</th><th style="width:240px">Gevoed door</th></tr></thead><tbody>`;
+    if(!rijen.length) html += `<tr><td colspan="5" class="hint">Niets te tonen${enkelLeeg?" — alles heeft al een automaat 👍":""}.</td></tr>`;
+    perKamer.forEach((lijst, kamer)=>{
+      html += `<tr class="az-kamer"><td colspan="5"><label><input type="checkbox" class="az-kamer-cb" data-kamer="${escapeHtml(kamer)}"> ${escapeHtml(kamer)} <span class="az-via">(${lijst.length})</span></label></td></tr>`;
+      lijst.forEach(r=>{
+        const eigen = r.obj.zekeringModuleId || "";
+        const viaK = !eigen && r.viaKring ? ((azKring(r.obj.kringId)||{}).zekeringModuleId || "") : "";
+        html += `<tr data-id="${r.obj.id}" data-kamer="${escapeHtml(kamer)}"><td><input type="checkbox" class="az-cb" ${gekozen.has(r.obj.id)?"checked":""}></td>
+          <td>${escapeHtml(r.soort)}</td><td><b>${escapeHtml(r.code||"")}</b></td><td>${escapeHtml(r.naam||"")}</td>
+          <td><select class="az-rij-sel"><option value="">${viaK ? "via kring: "+escapeHtml(azAutomaatLabel(viaK, aut)) : "— geen —"}</option>${opts}</select>
+          ${!eigen && !viaK ? `<div class="az-via az-leeg">nog geen automaat</div>` : ""}</td></tr>`;
+      });
+    });
+    html += `</tbody></table>`;
+    tabelSlot.innerHTML = html;
+    const map = new Map(rijen.map(r=>[r.obj.id, r]));
+    tabelSlot.querySelectorAll("tr[data-id]").forEach(tr=>{
+      const r = map.get(tr.dataset.id);
+      const sel = tr.querySelector(".az-rij-sel");
+      sel.value = r.obj.zekeringModuleId || "";
+      sel.addEventListener("change", ()=>{ r.obj.zekeringModuleId = sel.value; save(); teken(); });
+      tr.querySelector(".az-cb").addEventListener("change", e=>{ if(e.target.checked) gekozen.add(r.obj.id); else gekozen.delete(r.obj.id); telBij(); });
+    });
+    tabelSlot.querySelectorAll(".az-kamer-cb").forEach(cb=> cb.addEventListener("change", ()=>{
+      tabelSlot.querySelectorAll(`tr[data-kamer="${CSS.escape(cb.dataset.kamer)}"] .az-cb`).forEach(x=>{
+        x.checked = cb.checked; const id = x.closest("tr").dataset.id; if(cb.checked) gekozen.add(id); else gekozen.delete(id); });
+      telBij();
+      if(cb.checked && !ov.querySelector(".az-n-naam").value) ov.querySelector(".az-n-naam").value = cb.dataset.kamer;
+    }));
+    telBij();
+  }
+  function telBij(){ ov.querySelector(".az-n").textContent = gekozen.size+" geselecteerd"; }
+  function geselecteerdeObjecten(){ const m = new Map(azLijstMetStroom().map(r=>[r.obj.id, r.obj])); return [...gekozen].map(id=>m.get(id)).filter(Boolean); }
+  ov.querySelector(".az-toewijs").addEventListener("click", ()=>{
+    const v = ov.querySelector(".az-bestaand").value;
+    const objs = geselecteerdeObjecten();
+    if(!objs.length){ toast("Vink eerst rijen aan."); return; }
+    if(!v){ toast("Kies een automaat."); return; }
+    objs.forEach(o=> o.zekeringModuleId = v==="__geen" ? "" : v);
+    gekozen.clear(); save(); teken();
+    toast(objs.length+" toegewezen");
+  });
+  ov.querySelector(".az-nieuw").addEventListener("click", ()=>{
+    const objs = geselecteerdeObjecten();
+    if(!objs.length){ toast("Vink eerst rijen aan."); return; }
+    const m = azNieuweAutomaat(ov.querySelector(".az-n-naam").value.trim(), ov.querySelector(".az-n-A").value, ov.querySelector(".az-n-polen").value, ov.querySelector(".az-n-diff").value);
+    objs.forEach(o=> o.zekeringModuleId = m.id);
+    gekozen.clear(); ov.querySelector(".az-n-naam").value = "";
+    save(); vulKeuzes(); teken();
+    toast("Nieuwe automaat "+(computeZekeringCodes()[m.id]||"")+" aangemaakt en toegewezen aan "+objs.length);
+  });
+  ["input","change"].forEach(ev=>{ ov.querySelector(".az-zoek").addEventListener(ev, teken); });
+  ov.querySelector(".az-enkel-leeg").addEventListener("change", teken);
+  soortSel.addEventListener("change", teken);
+  ov.querySelector(".az-sluit").addEventListener("click", ()=>{ ov.remove(); selectTab(currentTab||DEFAULT_TAB); });
+  vulKeuzes(); teken();
+}
+
+// ---------- 2. koppelvoorstel (enkel lege koppelingen) ----------
+const KV_LICHT = /spots|ledstrip|lichtpunt|dali|track|kastverlichting|tuinverlichting/i;
+function kvAlleUitgangen(cat, naamTest){
+  const out = [];
+  state.zekeringen.kasten.forEach(k=> k.rijen.forEach(r=> r.items.forEach(m=>{
+    if(m.categorie!==cat || !Array.isArray(m.uitgangen)) return;
+    if(naamTest && !naamTest.test((m.naam||"")+" "+(m.type||""))) return;
+    m.uitgangen.forEach(u=> out.push({module:m, uitgang:u}));
+  })));
+  return out;
+}
+function kvBereken(){
+  const wijz = []; // {tekst, doe()}
+  const kc = computeKringCodes();
+  // a. knoppen -> kringen van dezelfde kamer
+  const kringenPerKamer = {};
+  state.kringen.items.forEach(k=>{ if(k.leeg) return; (kringenPerKamer[k.kamer||""] = kringenPerKamer[k.kamer||""] || []).push(k); });
+  Object.values(kringenPerKamer).forEach(l=> l.sort((a,b)=> (KV_LICHT.test(b.info)?1:0) - (KV_LICHT.test(a.info)?1:0)));
+  const knopCodes = computeKnoppenCodes();
+  state.knoppen.items.forEach(knop=>{
+    if(knop.leeg) return;
+    const kr = (kringenPerKamer[knop.kamer||""] || []).filter(k=> knop.type!=="Bewegingsmelder" || KV_LICHT.test(k.info||""));
+    if(!kr.length) return;
+    if((knop.gangen||[]).some(g=>g.kringId)) return; // al (deels) gekoppeld: niet aankomen
+    (knop.gangen||[]).forEach((g,i)=>{
+      const k = kr[i]; if(!k) return;
+      wijz.push({soort:"Knoppen → kringen", tekst:`${knopCodes[knop.id]||"knop"} (${knop.kamer}) positie ${i+1} → kring ${kc[k.id]||"?"} ${k.info||""}`, doe:()=>{ g.kringId = k.id; }});
+    });
+  });
+  // b. muziekzones -> versterkerkanalen (patchkast "Muziek")
+  const mzc = computeMuziekCodes();
+  const vrijeEenheden = [];
+  state.patchkast.kasten.forEach(kast=> kast.items.forEach(it=>{ if(it.categorie==="Muziek") (it.eenheden||[]).forEach((e,i)=>{ if(!e.zoneId) vrijeEenheden.push({it, e, i}); }); }));
+  const zonesMetKanaal = new Set();
+  state.patchkast.kasten.forEach(kast=> kast.items.forEach(it=> (it.eenheden||[]).forEach(e=>{ if(e.zoneId) zonesMetKanaal.add(e.zoneId); })));
+  state.muziek.items.filter(z=> !z.leeg && !zonesMetKanaal.has(z.id)).forEach(z=>{
+    const v = vrijeEenheden.shift(); if(!v) return;
+    wijz.push({soort:"Muziekzones → versterker", tekst:`zone ${mzc[z.id]||""} ${z.naam} → ${v.it.naam||"versterker"} kanaal ${v.i+1}`, doe:()=>{ v.e.zoneId = z.id; }});
+  });
+  // c. verwarmingszones -> vrije uitgangen van HVAC-modules
+  const wc = computeVerwarmingCodes();
+  const verwBezet = new Set(alleZekeringUitgangen().filter(e=>e.uitgang.type==="verwarming" && e.uitgang.targetId).map(e=>e.uitgang.targetId));
+  const vrijHvac = kvAlleUitgangen("HVAC").filter(e=> !e.uitgang.targetId);
+  state.verwarming.items.filter(z=> !z.leeg && !z.zuiverElektrisch && !verwBezet.has(z.id)).forEach(z=>{
+    const u = vrijHvac.shift(); if(!u) return;
+    wijz.push({soort:"Verwarming → actor", tekst:`zone ${wc[z.id]||""} ${z.naam} → ${u.module.naam||"HVAC"} uitgang ${u.module.uitgangen.indexOf(u.uitgang)+1}`, doe:()=>{ u.uitgang.type = "verwarming"; u.uitgang.targetId = z.id; }});
+  });
+  // d. motoren -> 2 vrije uitgangen (op/neer) van rolluik-/motoractoren
+  const mc = computeMotorCodes();
+  const motBezet = new Set(alleZekeringUitgangen().filter(e=>e.uitgang.type==="motor" && e.uitgang.targetId).map(e=>e.uitgang.targetId));
+  const vrijMot = kvAlleUitgangen("Relais", /rolluik|motor|jalouz|screen/i).filter(e=> !e.uitgang.targetId);
+  ((state.motoren&&state.motoren.items)||[]).filter(m=> !motBezet.has(m.id) && motorSturing(m.sturing).uitgangen).forEach(m=>{
+    if(vrijMot.length < 2) return;
+    const op = vrijMot.shift(), neer = vrijMot.shift();
+    wijz.push({soort:"Motoren → actor", tekst:`${mc[m.id]||""} ${m.naam} → ${op.module.naam||"actor"} uitgang ${op.module.uitgangen.indexOf(op.uitgang)+1} (op) + ${neer.module.uitgangen.indexOf(neer.uitgang)+1} (neer)`,
+      doe:()=>{ op.uitgang.type="motor"; op.uitgang.targetId=m.id; op.uitgang.rol="op"; neer.uitgang.type="motor"; neer.uitgang.targetId=m.id; neer.uitgang.rol="neer"; }});
+  });
+  // e. 230V-kringen (geen drivers) -> vrije uitgangen van schakelactoren
+  const krBezet = new Set(alleZekeringUitgangen().filter(e=>e.uitgang.type==="kring" && e.uitgang.targetId).map(e=>e.uitgang.targetId));
+  const vrijSchak = kvAlleUitgangen("Relais", /schakel|switch/i).filter(e=> !e.uitgang.targetId);
+  state.kringen.items.filter(k=> !k.leeg && !krBezet.has(k.id) && !driversInKring(k.id).length).forEach(k=>{
+    const u = vrijSchak.shift(); if(!u) return;
+    wijz.push({soort:"230V-kringen → schakelactor", tekst:`kring ${kc[k.id]||""} ${k.kamer||""} ${k.info||""} → ${u.module.naam||"actor"} uitgang ${u.module.uitgangen.indexOf(u.uitgang)+1}`, doe:()=>{ u.uitgang.type="kring"; u.uitgang.targetId=k.id; }});
+  });
+  return wijz;
+}
+function kvPasToe(){ const w = kvBereken(); w.forEach(x=>x.doe()); return w; }
+function kvOpen(){
+  if(!currentProjectId){ toast("Kies eerst een project."); return; }
+  const w = kvBereken();
+  const groepen = {};
+  w.forEach(x=> (groepen[x.soort] = groepen[x.soort] || []).push(x));
+  const body = w.length
+    ? `<p class="hint">Enkel lege koppelingen worden ingevuld; wat al gekoppeld is blijft staan. Vink weg wat niet mag.</p>` +
+      Object.entries(groepen).map(([s,l])=>`<details class="of-rij" open style="border:1px solid var(--line,#dde3e0);border-radius:10px;margin:6px 0;padding:6px 12px;">
+        <summary style="display:flex;gap:8px;align-items:center;cursor:pointer;"><input type="checkbox" class="kv-cb" data-soort="${escapeHtml(s)}" checked style="width:auto"> <b>${escapeHtml(s)}</b><span style="margin-left:auto" class="az-via">${l.length}</span></summary>
+        <div class="kv-lijst">${l.map(x=>`<div>${escapeHtml(x.tekst)}</div>`).join("")}</div></details>`).join("")
+    : `<p>Er zijn geen lege koppelingen meer die automatisch ingevuld kunnen worden.</p><p class="hint">Tip: actoren in de zekeringkast hebben uitgangen nodig om iets aan te koppelen (aantal uitgangen instellen in de module).</p>`;
+  const ov = azModal("kv-modal", "Koppelvoorstel", body, w.length
+    ? `<button class="btn btn-ghost kv-annul">Annuleren</button><button class="btn btn-primary kv-ok">Koppelen</button>`
+    : `<button class="btn btn-primary kv-annul">Sluiten</button>`);
+  ov.querySelectorAll("summary input").forEach(cb=> cb.addEventListener("click", e=> e.stopPropagation()));
+  ov.querySelector(".kv-annul").addEventListener("click", ()=> ov.remove());
+  if(ov.querySelector(".kv-ok")) ov.querySelector(".kv-ok").addEventListener("click", ()=>{
+    const aan = new Set([...ov.querySelectorAll(".kv-cb")].filter(c=>c.checked).map(c=>c.dataset.soort));
+    const vorige = JSON.stringify(state);
+    const gedaan = w.filter(x=> aan.has(x.soort));
+    gedaan.forEach(x=> x.doe());
+    save(); ov.remove(); selectTab(currentTab||DEFAULT_TAB);
+    const ov2 = azModal("kv-modal", "Koppelvoorstel", `<p>${gedaan.length} koppeling(en) ingevuld.</p>`,
+      `<button class="btn btn-ghost kv-undo">Ongedaan maken</button><button class="btn btn-primary kv-annul">Sluiten</button>`);
+    ov2.querySelector(".kv-annul").addEventListener("click", ()=> ov2.remove());
+    ov2.querySelector(".kv-undo").addEventListener("click", ()=>{ state = JSON.parse(vorige); save(); ov2.remove(); selectTab(currentTab||DEFAULT_TAB); toast("Koppelvoorstel ongedaan gemaakt"); });
+  });
+}
+
+// ---------- 3. kringen samenvoegen ----------
+function ksVoegSamen(doelId, bronIds){
+  const bron = new Set(bronIds.filter(id=> id!==doelId));
+  const doel = azKring(doelId);
+  if(!doel || !bron.size) return 0;
+  alleDrivers().forEach(d=>{ if(bron.has(d.kringId)) d.kringId = doelId; });
+  state.verlichting.items.forEach(v=>{ if(bron.has(v.kringId)) v.kringId = doelId; });
+  state.knoppen.items.forEach(k=> (k.gangen||[]).forEach(g=>{ if(bron.has(g.kringId)) g.kringId = doelId; }));
+  alleZekeringUitgangen().forEach(e=>{ if(e.uitgang.type==="kring" && bron.has(e.uitgang.targetId)) e.uitgang.targetId = doelId; });
+  // dubbele uitgangen naar dezelfde kring: enkel de eerste houden
+  let eerste = false;
+  alleZekeringUitgangen().forEach(e=>{ if(e.uitgang.type==="kring" && e.uitgang.targetId===doelId){ if(eerste) e.uitgang.targetId = ""; eerste = true; } });
+  const infos = [doel.info, ...state.kringen.items.filter(k=>bron.has(k.id)).map(k=>k.info)].filter(Boolean);
+  doel.info = [...new Set(infos)].join(" + ");
+  if(!doel.zekeringModuleId){ const z = state.kringen.items.find(k=> bron.has(k.id) && k.zekeringModuleId); if(z) doel.zekeringModuleId = z.zekeringModuleId; }
+  state.kringen.items = state.kringen.items.filter(k=> !bron.has(k.id));
+  return bron.size;
+}
+function ksOpen(){
+  const kc = computeKringCodes();
+  const perKamer = new Map();
+  state.kringen.items.forEach(k=>{ if(k.leeg) return; const n = k.kamer||"(geen kamer)"; if(!perKamer.has(n)) perKamer.set(n, []); perKamer.get(n).push(k); });
+  let body = `<p class="hint">Vink de kringen aan die één kring moeten worden. De eerst aangevinkte blijft over; drivers, lichtpunten, knoppen en actor-uitgangen van de andere gaan mee.</p>
+    <div class="az-filter"><input type="search" class="ks-zoek" placeholder="Filter op kamer of omschrijving…"></div><div class="az-kring-lijst">`;
+  perKamer.forEach((l, kamer)=>{
+    body += `<div class="ks-kamer" data-kamer="${escapeHtml(kamer.toLowerCase())}"><div class="of-sub" style="font-weight:700;margin:10px 0 2px;">${escapeHtml(kamer)}</div>` +
+      l.map(k=>`<label data-tekst="${escapeHtml(((k.info||"")+" "+(kc[k.id]||"")).toLowerCase())}"><input type="checkbox" class="ks-cb" value="${k.id}"> <b>${escapeHtml(kc[k.id]||"")}</b> ${escapeHtml(k.info||"")}
+        <span class="az-via">· ${driversInKring(k.id).length} driver(s), ${verlichtingInKring(k.id).length} lichtpunt(en)</span></label>`).join("") + `</div>`;
+  });
+  body += `</div>`;
+  const ov = azModal("ks-modal", "Kringen samenvoegen", body, `<span class="ks-n az-via" style="margin-right:auto">0 aangevinkt</span><button class="btn btn-ghost ks-annul">Annuleren</button><button class="btn btn-primary ks-ok">Samenvoegen</button>`);
+  const volgorde = [];
+  ov.querySelectorAll(".ks-cb").forEach(cb=> cb.addEventListener("change", ()=>{
+    const i = volgorde.indexOf(cb.value); if(cb.checked && i<0) volgorde.push(cb.value); if(!cb.checked && i>=0) volgorde.splice(i,1);
+    ov.querySelector(".ks-n").textContent = volgorde.length+" aangevinkt"+(volgorde.length?" — blijft: "+(kc[volgorde[0]]||""):"");
+  }));
+  ov.querySelector(".ks-zoek").addEventListener("input", e=>{
+    const q = e.target.value.trim().toLowerCase();
+    ov.querySelectorAll(".ks-kamer").forEach(b=>{
+      const kamerHit = b.dataset.kamer.includes(q);
+      let zicht = 0;
+      b.querySelectorAll("label").forEach(l=>{ const s = !q || kamerHit || l.dataset.tekst.includes(q); l.style.display = s?"":"none"; if(s) zicht++; });
+      b.style.display = zicht ? "" : "none";
+    });
+  });
+  ov.querySelector(".ks-annul").addEventListener("click", ()=> ov.remove());
+  ov.querySelector(".ks-ok").addEventListener("click", ()=>{
+    if(volgorde.length < 2){ toast("Vink minstens 2 kringen aan."); return; }
+    const n = ksVoegSamen(volgorde[0], volgorde.slice(1));
+    save(); ov.remove(); selectTab(currentTab||DEFAULT_TAB);
+    toast(n+" kring(en) samengevoegd in "+(computeKringCodes()[volgorde[0]]||"de eerste"));
+  });
+}
 
 window.CaDosApp = {
   loadForProject,
@@ -23294,7 +24051,13 @@ window.CaDosApp = {
   migrate,
   MODULE_TOGGLES,
   // 19/11/2026: offerte inlezen (start(bestand?) opent de kiezer of verwerkt het gegeven bestand)
-  offerte: { start: ofStart, lees: ofLeesOfferte, voorstel: ofBouwVoorstel, pasToe: (V, keuze)=> ofPasToe(V, keuze) }
+  offerte: { start: ofStart, lees: ofLeesOfferte, voorstel: ofBouwVoorstel, pasToe: (V, keuze)=> ofPasToe(V, keuze) },
+  // 19/11/2026: armaturen koppelen aan de catalogus
+  armaturenKoppelen: { open: akOpen, ongekoppeld: akOngekoppeld, voorstellen: akVoorstellen },
+  // 19/11/2026: automaten toewijzen, koppelvoorstel, kringen samenvoegen
+  toewijzen: { open: azOpen, lijst: azLijstMetStroom, nieuweAutomaat: azNieuweAutomaat },
+  koppelvoorstel: { open: kvOpen, bereken: kvBereken, pasToe: kvPasToe },
+  kringen: { samenvoegen: ksVoegSamen, open: ksOpen }
 };
 
 })();
@@ -31841,6 +32604,7 @@ window.CaCalcApp = {
     if(error) throw error;
   }
   window.dbListCatalogArmaturen = dbListCatalogArmaturen;
+  window.dbAddCatalogArmatuur = dbAddCatalogArmatuur; // 19/11/2026: armaturen koppelen (nieuw in catalogus)
   window.dbListCatalogDrivers = dbListCatalogDrivers;
   // ===== Modulebibliotheek zekeringkast (2026-10-28) =====
   // Gedeelde bibliotheek van DIN-railmodules (tabel elektro_catalogus_modules, bucket
