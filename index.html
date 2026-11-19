@@ -548,6 +548,10 @@
     #main-nav .tab-btn:not(.active)::before{opacity:.8;}
     #main-nav .tab-btn.active{color:var(--tile-ink, var(--tile));}
     #main-nav .tab-btn.active::before{box-shadow:0 0 0 3px var(--tile-soft);opacity:1;}
+    /* 2026-11-19, op vraag van Peter: "Facturen en materialen is helemaal nog niet af en die knoppen
+       mogen voorlopig weg" -- op gsm niet in de onderbalk. Op pc blijven ze staan (CaMat-import werkt
+       enkel op pc). Tabbladen zelf blijven bestaan (bv. een factuurmelding opent CaFin nog). */
+    #main-nav #main-nav-btn-cafin, #main-nav #main-nav-btn-materialen{display:none !important;}
     #app{padding-bottom:calc(var(--bnav-offset) + 32px + env(safe-area-inset-bottom));}
     header.top{margin-bottom:12px;}
   }
@@ -33954,7 +33958,8 @@ window.CaCalcApp = {
   function updateMainNavVisibility(){
     const nav = el('main-nav');
     if(!nav) return;
-    const visible = Array.from(nav.querySelectorAll('.tab-btn')).filter(b => b.style.display !== 'none');
+    // getComputedStyle: ook knoppen meetellen die enkel via CSS verborgen zijn (Facturen/CaMat op gsm, 2026-11-19).
+    const visible = Array.from(nav.querySelectorAll('.tab-btn')).filter(b => b.style.display !== 'none' && getComputedStyle(b).display !== 'none');
     document.body.classList.toggle('single-app', visible.length <= 1);
     if(!document.body.dataset.app && visible[0]){
       document.body.dataset.app = { verslag: 'werf', inzet: 'planning', cados: 'dossier', cadraw: 'dossier', cacalc: 'calc', cafin: 'cafin' }[visible[0].dataset.tab] || '';
