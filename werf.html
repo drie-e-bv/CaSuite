@@ -5755,6 +5755,7 @@
       <div class="modkiezer" id="cados-modkiezer">
         <div class="modkiezer-aanmaken" id="cados-aanmaken-wrap" style="display:none;">
           <button type="button" class="btn btn-primary" id="cados-aanmaken-btn">+ Dossier aanmaken</button>
+          <button type="button" class="btn btn-secondary" id="cados-aanmaken-offerte-btn" title="Dossier aanmaken en meteen vullen vanuit een Casentis-offerte (PDF)">+ Aanmaken uit offerte (PDF)</button>
           <span class="modkiezer-of" id="cados-ander-label">of kies een ander project</span>
         </div>
         <input type="text" class="ip-proj-search" id="cados-proj-search" placeholder="Zoek een project…">
@@ -5782,6 +5783,7 @@
     <div id="actions" class="tb-menu">
       <button class="btn cd-act cd-act-print" id="btnPrint">Afdrukken</button>
       <button class="btn cd-act cd-act-export" id="btnExport">Exporteer JSON</button>
+      <button class="btn cd-act cd-act-offerte" id="btnOfferte" title="Lees een Casentis-offerte (PDF uit Plenion) in en maak er een eerste aanzet van het dossier van">Offerte inlezen</button>
       <button class="btn cd-act cd-act-import" id="btnImport">Importeer JSON</button>
       <button class="btn ghost cd-act cd-act-new" id="btnNew">Dossier leegmaken</button>
     </div>
@@ -6499,6 +6501,7 @@ body.print-patchkast #printExport{display:block !important;}
   .cd-act-print{--ico:var(--i-print);}
   .cd-act-export{--ico:var(--i-download);}
   .cd-act-import{--ico:var(--i-upload);}
+  .cd-act-offerte{--ico:var(--i-file-plus);}
   .cd-act-new{--ico:var(--i-trash);}
   #cc-btn-new{--ico:var(--i-file-plus);}
   #cc-btn-load{--ico:var(--i-folder);}
@@ -22519,6 +22522,764 @@ wireGlobalSearch();
 // dossier-JSON (rechtstreeks via window.dbGetCadosDossier/dbSaveCadosDossier), dus er is geen
 // risico dat het per ongeluk het project overschrijft dat op dit moment in het CaDos-tabblad zelf
 // open staat (die twee kunnen best een ander project zijn).
+/* =========================================================================
+   OFFERTE INLEZEN (19/11/2026, op vraag van Peter: "Kun je in CaDos een onderdeel maken waarbij
+   een pdf offerte ingelezen wordt en daarvan een eerste aanzet wordt gemaakt van alle cados
+   gegevens"). Alle Casentis-offertes (Plenion-export) hebben dezelfde opbouw:
+     groep  (Kamers / Installatie / Technieken en voorzieningen / Security)   "... 123 456,78 EUR"
+     sectie (een kamer, of Netwerk / Technieken / Alarmsysteem ...)             "naam   subtotaal  subtotaal"
+     post   "omschrijving   aantal  eenheid  eenheidsprijs  totaal"
+   De PDF wordt in de browser gelezen met pdf.js (geen AI, geen upload), daarna vertaald naar
+   CaDos-gegevens. Niets wordt overschreven: alles wordt toegevoegd, na een voorbeeld waarin je per
+   onderdeel kiest wat mee mag. Vóór het toevoegen gaat er een kopie naar dossier_backups en kan je
+   meteen "Ongedaan maken".
+   ========================================================================= */
+const OFFERTE_PDFJS_WORKER = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.5.141/pdf.worker.min.js";
+
+// ---------- 1. PDF -> rijen -> kop + posten ----------
+async function ofPdfRijen(buf){
+  if(!window.pdfjsLib) throw new Error("PDF-lezer niet geladen (geen internet?)");
+  if(!pdfjsLib.GlobalWorkerOptions.workerSrc) pdfjsLib.GlobalWorkerOptions.workerSrc = OFFERTE_PDFJS_WORKER;
+  const doc = await pdfjsLib.getDocument({data: buf}).promise;
+  const paginas = [];
+  for(let pn=1; pn<=doc.numPages; pn++){
+    const page = await doc.getPage(pn);
+    const tc = await page.getTextContent();
+    const items = tc.items
+      .filter(i=> i.str && i.str.trim())
+      // Plenion zet é in de vette kopletters (kamernamen) als "È" in de PDF -> terugzetten.
+      .map(i=>({x:i.transform[4], y:i.transform[5], w:i.width, s:i.str.trim().replace(/([A-Za-z])È/g, "$1é")}));
+    items.sort((a,b)=> (b.y-a.y) || (a.x-b.x));
+    const rijen = [];
+    items.forEach(it=>{
+      const r = rijen.find(r=> Math.abs(r.y-it.y) <= 2);
+      if(r) r.items.push(it); else rijen.push({y:it.y, items:[it]});
+    });
+    rijen.forEach(r=>{ r.items.sort((a,b)=>a.x-b.x); r.tekst = r.items.map(i=>i.s).join(" "); });
+    rijen.sort((a,b)=> b.y-a.y);
+    paginas.push({nr:pn, rijen});
+    if(pn>=3 && rijen.some(r=> /^(Samenvatting|Opmerkingen)\b/.test(r.tekst))) break; // rest = voorwaarden
+  }
+  return paginas;
+}
+function ofGetal(s){
+  if(s==null) return NaN;
+  const t = String(s).replace(/\s| /g,"").replace(/EUR$/i,"").replace(/\./g,"").replace(",",".");
+  return /^-?\d+(\.\d+)?$/.test(t) ? parseFloat(t) : NaN;
+}
+function ofParseKop(rijen){
+  const kop = {klant:"", klantAdres:"", projectNaam:"", projectAdres:"", project:"", nummer:"", versie:"", datum:"", ref:""};
+  let i = 0;
+  const klantRegels = [];
+  for(; i<rijen.length; i++){
+    const t = rijen[i].tekst;
+    const dm = t.match(/(\d{1,2}\/\d{1,2}\/\d{4})/);
+    if(dm){ kop.datum = dm[1]; i++; break; }
+    if(rijen[i].items[0].x > 200) klantRegels.push(t);
+  }
+  kop.klant = klantRegels[0] || "";
+  kop.klantAdres = klantRegels.slice(1).join(", ");
+  let inAdres = false; const adresRegels = [];
+  for(; i<rijen.length; i++){
+    const t = rijen[i].tekst;
+    if(/^Projectadres\b/i.test(t)){ inAdres = true; continue; }
+    let m;
+    if((m = t.match(/^Project\s*:\s*(.*)$/i))){ inAdres = false; kop.project = m[1].trim(); continue; }
+    if((m = t.match(/^Nummer\s*:\s*(\S+)(?:\s*\/\s*Versie\s*(\S+))?/i))){ kop.nummer = m[1]; kop.versie = m[2]||""; continue; }
+    if((m = t.match(/^Uw ref\.?\s*:\s*(.*)$/i))){ kop.ref = m[1].trim(); break; }
+    if(inAdres && !/^\+?[\d\s\/.()-]{8,}$/.test(t)) adresRegels.push(t); // telefoonnummer niet in het adres
+  }
+  kop.projectNaam = adresRegels[0] || "";
+  kop.projectAdres = adresRegels.slice(1).join(", ");
+  return kop;
+}
+function ofParsePosten(paginas){
+  const posten = [];
+  let groep = "", sectie = "", laatste = null, wachtendeOms = "", stop = false;
+  let xHash = 390;
+  paginas.forEach(pg=>{
+    if(stop || pg.nr===1) return;
+    const kopRij = pg.rijen.find(r=> /^Omschrijving\b/.test(r.tekst) && r.items.some(i=>i.s==="#"));
+    if(kopRij) xHash = kopRij.items.find(i=>i.s==="#").x;
+    const grens = xHash - 40;
+    pg.rijen.forEach(r=>{
+      if(stop) return;
+      const t = r.tekst;
+      if(/^(Samenvatting|Opmerkingen)\b/.test(t)){ stop = true; return; }
+      if(/^Offerte\b.*Pagina\s*\d+/i.test(t) || /^Omschrijving\b/.test(t)) return;
+      if(/Casentis BV - |Tel\.\s*:\s*\+32|BTW BE\s*\d/.test(t)) return;
+      const oms = r.items.filter(i=> i.x < grens).map(i=>i.s).join(" ").trim();
+      const rest = r.items.filter(i=> i.x >= grens).map(i=>i.s);
+      if(rest.length && /EUR$/.test(rest[rest.length-1])){
+        groep = oms; sectie = ""; laatste = null; wachtendeOms = ""; return;
+      }
+      if(!rest.length){
+        if(!oms) return;
+        if(laatste && laatste.y - r.y <= 14 && laatste.pagina===pg.nr && !wachtendeOms){ laatste.oms += " " + oms; laatste.y = r.y; }
+        else wachtendeOms = (wachtendeOms ? wachtendeOms+" " : "") + oms;
+        return;
+      }
+      const q = ofGetal(rest[0]);
+      const ehM = rest[1] ? rest[1].match(/^([A-Za-zÀ-ÿ²]+)/) : null;
+      if(!Number.isNaN(q) && ehM && rest.length<=4){
+        const omsVol = (oms || wachtendeOms).trim();
+        wachtendeOms = "";
+        laatste = {groep, sectie, oms:omsVol, aantal:q, eh:ehM[1], ep:ofGetal(rest[2]), totaal:ofGetal(rest[3]), pagina:pg.nr, y:r.y};
+        posten.push(laatste);
+        return;
+      }
+      if(oms && rest.every(x=> !Number.isNaN(ofGetal(x)))){
+        sectie = oms; laatste = null; wachtendeOms = ""; return;
+      }
+    });
+  });
+  posten.forEach(p=>{ p.oms = p.oms.replace(/\s+/g," ").trim(); });
+  return posten.filter(p=> p.oms);
+}
+async function ofLeesOfferte(buf){
+  const paginas = await ofPdfRijen(buf);
+  if(!paginas.length) throw new Error("Lege PDF");
+  const kop = ofParseKop(paginas[0].rijen);
+  const posten = ofParsePosten(paginas);
+  return {kop, posten};
+}
+
+// ---------- 2. posten -> CaDos-voorstel ----------
+const OF_GEEN_KAMER = /^(alarm|alarmsysteem|security|wachtbuizen|raming.*|opties.*|netwerk|technieken|algemeen|voedingskabels|toegangscontrole|av|muziek|hvac.*|zonne.*)$/i;
+const OF_ONDERDELEN = [
+  {key:"instellingen", label:"Projectgegevens (enkel lege velden)"},
+  {key:"kamers", label:"Kamers"},
+  {key:"kringen", label:"Kringen", module:"kringen"},
+  {key:"driverkast", label:"Driverkast (LED-drivers + armaturen)", module:"driverkast"},
+  {key:"verlichting", label:"Verlichting 230V", module:"verlichting"},
+  {key:"knoppen", label:"Knoppen & bewegingsmelders", module:"knoppen"},
+  {key:"muziek", label:"Muziekzones", module:"muziek"},
+  {key:"verwarming", label:"Verwarmingszones", module:"verwarming"},
+  {key:"motoren", label:"Motoren (screens/rolluiken)", module:"motoren"},
+  {key:"toegangscontrole", label:"Toegangscontrole", module:"toegangscontrole"},
+  {key:"alarm", label:"Alarm", module:"alarm"},
+  {key:"camerabewaking", label:"Camerabewaking", module:"camerabewaking"},
+  {key:"laadpalen", label:"Laadpalen", module:"laadpalen"},
+  {key:"zonnepanelen", label:"Zonnepanelen", module:"zonnepanelen"},
+  {key:"data", label:"Data / patchkast", module:"data"},
+  {key:"zekeringen", label:"Zekeringkast (toestellen + domotica-modules)"},
+];
+function ofVerdeel(lijst, n){
+  // lijst van {naam, aantal}: in n zo gelijk mogelijke opeenvolgende stukken
+  const los = [];
+  lijst.forEach(a=>{ const k = Math.round(a.aantal); for(let i=0;i<k;i++) los.push(a.naam); });
+  const stukken = Array.from({length:n}, ()=>[]);
+  if(!los.length) return stukken;
+  let idx = 0;
+  for(let d=0; d<n; d++){
+    const grootte = Math.floor(los.length/n) + (d < los.length % n ? 1 : 0);
+    for(let j=0;j<grootte;j++) stukken[d].push(los[idx++]);
+  }
+  return stukken.map(st=>{
+    const g = [];
+    st.forEach(naam=>{ const b = g.find(x=>x.naam===naam); if(b) b.aantal++; else g.push({naam, aantal:1}); });
+    return g;
+  });
+}
+function ofArmNaam(oms){ return oms.replace(/^armatuur\s*:\s*/i,"").trim(); }
+function ofAlarmType(t){
+  t = t.toLowerCase();
+  if(/pir|bewegings/.test(t)) return "PIR";
+  if(/magneet/.test(t)) return "Magneet";
+  if(/sirene/.test(t)) return "Sirene";
+  if(/rook|brand|hitte/.test(t)) return "Brand";
+  if(/klavier|keypad|bus/.test(t)) return "Bus";
+  return "Sensor";
+}
+
+function ofBouwVoorstel(off){
+  const {kop, posten} = off;
+  const V = {kop, onderdelen:{}, overgeslagen:{}, nietHerkend:[], kamers:[]};
+  OF_ONDERDELEN.forEach(o=>{ V.onderdelen[o.key] = {items:[], regels:[]}; });
+  const O = V.onderdelen;
+  const skip = (cat, p)=>{ (V.overgeslagen[cat] = V.overgeslagen[cat] || []).push(p); };
+  const isKnxMotor = posten.some(p=> /rolluikact|motoract|jalouzie/i.test(p.oms));
+  const heeftAlarmToestellen = posten.some(p=> /^alarm\s*:/i.test(p.oms));
+  const kamerSecties = [];
+
+  // Kop
+  const inst = {};
+  if(kop.projectNaam) inst.project = kop.projectNaam;
+  if(kop.projectAdres) inst.adres = kop.projectAdres;
+  if(kop.klant) inst.klant = kop.klant;
+  if(kop.nummer) inst.referentie = "Offerte " + kop.nummer + (kop.versie ? " v"+kop.versie : "");
+  if(kop.datum) inst.datum = kop.datum.split("/").reverse().map(x=>x.padStart(2,"0")).join("-");
+  inst.installateur = "Casentis BV";
+  O.instellingen.waarden = inst;
+  O.instellingen.regels = Object.entries(inst).map(([k,v])=> k+": "+v);
+
+  // per sectie
+  const secties = [];
+  posten.forEach(p=>{
+    let s = secties[secties.length-1];
+    if(!s || s.naam!==p.sectie || s.groep!==p.groep){ s = {naam:p.sectie, groep:p.groep, posten:[]}; secties.push(s); }
+    s.posten.push(p);
+  });
+
+  const zekModules = { domotica:[], toestellen:[] };
+  const dataPoorten = []; // {omschrijving, kamer, ref}
+  const nieuweKring = (kamer, info)=>{ const k = newKringItem(); k.kamer = kamer; k.info = info; O.kringen.items.push(k); return k; };
+  const automaat = (naam, A, polen)=>{
+    const m = {id:cryptoId(), categorie:"Automaat", type:"", polen:polen||"2P", mA:"", A:A||"16A",
+      breedte: polenToBreedte(polen||"2P"), naam, isRem:false, kabelOpKlemmen:false, kabelType:"", kabelAantal:1};
+    zekModules.toestellen.push(m); return m;
+  };
+  const domoModule = (cat, naam, breedte)=>{
+    const preset = MODULE_CATEGORIEEN[cat];
+    const m = {id:cryptoId(), categorie:cat, type:"", polen:preset.polen, mA:preset.mA, A:preset.A,
+      breedte: breedte || preset.breedte, naam, isRem:false, kabelOpKlemmen:false, kabelType:"", kabelAantal:1};
+    if(cat==="HVAC" || cat==="Relais") m.uitgangen = [];
+    zekModules.domotica.push(m); return m;
+  };
+  const patch = { kasten:[], items:[] }; // items: newPatchItem-objecten (in volgorde)
+  let alarmCentraleZekering = null;
+
+  secties.forEach(sec=>{
+    const technisch = /technieken|security/i.test(sec.groep);
+    const kamer = (!technisch && sec.naam && !OF_GEEN_KAMER.test(sec.naam)) ? sec.naam : "";
+    let kamerGebruikt = false;
+    let licht = null; const lichtGroepen = [];
+    const slots = { knop:{n:0, prod:[]}, beweging:{n:0, prod:[]}, paneel:{n:0, prod:[]} };
+    const muz = {speakers:0, subs:0, producten:[]};
+    let verw = null, koel = false; const gesch = [];
+    const nieuweLicht = (soort, p, extra)=>{ licht = Object.assign({soort, aantal:Math.round(p.aantal), serie:0, armaturen:[], oms:p.oms, kamer}, extra||{}); lichtGroepen.push(licht); kamerGebruikt = true; return licht; };
+
+    sec.posten.forEach(p=>{
+      const d = p.oms.toLowerCase();
+      const q = p.aantal;
+      let m;
+      // ---- verlichting ----
+      if(/^(wand)?lichtpunt\s+\d+\s*ma\b.*serie/.test(d)){
+        const g = [...lichtGroepen].reverse().find(g=>g.soort==="driver"); if(g) g.serie += Math.round(q); return;
+      }
+      if((m = d.match(/^(wand)?lichtpunt\s*-?\s*(\d+)\s*ma\b(?:\s*-\s*(\d+)\s*w)?/))){
+        nieuweLicht("driver", p, {stroom:m[2]+"mA", watt:m[3]?m[3]+"W":"", wand:!!m[1], koppel:/koppel/.test(d)}); return;
+      }
+      if(/^lichtpunt\s*\d+\s*v\s*dc.*parallel/.test(d)){
+        const g = [...lichtGroepen].reverse().find(g=>g.soort==="24v"); if(g) g.serie += Math.round(q); return;
+      }
+      if((m = d.match(/^(wand)?lichtpunt\s*-?\s*(\d+)\s*v\s*dc/))){ nieuweLicht("24v", p, {spanning:m[2]+"Vdc"}); return; }
+      if(/^lichtpunt\s*-\s*dali\s*track/.test(d)){ nieuweLicht("track", p); return; }
+      if(/^(wand)?lichtpunt\b/.test(d)){ nieuweLicht("230", p, {wand:/^wand/.test(d)}); return; }
+      if(/^voeding\s*230\s*v\s*-\s*kastverlichting/.test(d)){ nieuweLicht("kast", p); return; }
+      if(/^kastverlichting\s*:/.test(d)){ const g=[...lichtGroepen].reverse().find(g=>g.soort==="kast"); if(g){ g.info = p.oms; return; } }
+      if(/^tuinverlichting/.test(d)){ nieuweLicht("230", p); licht.info = p.oms; return; }
+      if(/^armatuur\s*:/.test(d)){
+        if(!licht) nieuweLicht("230", {aantal:0, oms:"(armatuur zonder lichtpunt)"});
+        licht.armaturen.push({naam:ofArmNaam(p.oms), aantal:q}); return;
+      }
+      // ---- knoppen ----
+      if(/^drukknop\s+buskabel/.test(d)){ slots.knop.n += Math.round(q); kamerGebruikt = true; return; }
+      if(/^drukknop\b/.test(d)){ slots.knop.prod.push({naam:p.oms.replace(/^drukknop\s*-\s*/i,""), aantal:Math.round(q)}); kamerGebruikt = true; return; }
+      if(/^(inbouw|opbouw)\s+bewegingsmelder/.test(d)){ slots.beweging.n += Math.round(q); kamerGebruikt = true; return; }
+      if(/bewegingsmelder/.test(d) && !/^armatuur/.test(d)){ slots.beweging.prod.push({naam:p.oms, aantal:Math.round(q)}); kamerGebruikt = true; return; }
+      if(/^bedieningspaneel$/.test(d)){ slots.paneel.n += Math.round(q); kamerGebruikt = true; return; }
+      if(/bedieningspaneel/.test(d)){ slots.paneel.prod.push({naam:p.oms, aantal:Math.round(q)}); kamerGebruikt = true; return; }
+      // ---- stopcontacten / data ----
+      if(/^(vloer)?stopcontact\s+geschakeld/.test(d)){
+        gesch.push((/vloer/.test(d)?"Vloerstopcontact":"Stopcontact")+" geschakeld"+(q>1?" ("+q+"×)":"")); kamerGebruikt = true; return;
+      }
+      if((m = d.match(/^multimedia\s*\((\d+)\s*x\s*data/))){
+        for(let i=0;i<Math.round(q)*parseInt(m[1]);i++) dataPoorten.push({kamer, wat:"multimedia"}); kamerGebruikt = true; return;
+      }
+      if(/^dubbel\s*data|^dubbeldata/.test(d)){
+        for(let i=0;i<Math.round(q)*2;i++) dataPoorten.push({kamer, wat:/vloer/.test(d)?"vloerdata":"data"}); kamerGebruikt = true; return;
+      }
+      if(/^(enkel\s*)?data(stopcontact|punt)\b/.test(d)){
+        for(let i=0;i<Math.round(q);i++) dataPoorten.push({kamer, wat:"data"}); kamerGebruikt = true; return;
+      }
+      if(/^wifi\s*antenne/.test(d)){ for(let i=0;i<Math.round(q);i++) dataPoorten.push({kamer, wat:"wifi-antenne"}); return; }
+      if(/^voeding\s+toestel\s*(\d+)\s*a/.test(d)){
+        const A = d.match(/(\d+)\s*a\b/)[1]+"A";
+        for(let i=0;i<Math.round(q);i++){
+          const a = automaat((kamer||sec.naam)+" - toestel"+(q>1?" "+(i+1):""), A, "2P");
+          if(/^alarm/i.test(sec.naam) && !alarmCentraleZekering) alarmCentraleZekering = a;
+        }
+        kamerGebruikt = !!kamer; return;
+      }
+      if(/^driefasige\s+voeding/.test(d)){
+        const A = (d.match(/(\d+)\s*a\b/)||[0,"32"])[1]+"A";
+        const extra = p.oms.split(/\)\s*-\s*/)[1] || "";
+        for(let i=0;i<Math.round(q);i++) automaat((kamer||sec.naam)+" - 3F voeding"+(extra?" "+extra:"")+(q>1?" "+(i+1):""), A, "4P");
+        kamerGebruikt = !!kamer; return;
+      }
+      if(/^aansluiting\s+(voor\s+)?laadstation/.test(d)){
+        const A = (d.match(/(\d+)\s*a\b/)||[0,"32"])[1]+"A";
+        for(let i=0;i<Math.round(q);i++){
+          const lp = newLaadpaalItem(); lp.kamer = kamer; lp.naam = "Laadpaal "+(O.laadpalen.items.length+1); lp.aantalFasen = "3";
+          lp.info = p.oms;
+          const a = automaat("Laadpaal "+(O.laadpalen.items.length+1), A, "4P");
+          lp.zekeringModuleId = a.id;
+          if(/data/.test(d)){ const dp = {kamer, wat:"laadpaal", laadpaal:lp}; dataPoorten.push(dp); }
+          O.laadpalen.items.push(lp);
+        }
+        O.laadpalen.regels.push(Math.round(q)+"× "+p.oms);
+        return;
+      }
+      if(/^leiding\s+subwoofer/.test(d)){ muz.subs += Math.round(q); kamerGebruikt = true; return; }
+      if(/^leiding\s+luidspreker/.test(d)){ muz.speakers += Math.round(q); kamerGebruikt = true; return; }
+      if(/data|utp/.test(d)){ skip("Afwerking / toestellen bij een post", p); return; }
+      if(/stopcontact|schakelrelais/.test(d)){ skip("Stopcontacten (geen CaDos-onderdeel)", p); kamerGebruikt = kamerGebruikt || !!kamer; return; }
+      if(/boring/.test(d)){ skip("Boringen", p); return; }
+      if(/^inbouwen\b|afwerking/.test(d)){ skip("Afwerking / toestellen bij een post", p); return; }
+      // ---- muziek ----
+      if(technisch && /guardian|beveiliging/.test(d)){ skip("AV-toebehoren", p); return; }
+      if(/^bekabeling\s+muziek/.test(d)){ muz.producten.push(p.oms); kamerGebruikt = true; return; }
+      if(!technisch && (/^speaker\b|^muziek\s*:|guardian/.test(d))){ muz.producten.push(Math.round(q)+"× "+p.oms.replace(/^speaker\s*-?\s*:?\s*/i,"")); kamerGebruikt = true; return; }
+      // ---- verwarming / motoren / toegang ----
+      if(/^zoneverwarming/.test(d)){ verw = true; kamerGebruikt = true; return; }
+      if(/^zonekoeling/.test(d)){ koel = true; kamerGebruikt = true; return; }
+      if(/^stuurleiding\s+motor/.test(d)){
+        for(let i=0;i<Math.round(q);i++){
+          const mo = newMotorItem(); mo.kamer = kamer; mo.naam = (kamer||"Motor")+(q>1?" "+(i+1):"");
+          if(isKnxMotor){ mo.sturing = "knx"; mo.kabel = motorSturing("knx").kabel; }
+          mo.info = "Uit offerte: "+p.oms+" — soort nog na te kijken";
+          O.motoren.items.push(mo);
+        }
+        O.motoren.regels.push((kamer||sec.naam)+": "+Math.round(q)+"× motor");
+        kamerGebruikt = true; return;
+      }
+      if((m = d.match(/^toegangscontrole\s+kabel\s*:\s*(.*)$/))){
+        for(let i=0;i<Math.round(q);i++) O.toegangscontrole.items.push({omschrijving: (m[1].charAt(0).toUpperCase()+m[1].slice(1)) + (kamer?" — "+kamer:"")});
+        kamerGebruikt = true; return;
+      }
+      if(/videofoon/.test(d) && !/te bepalen|te bespreken/.test(d)){ O.toegangscontrole.items.push({omschrijving: p.oms + (kamer?" — "+kamer:"")}); return; }
+      if(/^toegangscontrole\s*-\s*sturing/.test(d)){ skip("Toegangscontrole-sturing (centraal)", p); return; }
+      if(/codeklavier/.test(d) && sec.naam && /toegang/i.test(sec.naam)){ skip("Toestellen toegangscontrole (horen bij de kabels per kamer)", p); return; }
+      // ---- alarm ----
+      if(/^alarmcentrale/.test(d)){ O.alarm.centrale = p.oms; return; }
+      if((m = d.match(/^alarm(kabel)?\s*:\s*(.*)$/))){
+        const isKabel = !!m[1];
+        if(isKabel === heeftAlarmToestellen){ skip(isKabel ? "Alarmkabels (toestellen staan apart)" : "Alarm", p); return; }
+        const naam = p.oms.replace(/^alarm(kabel)?\s*:\s*/i,"");
+        for(let i=0;i<Math.round(q);i++) O.alarm.items.push({omschrijving: naam + (kamer?" — "+kamer:""), toestelType: ofAlarmType(naam)});
+        O.alarm.regels.push(Math.round(q)+"× "+naam+(kamer?" ("+kamer+")":""));
+        return;
+      }
+      if(/simkaart/.test(d)){ skip("Algemene posten", p); return; }
+      // ---- camera ----
+      if(/^camera\b/.test(d)){
+        for(let i=0;i<Math.round(q);i++){ const c = newCameraItem(); c.kamer = kamer; c.naam = p.oms.replace(/^camera\s*:?\s*/i,""); O.camerabewaking.items.push(c); }
+        O.camerabewaking.regels.push(Math.round(q)+"× "+p.oms); return;
+      }
+      // ---- zon ----
+      if(/zonne|zonnepane|omvormer/.test(d)){
+        const pv = newZonnepaneelItem(); pv.naam = "PV-installatie"; pv.kamer = kamer;
+        const np = d.match(/(\d+)\s*panelen/); const wp = d.match(/(\d+)\s*w(p)?\b/);
+        if(np) pv.aantalPanelen = np[1]; if(wp) pv.vermogenPerPaneel = wp[1];
+        pv.info = p.oms; O.zonnepanelen.items.push(pv); O.zonnepanelen.regels.push(p.oms); return;
+      }
+      // ---- technieken: netwerk ----
+      if((m = d.match(/patchkast\s*(\d+)\s*u/))){
+        for(let i=0;i<Math.round(q);i++){
+          patch.kasten.push(parseInt(m[1]));
+          const sw = d.match(/(\d+)\s*p\s*poe\s*switch/);
+          if(sw){ const s = newPatchItem("Switch"); s.naam = "POE switch "+sw[1]+"P"; while(s.poorten.length < parseInt(sw[1])) s.poorten.push(newSwitchPoort()); s.__kast = patch.kasten.length-1; patch.items.push(s); }
+        }
+        O.data.regels.push(Math.round(q)+"× "+p.oms); return;
+      }
+      if((m = d.match(/switch\s*(\d+)\s*p\b/)) || (m = d.match(/(\d+)\s*p\b.*switch/))){
+        for(let i=0;i<Math.round(q);i++){ const s = newPatchItem("Switch"); s.naam = p.oms; const n = parseInt(m[1]); s.poorten = Array.from({length:n}, newSwitchPoort); patch.items.push(s); }
+        O.data.regels.push(Math.round(q)+"× "+p.oms); return;
+      }
+      if(/router|firewall|modem/.test(d)){ const o = newPatchItem("Overig"); o.naam = p.oms; patch.items.push(o); O.data.regels.push(p.oms); return; }
+      // ---- technieken: AV ----
+      if(technisch && (/versterker|amplifier|input\s*\/\s*output|asano|powerzone|av amp/.test(d))){
+        for(let i=0;i<Math.round(q);i++){
+          const mz = newPatchItem("Muziek"); mz.naam = p.oms.replace(/^versterker\s*:\s*/i,"");
+          const z = d.match(/(\d+)\s*-?\s*zone/) || d.match(/(\d+)\s*x\s*\d+\s*w/);
+          if(z){ mz.eenheden = Array.from({length:parseInt(z[1])}, ()=>({id:cryptoId(), zoneId:""})); }
+          patch.items.push(mz);
+        }
+        O.data.regels.push(Math.round(q)+"× "+p.oms); return;
+      }
+      // ---- technieken: zekeringkast & domotica ----
+      if(/^zekering(s)?kast/.test(d)){ V.zekeringkastOms = p.oms; return; }
+      if(/knx.*voeding|voeding.*knx/.test(d)){ for(let i=0;i<Math.round(q);i++) domoModule("Voeding", p.oms, 2); return; }
+      if(/basalte\s*server|core\s*plus|centrale|server/.test(d) && technisch){ for(let i=0;i<Math.round(q);i++) domoModule("Centrale", p.oms, 4); return; }
+      if(/dali\s*module|dali\s*gateway|dali-interface/.test(d)){ for(let i=0;i<Math.round(q);i++) domoModule("DALI", p.oms, 4); return; }
+      if(/verwarmingsa[ck]tor|hvac.*module|modules\s+sturing\s+zones/.test(d)){ for(let i=0;i<Math.round(q);i++) domoModule("HVAC", p.oms, 4); return; }
+      if(/schakela[ck]tor|rolluika[ck]tor|motora[ck]tor|relais/.test(d)){ for(let i=0;i<Math.round(q);i++) domoModule("Relais", p.oms, 4); return; }
+      if(/lijnkoppelaar|ip\s*router\s*knx|knx\s*ip/.test(d)){ for(let i=0;i<Math.round(q);i++) domoModule("Overig", p.oms, 2); return; }
+      if(/overspanning/.test(d)){ const mo = domoModule("Overig", p.oms, 2); mo.__vooraan = true; return; }
+      if(/aarding|tellerkast|smartphone|schema|keuring|programmatie|adresseren|te bepalen|te bespreken|wachtbuizen|exclusief|uitbreiding elektrisch bord|thermostaat|sturing zone|^technieken$/.test(d)){ skip("Algemene posten", p); return; }
+      V.nietHerkend.push(p);
+    });
+
+    // ---- sectie afsluiten: verlichting ----
+    lichtGroepen.forEach(g=>{
+      const sturingInfo = g.soort==="driver" ? ("Spots "+g.stroom+(g.watt?" "+g.watt:"")) : g.soort==="24v" ? ("Ledstrip "+(g.spanning||"24Vdc")) : g.soort==="track" ? "DALI track" : g.soort==="kast" ? "Kastverlichting" : "Lichtpunt 230V";
+      if(g.soort==="driver" || g.soort==="24v" || g.soort==="track"){
+        const n = Math.max(1, g.aantal);
+        const kr = nieuweKring(kamer, sturingInfo + (n>1?" ("+n+" drivers)":"") + (g.koppel?" — gekoppeld":""));
+        let stukken;
+        if(g.soort==="driver") stukken = ofVerdeel(g.armaturen, n);
+        else if(g.armaturen.length===1 && n>1){
+          const per = Math.round((g.armaturen[0].aantal/n)*10)/10;
+          stukken = Array.from({length:n}, ()=>[{naam:g.armaturen[0].naam, aantal:per}]);
+        } else {
+          stukken = Array.from({length:n}, ()=>[]);
+          g.armaturen.forEach((a,i)=> stukken[i % n].push({naam:a.naam, aantal:a.aantal}));
+        }
+        for(let i=0;i<n;i++){
+          const dr = newDriverItem();
+          dr.type = sturingInfo + " (uit offerte)";
+          dr.kringId = kr.id;
+          dr.armaturen = stukken[i].map(a=>{ const x = newDriverArmatuur(); x.naam = a.naam; x.ruimte = kamer; x.aantal = a.aantal; return x; });
+          O.driverkast.items.push(dr);
+        }
+        const tot = g.armaturen.reduce((s,a)=>s+a.aantal,0);
+        O.driverkast.regels.push((kamer||sec.naam)+": "+n+"× driver "+sturingInfo+(tot ? ", "+tot+(g.soort==="24v" ? " m ledstrip" : " armatu"+(tot===1?"ur":"ren")) : ""));
+      } else {
+        const n = Math.max(g.aantal, g.soort==="230" && g.aantal===0 ? 1 : 0);
+        const kr = nieuweKring(kamer, sturingInfo + (n>1?" ("+n+"×)":""));
+        const stukken = ofVerdeel(g.armaturen, Math.max(1,n));
+        for(let i=0;i<Math.max(1,n);i++){
+          const it = newVerlichtingItem();
+          it.kamer = kamer; it.kringId = kr.id;
+          it.naam = g.soort==="kast" ? "Kastverlichting" : (stukken[i].map(a=> (a.aantal>1?a.aantal+"× ":"")+a.naam).join(" + ") || "");
+          it.info = g.soort==="kast" ? (g.info || "Voeding 230V kastverlichting") : (g.info || "");
+          O.verlichting.items.push(it);
+        }
+        O.verlichting.regels.push((kamer||sec.naam)+": "+Math.max(1,n)+"× "+sturingInfo+(g.armaturen.length?" — "+g.armaturen.map(a=>a.naam).join(", "):""));
+      }
+    });
+    gesch.forEach(info=> nieuweKring(kamer, info));
+    // ---- knoppen ----
+    const maakKnoppen = (slot, type, standaardNaam)=>{
+      const lijst = [];
+      slot.prod.forEach(pr=>{ for(let i=0;i<pr.aantal;i++) lijst.push(pr.naam); });
+      while(lijst.length < slot.n) lijst.push(standaardNaam);
+      lijst.forEach(naam=>{
+        const k = newKnopItem(); k.type = type; k.kamer = kamer; k.naam = naam;
+        if(type==="Drukknop"){
+          const v = parseInt((naam.match(/(\d)\s*[VT]\b/i)||[])[1]) || 1;
+          const vd = KNOP_VOUDIGHEDEN.includes(v) ? v : (v>=4 ? 4 : v>=2 ? 2 : 1);
+          pasVoudigheidAan(k, vd);
+        }
+        O.knoppen.items.push(k);
+      });
+      if(lijst.length) O.knoppen.regels.push((kamer||sec.naam)+": "+lijst.length+"× "+(type==="Drukknop" && standaardNaam.startsWith("Bedien")?"bedieningspaneel":type.toLowerCase())+(slot.prod.length?" ("+[...new Set(slot.prod.map(x=>x.naam))].join(", ")+")":""));
+    };
+    maakKnoppen(slots.knop, "Drukknop", "Drukknop");
+    maakKnoppen(slots.paneel, "Drukknop", "Bedieningspaneel");
+    maakKnoppen(slots.beweging, "Bewegingsmelder", "Bewegingsmelder");
+    // ---- muziek ----
+    if(muz.speakers || muz.subs || muz.producten.length){
+      const z = newMuziekItem(); z.kamer = kamer; z.naam = kamer || sec.naam;
+      z.info = muz.producten.length ? muz.producten.join(" · ") : [muz.speakers?muz.speakers+" luidspreker(s)":"", muz.subs?muz.subs+" sub(s)":""].filter(Boolean).join(" · ");
+      O.muziek.items.push(z); O.muziek.regels.push(z.naam+": "+z.info);
+    }
+    // ---- verwarming ----
+    if(verw || koel){
+      const z = newVerwarmingItem(); z.kamer = kamer; z.naam = kamer || sec.naam;
+      z.info = verw && koel ? "Verwarming + koeling" : verw ? "Verwarming" : "Koeling";
+      O.verwarming.items.push(z); O.verwarming.regels.push(z.naam+": "+z.info);
+    }
+    if(kamer && kamerGebruikt && !kamerSecties.includes(kamer)) kamerSecties.push(kamer);
+  });
+
+  V.kamers = kamerSecties;
+  O.kamers.items = kamerSecties.slice();
+  O.kamers.regels = kamerSecties.slice();
+  O.kringen.regels = O.kringen.items.map(k=> (k.kamer||"—")+": "+k.info);
+  O.knoppen.regels = O.knoppen.regels || [];
+  O.toegangscontrole.regels = O.toegangscontrole.items.map(t=>t.omschrijving);
+  if(O.alarm.centrale) O.alarm.regels.unshift("Centrale: "+O.alarm.centrale);
+  O.alarm.zekering = alarmCentraleZekering;
+
+  // data: patchpanelen vullen
+  if(dataPoorten.length){
+    const tel = {};
+    dataPoorten.forEach(dp=>{ const k = (dp.kamer||"Algemeen")+"|"+dp.wat; tel[k]=(tel[k]||0)+1; dp.omschrijving = (dp.kamer||"Algemeen")+" — "+dp.wat+" "+tel[k]; });
+    const aantalPanelen = Math.ceil(dataPoorten.length/24);
+    const panelen = [];
+    for(let i=0;i<aantalPanelen;i++){ const pp = newPatchItem("Patchpaneel"); pp.naam = "Patchpaneel "+(i+1); panelen.push(pp); }
+    dataPoorten.forEach((dp,i)=>{
+      const poort = panelen[Math.floor(i/24)].poorten[i%24];
+      poort.omschrijving = dp.omschrijving;
+      if(dp.laadpaal){ dp.laadpaal.verbindingType = "bekabeld"; dp.laadpaal.patchpaneelPoortId = poort.id; }
+    });
+    patch.items = [...panelen, ...patch.items];
+    O.data.regels.unshift(dataPoorten.length+" datapunten → "+aantalPanelen+" patchpaneel/-panelen van 24 poorten");
+  }
+  O.data.kasten = patch.kasten;
+  O.data.items = patch.items;
+
+  // zekeringkast
+  const voor = zekModules.domotica.filter(m=>m.__vooraan), domo = zekModules.domotica.filter(m=>!m.__vooraan);
+  O.zekeringen.items = [...voor, ...domo, ...zekModules.toestellen];
+  O.zekeringen.regels = [];
+  if(V.zekeringkastOms) O.zekeringen.regels.push(V.zekeringkastOms);
+  const telCat = {};
+  [...voor, ...domo].forEach(m=>{ telCat[m.naam]=(telCat[m.naam]||0)+1; });
+  Object.entries(telCat).forEach(([n,c])=> O.zekeringen.regels.push(c+"× "+n));
+  if(zekModules.toestellen.length) O.zekeringen.regels.push(zekModules.toestellen.length+" automaten voor vaste toestellen/laadpalen: "+zekModules.toestellen.map(a=>a.naam+" "+a.A+" "+a.polen).join(", "));
+
+  Object.values(O).forEach(o=>{ o.aantal = (o.items||[]).length; });
+  O.instellingen.aantal = Object.keys(inst).length;
+  return V;
+}
+
+// ---------- 3. toepassen op het open dossier ----------
+function ofPasToe(V, keuze){
+  const O = V.onderdelen;
+  const aan = k=> !!keuze[k] && O[k] && (O[k].aantal || (k==="alarm" && O.alarm.centrale));
+  const gedaan = [];
+  const ids = new Set(); // ids die echt in het dossier terechtkomen
+  const reg = o=>{ if(o && o.id) ids.add(o.id); };
+
+  if(keuze.instellingen){
+    let n = 0;
+    Object.entries(O.instellingen.waarden||{}).forEach(([k,v])=>{ if(v && !(state.instellingen[k]||"").trim()){ state.instellingen[k] = v; n++; } });
+    if(n) gedaan.push(n+" projectgegeven(s)");
+  }
+  if(aan("kamers")){
+    const voor = state.kamers.filter(Boolean).length;
+    V.kamers.forEach(k=> ensureKamerInLijst(k));
+    const n = state.kamers.filter(Boolean).length - voor;
+    gedaan.push(n ? n+" kamer(s)" : "kamers stonden er al");
+  }
+  if(aan("zekeringen")){
+    const kast = state.zekeringen.kasten[0] || (state.zekeringen.kasten.push(newZekeringKast("Zekeringkast 1")), state.zekeringen.kasten[0]);
+    const maat = parseInt(kast.maat) || 24;
+    // lege beginrij hergebruiken, anders nieuwe rijen achteraan
+    let rij = (kast.rijen.length===1 && !kast.rijen[0].items.length) ? kast.rijen[0] : null;
+    const vrij = r=> maat - r.items.reduce((t,x)=> t + moduleBreedte(x), 0);
+    let vorigeSoort = null;
+    O.zekeringen.items.forEach(m=>{
+      const soort = m.categorie==="Automaat" ? "a" : "d";
+      if(!rij || vrij(rij) < moduleBreedte(m) || (vorigeSoort && soort!==vorigeSoort && rij.items.length)){
+        rij = newRij(); kast.rijen.push(rij);
+      }
+      vorigeSoort = soort;
+      delete m.__vooraan;
+      rij.items.push(m); reg(m);
+    });
+    gedaan.push(O.zekeringen.items.length+" zekeringmodule(s)");
+  }
+  if(aan("kringen")){ O.kringen.items.forEach(k=>{ state.kringen.items.push(k); reg(k); }); gedaan.push(O.kringen.items.length+" kring(en)"); }
+  if(aan("driverkast")){
+    let kast = state.driverkast.kasten[0];
+    if(!kast){ kast = newDriverKast(); state.driverkast.kasten.push(kast); }
+    O.driverkast.items.forEach(dr=>{
+      kast.items.push(dr); reg(dr);
+      try{ dr.naam = computeDriverMatch(dr, kast.sturing).naam; if(dr.naam==="Geen overeenkomst") dr.naam = ""; }catch(e){}
+    });
+    gedaan.push(O.driverkast.items.length+" driver(s)");
+  }
+  if(aan("verlichting")){ O.verlichting.items.forEach(it=>{ state.verlichting.items.push(it); reg(it); }); gedaan.push(O.verlichting.items.length+" lichtpunt(en) 230V"); }
+  if(aan("knoppen")){ O.knoppen.items.forEach(k=>{ state.knoppen.items.push(k); reg(k); }); gedaan.push(O.knoppen.items.length+" knop(pen)/melder(s)"); }
+  if(aan("muziek")){ O.muziek.items.forEach(z=>{ state.muziek.items.push(z); reg(z); }); gedaan.push(O.muziek.items.length+" muziekzone(s)"); }
+  if(aan("verwarming")){ O.verwarming.items.forEach(z=>{ state.verwarming.items.push(z); reg(z); }); gedaan.push(O.verwarming.items.length+" verwarmingszone(s)"); }
+  if(aan("motoren")){ if(!state.motoren) state.motoren = {items:[]}; O.motoren.items.forEach(m=>{ state.motoren.items.push(m); reg(m); }); gedaan.push(O.motoren.items.length+" motor(en)"); }
+  if(aan("camerabewaking")){ O.camerabewaking.items.forEach(c=>{ state.camerabewaking.items.push(c); reg(c); }); gedaan.push(O.camerabewaking.items.length+" camera('s)"); }
+  if(aan("laadpalen")){ O.laadpalen.items.forEach(l=>{ state.laadpalen.items.push(l); reg(l); }); gedaan.push(O.laadpalen.items.length+" laadpa(a)l(en)"); }
+  if(aan("zonnepanelen")){ O.zonnepanelen.items.forEach(z=>{ state.zonnepanelen.items.push(z); reg(z); }); gedaan.push(O.zonnepanelen.items.length+" PV-installatie(s)"); }
+  // vaste genummerde lijsten: eerste lege rijen invullen, zo nodig extra rijen bijmaken
+  const vulVast = (lijst, basisCodes, extraKey, nieuwe, maak)=>{
+    let i = 0;
+    nieuwe.forEach(n=>{
+      while(i < lijst.length && lijst[i] && (lijst[i].omschrijving||"").trim()) i++;
+      if(i >= basisCodes + (state.extra[extraKey]||0)) state.extra[extraKey] = (state.extra[extraKey]||0) + 1;
+      if(!lijst[i]) lijst[i] = maak();
+      Object.assign(lijst[i], n); i++;
+    });
+  };
+  if(aan("toegangscontrole")){
+    vulVast(state.toegangscontrole, TOEGANG_CODES.length, "toegangscontrole", O.toegangscontrole.items, ()=>({omschrijving:""}));
+    gedaan.push(O.toegangscontrole.items.length+" toegangscontrole-punt(en)");
+  }
+  if(aan("alarm")){
+    vulVast(state.alarm, ALARM_CODES.length, "alarm", O.alarm.items, newAlarmItem);
+    if(O.alarm.centrale && !(state.alarmCentrale.type||"").trim()) state.alarmCentrale.type = O.alarm.centrale;
+    if(O.alarm.zekering && ids.has(O.alarm.zekering.id) && !state.alarmCentrale.zekeringModuleId) state.alarmCentrale.zekeringModuleId = O.alarm.zekering.id;
+    gedaan.push(O.alarm.items.length+" alarmtoestel(len)");
+  }
+  if(aan("data")){
+    const kasten = state.patchkast.kasten;
+    if(!kasten.length) kasten.push(newKast());
+    const leeg = kasten.length===1 && !kasten[0].items.length;
+    const maxU = u=> Math.min(PATCH_MAXU_MAX, Math.max(PATCH_MAXU_MIN, u||PATCH_MAXU_DEFAULT));
+    let start = 0;
+    if(leeg){
+      O.data.kasten.forEach((u,i)=>{ if(i===0) kasten[0].maxU = maxU(u); else kasten.push(newKast(maxU(u))); });
+    } else if(O.data.kasten.length){
+      start = kasten.length;
+      O.data.kasten.forEach(u=> kasten.push(newKast(maxU(u))));
+    }
+    const doelen = kasten.slice(start);
+    const bezet = k=> k.items.reduce((t,x)=> t + (parseInt(x.hoogte)||1), 0);
+    O.data.items.forEach(it=>{
+      let k = (it.__kast!=null && doelen[it.__kast]) || null;
+      if(!k) k = doelen.find(kk=> bezet(kk) + (parseInt(it.hoogte)||1) <= (parseInt(kk.maxU)||PATCH_MAXU_DEFAULT)) || doelen[doelen.length-1];
+      delete it.__kast;
+      k.items.push(it); reg(it);
+      (it.poorten||[]).forEach(p=>reg(p));
+    });
+    gedaan.push(O.data.items.length+" patchkast-component(en)");
+  }
+  // verwijzingen naar iets dat niet mee kwam leegmaken
+  const schoon = (obj, veld)=>{ if(obj[veld] && !ids.has(obj[veld])) obj[veld] = ""; };
+  O.driverkast.items.forEach(d=>schoon(d,"kringId"));
+  O.verlichting.items.forEach(v=>schoon(v,"kringId"));
+  O.laadpalen.items.forEach(l=>{ schoon(l,"zekeringModuleId"); schoon(l,"patchpaneelPoortId"); });
+  // modules aanzetten waar nu gegevens in staan
+  OF_ONDERDELEN.forEach(o=>{ if(o.module && aan(o.key) && state.modules) state.modules[o.module] = true; });
+  if(!Array.isArray(state.offerteImports)) state.offerteImports = [];
+  state.offerteImports.push({nummer:V.kop.nummer||"", versie:V.kop.versie||"", datum:V.kop.datum||"", ingelezen:new Date().toISOString(), onderdelen:Object.keys(keuze).filter(k=>keuze[k])});
+  return gedaan;
+}
+// ---------- 4. venster ----------
+function ofModalCss(){
+  if(document.getElementById("of-css")) return;
+  const st = document.createElement("style"); st.id = "of-css";
+  st.textContent = `
+  #of-modal .modal-box{max-width:760px;}
+  #of-modal .of-kop{font-size:14px;line-height:1.5;margin:0 0 10px;padding:10px 12px;background:var(--sunken,#f4f6f5);border-radius:10px;}
+  #of-modal .of-rij{border:1px solid var(--line,#dde3e0);border-radius:10px;margin:6px 0;}
+  #of-modal .of-rij summary{display:flex;align-items:center;gap:10px;padding:9px 12px;cursor:pointer;list-style:none;}
+  #of-modal .of-rij summary::-webkit-details-marker{display:none;}
+  #of-modal .of-rij summary input{width:auto;margin:0;}
+  #of-modal .of-rij .of-n{margin-left:auto;font-size:13px;color:var(--ink-soft,#5b6b63);white-space:nowrap;}
+  #of-modal .of-rij .of-let{font-size:12px;color:#9a6200;}
+  #of-modal .of-detail{padding:0 12px 10px 38px;font-size:13px;color:var(--ink-soft,#5b6b63);max-height:220px;overflow:auto;}
+  #of-modal .of-detail div{padding:2px 0;border-bottom:1px dashed var(--line,#e5e9e7);}
+  #of-modal .of-leeg{opacity:.5;}
+  #of-modal .of-sub{font-weight:700;font-size:14px;margin:16px 0 4px;}
+  #of-modal .of-waarsch{background:#fff4e0;border:1px solid #f0c674;color:#7a4b00;border-radius:10px;padding:8px 12px;font-size:13px;margin:8px 0;}
+  `;
+  document.head.appendChild(st);
+}
+function ofSluit(){ const m = document.getElementById("of-modal"); if(m) m.remove(); }
+function ofToonModal(inhoudHtml, knoppenHtml){
+  ofModalCss(); ofSluit();
+  const ov = document.createElement("div");
+  ov.className = "modal-overlay"; ov.id = "of-modal";
+  ov.innerHTML = `<div class="modal-box"><h2>Offerte inlezen</h2><div class="modal-body">${inhoudHtml}</div><div class="modal-actions">${knoppenHtml}</div></div>`;
+  document.body.appendChild(ov);
+  return ov;
+}
+function ofStart(gekozenBestand){
+  if(!currentProjectId){ toast("Kies eerst een project."); return; }
+  const verwerk = async (file)=>{
+    ofToonModal(`<p>Offerte <b>${escapeHtml(file.name)}</b> wordt gelezen…</p>`, `<button class="btn btn-ghost" id="of-annul">Annuleren</button>`)
+      .querySelector("#of-annul").addEventListener("click", ofSluit);
+    try{
+      const off = await ofLeesOfferte(await file.arrayBuffer());
+      if(!off.posten.length) throw new Error("Geen offerteposten gevonden. Is dit een Casentis-offerte uit Plenion?");
+      ofToonVoorstel(ofBouwVoorstel(off), file.name);
+    }catch(e){
+      console.error("CaDos: offerte inlezen mislukt", e);
+      ofToonModal(`<p>De offerte kon niet gelezen worden.</p><p class="hint">${escapeHtml(e.message||String(e))}</p>`, `<button class="btn btn-primary" id="of-ok">Sluiten</button>`)
+        .querySelector("#of-ok").addEventListener("click", ofSluit);
+    }
+  };
+  if(gekozenBestand instanceof Blob) return verwerk(gekozenBestand);
+  const inp = document.createElement("input");
+  inp.type = "file"; inp.accept = "application/pdf,.pdf"; inp.style.display = "none";
+  inp.addEventListener("change", ()=>{
+    const file = inp.files && inp.files[0]; inp.remove();
+    if(file) verwerk(file);
+  });
+  document.body.appendChild(inp);
+  inp.click();
+}
+function ofBestaandAantal(key){
+  try{
+    switch(key){
+      case "kamers": return state.kamers.filter(Boolean).length;
+      case "kringen": return state.kringen.items.length;
+      case "driverkast": return state.driverkast.kasten.reduce((t,k)=>t+k.items.length,0);
+      case "verlichting": return state.verlichting.items.length;
+      case "knoppen": return state.knoppen.items.length;
+      case "muziek": return state.muziek.items.length;
+      case "verwarming": return state.verwarming.items.length;
+      case "motoren": return (state.motoren&&state.motoren.items||[]).length;
+      case "toegangscontrole": return state.toegangscontrole.filter(t=>t&&(t.omschrijving||"").trim()).length;
+      case "alarm": return state.alarm.filter(t=>t&&(t.omschrijving||"").trim()).length;
+      case "camerabewaking": return state.camerabewaking.items.length;
+      case "laadpalen": return state.laadpalen.items.length;
+      case "zonnepanelen": return state.zonnepanelen.items.length;
+      case "data": return state.patchkast.kasten.reduce((t,k)=>t+k.items.length,0);
+      case "zekeringen": return state.zekeringen.kasten.reduce((t,k)=>t+k.rijen.reduce((s,r)=>s+r.items.length,0),0);
+    }
+  }catch(e){}
+  return 0;
+}
+function ofToonVoorstel(V, bestandsnaam){
+  const k = V.kop;
+  const eerder = (state.offerteImports||[]).filter(x=> x.nummer && x.nummer===k.nummer);
+  let html = `<div class="of-kop"><b>Offerte ${escapeHtml(k.nummer||"?")}${k.versie?" / versie "+escapeHtml(k.versie):""}</b>${k.datum?" · "+escapeHtml(k.datum):""}<br>
+    Klant: ${escapeHtml(k.klant||"—")}<br>Project: ${escapeHtml([k.projectNaam,k.projectAdres].filter(Boolean).join(", ")||"—")}</div>`;
+  if(eerder.length) html += `<div class="of-waarsch">⚠ Deze offerte werd al eens ingelezen in dit dossier (${eerder.map(x=>"v"+(x.versie||"?")+" op "+new Date(x.ingelezen).toLocaleDateString("nl-BE")).join(", ")}). Opnieuw toevoegen maakt alles dubbel.</div>`;
+  html += `<p class="hint">Vink aan wat in het dossier mag komen. Alles wordt <b>toegevoegd</b> aan wat er al staat; er wordt niets gewist of overschreven. Tik op een onderdeel om te zien wat er komt.</p>`;
+  OF_ONDERDELEN.forEach(o=>{
+    const od = V.onderdelen[o.key];
+    const n = o.key==="alarm" ? od.aantal + (od.centrale?1:0) : od.aantal;
+    const bestaand = o.key==="instellingen" ? 0 : ofBestaandAantal(o.key);
+    const leeg = !n;
+    html += `<details class="of-rij ${leeg?"of-leeg":""}"><summary>
+      <input type="checkbox" data-key="${o.key}" ${leeg?"disabled":"checked"}>
+      <span>${escapeHtml(o.label)}</span>
+      ${bestaand && !leeg ? `<span class="of-let">al ${bestaand} in dossier</span>` : ""}
+      <span class="of-n">${leeg ? "niets gevonden" : (o.key==="instellingen" ? n+" veld(en)" : n+" stuk(s)")}</span></summary>
+      <div class="of-detail">${(od.regels||[]).map(r=>`<div>${escapeHtml(r)}</div>`).join("") || "<div>—</div>"}</div></details>`;
+  });
+  const overg = Object.entries(V.overgeslagen);
+  if(overg.length){
+    html += `<div class="of-sub">Niet overgenomen (geen CaDos-gegevens)</div>`;
+    overg.forEach(([cat, lijst])=>{
+      html += `<details class="of-rij"><summary><span>${escapeHtml(cat)}</span><span class="of-n">${lijst.length} post(en)</span></summary>
+        <div class="of-detail">${lijst.map(p=>`<div>${escapeHtml((p.sectie?p.sectie+": ":"")+p.aantal+"× "+p.oms)}</div>`).join("")}</div></details>`;
+    });
+  }
+  if(V.nietHerkend.length){
+    html += `<div class="of-sub">Niet herkend — graag nakijken</div>
+      <details class="of-rij" open><summary><span>Posten die de lezer (nog) niet kent</span><span class="of-n">${V.nietHerkend.length}</span></summary>
+      <div class="of-detail">${V.nietHerkend.map(p=>`<div>${escapeHtml((p.sectie?p.sectie+": ":"")+p.aantal+"× "+p.oms)}</div>`).join("")}</div></details>`;
+  }
+  html += `<p class="hint" style="margin-top:12px;">Na het toevoegen nog na te kijken: verdiepingen per kamer, welke spots op welke driver hangen, soort motor (screen/rolluik), differentiëlen en stopcontactkringen in de zekeringkast.</p>`;
+  const ov = ofToonModal(html, `<button class="btn btn-ghost" id="of-annul">Annuleren</button><button class="btn btn-primary" id="of-ok">Toevoegen aan dossier</button>`);
+  ov.querySelectorAll("summary input").forEach(cb=> cb.addEventListener("click", e=> e.stopPropagation()));
+  ov.querySelector("#of-annul").addEventListener("click", ofSluit);
+  ov.querySelector("#of-ok").addEventListener("click", async ()=>{
+    const keuze = {};
+    ov.querySelectorAll("summary input[data-key]").forEach(cb=>{ keuze[cb.dataset.key] = cb.checked && !cb.disabled; });
+    if(!Object.values(keuze).some(Boolean)){ toast("Niets aangevinkt."); return; }
+    const knop = ov.querySelector("#of-ok"); knop.disabled = true; knop.textContent = "Bezig…";
+    try{ if(window.CaDosApp && window.CaDosApp.flushSave) await window.CaDosApp.flushSave(); }catch(e){}
+    let backupOk = false;
+    try{ if(window.dbBackupCadosDossier) backupOk = await window.dbBackupCadosDossier(currentProjectId, "CaDos: voor offerte inlezen "+(k.nummer||bestandsnaam)); }catch(e){ console.warn("CaDos: back-up vóór offerte-import mislukt", e); }
+    const vorige = JSON.stringify(state);
+    let gedaan;
+    try{
+      gedaan = ofPasToe(V, keuze);
+    }catch(e){
+      console.error("CaDos: offerte toepassen mislukt", e);
+      state = JSON.parse(vorige);
+      toast("⚠️ Toevoegen mislukt, er is niets gewijzigd.");
+      ofSluit(); return;
+    }
+    save(); buildNav(); selectTab(currentTab||DEFAULT_TAB);
+    const ov2 = ofToonModal(`<p><b>Toegevoegd aan het dossier:</b></p><ul>${gedaan.map(g=>`<li>${escapeHtml(g)}</li>`).join("")}</ul>
+      <p class="hint">${backupOk ? "Er werd vooraf een back-up van het dossier bewaard." : "Er was nog geen bewaard dossier om een back-up van te maken."} Niet goed? Dan zet "Ongedaan maken" alles terug zoals het was.</p>`,
+      `<button class="btn btn-ghost" id="of-undo">Ongedaan maken</button><button class="btn btn-primary" id="of-ok">Sluiten</button>`);
+    ov2.querySelector("#of-ok").addEventListener("click", ofSluit);
+    ov2.querySelector("#of-undo").addEventListener("click", ()=>{
+      state = JSON.parse(vorige);
+      save(); buildNav(); selectTab(currentTab||DEFAULT_TAB);
+      ofSluit(); toast("Offerte-import ongedaan gemaakt");
+    });
+  });
+}
+document.getElementById("btnOfferte") && document.getElementById("btnOfferte").addEventListener("click", ()=> ofStart());
+
 window.CaDosApp = {
   loadForProject,
   hasProjectLoaded: () => !!currentProjectId,
@@ -22532,7 +23293,9 @@ window.CaDosApp = {
   currentProjectId: () => currentProjectId,
   blankState,
   migrate,
-  MODULE_TOGGLES
+  MODULE_TOGGLES,
+  // 19/11/2026: offerte inlezen (start(bestand?) opent de kiezer of verwerkt het gegeven bestand)
+  offerte: { start: ofStart, lees: ofLeesOfferte, voorstel: ofBouwVoorstel, pasToe: (V, keuze)=> ofPasToe(V, keuze) }
 };
 
 })();
@@ -30919,6 +31682,15 @@ window.CaCalcApp = {
   // gedeclareerde const sb / dbXxx-functies, want die zitten in een andere sluiting) ze kan
   // aanroepen zonder dat er iets van CaDos zelf hoeft te veranderen.
   window.dbGetCadosDossier = dbGetCadosDossier;
+  // 19/11/2026 (offerte inlezen): kopie van het bewaarde dossier in dossier_backups, zelfde tabel als CaDraw.
+  window.dbBackupCadosDossier = async function(projectId, reden){
+    const { data, error } = await sb.from('project_elektro_dossiers').select('id, data').eq('project_id', projectId).maybeSingle();
+    if(error) throw error;
+    if(!data) return false;
+    const bk = await sb.from('dossier_backups').insert({ dossier_id: data.id, data: data.data, reden: reden || 'CaDos' });
+    if(bk.error) throw bk.error;
+    return true;
+  };
   window.dbSaveCadosDossier = dbSaveCadosDossier;
 
   // ===== CaCalc-opslag (ronde 51, Fix 2) =====
@@ -35245,6 +36017,34 @@ window.CaCalcApp = {
       if(zoek) zoek.value = '';
       kiesGlobaalProject(opt.dataset.proj);
     });
+  });
+  // 19/11/2026: dossier aanmaken + meteen een offerte inlezen. Eerst de PDF kiezen (de bestandskiezer
+  // moet rechtstreeks op de klik openen), dan pas het dossier aanmaken.
+  if(el('cados-aanmaken-offerte-btn')) el('cados-aanmaken-offerte-btn').addEventListener('click', (e) => {
+    const projectId = state.globalProjectId;
+    if(!projectId) return;
+    const btn = e.currentTarget;
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = 'application/pdf,.pdf'; inp.style.display = 'none';
+    inp.addEventListener('change', async () => {
+      const file = inp.files && inp.files[0]; inp.remove();
+      if(!file) return;
+      btn.disabled = true;
+      try{
+        const project = state.projects.find(x => String(x.id) === String(projectId));
+        await maakCadosDossier(projectId, project);
+        state.globalProjectHasCados = true;
+        updateMainNavModuleButtons();
+        cadosCurrentProjectId = '';
+        await loadCadosDossier(String(projectId));
+        if(window.CaDosApp && window.CaDosApp.offerte) window.CaDosApp.offerte.start(file);
+      }catch(err){
+        console.error('CaDos-dossier aanmaken (offerte) mislukt:', err);
+        alert('Kon het dossier niet aanmaken: ' + (err && err.message ? err.message : '(onbekende fout)'));
+      }finally{ btn.disabled = false; }
+    });
+    document.body.appendChild(inp);
+    inp.click();
   });
   el('cados-aanmaken-btn').addEventListener('click', async (e) => {
     const projectId = state.globalProjectId;
