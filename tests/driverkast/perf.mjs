@@ -13,7 +13,7 @@ await p.click('#main-nav-btn-cados');await p.waitForTimeout(400);
 await p.locator('#cados-proj-list >> text=Leeg project').first().click();await p.waitForTimeout(700);
 let [fc]=await Promise.all([p.waitForEvent('filechooser'),p.click('#cados-aanmaken-offerte-btn')]);
 await fc.setFiles(PDF);await p.waitForSelector('#of-modal summary input',{timeout:15000});
-await p.click('#of-modal #of-ok');await p.waitForSelector('#of-modal #of-undo');await p.click('#of-modal #of-ok');await p.waitForTimeout(800);
+await p.click('#of-modal #of-ok');await p.locator('#dkvraag-modal .dq-ok').click({timeout:4000}).catch(()=>{});await p.waitForSelector('#of-modal #of-undo');await p.click('#of-modal #of-ok');await p.waitForTimeout(800);
 const t=async(lbl,fn)=>{const t0=Date.now();await fn();await p.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>setTimeout(r,0))));console.log(lbl,Date.now()-t0,'ms');};
 await t('open driverkast',()=>p.evaluate(()=>document.querySelector('#tabbar button[data-id="driverkast"]').click()));
 console.log('swipe-boxes',await p.evaluate(()=>document.querySelectorAll('#cados-app .rail-scroll, #cados-app .card-body[style*="overflow"], #cados-app #kastTabbar').length),'DOM-nodes',await p.evaluate(()=>document.querySelectorAll('#cados-app *').length),'overzicht',await p.evaluate(()=>document.querySelectorAll('#dkOverzicht *').length),'kasten',await p.evaluate(()=>document.querySelectorAll('#dkKastenwrap *').length),'options',await p.evaluate(()=>document.querySelectorAll('#cados-app option').length));

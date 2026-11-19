@@ -14,14 +14,13 @@ await p.click('#main-nav-btn-cados');await p.waitForTimeout(400);
 await p.locator('#cados-proj-list >> text=Leeg project').first().click();await p.waitForTimeout(700);
 await p.click('#cados-aanmaken-btn');await p.waitForTimeout(1200);
 await p.evaluate(()=>document.querySelector('#tabbar button[data-id="driverkast"]').click());await p.waitForTimeout(400);
-await p.fill('#dkMax','30');await p.press('#dkMax','Tab');await p.waitForTimeout(800);
 // handmatig 1 kast met 35 lege drivers -> geen melding (vrij aanpassen)
 await p.evaluate(()=>{for(let i=0;i<35;i++)document.querySelector('.driverAdd').click();});await p.waitForTimeout(500);
 let d=await D();console.log('handmatig: kast1',d.driverkast.kasten[0].items.length,'| melding max?',await p.evaluate(()=>/maximum is/.test(document.querySelector('#panel-driverkast').innerText)));
 // import
 let [fc]=await Promise.all([p.waitForEvent('filechooser'),p.evaluate(()=>document.getElementById('btnOfferte').click())]);
 await fc.setFiles(PDF);await p.waitForSelector('#of-modal summary input',{timeout:15000});
-await p.click('#of-modal #of-ok');await p.waitForSelector('#of-modal #of-undo');
+await p.click('#of-modal #of-ok');await p.fill('#dkvraag-modal .dq-max','30');await p.click('#dkvraag-modal .dq-ok');await p.waitForSelector('#of-modal #of-undo');
 console.log('resultaat:',await p.evaluate(()=>[...document.querySelectorAll('#of-modal li')].map(l=>l.textContent).filter(t=>/driver/.test(t)).join(' / ')));
 await p.click('#of-modal #of-ok');await p.waitForTimeout(800);
 d=await D();console.log('kasten:',d.driverkast.kasten.map(k=>k.items.length).join(','));

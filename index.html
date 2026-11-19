@@ -6283,6 +6283,7 @@
 #cados-app .rackitem-btns .rb-remove{color:var(--danger);}
 #cados-app .rackitem-btns .rb-add{color:var(--copper);}
 #cados-app .rackitem-btns .rb-linkarm{color:var(--teal);font-size:11px;}
+#cados-app .rackitem-btns .rb-230{font-size:10px;font-weight:700;color:#b35c00;}
 #cados-app .rackitem-btns .rb-copy{color:var(--ink-dim);}
 #cados-app .rackitem-btns .rb-up,
 #cados-app .rackitem-btns .rb-down{color:var(--ink-dim);font-size:11px;}
@@ -10887,10 +10888,8 @@ function renderDriverkast(){
         <div class="toolbar-row">
           <button class="addbtn" id="addDriverkast">+ Kast toevoegen</button>
           <button class="btn" id="exportDriverkast">Exporteer voor werf (PDF)</button>
-          <button class="btn" id="dk230" title="Armaturen die geen driver nodig hebben naar Verlichting 230V verhuizen">↪ Naar 230V</button>
           <button class="btn" id="dkVerdeel" title="Drivers per kamer naar een andere (nieuwe) kast verplaatsen">⇄ Verdelen over kasten</button>
-          <label class="btn" style="display:inline-flex;gap:6px;align-items:center;cursor:default;" title="Gedeelde instelling: bij Offerte inlezen komen er hoogstens zoveel drivers in één kast. Zelf aanpassen blijft altijd vrij. Leeg of 0 = geen limiet.">Max. drivers/kast bij import
-            <input id="dkMax" type="number" min="0" step="1" value="${dkMaxDrivers()||""}" placeholder="—" style="width:64px;padding:4px 6px;"></label>
+          <button class="btn" id="dkHerreken" title="Alle drivers opnieuw over de kasten verdelen (max. aantal per kast)">⟳ Herrekenen</button>
           <button class="btn" id="dkKoppel" title="Armaturen zonder match koppelen aan de catalogus">🔗 Armaturen koppelen${(()=>{ const n = akOngekoppeld().length; return n ? ` <span class="ak-badge">${n}</span>` : ""; })()}</button>
         </div>
       </div>
@@ -11044,13 +11043,8 @@ function renderDriverkast(){
   })();
   // 19/11/2026: maximum drivers per kast
   if(!cadosInstGeladen) laadCadosInst().then(()=>{ if(currentTab==="driverkast" && dkMaxDrivers()) selectTab("driverkast"); }).catch(()=>{});
-  wrap.querySelector("#dkMax").addEventListener("change", async e=>{
-    const v = await dkBewaarMax(e.target.value);
-    selectTab("driverkast");
-    toast(v ? "Bij offerte inlezen: hoogstens "+v+" drivers per kast (alle projecten)" : "Geen maximum meer bij import");
-  });
+  wrap.querySelector("#dkHerreken").addEventListener("click", ()=> dkHerrekenOpen());
   wrap.querySelector("#dkKoppel").addEventListener("click", ()=> akOpen());
-  wrap.querySelector("#dk230").addEventListener("click", ()=> dk230Open());
   wrap.querySelector("#dkVerdeel").addEventListener("click", ()=> dkVerdeelOpen());
 
   return wrap;
@@ -11255,6 +11249,7 @@ function renderDriverChip(driver, kast, rebuildAll, selected, selectItem, onDele
       </span>
       <button class="rb-copy" title="kopiëren (tik daarna op de gewenste positie)">⧉</button>
       <button class="rb-linkarm" title="armatuur koppelen aan deze driver">↳＋</button>
+      ${driver.leeg ? "" : `<button class="rb-230" title="Driver verwijderen en de armaturen als lichtpunten naar Verlichting 230V verplaatsen (zelfde kamer en kring)">230V</button>`}
       ${!isMoveModeActive ? `<button class="rb-move" title="verplaatsen naar een specifieke plek">📍</button>` : ""}
       ${leegToggleBtnHtml(driver)}
     </span>
@@ -11267,6 +11262,24 @@ function renderDriverChip(driver, kast, rebuildAll, selected, selectItem, onDele
   }));
   const moveBtn = block.querySelector(".rb-move");
   if(moveBtn) moveBtn.addEventListener("click", stop(()=> startMovingDriver(driver, kast)));
+  // 19/11/2026 (Peter: "Verplaatsen naar 230V moet bij de driver knop komen: driver verwijderen en
+  // naar 230V verplaatsen")
+  const b230 = block.querySelector(".rb-230");
+  if(b230) b230.addEventListener("click", stop(()=>{
+    const arms = (driver.armaturen||[]).filter(a=> a.naam || a.aantal);
+    const tekst = arms.length ? arms.map(a=> (a.aantal||1)+"× "+(a.naam||"armatuur")).join(", ") : "1 lichtpunt (zonder armatuur)";
+    if(!confirm(`Driver ${code||""} verwijderen en naar Verlichting 230V verplaatsen?\n\n${tekst}${dkKamerVanDriver(driver)?"\nKamer: "+dkKamerVanDriver(driver):""}`)) return;
+    let n;
+    if(arms.length) n = dkNaar230(arms.map(arm=>({arm, driver})), {kring:true, legeDriversWeg:true});
+    else {
+      const v = newVerlichtingItem(); v.kamer = dkKamerVanDriver(driver); v.kringId = driver.kringId || ""; v.info = driver.type || "";
+      state.verlichting.items.push(v); if(state.modules) state.modules.verlichting = true; n = 1;
+    }
+    // driver zeker weg (ook als hij lege armatuur-regels had)
+    state.driverkast.kasten.forEach(k=>{ k.items = k.items.filter(d=> d!==driver); });
+    save(); rebuildAll();
+    toast(n+" lichtpunt(en) naar Verlichting 230V, driver "+(code||"")+" verwijderd");
+  }));
   block.querySelector(".rb-linkarm").addEventListener("click", stop(()=>{
     const nieuweArm = newDriverArmatuur();
     driver.armaturen.push(nieuweArm);
@@ -11376,6 +11389,54 @@ function renderDriverEditor(driver, rebuildAll, selectItem, code, onDelete){
   return box;
 }
 
+/* 19/11/2026 (Peter: "Hier moet ik nieuwe armatuur kunnen toevoegen aan de catalogus met specs"):
+   in de armatuur-editor (driverkast en verlichting 230V) staat bij een naam zonder catalogusmatch een
+   knop "+ In catalogus zetten". Naam (in te korten), watt en info (stroom/spanning) -> gedeelde
+   catalogus (elektro_catalogus_armaturen). Daarna krijgen alle armaturen met de oude naam de
+   catalogusnaam en kiezen de drivers opnieuw. */
+function akCatalogusSlot(slot, getNaam, opties){
+  opties = opties || {};
+  function teken(){
+    const naam = (getNaam()||"").trim();
+    if(!naam || armatuurLookup(naam)){ slot.innerHTML = ""; return; }
+    slot.innerHTML = `<div style="margin-top:10px;padding:10px 12px;border:1px dashed #e0a24a;border-radius:10px;background:#fff8ee;">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;"><span style="font-size:13px;">"${escapeHtml(naam)}" staat niet in de catalogus.</span>
+      <button class="btn small ak-cs-open">+ In catalogus zetten (met specs)</button></div>
+      <div class="ak-cs-form" style="display:none;margin-top:8px;">
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) 90px 110px;gap:8px;">
+          <div class="field"><label>Naam in catalogus</label><input class="ak-cs-naam" value="${escapeHtml(naam.replace(/\s+-\s+\d{4}K\b.*$/i,"").trim())}"></div>
+          <div class="field"><label>Watt</label><input class="ak-cs-watt" type="number" min="0" step="0.1" placeholder="W"></div>
+          <div class="field"><label>Stroom/spanning</label><input class="ak-cs-info" value="${escapeHtml(opties.info ? opties.info() : "")}" placeholder="350mA / 24VDC / 230V"></div>
+        </div>
+        <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin:6px 0;"><input type="checkbox" class="ak-cs-alle" checked style="width:auto"> ook alle andere armaturen "${escapeHtml(naam)}" in dit dossier</label>
+        <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin:6px 0;"><input type="checkbox" class="ak-cs-onthoud" checked style="width:auto"> onthouden voor volgende offertes</label>
+        <button class="btn small primary ak-cs-ok">Toevoegen aan catalogus</button>
+      </div></div>`;
+    slot.querySelector(".ak-cs-open").addEventListener("click", ()=>{ slot.querySelector(".ak-cs-form").style.display = ""; slot.querySelector(".ak-cs-watt").focus(); });
+    slot.querySelector(".ak-cs-ok").addEventListener("click", async ()=>{
+      const nieuw = slot.querySelector(".ak-cs-naam").value.trim();
+      const watt = parseFloat(slot.querySelector(".ak-cs-watt").value);
+      const info = slot.querySelector(".ak-cs-info").value.trim();
+      if(!nieuw){ toast("Geef een naam."); return; }
+      if(Number.isNaN(watt)){ toast("Vul het wattage in (nodig voor de driverkeuze)."); slot.querySelector(".ak-cs-watt").focus(); return; }
+      const knop = slot.querySelector(".ak-cs-ok"); knop.disabled = true; knop.textContent = "Bezig…";
+      if(!armatuurLookup(nieuw)){
+        try{ if(window.dbAddCatalogArmatuur) await window.dbAddCatalogArmatuur({naam:nieuw, wattage:watt, info}); }
+        catch(e){ console.warn("CaDos: catalogusregel toevoegen mislukt", e); toast("⚠️ Toevoegen aan de catalogus mislukt"); knop.disabled = false; knop.textContent = "Toevoegen aan catalogus"; return; }
+        try{ if(window.dbListCatalogArmaturen) state.armaturen = await window.dbListCatalogArmaturen(); }catch(e){}
+        if(!armatuurLookup(nieuw)) state.armaturen.push({naam:nieuw, wattage:watt, info});
+      }
+      const koppeling = {[naam]: nieuw};
+      if(slot.querySelector(".ak-cs-alle").checked) akPasNamenToe(koppeling);
+      else if(opties.zet) opties.zet(nieuw);
+      if(slot.querySelector(".ak-cs-onthoud").checked) akOnthoudKoppelingen(koppeling);
+      save(); toast(`"${nieuw}" (${watt}W${info?" · "+info:""}) staat in de catalogus`);
+      if(opties.klaar) opties.klaar();
+    });
+  }
+  teken();
+  return teken;
+}
 function renderArmatuurEditor(arm, driver, sturing, rebuildAll, selectItem, code, onDelete){
   const box = el(`<div class="mod-editor">
     <div class="me-head">
@@ -11390,6 +11451,7 @@ function renderArmatuurEditor(arm, driver, sturing, rebuildAll, selectItem, code
       <div class="field"><label>Aantal</label><input class="di-aantal" type="number" min="0" step="1" value="${escapeHtml(arm.aantal)}"></div>
       <div class="field wide"><label>Wattage (uit catalogus)</label><div class="breedte-auto di-specs">${escapeHtml(driverArmatuurSpecText(arm)) || "—"}</div></div>
     </div>
+    <div class="ak-cs-slot"></div>
     <button class="btn small ghost me-delete" style="margin-top:14px;">Armatuur ontkoppelen</button>
     <button class="btn small ghost me-naar230" style="margin-top:14px;" title="wordt een lichtpunt in Verlichting 230V (zelfde kamer en kring)">↪ Naar Verlichting 230V</button>
   </div>`);
@@ -11411,7 +11473,12 @@ function renderArmatuurEditor(arm, driver, sturing, rebuildAll, selectItem, code
     selectItem(arm.id);
     save(); rebuildAll();
   });
-  box.querySelector(".di-naam").addEventListener("input", e=>{ arm.naam=e.target.value; save(); refresh(); });
+  const csTeken = akCatalogusSlot(box.querySelector(".ak-cs-slot"), ()=> arm.naam, {
+    info: ()=> ((driver.type||"").match(/(\d+\s*mA|\d+\s*V\s*dc)/i)||[])[1] || "",
+    zet: (n)=>{ arm.naam = n; herberekenDriver(driver, sturing); },
+    klaar: ()=>{ rebuildAll(); }
+  });
+  box.querySelector(".di-naam").addEventListener("input", e=>{ arm.naam=e.target.value; save(); refresh(); csTeken(); });
   const ruimteInp = box.querySelector(".di-ruimte");
   ruimteInp.addEventListener("input", e=>{ arm.ruimte=e.target.value; save(); updateDriverItemVisual(arm); });
   ruimteInp.addEventListener("change", e=>{ ensureKamerInLijst(e.target.value); });
@@ -11714,6 +11781,7 @@ function renderVerlichtingEditor(item, rebuildAll, selectItem, code, onDelete){
       <div class="field"><label>Nummer (handmatig, optioneel)</label><input class="ve-nummer" type="number" value="${escapeHtml(item.manueelNummer)}" placeholder="automatisch"></div>
       <div class="field"><label>Schakelkring</label><select class="ve-kring"><option value="">— geen —</option>${(()=>{const kc=computeKringCodes(); return state.kringen.items.map(k=>`<option value="${k.id}" ${item.kringId===k.id?"selected":""}>${escapeHtml(kringLabel(k, kc[k.id]))}</option>`).join("");})()}</select></div>
     </div>
+    <div class="ak-cs-slot"></div>
     <div class="field-grid"><div class="field wide"><label>Gevoed door automaat</label><select class="ve-zekering"><option value="">${(()=>{ const k = azKring(item.kringId); return k && k.zekeringModuleId ? "via kring: "+escapeHtml(azAutomaatLabel(k.zekeringModuleId)) : "— geen —"; })()}</option>${alleZekeringAutomaten().map(a=>`<option value="${a.id}" ${item.zekeringModuleId===a.id?"selected":""}>${escapeHtml([a.code, a.naam, a.A, a.polen].filter(Boolean).join(" "))}</option>`).join("")}</select></div></div>
     <div class="hint" style="margin:6px 0 2px;">Laat leeg voor automatische nummering (telt door vanaf het vorige item). Vul je hier iets in, dan tellen alle volgende items automatisch verder vanaf dát nummer.</div>
     <button class="btn small ghost me-delete" style="margin-top:10px;">Verwijderen</button>
@@ -11722,7 +11790,9 @@ function renderVerlichtingEditor(item, rebuildAll, selectItem, code, onDelete){
   box.querySelector(".ve-kring").addEventListener("change", e=>{ item.kringId=e.target.value; save(); rebuildAll(); });
   box.querySelector(".me-close").addEventListener("click", ()=> selectItem(item.id));
   box.querySelector(".me-delete").addEventListener("click", ()=>{ onDelete(); selectItem(item.id); save(); rebuildAll(); });
-  box.querySelector(".ve-naam").addEventListener("input", e=>{ item.naam=e.target.value; save(); updateVerlichtingVisual(item); });
+  const csTekenV = akCatalogusSlot(box.querySelector(".ak-cs-slot"), ()=> item.naam, {
+    info: ()=> "230V", zet: (n)=>{ item.naam = n; }, klaar: ()=>{ rebuildAll(); } });
+  box.querySelector(".ve-naam").addEventListener("input", e=>{ item.naam=e.target.value; save(); updateVerlichtingVisual(item); csTekenV(); });
   const kamerInp = box.querySelector(".ve-kamer");
   kamerInp.addEventListener("input", e=>{ item.kamer=e.target.value; save(); updateVerlichtingVisual(item); });
   kamerInp.addEventListener("change", e=> ensureKamerInLijst(e.target.value));
@@ -23110,11 +23180,13 @@ function ofBouwVoorstel(off){
         const kr = perLp ? null : nieuweKring(kamer, sturingInfo + (n>1?" ("+n+" drivers)":"") + (g.koppel?" — gekoppeld":""));
         let stukken;
         if(g.soort==="driver") stukken = ofVerdeel(g.armaturen, n);
-        else if(g.armaturen.length===1 && n>1){
+        else if(g.soort==="24v" && g.armaturen.length===1 && n>1){ // meters ledstrip mogen verdeeld worden
           const per = Math.round((g.armaturen[0].aantal/n)*10)/10;
           stukken = Array.from({length:n}, ()=>[{naam:g.armaturen[0].naam, aantal:per}]);
         } else {
           stukken = Array.from({length:n}, ()=>[]);
+          // stuks niet opdelen (bv. 1 DALI-track over 4 drivers -> niet 0,3 per driver): de armatuur komt
+          // bij de eerste driver(s), de andere drivers blijven open voor de rest van het ontwerp
           g.armaturen.forEach((a,i)=> stukken[i % n].push({naam:a.naam, aantal:a.aantal}));
         }
         for(let i=0;i<n;i++){
@@ -23261,7 +23333,7 @@ function ofPasToe(V, keuze){
     if(!kast){ kast = newDriverKast(); state.driverkast.kasten.push(kast); }
     // max. drivers per kast (enkel bij import): de nieuwe drivers in bakken; de eerste bak gaat in
     // kast 1 als die nog leeg is, anders (en voor de volgende bakken) in nieuwe kasten
-    const max = dkMaxDrivers();
+    const max = (typeof V.maxDrivers==="number") ? V.maxDrivers : dkMaxDrivers();
     const bakken = dkBakken(O.driverkast.items, max);
     const doelen = bakken.map((b, i)=>{
       if(i===0 && (!max || !kast.items.filter(d=>!d.leeg).length)) return kast;
@@ -23509,6 +23581,14 @@ function ofToonVoorstel(V, bestandsnaam){
     const keuze = {};
     ov.querySelectorAll("summary input[data-key]").forEach(cb=>{ keuze[cb.dataset.key] = cb.checked && !cb.disabled; });
     if(!Object.values(keuze).some(Boolean)){ toast("Niets aangevinkt."); return; }
+    if(keuze.driverkast && V.onderdelen.driverkast.items.length){
+      const m = await dkVraagMax("Drivers per kast",
+        `De offerte bevat ${V.onderdelen.driverkast.items.length} drivers. Hoeveel mogen er in één driverkast? Achteraf aanpassen kan altijd met "⟳ Herrekenen" in de Driverkast.`,
+        V.onderdelen.driverkast.items,
+        d=> (d.armaturen||[]).map(a=>a.ruimte).find(Boolean) || ((V.onderdelen.kringen.items.find(k=>k.id===d.kringId)||{}).kamer) || "");
+      if(m===null) return;
+      V.maxDrivers = m;
+    }
     const knop = ov.querySelector("#of-ok"); knop.disabled = true; knop.textContent = "Bezig…";
     try{ if(window.CaDosApp && window.CaDosApp.flushSave) await window.CaDosApp.flushSave(); }catch(e){}
     let backupOk = false;
@@ -24363,10 +24443,10 @@ async function dkBewaarMax(v){
 }
 
 // verdeelt een lijst drivers in bakken van hoogstens max (kamers samen, volgorde behouden)
-function dkBakken(drivers, max){
+function dkBakken(drivers, max, kamerVan){
   if(!max || drivers.length <= max) return [drivers.slice()];
   const groepen = [];
-  drivers.forEach(d=>{ const k = dkKamerVanDriver(d); const g = groepen.find(x=> x.kamer===k); if(g) g.drivers.push(d); else groepen.push({kamer:k, drivers:[d]}); });
+  drivers.forEach(d=>{ const k = kamerVan ? kamerVan(d) : dkKamerVanDriver(d); const g = groepen.find(x=> x.kamer===k); if(g) g.drivers.push(d); else groepen.push({kamer:k, drivers:[d]}); });
   const bakken = [[]];
   groepen.forEach(g=>{
     let rest = g.drivers.slice(), bak = bakken[bakken.length-1];
@@ -24374,6 +24454,83 @@ function dkBakken(drivers, max){
     while(rest.length){ bak.push(...rest.splice(0, max - bak.length)); if(rest.length){ bak = []; bakken.push(bak); } }
   });
   return bakken;
+}
+
+/* 19/11/2026 (Peter: "Die vraag moet bij import al in apart venster komen? En wanneer je het aanpast na
+   ontwerp moet er een herreken knop komen"):
+   - Offerte inlezen: na "Toevoegen aan dossier" eerst een apart venster "Drivers per kast" (standaard
+     de gedeelde instelling, met voorbeeld "→ X kasten").
+   - Driverkast: knop "⟳ Herrekenen": zelfde venster, verdeelt ALLE drivers opnieuw over de kasten
+     (per sturing, kamers samen, volgorde behouden), met Ongedaan maken. */
+function dkVraagMax(titel, uitleg, drivers, kamerVan){
+  return new Promise(resolve=>{
+    const std = dkMaxDrivers() || 30;
+    const ov = azModal("dkvraag-modal", titel, `<p class="hint">${uitleg}</p>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0;">
+        <label style="font-weight:600;">Max. drivers per kast</label>
+        <input class="dq-max" type="number" min="0" step="1" value="${std}" style="width:90px;">
+        <span class="dq-res az-via"></span></div>
+      <label style="display:flex;gap:8px;align-items:center;font-size:13px;"><input type="checkbox" class="dq-std" style="width:auto" ${dkMaxDrivers()?"":"checked"}> als standaard bewaren voor iedereen</label>
+      <p class="hint" style="margin-top:8px;">0 = alles in één kast. Kamers blijven samen; een kamer wordt enkel gesplitst als ze zelf groter is dan het maximum.</p>`,
+      `<button class="btn btn-ghost dq-annul">Annuleren</button><button class="btn btn-primary dq-ok">Verder</button>`);
+    const inp = ov.querySelector(".dq-max");
+    const toon = ()=>{ const m = Math.max(0, parseInt(inp.value)||0);
+      const b = dkBakken(drivers, m, kamerVan);
+      ov.querySelector(".dq-res").textContent = "→ "+b.length+" kast(en): "+b.map(x=>x.length).join(" / ")+" drivers"; };
+    inp.addEventListener("input", toon); toon();
+    setTimeout(()=>{ inp.focus(); inp.select(); }, 30);
+    inp.addEventListener("keydown", e=>{ if(e.key==="Enter") ov.querySelector(".dq-ok").click(); });
+    ov.querySelector(".dq-annul").addEventListener("click", ()=>{ ov.remove(); resolve(null); });
+    ov.querySelector(".dq-ok").addEventListener("click", async ()=>{
+      const m = Math.max(0, parseInt(inp.value)||0);
+      if(ov.querySelector(".dq-std").checked) await dkBewaarMax(m);
+      ov.remove(); resolve(m);
+    });
+  });
+}
+// alle drivers opnieuw verdelen, per sturing; bestaande kasten (in volgorde) worden hergebruikt
+function dkHerreken(max){
+  const kasten = state.driverkast.kasten;
+  const perSturing = new Map();
+  kasten.forEach(k=>{ if(!perSturing.has(k.sturing)) perSturing.set(k.sturing, []); perSturing.get(k.sturing).push(k); });
+  const nieuwLijst = [];
+  perSturing.forEach((groep, sturing)=>{
+    const drivers = groep.flatMap(k=> k.items.filter(d=>!d.leeg));
+    const leeg = new Map(groep.map(k=> [k, k.items.filter(d=>d.leeg)]));
+    const bakken = drivers.length ? dkBakken(drivers, max) : [];
+    const gebruikt = [];
+    bakken.forEach((b, i)=>{
+      let k = groep[i];
+      if(!k){ k = newDriverKast(); k.sturing = sturing; }
+      k.items = b.slice(); gebruikt.push(k);
+    });
+    groep.forEach((k, i)=>{
+      const l = leeg.get(k);
+      if(i < gebruikt.length){ k.items.push(...l); }
+      else if(l.length){ k.items = l.slice(); gebruikt.push(k); } // kast met enkel gereserveerde nummers blijft
+    });
+    gebruikt.forEach(k=> k.items.forEach(d=>{ if(!d.leeg) d.naam = computeDriverMatch(d, k.sturing).naam; }));
+    nieuwLijst.push(...gebruikt);
+  });
+  const weg = kasten.length - nieuwLijst.filter(k=> kasten.includes(k)).length;
+  const bij = nieuwLijst.filter(k=> !kasten.includes(k)).length;
+  state.driverkast.kasten = nieuwLijst.length ? nieuwLijst : [newDriverKast()];
+  return {bij, weg, aantal: state.driverkast.kasten.length};
+}
+async function dkHerrekenOpen(){
+  const drivers = state.driverkast.kasten.flatMap(k=> k.items.filter(d=>!d.leeg));
+  if(!drivers.length){ toast("Nog geen drivers."); return; }
+  const sturingen = [...new Set(state.driverkast.kasten.map(k=>k.sturing))];
+  const max = await dkVraagMax("Drivers herverdelen over kasten",
+    `Alle ${drivers.length} drivers worden opnieuw over de kasten verdeeld${sturingen.length>1?" (DALI- en PUSH-kasten apart)":""}. Bestaande kasten worden in volgorde hergebruikt, er komen kasten bij of lege kasten vallen weg.`, drivers);
+  if(max===null) return;
+  const vorige = JSON.stringify(state);
+  const r = dkHerreken(max);
+  save(); selectTab("driverkast");
+  const ov = azModal("dkvraag-modal", "Drivers herverdeeld", `<p>${r.aantal} kast(en)${r.bij?", "+r.bij+" nieuw":""}${r.weg?", "+r.weg+" leeg en verwijderd":""}${max?" — hoogstens "+max+" drivers per kast":""}.</p>`,
+    `<button class="btn btn-ghost dq-undo">Ongedaan maken</button><button class="btn btn-primary dq-ok">Sluiten</button>`);
+  ov.querySelector(".dq-ok").addEventListener("click", ()=> ov.remove());
+  ov.querySelector(".dq-undo").addEventListener("click", ()=>{ state = JSON.parse(vorige); save(); ov.remove(); selectTab("driverkast"); toast("Herverdelen ongedaan gemaakt"); });
 }
 
 window.CaDosApp = {

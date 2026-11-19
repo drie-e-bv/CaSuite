@@ -42,7 +42,7 @@ let [fc] = await Promise.all([p.waitForEvent('filechooser'), p.click('#cados-aan
 await fc.setFiles(path.join(OFF, PDF));
 await p.waitForSelector('#of-modal summary input', {timeout:15000});
 await p.evaluate(()=> document.querySelectorAll('#of-modal summary input').forEach(cb=>{ cb.checked = ['kamers','driverkast','verlichting','laadpalen'].includes(cb.dataset.key); }));
-await p.click('#of-modal #of-ok'); await p.waitForSelector('#of-modal #of-undo'); await p.click('#of-modal #of-ok'); await p.waitForTimeout(1200);
+await p.click('#of-modal #of-ok');await p.locator('#dkvraag-modal .dq-ok').click({timeout:4000}).catch(()=>{});await p.waitForSelector('#of-modal #of-undo'); await p.click('#of-modal #of-ok'); await p.waitForTimeout(1200);
 let d = await p.evaluate(()=> __DB.project_elektro_dossiers.find(r=>r.project_id==='p2').data);
 ok(d.kringen.items.length===0, 'deelimport: geen kringen');
 ok(d.driverkast.kasten[0].items.length>0 && d.driverkast.kasten[0].items.every(x=>!x.kringId), 'deelimport: drivers zonder verwijzing naar niet-overgenomen kring');
@@ -52,7 +52,7 @@ ok((d.offerteImports||[]).length===1, 'import wordt bijgehouden in offerteImport
 await fc.setFiles(path.join(OFF, PDF)); await p.waitForSelector('#of-modal summary input', {timeout:15000});
 ok(await p.evaluate(()=> !!document.querySelector('#of-modal .of-waarsch')), 'tweede keer dezelfde offerte: waarschuwing');
 const voor = JSON.stringify(d);
-await p.click('#of-modal #of-ok'); await p.waitForSelector('#of-modal #of-undo'); await p.waitForTimeout(900);
+await p.click('#of-modal #of-ok');await p.locator('#dkvraag-modal .dq-ok').click({timeout:4000}).catch(()=>{});await p.waitForSelector('#of-modal #of-undo'); await p.waitForTimeout(900);
 const na = await p.evaluate(()=> __DB.project_elektro_dossiers.find(r=>r.project_id==='p2').data.kringen.items.length);
 ok(na>0, 'volledige import: '+na+' kringen');
 ok(await p.evaluate(()=> __DB.dossier_backups.length)===2, 'back-up in dossier_backups vóór elke import (2)');

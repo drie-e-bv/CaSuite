@@ -23,7 +23,7 @@ await p.click('#of-bewaar');await p.waitForSelector('#of-modal #of-ok');await p.
 console.log('na regels: kringen',await p.evaluate(()=>[...document.querySelectorAll('#of-modal details')].find(d=>/Kringen/.test(d.innerText)).querySelector('.of-n').textContent),
  '| niet herkend nog:',await p.evaluate(()=>!!/niet kent/.test(document.querySelector('#of-modal').innerText)));
 console.log('regels in DB:',await p.evaluate(()=>JSON.stringify((__DB.elektro_cados_instellingen.find(r=>r.sleutel==='offerte_vertaalregels')||{}).waarde)));
-await p.click('#of-modal #of-ok');await p.waitForSelector('#of-modal #of-undo');
+await p.click('#of-modal #of-ok');await p.locator('#dkvraag-modal .dq-ok').click({timeout:4000}).catch(()=>{});await p.waitForSelector('#of-modal #of-undo');
 console.log('resultaat:',await p.evaluate(()=>document.querySelector('#of-modal .modal-body').innerText.replace(/\n+/g,' | ')));
 let d=await D();
 const knopGek=d.knoppen.items.filter(k=>k.gangen.some(g=>g.kringId)).length;
