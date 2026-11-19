@@ -7,10 +7,10 @@ import { chromium } from '/opt/npm-tools/node_modules/playwright/index.mjs';
 import fs from 'fs'; import path from 'path'; import { fileURLToPath } from 'url';
 const HIER = path.dirname(fileURLToPath(import.meta.url));
 const OFF = process.env.OFFERTES_DIR || '.', PDFJS = process.env.PDFJS_DIR || '.';
-const VERWACHT = { // aantallen per onderdeel, gecontroleerd op 19/11/2026
-  '2600124': {posten:338, kamers:21, kringen:47, driverkast:96, verlichting:22, knoppen:47, muziek:5, verwarming:1, motoren:18, alarm:73, laadpalen:1, zonnepanelen:1, data:7, zekeringen:40, nietHerkend:0},
-  '2600130': {posten:558, kamers:32, kringen:77, driverkast:176, verlichting:54, knoppen:77, muziek:12, verwarming:19, motoren:49, alarm:78, laadpalen:3, zonnepanelen:0, data:14, zekeringen:80, nietHerkend:1},
-  '2600139': {posten:385, kamers:24, kringen:56, driverkast:141, verlichting:24, knoppen:48, muziek:0, verwarming:21, motoren:2, alarm:40, laadpalen:1, zonnepanelen:0, data:4, zekeringen:37, nietHerkend:0},
+const VERWACHT = { // aantallen per onderdeel, gecontroleerd op 19/11/2026 (posten bijgewerkt na fix "1,0 SET" in één tekstblok)
+  '2600124': {posten:350, kamers:21, kringen:48, driverkast:96, verlichting:23, knoppen:47, muziek:5, verwarming:1, motoren:18, alarm:73, laadpalen:1, zonnepanelen:1, data:7, zekeringen:40, nietHerkend:0},
+  '2600130': {posten:584, kamers:32, kringen:77, driverkast:176, verlichting:54, knoppen:77, muziek:12, verwarming:19, motoren:49, alarm:78, laadpalen:3, zonnepanelen:0, data:14, zekeringen:80, nietHerkend:1},
+  '2600139': {posten:405, kamers:24, kringen:56, driverkast:141, verlichting:24, knoppen:48, muziek:0, verwarming:21, motoren:2, alarm:40, laadpalen:1, zonnepanelen:0, data:4, zekeringen:37, nietHerkend:0},
 };
 let fout = 0; const ok = (c, m)=>{ console.log((c?'  ok   ':'  FOUT ')+m); if(!c) fout++; };
 const b = await chromium.launch({executablePath:'/usr/bin/google-chrome', args:['--no-sandbox']});
