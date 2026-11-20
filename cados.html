@@ -3742,7 +3742,23 @@
 #cados-app .uv-canvas-box #uvBanner .move-banner{box-shadow:0 4px 14px rgba(0,0,0,.22);border-radius:10px;}
 #cados-app .uv-status{flex:none;font-size:12px;color:var(--ink-dim);padding:4px 10px;border-top:1px solid var(--line);background:var(--surface);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-#cados-app .uv-side{display:flex;flex-direction:column;gap:8px;overflow:auto;}
+#cados-app .uv-side{display:flex;flex-direction:column;gap:8px;overflow:visible;}
+#cados-app .uv-werk .uv-side, #cados-app .uv-werk.kc-breed .uv-side{max-height:none !important;}
+#cados-app .uv-werk > .uv-canvas-box{position:sticky;top:8px;}
+#cados-app .uv-canvas-wrap{scrollbar-width:thin;}
+/* 20/11/2026: zolang er een nieuwe module klaarstaat, blijft de werkbalk niet plakken (anders verdween de
+   module-kiezer eronder) */
+#cados-app .builder-side:has(#stagingSlot:not(:empty)) .sticky-controls{position:static;}
+/* 20/11/2026 (Peter: "we zijn bovenaan te veel plaats kwijt"): titel, korte uitleg en "Hoe werkt dit?" op één lijn */
+#cados-app div.panel-head{display:flex;flex-wrap:wrap;align-items:baseline;column-gap:14px;row-gap:2px;margin-bottom:8px;}
+#cados-app div.panel-head > h2{margin:0;font-size:19px;}
+#cados-app div.panel-head > p{margin:0;flex:1 1 280px;min-width:0;font-size:13px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+#cados-app div.panel-head > .hint-toggle{min-height:0;padding:2px 10px;margin:0;}
+#cados-app div.panel-head > .hint-panel{flex-basis:100%;}
+#cados-app #kastTabbar{margin:0;}
+#cados-app .toolbar-card:has(> #kastTabbar){margin-bottom:8px !important;padding:4px 6px;}
+#cados-app .zk-acties{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px;}
+#cados-app .zk-acties .btn{width:100%;min-height:34px;padding:4px 6px;font-size:12.5px;white-space:normal;line-height:1.2;justify-content:center;}
 #cados-app .uv-side .card{position:static;margin:0;}
 #cados-app .uv-side .card-body{padding:10px 12px;}
 #cados-app .uv-detail{border-color:#e7b892;}
@@ -7272,9 +7288,12 @@ function renderComponentenOverzicht(codes, rebuildAll){
     if(maSel) maSel.addEventListener("change", e=>{ m.mA = e.target.value; save(); rebuildAll(); });
     tr.querySelector(".ov-naam").addEventListener("input", e=>{ m.naam = e.target.value; save(); updateChipVisual(m); });
     const kabelklemmenBox = tr.querySelector(".ov-kabelklemmen"), kabeltypeInp = tr.querySelector(".ov-kabeltype"), kabelaantalInp = tr.querySelector(".ov-kabelaantal");
-    kabelklemmenBox.addEventListener("change", e=>{ m.kabelOpKlemmen = e.target.checked; save(); kabeltypeInp.disabled = !e.target.checked; kabelaantalInp.disabled = !e.target.checked; });
+    // 20/11/2026: vinkje "op klemmen", kabeltype en aantal werken de rijgklemmenlijst meteen bij
+    kabelklemmenBox.addEventListener("change", e=>{ m.kabelOpKlemmen = e.target.checked; kabeltypeInp.disabled = !e.target.checked; kabelaantalInp.disabled = !e.target.checked; zkKlemmenOpnieuw(m); save(); rebuildAll(); });
     kabeltypeInp.addEventListener("input", e=>{ m.kabelType = e.target.value; save(); });
+    kabeltypeInp.addEventListener("change", ()=>{ if(m.kabelOpKlemmen){ zkKlemmenOpnieuw(m); save(); rebuildAll(); } });
     kabelaantalInp.addEventListener("input", e=>{ m.kabelAantal = Math.max(1,parseInt(e.target.value)||1); save(); });
+    kabelaantalInp.addEventListener("change", ()=>{ if(m.kabelOpKlemmen){ zkKlemmenOpnieuw(m); save(); rebuildAll(); } });
     tbody.appendChild(tr);
   });
   return wrap;
@@ -7370,6 +7389,109 @@ function kastVanModule(moduleId){
     for(const rij of kast.rijen){ if(rij.items.some(it=>it.id===moduleId)) return kast; }
   }
   return huidigeZekeringKast();
+}
+
+// 20/11/2026 (Peter: "Verplaatsen in ontwerp moet handiger, ik wil voeding verplaatsen naar ander differentieel.
+// Kunnen we dit doen zoals bij het toewijzen na import"): automaat naar een ander differentieel = koppelen én op de
+// rail achter de laatste automaat van die groep zetten. Loopt de rij over, dan schuift het laatste stuk door naar de
+// volgende rij (zoals tekst die doorloopt); lege plaatsen worden eerst opgebruikt. Alle automaten krijgen vooraf een
+// vaste koppeling zodat de codes kloppen, ook als een groep over twee rijen loopt.
+// 20/11/2026 (Peter): "Als er remautomaat voorzien is moeten alle 30mA [differentiëlen] daaraan gelinkt worden. Bij de
+// differentiëlen moeten we ook in het plan zien op welke L ze zijn aangesloten, om bij de bekabeling te linken aan de
+// REM of het hoofddifferentieel."
+const zkIsRem = m=> m && m.categorie==="Automaat" && (m.isRem || /\bREM\b|remautomaat/i.test(m.naam||""));
+function zkVoedingBronnen(kast){
+  if(!kast) return [];
+  const codes = typeof computeZekeringCodes==="function" ? computeZekeringCodes() : {};
+  const flat = kast.rijen.flatMap(r=> r.items);
+  return [...flat.filter(zkIsRem).map(m=>({id:m.id, label:"REM "+(codes[m.id]||"")+(m.A?" "+m.A:""), kort:"REM"})),
+    ...flat.filter(m=> m.categorie==="Differentieel" && m.isHoofd).map(m=>({id:m.id, label:"Hoofddifferentieel "+(codes[m.id]||"")+(m.mA?" "+m.mA:""), kort:"HOOFD"}))];
+}
+function zkVoedingVan(kast, d){
+  if(!d || d.categorie!=="Differentieel" || d.isHoofd) return null;
+  const flat = kast.rijen.flatMap(r=> r.items);
+  const hoofdIdx = flat.findIndex(m=> m.categorie==="Differentieel" && m.isHoofd);
+  if(hoofdIdx >= 0 && flat.indexOf(d) < hoofdIdx) return null; // laadpaal e.d. vóór het hoofddifferentieel: rechtstreeks van de teller
+  if(d.voedingVan){ const b = flat.find(m=> m.id===d.voedingVan); if(b) return b; }
+  if(String(d.mA||"").startsWith("30") && !String(d.mA).startsWith("300")){ const rem = flat.find(zkIsRem); if(rem) return rem; }
+  return hoofdIdx >= 0 ? flat[hoofdIdx] : null;
+}
+function zkVastKoppelen(kast){
+  const vorige = zekeringHuidigeKastId; zekeringHuidigeKastId = kast.id;
+  const flat = []; kast.rijen.forEach(r=> r.items.forEach(x=> flat.push(x)));
+  const g = determineAutomaatGroups(flat);
+  zekeringHuidigeKastId = vorige;
+  flat.forEach(x=>{ if(x.categorie==="Automaat" && !x.isRem && g[x.id] && !x.linkedDiffId) x.linkedDiffId = g[x.id].id; });
+}
+function zkReflow(kast, vanRij){
+  const maat = kast.maat || 24, bw = x=> moduleBreedte(x);
+  for(let i = vanRij; i < kast.rijen.length; i++){
+    const rij = kast.rijen[i];
+    let teVeel = rij.items.reduce((t,x)=> t + bw(x), 0) - maat;
+    // lege plaatsen eerst
+    for(let j = rij.items.length-1; j >= 0 && teVeel > 0; j--){
+      const x = rij.items[j]; if(x.categorie!=="Leeg") continue;
+      const af = Math.min(bw(x), teVeel);
+      if(af >= bw(x)) rij.items.splice(j,1); else x.breedte = bw(x) - af;
+      teVeel -= af;
+    }
+    if(teVeel <= 0) continue;
+    const door = [];
+    while(teVeel > 0 && rij.items.length > 1){ const x = rij.items.pop(); door.unshift(x); teVeel -= bw(x); }
+    if(!door.length) continue;
+    if(i+1 >= kast.rijen.length) kast.rijen.push(newRij());
+    kast.rijen[i+1].items.unshift(...door);
+  }
+}
+function zkVerplaatsNaarDiff(kast, m, diffId){
+  zkVastKoppelen(kast);
+  const van = kast.rijen.find(r=> r.items.includes(m)); if(!van) return false;
+  van.items.splice(van.items.indexOf(m), 1);
+  m.linkedDiffId = diffId;
+  // plaats: na het laatste lid van de groep (of meteen na het differentieel)
+  let ri = -1, ii = -1;
+  kast.rijen.forEach((r, i)=> r.items.forEach((x, j)=>{ if(x.id===diffId || (x.categorie==="Automaat" && x.linkedDiffId===diffId && x!==m)){ ri = i; ii = j; } }));
+  if(ri < 0){ van.items.push(m); return true; }
+  kast.rijen[ri].items.splice(ii+1, 0, m);
+  zkReflow(kast, ri);
+  return true;
+}
+function zkGroepenVenster(naKlaar){
+  const kast = huidigeZekeringKast(); if(!kast) return;
+  zkVastKoppelen(kast);
+  const ov = document.createElement("div"); ov.className = "modal-overlay"; ov.id = "zkg-modal";
+  const teken = ()=>{
+    const codes = computeZekeringCodes();
+    const flat = []; kast.rijen.forEach(r=> r.items.forEach(x=> flat.push(x)));
+    const diffs = flat.filter(x=> x.categorie==="Differentieel");
+    const aut = flat.filter(x=> x.categorie==="Automaat" && !x.isRem);
+    const leden = d=> aut.filter(x=> x.linkedDiffId===d.id);
+    const label = d=> `${codes[d.id]||"?"} · ${[d.polen, d.mA, d.fase].filter(Boolean).join(" ")}${d.isHoofd?" · hoofd":""}${d.isHoofd?"":" ("+leden(d).length+"/"+MAX_AUTOMATEN_PER_GROEPDIFF+")"}`;
+    const meerpolig = x=> x==="4P" || x==="3P" || x==="3P+N";
+    const opts = (m)=> diffs.map(d=>{ const vol = !d.isHoofd && leden(d).filter(x=>x!==m).length >= MAX_AUTOMATEN_PER_GROEPDIFF;
+      const polen = meerpolig(m.polen) && !meerpolig(d.polen); const nee = (vol || polen) && m.linkedDiffId!==d.id;
+      return `<option value="${d.id}" ${m.linkedDiffId===d.id?"selected":""} ${nee?"disabled":""}>${escapeHtml(label(d))}${nee ? (polen?" — "+escapeHtml(m.polen)+" past niet op "+escapeHtml(d.polen):" — vol") : ""}</option>`; }).join("");
+    const los = aut.filter(x=> !diffs.some(d=> d.id===x.linkedDiffId));
+    ov.innerHTML = `<div class="modal-box" style="max-width:860px"><h2>⇄ Automaten herschikken</h2><div class="modal-body">
+      <p class="hint">Kies per automaat het differentieel. De automaat verhuist op de rail mee naar die groep (achter de laatste automaat); de codes en de fase volgen vanzelf. Volle 30 mA-groepen (8) kan je niet kiezen.</p>
+      ${[...diffs.map(d=> ({d, l:leden(d)})), ...(los.length?[{d:null, l:los}]:[])].map(({d,l})=>`
+        <div style="border:1px solid var(--line);border-radius:10px;margin:8px 0;overflow:hidden">
+          <div style="background:var(--sunken,#f4f6f5);padding:6px 10px;font-weight:600;font-size:13px">${d ? "DIFF "+escapeHtml(label(d))+(d.naam?" — "+escapeHtml(d.naam):"") : "Zonder differentieel"}</div>
+          <table style="width:100%;border-collapse:collapse;font-size:13px">${l.map(m=>`<tr data-id="${m.id}">
+            <td style="padding:4px 8px;width:50px;color:#c0392b;font-weight:700">${escapeHtml(codes[m.id]||"")}</td>
+            <td style="padding:4px 8px">${escapeHtml(m.naam||"(zonder naam)")} <span class="hint">${escapeHtml([m.polen, m.A, m.fase].filter(Boolean).join(" "))}</span></td>
+            <td style="padding:4px 8px;width:270px"><select class="zkg-diff" style="width:100%;min-height:32px">${d?"":`<option value="" selected>— kies —</option>`}${opts(m)}</select></td></tr>`).join("") || `<tr><td class="hint" style="padding:6px 10px">geen automaten</td></tr>`}</table>
+        </div>`).join("")}
+      </div><div class="modal-actions"><button class="btn btn-primary" id="zkg-ok">Klaar</button></div></div>`;
+    ov.querySelector("#zkg-ok").addEventListener("click", ()=>{ ov.remove(); if(naKlaar) naKlaar(); });
+    ov.querySelectorAll(".zkg-diff").forEach(sel=> sel.addEventListener("change", e=>{
+      const m = aut.find(x=> x.id===sel.closest("tr").dataset.id); if(!m || !e.target.value) return;
+      const body = ov.querySelector(".modal-body"), y = body.scrollTop;
+      zkVerplaatsNaarDiff(kast, m, e.target.value); save();
+      teken(); ov.querySelector(".modal-body").scrollTop = y;
+    }));
+  };
+  document.body.appendChild(ov); teken();
 }
 function countAutomatenInGroup(diffItem, excludeId){
   if(!diffItem) return 0;
@@ -8573,16 +8695,21 @@ function renderZekeringen(){
           <div id="moveBanner"></div>
           <div class="toolbar-card">
             <div class="toolbar-row">
+              <button class="addbtn" id="addModuleGlobal">+ Module toevoegen</button>
               <div class="toolbar-settings">
                 <label>Modules per rij (hele kast)</label>
                 <select class="kast-maat">${ZEKERING_MAAT_OPTIES.map(m=>`<option value="${m}" ${kast.maat===m?"selected":""}>${m} modules</option>`).join("")}</select>
-                <button class="btn" id="exportZekering">Exporteer voor werf (PDF)</button>
-                <button class="btn" id="zkToewijzen" title="Alles wat stroom nodig heeft aan een automaat koppelen">⚡ Automaten toewijzen${(()=>{ const n = azLijstMetStroom().filter(r=>!azAutomaatVan(r.obj)).length; return n ? ` <span class="ak-badge">${n}</span>` : ""; })()}</button>
-                <button class="btn" id="zkKoppelvoorstel" title="Lege koppelingen automatisch invullen">🔗 Koppelvoorstel</button>
-                <button class="btn" id="zkPlannen" title="Architectenplannen (PDF) inlezen: verdieping per kamer, buurkamers, kabellengtes">📐 Plannen inlezen</button>
-                <button class="btn" id="zkVerdeel" title="Stappenvenster: stopcontacten, toestellen en differentiëlen volgens het AREI">⚡ Verdelen volgens AREI</button>
-                <button class="btn" id="zkLijst" title="Afdrukbare lijst kringen (legende voor de kastdeur)">📄 Lijst kringen</button>
-                <button class="btn" id="toggleSelect">Selecteren</button>
+                <!-- 20/11/2026 (Peter: "de balk er boven is te groot geworden, waardoor die weg scrollt"): knoppen compact in 2 kolommen -->
+                <div class="zk-acties">
+                  <button class="btn small" id="zkVerdeel" title="Stappenvenster: stopcontacten, toestellen en differentiëlen volgens het AREI">⚡ Verdelen (AREI)</button>
+                  <button class="btn small" id="zkPlannen" title="Architectenplannen (PDF) inlezen: verdieping per kamer, buurkamers, kabellengtes">📐 Plannen</button>
+                  <button class="btn small" id="zkToewijzen" title="Alles wat stroom nodig heeft aan een automaat koppelen">⚡ Toewijzen${(()=>{ const n = azLijstMetStroom().filter(r=>!azAutomaatVan(r.obj)).length; return n ? ` <span class="ak-badge">${n}</span>` : ""; })()}</button>
+                  <button class="btn small" id="zkKoppelvoorstel" title="Lege koppelingen automatisch invullen">🔗 Koppelvoorstel</button>
+                  <button class="btn small" id="zkLijst" title="Afdrukbare lijst kringen (legende voor de kastdeur)">📄 Lijst kringen</button>
+                  <button class="btn small" id="exportZekering" title="Exporteer voor werf (PDF)">⎙ Werf-PDF</button>
+                  <button class="btn small" id="zkHerschik" title="Automaten naar een ander differentieel verplaatsen (lijst per groep)">⇄ Herschikken</button>
+                  <button class="btn small" id="toggleSelect">Selecteren</button>
+                </div>
               </div>
               <div class="toolbar-settings">
                 <label>Locatie kast</label>
@@ -8590,7 +8717,6 @@ function renderZekeringen(){
                 ${verdiepingSelectHtml(kast.verdieping, "zk-verdieping")}
                 <datalist id="dl-kamers-zekering">${state.kamers.filter(Boolean).map(k=>`<option value="${escapeHtml(k)}">`).join("")}</datalist>
               </div>
-              <button class="addbtn" id="addModuleGlobal">+ Module toevoegen</button>
             </div>
           </div>
         </div>
@@ -8836,6 +8962,10 @@ function renderZekeringen(){
         stagingItem = null;
         if(wasEditing) editingId = null;
       }));
+      if(!rebuild.__stagingGetoond || rebuild.__stagingGetoond!==stagingItem.id){
+        rebuild.__stagingGetoond = stagingItem.id;
+        requestAnimationFrame(()=>{ const r = stagingSlot.getBoundingClientRect(); if(r.top < 0 || r.top > window.innerHeight - 120) stagingSlot.scrollIntoView({block:"start", behavior:"smooth"}); });
+      }
     }
     const selectBtn = wrap.querySelector("#toggleSelect");
     if(selectBtn){
@@ -8854,11 +8984,28 @@ function renderZekeringen(){
       moveBanner.appendChild(banner);
     } else if(selectMode){
       const n = selectedIds.size;
+      // 20/11/2026: geselecteerde automaten in één keer naar een ander differentieel
+      const codesNu = computeZekeringCodes();
+      const diffsNu = kast.rijen.flatMap(r=> r.items).filter(x=> x.categorie==="Differentieel");
+      const selAut = kast.rijen.flatMap(r=> r.items).filter(x=> selectedIds.has(x.id) && x.categorie==="Automaat" && !x.isRem);
       const banner = el(`<div class="move-banner">🔲 Selectiemodus — tik componenten aan om te kiezen (${n} geselecteerd).
         <button class="btn small primary" ${n===0?"disabled":""}>Verplaats geselecteerde</button>
+        ${selAut.length ? `<select class="zk-sel-diff" style="min-height:32px;max-width:220px;margin-top:6px"><option value="">⇄ Naar differentieel…</option>${diffsNu.map(d=>`<option value="${d.id}">${escapeHtml((codesNu[d.id]||"?")+" · "+[d.polen,d.mA,d.fase].filter(Boolean).join(" ")+(d.naam?" · "+d.naam:""))}</option>`).join("")}</select>` : ""}
         <button class="btn small ghost">Stoppen</button></div>`);
-      banner.querySelectorAll("button")[0].addEventListener("click", startMovingSelectie);
-      banner.querySelectorAll("button")[1].addEventListener("click", toggleSelectMode);
+      const knoppen = banner.querySelectorAll("button");
+      knoppen[0].addEventListener("click", startMovingSelectie);
+      knoppen[knoppen.length-1].addEventListener("click", toggleSelectMode);
+      const sd = banner.querySelector(".zk-sel-diff");
+      if(sd) sd.addEventListener("change", e=>{
+        const diffId = e.target.value; if(!diffId) return;
+        const d = diffsNu.find(x=> x.id===diffId);
+        zkVastKoppelen(kast);
+        const al = kast.rijen.flatMap(r=> r.items).filter(x=> x.categorie==="Automaat" && x.linkedDiffId===diffId && !selAut.includes(x)).length;
+        if(d && !d.isHoofd && al + selAut.length > MAX_AUTOMATEN_PER_GROEPDIFF){ alert(`Differentieel ${codesNu[diffId]} heeft daar geen plaats voor: ${al} + ${selAut.length} > ${MAX_AUTOMATEN_PER_GROEPDIFF} automaten.`); e.target.value = ""; return; }
+        selAut.forEach(x=> zkVerplaatsNaarDiff(kast, x, diffId));
+        selectedIds.clear(); save(); rebuild();
+        toast(selAut.length+" automaat/automaten naar "+(codesNu[diffId]||"differentieel")+" verplaatst");
+      });
       moveBanner.appendChild(banner);
     }
   }
@@ -8879,10 +9026,11 @@ function renderZekeringen(){
   wrap.querySelector("#zkKoppelvoorstel").addEventListener("click", ()=> kvOpen());
   wrap.querySelector("#zkVerdeel").addEventListener("click", ()=> zkOpen());
   wrap.querySelector("#zkPlannen").addEventListener("click", ()=> plOpen());
+  wrap.querySelector("#zkHerschik").addEventListener("click", ()=> zkGroepenVenster(()=> selectTab("zekeringen")));
   wrap.querySelector("#zkLijst").addEventListener("click", ()=> zkPrintLijst());
   if(state.zkBron && !(state.zkOntwerp && state.zkOntwerp.toegepast)){
     const bn = el(`<div class="conflict-banner" style="margin:0 0 10px;"><div class="conflict-head">⚡ De automaten en differentiëlen uit de offerte zijn nog niet verdeeld.</div>
-      <div class="hint">${state.zkBron.stop.reduce((t,s)=>t+s.muur+s.vloer,0)} stopcontacten en ${state.zkBron.voedingen.length} voedingen wachten op de AREI-verdeling.</div>
+      <div class="hint">${state.zkBron.stop.reduce((t,s)=>t+s.muur+s.vloer+(s.media||0),0)} stopcontacten en ${state.zkBron.voedingen.length} voedingen wachten op de AREI-verdeling.</div>
       <button class="btn btn-primary" style="margin-top:6px">Zekeringkast verdelen</button></div>`);
     bn.querySelector("button").addEventListener("click", ()=> zkOpen());
     kastwrap.parentNode.insertBefore(bn, kastwrap);
@@ -9277,6 +9425,11 @@ function renderModuleEditor(m, codes, rebuildAll, selectModule, onDelete, rij, s
           ? `Automaten onder dit differentieel: ${countAutomatenInGroup(m)} (onbeperkt)`
           : `Automaten onder dit differentieel: ${countAutomatenInGroup(m)} / ${MAX_AUTOMATEN_PER_GROEPDIFF}`}</div>
       </div>` : ""}
+      ${(cat==="Differentieel" && !m.isHoofd) ? `<div class="field"><label>Aangesloten op fase</label>
+        <select class="me-fase">${["", "L1","L2","L3","L1L2L3N"].map(f=>`<option value="${f}" ${(m.fase||"")===f?"selected":""}>${f||"—"}</option>`).join("")}</select></div>
+      <div class="field"><label>Gevoed door</label>
+        <select class="me-voeding"><option value="">Automatisch (REM als die er is, anders hoofddifferentieel)</option>${zkVoedingBronnen(kastVanModule(m.id)||huidigeZekeringKast()).map(b=>`<option value="${b.id}" ${m.voedingVan===b.id?"selected":""}>${escapeHtml(b.label)}</option>`).join("")}</select>
+        <div class="hint" style="margin-top:4px;">Staat in het uitvoeringsplan bij het differentieel (bv. "L2 ← REM"), zodat je weet waarop je het bekabelt.</div></div>` : ""}
       ${cat==="Automaat" ? `<div class="field wide">
         <label style="display:flex;align-items:center;gap:6px;">
           <input type="checkbox" class="me-rem" ${m.isRem?"checked":""}> Remautomaat (hoofdvoeding, mag vóór het differentieel)
@@ -9288,7 +9441,7 @@ function renderModuleEditor(m, codes, rebuildAll, selectModule, onDelete, rij, s
           <option value="">Automatisch (op basis van plaats op de rail)</option>
           ${allDifferentielen.map(d=>`<option value="${d.id}" ${m.linkedDiffId===d.id?"selected":""}>${escapeHtml(codes[d.id]||"?")}${d.isHoofd?" — hoofddifferentieel":""}${d.naam?" · "+escapeHtml(d.naam):""}</option>`).join("")}
         </select>
-        <div class="hint" style="margin-top:4px;">Kies dit als de automaat niet aansluitend tegen zijn differentieel staat, maar er toch logisch bij hoort (bv. "los" ergens anders geplaatst).</div>
+        <div class="hint" style="margin-top:4px;">Kies een ander differentieel: de automaat verhuist op de rail mee naar die groep (achter de laatste automaat). Alles in één keer herschikken: "⇄ Herschikken" in de werkbalk.</div>
       </div>` : ""}
     </div>
     <div class="field wide"><label style="display:flex;align-items:center;gap:6px;font-weight:600;">
@@ -9324,6 +9477,10 @@ function renderModuleEditor(m, codes, rebuildAll, selectModule, onDelete, rij, s
     selectModule(m.id); // sluit editor (id bestaat niet meer)
     save(); rebuildAll();
   });
+  const faseSel = box.querySelector(".me-fase");
+  if(faseSel) faseSel.addEventListener("change", e=>{ m.fase = e.target.value; save(); rebuildAll(); });
+  const voedSel = box.querySelector(".me-voeding");
+  if(voedSel) voedSel.addEventListener("change", e=>{ m.voedingVan = e.target.value || ""; save(); rebuildAll(); });
   const hoofdChk = box.querySelector(".me-hoofd");
   if(hoofdChk) hoofdChk.addEventListener("change", e=>{
     if(e.target.checked) setAlsHoofd(m); else m.isHoofd = false;
@@ -9346,7 +9503,8 @@ function renderModuleEditor(m, codes, rebuildAll, selectModule, onDelete, rij, s
         return;
       }
     }
-    m.linkedDiffId = nieuweId;
+    if(nieuweId){ const k = kastVanModule(m.id) || huidigeZekeringKast(); zkVerplaatsNaarDiff(k, m, nieuweId); }
+    else m.linkedDiffId = null;
     save(); rebuildAll();
   });
   box.querySelector(".me-cat").addEventListener("change", e=>{
@@ -9362,11 +9520,14 @@ function renderModuleEditor(m, codes, rebuildAll, selectModule, onDelete, rij, s
     save(); rebuildAll();
   });
   box.querySelector(".me-kabelklemmen").addEventListener("change", e=>{
-    m.kabelOpKlemmen = e.target.checked; save();
+    m.kabelOpKlemmen = e.target.checked; zkKlemmenOpnieuw(m); save();
     box.querySelector(".me-kabeltype-veld").style.display = e.target.checked ? "" : "none";
+    rebuildAll();
   });
   box.querySelector(".me-kabeltype").addEventListener("input", e=>{ m.kabelType=e.target.value; save(); });
+  box.querySelector(".me-kabeltype").addEventListener("change", ()=>{ if(m.kabelOpKlemmen){ zkKlemmenOpnieuw(m); save(); rebuildAll(); } });
   box.querySelector(".me-kabelaantal").addEventListener("input", e=>{ m.kabelAantal=Math.max(1,parseInt(e.target.value)||1); save(); });
+  box.querySelector(".me-kabelaantal").addEventListener("change", ()=>{ if(m.kabelOpKlemmen){ zkKlemmenOpnieuw(m); save(); rebuildAll(); } });
   if(velden.includes("uitgangen")){
     const uitgangenBody = box.querySelector(".me-uitgangen-body");
     const kringCodes = computeKringCodes(), verwCodes = computeVerwarmingCodes();
@@ -16687,6 +16848,12 @@ function wireBibStaging(box, item, rebuildAll){
    ========================================================================= */
 const UV = { MW: 38, MH: 150, G: 96, PADX: 64 };
 let uvView = "bedrading";         // "bedrading" | "eendraad"
+// 20/11/2026: naar het eendraadschema in CaDraw (zelfde project, via de projectkeuze bovenaan)
+function naarCadraw(){
+  const b = document.getElementById("main-nav-btn-cadraw");
+  if(b && b.offsetParent!==null){ b.click(); window.scrollTo(0,0); return; }
+  location.href = "cadraw.html";
+}
 let uvZoom = 1;
 let uvKleur = "Bruin", uvSectie = "2.5", uvKleurAuto = true;
 let uvPending = null;             // {m, k}: startklem van een nieuwe draad
@@ -18042,7 +18209,23 @@ function uvZekDropDoel(kast, id, pt){
   const index = leden.filter(x=>{ const md = mdVan[x.id]; return md && (md.x + md.w/2) < pt.x; }).length;
   return {ri, rij, index, leden, mdVan, geo};
 }
-function uvZekVrij(kast, rij, zonderId){ return (kast.maat || 24) - rij.items.filter(x=> x.id !== zonderId).reduce((t, x)=> t + (typeof moduleBreedte === "function" ? moduleBreedte(x) : (Number(x.breedte)||0)), 0); }
+// 20/11/2026 (Peter: "Waarom kan ik module daar niet verplaatsen?"): lege plaatsen (categorie Leeg) tellen als vrij --
+// bij het neerzetten schuift de module in die lege plaats en wordt die kleiner/verdwijnt ze.
+function uvZekVrij(kast, rij, zonderId){ return (kast.maat || 24) - rij.items.filter(x=> x.id !== zonderId && x.categorie !== "Leeg").reduce((t, x)=> t + (typeof moduleBreedte === "function" ? moduleBreedte(x) : (Number(x.breedte)||0)), 0); }
+function uvZekMaakPlaats(kast, rij, m, index){
+  const maat = kast.maat || 24, bw = x=> (typeof moduleBreedte === "function" ? moduleBreedte(x) : (Number(x.breedte)||0));
+  let teVeel = rij.items.reduce((t, x)=> t + bw(x), 0) - maat;
+  if(teVeel <= 0) return;
+  // eerst de lege plaatsen het dichtst bij de nieuwe positie inkrimpen
+  const pos = rij.items.indexOf(m);
+  const leeg = rij.items.map((x, i)=> ({x, i})).filter(o=> o.x.categorie==="Leeg").sort((a, b)=> Math.abs(a.i - pos) - Math.abs(b.i - pos));
+  for(const o of leeg){
+    if(teVeel <= 0) break;
+    const w = bw(o.x), af = Math.min(w, teVeel);
+    if(af >= w) rij.items.splice(rij.items.indexOf(o.x), 1); else o.x.breedte = w - af;
+    teVeel -= af;
+  }
+}
 function uvZekModBreedte(m){ return typeof moduleBreedte === "function" ? moduleBreedte(m) : (Number(m.breedte)||1); }
 const UV_ZEK_SLEEP = {
   mag: (id)=>{ const kast = huidigeZekeringKast(); return !!kast && kast.rijen.some(r=> r.items.some(m=> m.id===id)); },
@@ -18068,6 +18251,7 @@ const UV_ZEK_SLEEP = {
     van.items.splice(oudIndex, 1);
     d.rij.items.splice(d.index, 0, m);
     if(van === d.rij && oudIndex === d.index) return false;
+    uvZekMaakPlaats(kast, d.rij, m, d.index);
     return true;
   },
 };
@@ -18085,16 +18269,14 @@ function renderUitvoeringsplan(ctxArg){
   const kast = ctx.kast();
   uvSyncEnOpruimen(kast);
   const hist = uvHist(kast);
-  const view = ctx.eendraad ? uvView : "bedrading";
+  // 20/11/2026 (Peter): "Eendraadschema mag weg en gelinkt worden aan CaDraw" -- hier enkel nog de bedrading
+  const view = "bedrading";
   const bed = view==="bedrading";
   const wrap = el(`<div class="panel uv-panel" id="${ctx.panelId}">
     <div class="uv-kop">
       <strong class="uv-titel">${escapeHtml(ctx.titel)}</strong>
       <div class="uv-kasten" id="uvKastbar"></div>
-      ${ctx.eendraad ? `<div class="uv-seg">
-        <button class="btn small ${bed?"primary":"ghost"}" data-view="bedrading">Bedrading</button>
-        <button class="btn small ${!bed?"primary":"ghost"}" data-view="eendraad">Eendraadschema</button>
-      </div>` : ""}
+      ${ctx.eendraad ? `<button class="btn small ghost uv-naar-cadraw" title="Het eendraadschema staat in CaDraw (Schema &amp; plan)">Eendraadschema in CaDraw ↗</button>` : ""}
       <span class="uv-spacer"></span>
       <div class="uv-zoom">
         ${bed ? `<button class="btn small ghost uv-undo" title="ongedaan maken (Ctrl+Z)" ${hist.undo.length?"":"disabled"}>↶</button>
@@ -18226,7 +18408,9 @@ function renderUitvoeringsplan(ctxArg){
     const lint = document.querySelector(".casuite-testlint");
     const h = Math.max(420, Math.round(window.innerHeight - Math.max(0, top) - 14 - (lint ? lint.offsetHeight : 0)));
     canvasBox.style.height = h + "px";
-    side.style.maxHeight = h + "px";
+    // 20/11/2026 (Peter: "daar zitten te veel scrollbalken"): de zijkolom scrolt mee met de pagina,
+    // het werkvlak blijft bovenaan staan (sticky) -- geen aparte scrollbalk meer in de zijkolom
+    side.style.maxHeight = "";
   }
   function effSchaal(vb){
     const bw = Math.max(200, canvas.clientWidth - 12), bh = Math.max(200, canvas.clientHeight - 12);
@@ -18961,6 +19145,8 @@ function renderUitvoeringsplan(ctxArg){
 
   /* ---------- knoppen ---------- */
   wrap.querySelectorAll(".uv-seg button").forEach(b=> b.addEventListener("click", ()=>{ uvView = b.dataset.view; uvPending = null; uvKamModus = false; uvZoomVenster = false; selectTab(ctx.tab); }));
+  const naarCd = wrap.querySelector(".uv-naar-cadraw");
+  if(naarCd) naarCd.addEventListener("click", naarCadraw);
   const q = (s)=> wrap.querySelector(s);
   const aan = (s, ev, fn)=>{ const x = q(s); if(x) x.addEventListener(ev, fn); };
   aan(".uv-undo", "click", ongedaan);
@@ -19866,6 +20052,10 @@ function autoTitel(m){
 }
 function autoOndertitel(m){
   const cat = m.categorie || "Overig";
+  if(cat==="Differentieel" && !m.isHoofd){
+    let bron = null; try{ const k = kastVanModule(m.id); if(k) bron = zkVoedingVan(k, m); }catch(e){}
+    return [m.polen, m.fase && m.fase!=="L1L2L3N" ? m.fase : "", bron ? "←"+(zkIsRem(bron) ? "REM" : "HD") : ""].filter(Boolean).join(" ");
+  }
   if(["Automaat","Differentieel","Overig"].includes(cat)) return m.polen || "";
   return m.naam || m.type || (MODULE_CATEGORIEEN[cat] ? MODULE_CATEGORIEEN[cat].label : cat);
 }
@@ -20669,6 +20859,25 @@ function herkoppelKlemBronnen(){
    (zonder de aarding, zoals de Snelmodus), gekoppeld aan de zekering zodat naam/kamer meevolgen, en
    meteen op de rijgklemmenmodule van dezelfde kast als die er is. Vink je het af, dan verdwijnen enkel
    de automatisch aangemaakte klemmen weer. */
+// 20/11/2026: de automatisch aangemaakte klemmen van één module opnieuw opbouwen (na vinkje, kabeltype of
+// aantal kabels). Klemmen die je zelf (Snelmodus) gemaakt hebt blijven staan.
+function zkKlemmenOpnieuw(m){
+  const il = state.interlex; if(!il || !Array.isArray(il.items)) return;
+  const vanM = id=> id===m.id || String(id||"").startsWith(m.id+"::");
+  const weg = new Set(il.items.filter(k=> k.autoZek && vanM(k.bronId)).map(k=> k.id));
+  if(weg.size){
+    il.items = il.items.filter(k=> !weg.has(k.id));
+    state.zekeringen.kasten.forEach(kast=> kast.rijen.forEach(r=> r.items.forEach(x=>{
+      if(x.categorie==="Rijgklemmenmodule" && Array.isArray(x.rijgklemKlemIds) && x.rijgklemKlemIds.some(id=> weg.has(id))){
+        x.rijgklemKlemIds = x.rijgklemKlemIds.filter(id=> !weg.has(id));
+        if(typeof berekenRijgklemBreedte==="function") x.breedte = berekenRijgklemBreedte(x.rijgklemKlemIds.length);
+      }
+    })));
+  }
+  // enkel de gebruikte bron vergeten als er geen eigen (Snelmodus-)klemmen meer naar verwijzen
+  if(Array.isArray(il.gebruikteBronnen)) il.gebruikteBronnen = il.gebruikteBronnen.filter(g=> !(g.bronType==="zekeringen" && vanM(g.bronId) && !il.items.some(k=> k.bronId===g.bronId)));
+  autoZekeringKlemmen();
+}
 function autoZekeringKlemmen(){
   if(!state.interlex || !Array.isArray(state.interlex.items) || typeof snelmodusBronnen !== "function") return false;
   const il = state.interlex;
@@ -22493,6 +22702,12 @@ function renderConflictBanner(){
 }
 
 function selectTab(id){
+  // 20/11/2026 (Peter: "als ik in uitvoeringsplan helemaal naar onder scroll en een module een rij hoger
+  // verzet, verspringt het scherm weer helemaal naar boven"): hetzelfde tabblad opnieuw tekenen houdt de
+  // scrollpositie (pagina + werkvlakken) vast; enkel bij een ander tabblad naar boven.
+  const zelfde = id===currentTab && $content.firstElementChild;
+  const yWas = window.scrollY;
+  const binnen = zelfde ? [...$content.querySelectorAll(".uv-canvas-wrap, .kastwrap, .dk-scroll")].map(e=>[e.className, e.scrollLeft, e.scrollTop]) : [];
   currentTab=id;
   cleanupStrayDragArtifacts();
   document.querySelectorAll("#tabbar button").forEach(b=>b.classList.toggle("active", b.dataset.id===id));
@@ -22502,7 +22717,13 @@ function selectTab(id){
   const node = RENDERERS[id]();
   node.classList.add("active");
   $content.appendChild(node);
-  window.scrollTo(0,0);
+  if(zelfde){
+    const herstel = ()=>{
+      window.scrollTo(0, yWas);
+      binnen.forEach(([cls, l, t])=>{ const e = $content.getElementsByClassName(cls.split(" ")[0])[0]; if(e){ e.scrollLeft = l; e.scrollTop = t; } });
+    };
+    herstel(); requestAnimationFrame(herstel);
+  } else window.scrollTo(0,0);
   renderConflictBanner();
 }
 
@@ -23051,6 +23272,8 @@ function ofBouwVoorstel(off){
         gesch.push((/vloer/.test(d)?"Vloerstopcontact":"Stopcontact")+" geschakeld"+(q>1?" ("+q+"×)":"")); kamerGebruikt = true; return;
       }
       if((m = d.match(/^multimedia\s*\((\d+)\s*x\s*data/))){
+        // 20/11/2026 (Peter): in een multimediabox zit ook een dubbel stopcontact -> telt als 1 stopcontactpunt
+        if(/230\s*v/.test(d)) zkBronStop(V.zk, kamer||sec.naam).media += Math.round(q);
         for(let i=0;i<Math.round(q)*parseInt(m[1]);i++) dataPoorten.push({kamer, wat:"multimedia"}); kamerGebruikt = true; return;
       }
       if(/^dubbel\s*data|^dubbeldata/.test(d)){
@@ -23310,7 +23533,7 @@ function ofBouwVoorstel(off){
   [...voor, ...domo].forEach(m=>{ telCat[m.naam]=(telCat[m.naam]||0)+1; });
   Object.entries(telCat).forEach(([n,c])=> O.zekeringen.regels.push(c+"× "+n));
   if(zekModules.toestellen.length) O.zekeringen.regels.push(zekModules.toestellen.length+" automaten voor vaste toestellen/laadpalen: "+zekModules.toestellen.map(a=>a.naam+" "+a.A+" "+a.polen).join(", "));
-  const zkPunten = V.zk.stop.reduce((t,s)=> t + s.muur + s.vloer, 0), zkGesch = V.zk.stop.reduce((t,s)=> t + s.geschakeld, 0);
+  const zkPunten = V.zk.stop.reduce((t,s)=> t + s.muur + s.vloer + (s.media||0), 0), zkGesch = V.zk.stop.reduce((t,s)=> t + s.geschakeld, 0);
   if(zkPunten || V.zk.voedingen.length) O.zekeringen.regels.push("Automaten & differentiëlen: na het toevoegen via het stappenvenster ⚡ Zekeringkast verdelen (AREI) — "
     + zkPunten+" stopcontacten"+(zkGesch?" + "+zkGesch+" geschakeld":"")+" in "+V.zk.stop.length+" ruimtes, "+V.zk.voedingen.length+" voedingen"+(V.zk.tebepalen.length?", "+V.zk.tebepalen.length+" te bepalen":"")+(V.zk.aansluitingA?", aansluiting "+V.zk.aansluitingA:""));
 
@@ -24151,7 +24374,7 @@ const zkW = A=> parseInt(A)||0;
 function zkNieuweBron(){ return {stop:[], voedingen:[], tebepalen:[], aansluitingA:"", reservePct:null, overspanning:false, pv:false, offerte:""}; }
 function zkBronStop(bron, kamer){
   let s = bron.stop.find(x=>x.kamer===kamer);
-  if(!s){ s = {kamer, muur:0, vloer:0, geschakeld:0}; bron.stop.push(s); }
+  if(!s){ s = {kamer, muur:0, vloer:0, media:0, geschakeld:0}; bron.stop.push(s); }
   return s;
 }
 
@@ -24222,7 +24445,7 @@ function zkNieuwOntwerp(bron){
     overspanning: !!bron.overspanning, reservePct: bron.reservePct!=null ? bron.reservePct : 20, reserveSoort:"automaten",
     rijMaat: 36, domoticaApart:false, verdiepingen:{}, kamerSoort:{}, stop:[], stopKringen:null, toestellen:[], vast:[], vervangen:true};
   const kamersVan = new Set();
-  bron.stop.forEach(s=>{ O.stop.push({id:cryptoId(), kamer:s.kamer, muur:s.muur, vloer:s.vloer, geschakeld:s.geschakeld}); kamersVan.add(s.kamer); });
+  bron.stop.forEach(s=>{ O.stop.push({id:cryptoId(), kamer:s.kamer, muur:s.muur, vloer:s.vloer, media:s.media||0, geschakeld:s.geschakeld}); kamersVan.add(s.kamer); });
   // voedingen per kamer groeperen om per kamer een reeks toestellen te raden
   const perKamer = new Map();
   bron.voedingen.forEach(v=>{ const k = v.kamer||""; if(!perKamer.has(k)) perKamer.set(k, []); perKamer.get(k).push(v); });
@@ -24259,14 +24482,20 @@ function zkNieuwOntwerp(bron){
 
 /* ---------- stopcontacten -> kringen ---------- */
 function zkStopVoorstel(O){
-  const kringen = [];
-  const S = zkSoorten();
-  const delen = [];
+  const delen = [], gDelen = [];
   O.stop.forEach(s=>{
-    const tot = (parseInt(s.muur)||0) + (parseInt(s.vloer)||0);
+    const tot = (parseInt(s.muur)||0) + (parseInt(s.vloer)||0) + (parseInt(s.media)||0);
     const soort = O.kamerSoort[s.kamer] || zkKamerSoort(s.kamer);
     delen.push({kamer:s.kamer, n:tot, soort});
+    // 20/11/2026 (Peter): geschakelde stopcontacten van buurkamers samenvoegen tot ± volle kring (zelfde verdieping)
+    gDelen.push({kamer:s.kamer, n:parseInt(s.geschakeld)||0, soort: soort==="buiten" ? "buiten" : "normaal"});
   });
+  O.stopKringen = zkVerdeelPunten(O, delen);
+  O.geschKringen = zkVerdeelPunten(O, gDelen);
+  return O.stopKringen;
+}
+function zkVerdeelPunten(O, delen){
+  const kringen = [];
   delen.forEach(s=>{
     const n = s.n;
     if(n<=0) return;
@@ -24289,8 +24518,7 @@ function zkStopVoorstel(O){
       kringen.push({id:cryptoId(), soort, verdieping:vd, punten:x, delen:[Object.assign({kamer:s.kamer, n:x}, s.deel?{deel:s.deel}:{})], vol: stukken>1});
     });
   });
-  O.stopKringen = kringen.map(k=>({id:k.id, delen:k.delen}));
-  return O.stopKringen;
+  return kringen.map(k=>({id:k.id, delen:k.delen}));
 }
 function zkStopKringInfo(O, k){
   const punten = k.delen.reduce((t,d)=> t + d.n, 0);
@@ -24315,14 +24543,12 @@ function zkAlleKringen(O){
     lijst.push({id:k.id, bron:"stop", lengte, soort:"stopcontacten", naam:"STOPCONTACTEN "+zkUp(k.delen.map(zkDeelNaam).join(" ")), polen:st.polen, A:st.A, diff:"30",
       W:st.W, kabel:st.kabel, curve:st.curve, orde:st.orde, fase:(O.faseHand||{})[k.id]||"auto", kamer:k.delen[0].kamer, delen:k.delen});
   });
-  O.stop.forEach(s=>{
-    const n = parseInt(s.geschakeld)||0; if(n<=0) return;
-    const st = S.geschakeld, stukken = Math.ceil(n/8);
-    for(let i=0;i<stukken;i++){
-      const id = s.id+"-g"+i;
-      lijst.push({id, bron:"gesch", lengte:zkLengte([s.kamer]), soort:"geschakeld", naam:"GESCHAKELDE STOPCONTACTEN "+zkUp(s.kamer)+(stukken>1?" "+(i+1):""), polen:st.polen, A:st.A, diff:"30",
-        W:st.W, kabel:st.kabel, curve:st.curve, orde:st.orde, fase:(O.faseHand||{})[id]||"auto", kamer:s.kamer});
-    }
+  if(!O.geschKringen) zkStopVoorstel(O);
+  O.geschKringen.forEach(k=>{
+    if(!k.delen.length) return;
+    const st = S.geschakeld;
+    lijst.push({id:k.id, bron:"gesch", lengte:zkLengte([...new Set(k.delen.map(d=>d.kamer))]), soort:"geschakeld", naam:"GESCHAKELDE STOPCONTACTEN "+zkUp(k.delen.map(d=>d.kamer).join(" ")),
+      polen:st.polen, A:st.A, diff:"30", W:st.W, kabel:st.kabel, curve:st.curve, orde:st.orde, fase:(O.faseHand||{})[k.id]||"auto", kamer:k.delen[0].kamer, delen:k.delen});
   });
   const tel = {};
   const toestellen = [...O.toestellen, ...O.vast].filter(t=> t.aan);
@@ -24445,6 +24671,7 @@ function zkControles(O, R){
     });
   });
   O.stopKringen && O.stopKringen.forEach((k,i)=>{ const inf = zkStopKringInfo(O, k); inf.fouten.forEach(f=> (f.startsWith("meer")?fout:let_).push("Stopcontactkring "+(i+1)+": "+f)); });
+  O.geschKringen && O.geschKringen.forEach((k,i)=>{ const inf = zkStopKringInfo(O, k); inf.fouten.filter(f=> !/samen met andere/.test(f)).forEach(f=> (f.startsWith("meer")?fout:let_).push("Geschakelde kring "+(i+1)+": "+f)); });
   const L = R.last, fasen = O.fasen===1 ? [] : ["L1","L2","L3"];
   if(fasen.length){
     const max = Math.max(...fasen.map(f=>L[f])), min = Math.min(...fasen.map(f=>L[f]));
@@ -24521,9 +24748,11 @@ function zkPasToe(O){
       kr.info = "Stopcontacten "+k.delen.map(d=> zkDeelNaam(d)+" ("+d.n+")").join(", "); kr.zekeringModuleId = m.id; kr.zkStop = true; if(k.lengte) kr.kabelLengte = k.lengte;
       state.kringen.items.push(kr);
     } else if(k.bron==="gesch"){
-      const bestaand = state.kringen.items.filter(x=> x.kamer===k.kamer && /geschakeld/i.test(x.info||"") && /stopcontact/i.test(x.info||""));
-      if(bestaand.length) bestaand.forEach(x=>{ x.zekeringModuleId = m.id; if(!x.verdieping) x.verdieping = O.verdiepingen[k.kamer]||""; });
-      else { const kr = newKringItem(); kr.kamer = k.kamer; kr.verdieping = O.verdiepingen[k.kamer]||""; kr.info = "Stopcontacten geschakeld"; kr.zekeringModuleId = m.id; kr.zkStop = true; state.kringen.items.push(kr); }
+      [...new Set((k.delen||[{kamer:k.kamer}]).map(d=> d.kamer))].forEach(kamer=>{
+        const bestaand = state.kringen.items.filter(x=> x.kamer===kamer && /geschakeld/i.test(x.info||"") && /stopcontact/i.test(x.info||""));
+        if(bestaand.length) bestaand.forEach(x=>{ x.zekeringModuleId = m.id; if(!x.verdieping) x.verdieping = O.verdiepingen[kamer]||""; });
+        else { const kr = newKringItem(); kr.kamer = kamer; kr.verdieping = O.verdiepingen[kamer]||""; kr.info = "Stopcontacten geschakeld"; kr.zekeringModuleId = m.id; kr.zkStop = true; state.kringen.items.push(kr); }
+      });
     } else if(k.ref){
       const r = k.ref;
       if(r.type==="driverkast"){ const dk = state.driverkast.kasten.find(x=>x.id===r.kastId); if(dk) dk.items.forEach(d=>{ if(leeg(d.zekeringModuleId)) d.zekeringModuleId = m.id; }); }
@@ -24729,31 +24958,36 @@ async function zkOpen(opties){
   function stap2(){
     if(!O.stopKringen) zkStopVoorstel(O);
     const kamers = [...new Set([...O.stop.map(s=>s.kamer)])];
-    let h = `<p class="hint">Kies per kamer de verdieping en kijk het aantal stopcontacten na (dubbel = 1 punt). Max. 8 per kring; samenvoegen enkel op dezelfde verdieping; keuken, natte ruimtes en buiten altijd apart; een slaapkamer met badkamer (en dressing) blijft samen op eigen kring(en); geschakelde stopcontacten krijgen een eigen kring (5G2,5).</p>`;
+    let h = `<p class="hint">Kies per kamer de verdieping en kijk het aantal stopcontacten na (dubbel = 1 punt; een multimediabox met dubbel stopcontact telt ook als 1 punt). Max. 8 per kring; samenvoegen enkel op dezelfde verdieping; keuken, natte ruimtes en buiten altijd apart; een slaapkamer met badkamer (en dressing) blijft samen op eigen kring(en); geschakelde stopcontacten krijgen een eigen kring (5G2,5).</p>`;
     if(O.geraden) h += `<div class="zkw-let">${state.planAnalyse ? O.geradenKamers+" kamer(s) niet op het plan gevonden: die verdiepingen zijn <b>geraden</b> uit de kamernaam." : "De verdiepingen zijn <b>geraden</b> uit de kamernaam — kijk ze even na, of lees de plannen in (📐 in stap 1) voor verdiepingen, buurkamers en kabellengtes."}</div>`;
     else if(state.planAnalyse) h += `<div class="zkw-ok">Verdiepingen uit de plannen; stopcontacten worden enkel met buurkamers (binnen ${PL_NABIJ_M} m) samengevoegd.</div>`;
-    h += `<div class="zkw-scroll"><table class="zkw-tabel"><thead><tr><th>Kamer</th><th>Verdieping</th><th>Soort ruimte</th><th>Wand</th><th>Vloer</th><th>Geschakeld</th><th></th></tr></thead><tbody>
+    h += `<div class="zkw-scroll"><table class="zkw-tabel"><thead><tr><th>Kamer</th><th>Verdieping</th><th>Soort ruimte</th><th>Wand</th><th>Vloer</th><th title="multimediabox met dubbel stopcontact = 1 punt">Multimedia</th><th>Geschakeld</th><th></th></tr></thead><tbody>
       ${O.stop.map((s,i)=>`<tr data-i="${i}"><td><input class="zkw-s-kamer" value="${escapeHtml(s.kamer)}" list="zkw-dl-kamers" style="min-width:130px"></td>
         <td>${selectHtml(vdOpts(), O.verdiepingen[s.kamer]||"", "zkw-s-vd")}</td>
         <td>${selectHtml(Object.entries(ZK_KAMERSOORT_LABEL), O.kamerSoort[s.kamer]||zkKamerSoort(s.kamer), "zkw-s-soort")}</td>
-        <td><input type="number" min="0" class="zkw-s-muur" value="${s.muur}"></td><td><input type="number" min="0" class="zkw-s-vloer" value="${s.vloer}"></td>
+        <td><input type="number" min="0" class="zkw-s-muur" value="${s.muur}"></td><td><input type="number" min="0" class="zkw-s-vloer" value="${s.vloer}"></td><td><input type="number" min="0" class="zkw-s-media" value="${parseInt(s.media)||0}"></td>
         <td><input type="number" min="0" class="zkw-s-gesch" value="${s.geschakeld}"></td><td><button class="rowdel zkw-s-del" title="verwijderen">✕</button></td></tr>`).join("")}
       </tbody></table></div><datalist id="zkw-dl-kamers">${state.kamers.filter(Boolean).map(k=>`<option value="${escapeHtml(k)}">`).join("")}</datalist>
       <button class="addbtn" id="zkw-s-add">+ kamer</button>`;
-    const nGesch = O.stop.reduce((t,s)=> t + Math.ceil((parseInt(s.geschakeld)||0)/8), 0);
+    if(!O.geschKringen) zkStopVoorstel(O);
+    const nGesch = O.geschKringen.filter(k=>k.delen.length).length;
     h += `<div class="of-sub" style="font-weight:700;margin:14px 0 2px;display:flex;align-items:center;gap:10px;">Voorstel kringen: ${O.stopKringen.filter(k=>k.delen.length).length} stopcontactkring(en)${nGesch?" + "+nGesch+" geschakelde":""}
       <button class="btn small ghost" id="zkw-opnieuw" style="margin-left:auto">⟳ Opnieuw voorstellen</button></div>
       <p class="hint" style="margin:0">Niet akkoord? Verplaats een kamer naar een andere kring met de keuzelijst.</p>`;
-    const kringOpts = O.stopKringen.map((k,i)=>[i, "Kring "+(i+1)]).concat([["nieuw","Nieuwe kring"]]);
-    h += `<div class="zkw-kringen">${O.stopKringen.map((k,i)=>{
+    const kaarten = (lijst, soort, titel)=>{
+    const kringOpts = lijst.map((k,i)=>[i, titel+" "+(i+1)]).concat([["nieuw","Nieuwe kring"]]);
+    return `<div class="zkw-kringen">${lijst.map((k,i)=>{
       if(!k.delen.length) return "";
       const inf = zkStopKringInfo(O, k);
       const cls = inf.fouten.some(f=>f.startsWith("meer")) ? "fout" : inf.fouten.length ? "let" : "";
       const lg = zkLengte([...new Set(k.delen.map(d=>d.kamer))]);
-      return `<div class="zkw-kring ${cls}"><h4>Kring ${i+1}<span>${inf.punten} stopc. · ${escapeHtml(inf.verdieping||"—")}${lg?" · ≈ "+lg+" m":""}</span></h4>
-        ${k.delen.map((d,j)=>`<div class="zkw-deel">${escapeHtml(zkDeelNaam(d))} <span class="zkw-oms">(${d.n})</span>${selectHtml(kringOpts, i, "zkw-verplaats\" data-k=\""+i+"\" data-d=\""+j)}</div>`).join("")}
+      return `<div class="zkw-kring ${cls}"><h4>${titel} ${i+1}<span>${inf.punten} stopc. · ${escapeHtml(inf.verdieping||"—")}${lg?" · ≈ "+lg+" m":""}</span></h4>
+        ${k.delen.map((d,j)=>`<div class="zkw-deel">${escapeHtml(zkDeelNaam(d))} <span class="zkw-oms">(${d.n})</span>${selectHtml(kringOpts, i, "zkw-verplaats\" data-soort=\""+soort+"\" data-k=\""+i+"\" data-d=\""+j)}</div>`).join("")}
         ${inf.fouten.map(f=>`<div class="zkw-melding ${f.startsWith("meer")?"":"let"}">⚠ ${escapeHtml(f)}</div>`).join("")}</div>`;
     }).join("")}</div>`;
+    };
+    h += kaarten(O.stopKringen, "stop", "Kring");
+    if(nGesch) h += `<div class="of-sub" style="font-weight:700;margin:14px 0 2px;">Geschakelde stopcontacten (eigen automaat, 5G2,5 — buurkamers samen tot ± 8)</div>` + kaarten(O.geschKringen, "gesch", "Geschakeld");
     return h;
   }
   function stapToestellen(lijst, wat){
@@ -24869,17 +25103,18 @@ async function zkOpen(opties){
       zkStopVoorstel(O); teken(); }));
     qa("tr[data-i] .zkw-s-vd").forEach(sel=> sel.addEventListener("change", e=>{ const s = O.stop[parseInt(e.target.closest("tr").dataset.i)]; O.verdiepingen[s.kamer] = e.target.value; O.geraden = false; zkStopVoorstel(O); teken(); }));
     qa("tr[data-i] .zkw-s-soort").forEach(sel=> sel.addEventListener("change", e=>{ const s = O.stop[parseInt(e.target.closest("tr").dataset.i)]; O.kamerSoort[s.kamer] = e.target.value; zkStopVoorstel(O); teken(); }));
-    [["zkw-s-muur","muur"],["zkw-s-vloer","vloer"],["zkw-s-gesch","geschakeld"]].forEach(([c,veld])=> qa("tr[data-i] ."+c).forEach(inp=> inp.addEventListener("change", e=>{
+    [["zkw-s-muur","muur"],["zkw-s-vloer","vloer"],["zkw-s-media","media"],["zkw-s-gesch","geschakeld"]].forEach(([c,veld])=> qa("tr[data-i] ."+c).forEach(inp=> inp.addEventListener("change", e=>{
       O.stop[parseInt(e.target.closest("tr").dataset.i)][veld] = Math.max(0, parseInt(e.target.value)||0); zkStopVoorstel(O); teken(); })));
     qa(".zkw-s-del").forEach(b=> b.addEventListener("click", e=>{ O.stop.splice(parseInt(e.target.closest("tr").dataset.i),1); zkStopVoorstel(O); teken(); }));
-    op("#zkw-s-add","click", ()=>{ O.stop.push({id:cryptoId(), kamer:"", muur:0, vloer:0, geschakeld:0}); teken(); });
+    op("#zkw-s-add","click", ()=>{ O.stop.push({id:cryptoId(), kamer:"", muur:0, vloer:0, media:0, geschakeld:0}); teken(); });
     op("#zkw-opnieuw","click", ()=>{ zkStopVoorstel(O); teken(); });
     qa(".zkw-verplaats").forEach(sel=> sel.addEventListener("change", e=>{
       const ki = parseInt(sel.dataset.k), di = parseInt(sel.dataset.d);
-      const deel = O.stopKringen[ki].delen.splice(di,1)[0];
-      if(e.target.value==="nieuw") O.stopKringen.push({id:cryptoId(), delen:[deel]});
-      else O.stopKringen[parseInt(e.target.value)].delen.push(deel);
-      O.stopKringen = O.stopKringen.filter(k=> k.delen.length);
+      const veld = sel.dataset.soort==="gesch" ? "geschKringen" : "stopKringen";
+      const deel = O[veld][ki].delen.splice(di,1)[0];
+      if(e.target.value==="nieuw") O[veld].push({id:cryptoId(), delen:[deel]});
+      else O[veld][parseInt(e.target.value)].delen.push(deel);
+      O[veld] = O[veld].filter(k=> k.delen.length);
       teken();
     }));
     // stap 3/4
