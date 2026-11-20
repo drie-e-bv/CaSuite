@@ -1,0 +1,12 @@
+import { chromium } from '/opt/npm-tools/node_modules/playwright/index.mjs';
+const b=await chromium.launch({executablePath:'/usr/bin/google-chrome',args:['--no-sandbox']});
+const p=await b.newPage();
+await p.route(/^https?:\/\/(?!localhost)/,r=>{const u=r.request().url();
+ if(/supabase/.test(u))return r.fulfill({path:'stub3.js',contentType:'text/javascript'});
+ return r.fulfill({body:'',contentType:'text/javascript'})});
+await p.goto('http://localhost:8771/index.html');await p.waitForTimeout(2500);
+await p.evaluate(async()=>{await CaDosApp.loadForProject('p2')});
+console.log(await p.evaluate(()=>{const bron={stop:[{kamer:'Living',muur:5,vloer:2,geschakeld:2},{kamer:'Keuken',muur:9,vloer:0,geschakeld:0},{kamer:'Eetplaats',muur:1,vloer:0,geschakeld:0}],voedingen:[{kamer:'Keuken',A:'20A',fasen:1,oms:'v',sectie:'Keuken'},{kamer:'Keuken',A:'32A',fasen:3,oms:'3f',sectie:'Keuken'},{kamer:'Wasplaats',A:'20A',fasen:1,oms:'v',sectie:'Wasplaats'},{kamer:'Wasplaats',A:'20A',fasen:1,oms:'v',sectie:'Wasplaats'}],tebepalen:[{oms:'Hekken - te bepalen'}],aansluitingA:'63A',reservePct:20,overspanning:true,pv:false};
+ const O=CaDosApp.zekeringkast.nieuwOntwerp(bron);const R=CaDosApp.zekeringkast.verdeel(O);
+ return JSON.stringify({fasen:O.fasen,last:R.last,gr:R.groepen.map(g=>g.code+' '+g.soort+' '+g.fase+' : '+g.items.map(k=>k.code+'='+k.naam+'/'+k.fase+'/'+k.W).join(', '))},null,1)}));
+await b.close();
