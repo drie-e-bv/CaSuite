@@ -23725,11 +23725,16 @@ const ZK_BUITEN = /tuin|buiten|terras|poolhouse|carport|oprit/i;
 function zkKamerSoort(k){
   k = String(k||"");
   if(ZK_BUITEN.test(k)) return "buiten";
+  // 20/11/2026 (Peter): slaapkamer + badkamer + dressing = 1 kamer in de offerte, maar de badkamer krijgt een eigen kring
+  if(/slpk|slaap|master/i.test(k) && /badk|badkamer/i.test(k)) return "suite";
   if(ZK_NAT.test(k)) return "nat";
   if(/keuken/i.test(k) && !/bijkeuken/i.test(k)) return "keuken";
   return "normaal";
 }
-const ZK_KAMERSOORT_LABEL = {normaal:"Normaal", keuken:"Keuken (apart)", nat:"Natte ruimte (apart)", buiten:"Buiten (apart)"};
+const ZK_KAMERSOORT_LABEL = {normaal:"Normaal", suite:"Slaapkamer + badkamer (badkamer apart)", keuken:"Keuken (apart)", nat:"Natte ruimte (apart)", buiten:"Buiten (apart)"};
+const zkZonderBad = k=> String(k||"").replace(/\s*\+\s*badk(amer)?\.?\s*\d*/i,"").trim() || k;
+const zkDeelNaam = d=> d.deel==="bad" ? "Badkamer "+zkZonderBad(d.kamer) : (zkKamerSoort(d.kamer)==="suite" ? zkZonderBad(d.kamer) : d.kamer);
+const zkDeelSoort = (O, d)=> d.deel==="bad" ? "nat" : ((O.kamerSoort[d.kamer]||"normaal")==="suite" ? "normaal" : (O.kamerSoort[d.kamer]||"normaal"));
 function zkRaadVerdieping(k){
   const codes = (state.verdiepingen||[]).map(v=>v.code);
   const kies = c=> codes.includes(c) ? c : "";
@@ -23818,7 +23823,8 @@ function zkNieuwOntwerp(bron){
     overspanning: !!bron.overspanning, reservePct: bron.reservePct!=null ? bron.reservePct : 20, reserveSoort:"automaten",
     rijMaat: 36, domoticaApart:false, verdiepingen:{}, kamerSoort:{}, stop:[], stopKringen:null, toestellen:[], vast:[], vervangen:true};
   const kamersVan = new Set();
-  bron.stop.forEach(s=>{ O.stop.push({id:cryptoId(), kamer:s.kamer, muur:s.muur, vloer:s.vloer, geschakeld:s.geschakeld}); kamersVan.add(s.kamer); });
+  bron.stop.forEach(s=>{ const tot = s.muur + s.vloer;
+    O.stop.push({id:cryptoId(), kamer:s.kamer, muur:s.muur, vloer:s.vloer, geschakeld:s.geschakeld, bad: zkKamerSoort(s.kamer)==="suite" ? Math.min(tot>2 ? 2 : 1, Math.max(0, tot-1)) : 0}); kamersVan.add(s.kamer); });
   // voedingen per kamer groeperen om per kamer een reeks toestellen te raden
   const perKamer = new Map();
   bron.voedingen.forEach(v=>{ const k = v.kamer||""; if(!perKamer.has(k)) perKamer.set(k, []); perKamer.get(k).push(v); });
@@ -23855,19 +23861,29 @@ function zkNieuwOntwerp(bron){
 function zkStopVoorstel(O){
   const kringen = [];
   const S = zkSoorten();
+  const delen = [];
   O.stop.forEach(s=>{
-    const n = (parseInt(s.muur)||0) + (parseInt(s.vloer)||0);
-    if(n<=0) return;
+    const tot = (parseInt(s.muur)||0) + (parseInt(s.vloer)||0);
     const soort = O.kamerSoort[s.kamer] || zkKamerSoort(s.kamer);
+    if(soort==="suite"){
+      const bad = Math.min(tot, Math.max(0, parseInt(s.bad)||0));
+      delen.push({kamer:s.kamer, n:tot-bad, soort:"normaal"});
+      delen.push({kamer:s.kamer, n:bad, soort:"nat", deel:"bad"});
+    } else delen.push({kamer:s.kamer, n:tot, soort});
+  });
+  delen.forEach(s=>{
+    const n = s.n;
+    if(n<=0) return;
+    const soort = s.soort;
     const vd = O.verdiepingen[s.kamer] || "";
     const stukken = Math.ceil(n/8);
     const verdeel = Array.from({length:stukken}, (_,i)=> Math.floor(n/stukken) + (i < n%stukken ? 1 : 0));
     verdeel.forEach(x=>{
       if(soort==="normaal" && stukken===1){
         const doel = kringen.find(k=> k.soort==="normaal" && !k.vol && k.verdieping===vd && k.punten + x <= 8);
-        if(doel){ doel.delen.push({kamer:s.kamer, n:x}); doel.punten += x; return; }
+        if(doel){ doel.delen.push(Object.assign({kamer:s.kamer, n:x}, s.deel?{deel:s.deel}:{})); doel.punten += x; return; }
       }
-      kringen.push({id:cryptoId(), soort, verdieping:vd, punten:x, delen:[{kamer:s.kamer, n:x}], vol: stukken>1});
+      kringen.push({id:cryptoId(), soort, verdieping:vd, punten:x, delen:[Object.assign({kamer:s.kamer, n:x}, s.deel?{deel:s.deel}:{})], vol: stukken>1});
     });
   });
   O.stopKringen = kringen.map(k=>({id:k.id, delen:k.delen}));
@@ -23876,7 +23892,7 @@ function zkStopVoorstel(O){
 function zkStopKringInfo(O, k){
   const punten = k.delen.reduce((t,d)=> t + d.n, 0);
   const vds = [...new Set(k.delen.map(d=> O.verdiepingen[d.kamer]||""))];
-  const soorten = [...new Set(k.delen.map(d=> O.kamerSoort[d.kamer]||"normaal"))];
+  const soorten = [...new Set(k.delen.map(d=> zkDeelSoort(O, d)))];
   const fouten = [];
   if(punten > 8) fouten.push("meer dan 8 stopcontacten");
   if(k.delen.length > 1 && vds.length > 1) fouten.push("verschillende verdiepingen");
@@ -23892,7 +23908,7 @@ function zkAlleKringen(O){
   O.stopKringen.forEach(k=>{
     if(!k.delen.length) return;
     const st = S.stopcontacten;
-    lijst.push({id:k.id, bron:"stop", soort:"stopcontacten", naam:"STOPCONTACTEN "+zkUp(k.delen.map(d=>d.kamer).join(" ")), polen:st.polen, A:st.A, diff:"30",
+    lijst.push({id:k.id, bron:"stop", soort:"stopcontacten", naam:"STOPCONTACTEN "+zkUp(k.delen.map(zkDeelNaam).join(" ")), polen:st.polen, A:st.A, diff:"30",
       W:st.W, kabel:st.kabel, curve:st.curve, orde:st.orde, fase:(O.faseHand||{})[k.id]||"auto", kamer:k.delen[0].kamer, delen:k.delen});
   });
   O.stop.forEach(s=>{
@@ -24083,7 +24099,7 @@ function zkPasToe(O){
     const k = m.__k; delete m.__k; if(!k) return;
     if(k.bron==="stop"){
       const kr = newKringItem(); kr.kamer = k.delen[0].kamer; kr.verdieping = O.verdiepingen[kr.kamer]||"";
-      kr.info = "Stopcontacten "+k.delen.map(d=> d.kamer+" ("+d.n+")").join(", "); kr.zekeringModuleId = m.id; kr.zkStop = true;
+      kr.info = "Stopcontacten "+k.delen.map(d=> zkDeelNaam(d)+" ("+d.n+")").join(", "); kr.zekeringModuleId = m.id; kr.zkStop = true;
       state.kringen.items.push(kr);
     } else if(k.bron==="gesch"){
       const bestaand = state.kringen.items.filter(x=> x.kamer===k.kamer && /geschakeld/i.test(x.info||"") && /stopcontact/i.test(x.info||""));
@@ -24294,13 +24310,14 @@ async function zkOpen(opties){
   function stap2(){
     if(!O.stopKringen) zkStopVoorstel(O);
     const kamers = [...new Set([...O.stop.map(s=>s.kamer)])];
-    let h = `<p class="hint">Kies per kamer de verdieping en kijk het aantal stopcontacten na (dubbel = 1 punt). Max. 8 per kring; samenvoegen enkel op dezelfde verdieping; keuken, natte ruimtes en buiten altijd apart; geschakelde stopcontacten krijgen een eigen kring (5G2,5).</p>`;
+    let h = `<p class="hint">Kies per kamer de verdieping en kijk het aantal stopcontacten na (dubbel = 1 punt). Max. 8 per kring; samenvoegen enkel op dezelfde verdieping; keuken, natte ruimtes en buiten altijd apart; bij een slaapkamer met badkamer (en dressing) gaat de badkamer op een eigen kring — vul in hoeveel stopcontacten er in de badkamer zitten; geschakelde stopcontacten krijgen een eigen kring (5G2,5).</p>`;
     if(O.geraden) h += `<div class="zkw-let">De verdiepingen zijn <b>geraden</b> uit de kamernaam — kijk ze even na.</div>`;
-    h += `<div class="zkw-scroll"><table class="zkw-tabel"><thead><tr><th>Kamer</th><th>Verdieping</th><th>Soort ruimte</th><th>Wand</th><th>Vloer</th><th>Geschakeld</th><th></th></tr></thead><tbody>
+    h += `<div class="zkw-scroll"><table class="zkw-tabel"><thead><tr><th>Kamer</th><th>Verdieping</th><th>Soort ruimte</th><th>Wand</th><th>Vloer</th><th>Waarvan badkamer</th><th>Geschakeld</th><th></th></tr></thead><tbody>
       ${O.stop.map((s,i)=>`<tr data-i="${i}"><td><input class="zkw-s-kamer" value="${escapeHtml(s.kamer)}" list="zkw-dl-kamers" style="min-width:130px"></td>
         <td>${selectHtml(vdOpts(), O.verdiepingen[s.kamer]||"", "zkw-s-vd")}</td>
         <td>${selectHtml(Object.entries(ZK_KAMERSOORT_LABEL), O.kamerSoort[s.kamer]||zkKamerSoort(s.kamer), "zkw-s-soort")}</td>
         <td><input type="number" min="0" class="zkw-s-muur" value="${s.muur}"></td><td><input type="number" min="0" class="zkw-s-vloer" value="${s.vloer}"></td>
+        <td>${(O.kamerSoort[s.kamer]||zkKamerSoort(s.kamer))==="suite" ? `<input type="number" min="0" class="zkw-s-bad" value="${parseInt(s.bad)||0}" title="stopcontacten in de badkamer (eigen kring)">` : `<span class="zkw-oms">—</span>`}</td>
         <td><input type="number" min="0" class="zkw-s-gesch" value="${s.geschakeld}"></td><td><button class="rowdel zkw-s-del" title="verwijderen">✕</button></td></tr>`).join("")}
       </tbody></table></div><datalist id="zkw-dl-kamers">${state.kamers.filter(Boolean).map(k=>`<option value="${escapeHtml(k)}">`).join("")}</datalist>
       <button class="addbtn" id="zkw-s-add">+ kamer</button>`;
@@ -24314,7 +24331,7 @@ async function zkOpen(opties){
       const inf = zkStopKringInfo(O, k);
       const cls = inf.fouten.some(f=>f.startsWith("meer")) ? "fout" : inf.fouten.length ? "let" : "";
       return `<div class="zkw-kring ${cls}"><h4>Kring ${i+1}<span>${inf.punten} stopc. · ${escapeHtml(inf.verdieping||"—")}</span></h4>
-        ${k.delen.map((d,j)=>`<div class="zkw-deel">${escapeHtml(d.kamer)} <span class="zkw-oms">(${d.n})</span>${selectHtml(kringOpts, i, "zkw-verplaats\" data-k=\""+i+"\" data-d=\""+j)}</div>`).join("")}
+        ${k.delen.map((d,j)=>`<div class="zkw-deel">${escapeHtml(zkDeelNaam(d))} <span class="zkw-oms">(${d.n})</span>${selectHtml(kringOpts, i, "zkw-verplaats\" data-k=\""+i+"\" data-d=\""+j)}</div>`).join("")}
         ${inf.fouten.map(f=>`<div class="zkw-melding ${f.startsWith("meer")?"":"let"}">⚠ ${escapeHtml(f)}</div>`).join("")}</div>`;
     }).join("")}</div>`;
     return h;
@@ -24430,8 +24447,8 @@ async function zkOpen(opties){
       if(!(s.kamer in O.kamerSoort)) O.kamerSoort[s.kamer] = zkKamerSoort(s.kamer);
       zkStopVoorstel(O); teken(); }));
     qa("tr[data-i] .zkw-s-vd").forEach(sel=> sel.addEventListener("change", e=>{ const s = O.stop[parseInt(e.target.closest("tr").dataset.i)]; O.verdiepingen[s.kamer] = e.target.value; O.geraden = false; zkStopVoorstel(O); teken(); }));
-    qa("tr[data-i] .zkw-s-soort").forEach(sel=> sel.addEventListener("change", e=>{ const s = O.stop[parseInt(e.target.closest("tr").dataset.i)]; O.kamerSoort[s.kamer] = e.target.value; zkStopVoorstel(O); teken(); }));
-    [["zkw-s-muur","muur"],["zkw-s-vloer","vloer"],["zkw-s-gesch","geschakeld"]].forEach(([c,veld])=> qa("tr[data-i] ."+c).forEach(inp=> inp.addEventListener("change", e=>{
+    qa("tr[data-i] .zkw-s-soort").forEach(sel=> sel.addEventListener("change", e=>{ const s = O.stop[parseInt(e.target.closest("tr").dataset.i)]; O.kamerSoort[s.kamer] = e.target.value; if(e.target.value==="suite" && !s.bad) s.bad = 1; zkStopVoorstel(O); teken(); }));
+    [["zkw-s-muur","muur"],["zkw-s-vloer","vloer"],["zkw-s-bad","bad"],["zkw-s-gesch","geschakeld"]].forEach(([c,veld])=> qa("tr[data-i] ."+c).forEach(inp=> inp.addEventListener("change", e=>{
       O.stop[parseInt(e.target.closest("tr").dataset.i)][veld] = Math.max(0, parseInt(e.target.value)||0); zkStopVoorstel(O); teken(); })));
     qa(".zkw-s-del").forEach(b=> b.addEventListener("click", e=>{ O.stop.splice(parseInt(e.target.closest("tr").dataset.i),1); zkStopVoorstel(O); teken(); }));
     op("#zkw-s-add","click", ()=>{ O.stop.push({id:cryptoId(), kamer:"", muur:0, vloer:0, geschakeld:0}); teken(); });

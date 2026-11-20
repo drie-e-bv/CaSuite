@@ -1,0 +1,12 @@
+import { chromium } from '/opt/npm-tools/node_modules/playwright/index.mjs';
+const b=await chromium.launch({executablePath:'/usr/bin/google-chrome',args:['--no-sandbox']});
+const p=await b.newPage();
+await p.route(/^https?:\/\/(?!localhost)/,r=>{const u=r.request().url();
+ if(/supabase/.test(u))return r.fulfill({path:'stub3.js',contentType:'text/javascript'});
+ return r.fulfill({body:'',contentType:'text/javascript'})});
+await p.goto('http://localhost:8771/index.html');await p.waitForTimeout(2500);
+await p.evaluate(async()=>{await CaDosApp.loadForProject('p2')});
+console.log(await p.evaluate(()=>{const bron={stop:[{kamer:'Slpk 2 + badk 2',muur:5,vloer:0,geschakeld:0},{kamer:'Slpk 3 + badk 3',muur:5,vloer:0,geschakeld:0},{kamer:'Dressing',muur:4,vloer:0,geschakeld:0},{kamer:'Badkamer 1',muur:2,vloer:0,geschakeld:0}],voedingen:[],tebepalen:[],aansluitingA:'63A',reservePct:0,pv:false};
+ const O=CaDosApp.zekeringkast.nieuwOntwerp(bron);Object.keys(O.verdiepingen).forEach(k=>O.verdiepingen[k]='V1');const R=CaDosApp.zekeringkast.verdeel(O);
+ return O.stop.map(s=>s.kamer+' bad='+s.bad).join(' | ')+'\n'+R.kringen.map(k=>k.naam+' ('+k.delen.map(d=>d.n).join('+')+')').join('\n')}));
+await b.close();
