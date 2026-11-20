@@ -8579,6 +8579,7 @@ function renderZekeringen(){
                 <button class="btn" id="exportZekering">Exporteer voor werf (PDF)</button>
                 <button class="btn" id="zkToewijzen" title="Alles wat stroom nodig heeft aan een automaat koppelen">⚡ Automaten toewijzen${(()=>{ const n = azLijstMetStroom().filter(r=>!azAutomaatVan(r.obj)).length; return n ? ` <span class="ak-badge">${n}</span>` : ""; })()}</button>
                 <button class="btn" id="zkKoppelvoorstel" title="Lege koppelingen automatisch invullen">🔗 Koppelvoorstel</button>
+                <button class="btn" id="zkPlannen" title="Architectenplannen (PDF) inlezen: verdieping per kamer, buurkamers, kabellengtes">📐 Plannen inlezen</button>
                 <button class="btn" id="zkVerdeel" title="Stappenvenster: stopcontacten, toestellen en differentiëlen volgens het AREI">⚡ Verdelen volgens AREI</button>
                 <button class="btn" id="zkLijst" title="Afdrukbare lijst kringen (legende voor de kastdeur)">📄 Lijst kringen</button>
                 <button class="btn" id="toggleSelect">Selecteren</button>
@@ -8877,6 +8878,7 @@ function renderZekeringen(){
   wrap.querySelector("#zkToewijzen").addEventListener("click", ()=> azOpen());
   wrap.querySelector("#zkKoppelvoorstel").addEventListener("click", ()=> kvOpen());
   wrap.querySelector("#zkVerdeel").addEventListener("click", ()=> zkOpen());
+  wrap.querySelector("#zkPlannen").addEventListener("click", ()=> plOpen());
   wrap.querySelector("#zkLijst").addEventListener("click", ()=> zkPrintLijst());
   if(state.zkBron && !(state.zkOntwerp && state.zkOntwerp.toegepast)){
     const bn = el(`<div class="conflict-banner" style="margin:0 0 10px;"><div class="conflict-head">⚡ De automaten en differentiëlen uit de offerte zijn nog niet verdeeld.</div>
@@ -23635,9 +23637,10 @@ function ofToonVoorstel(V, bestandsnaam){
     save(); buildNav(); selectTab(currentTab||DEFAULT_TAB);
     const ov2 = ofToonModal(`<p><b>Toegevoegd aan het dossier:</b></p><ul>${gedaan.map(g=>`<li>${escapeHtml(g)}</li>`).join("")}</ul>
       <p class="hint">${backupOk ? "Er werd vooraf een back-up van het dossier bewaard." : "Er was nog geen bewaard dossier om een back-up van te maken."} Niet goed? Dan zet "Ongedaan maken" alles terug zoals het was.</p>`,
-      `<button class="btn btn-ghost" id="of-undo">Ongedaan maken</button><button class="btn btn-secondary" id="of-toewijs">⚡ Automaten toewijzen</button>${akOngekoppeld().length ? `<button class="btn btn-secondary" id="of-koppel">🔗 Armaturen koppelen (${akOngekoppeld().length})</button>` : ""}${keuze.zekeringen && state.zkBron ? `<button class="btn btn-secondary" id="of-ok">Sluiten</button><button class="btn btn-primary" id="of-zk">Verder: zekeringkast verdelen →</button>` : `<button class="btn btn-primary" id="of-ok">Sluiten</button>`}`);
+      `<button class="btn btn-ghost" id="of-undo">Ongedaan maken</button><button class="btn btn-secondary" id="of-toewijs">⚡ Automaten toewijzen</button>${akOngekoppeld().length ? `<button class="btn btn-secondary" id="of-koppel">🔗 Armaturen koppelen (${akOngekoppeld().length})</button>` : ""}${keuze.zekeringen && state.zkBron ? `<button class="btn btn-secondary" id="of-ok">Sluiten</button><button class="btn btn-secondary" id="of-plan">📐 Plannen inlezen</button><button class="btn btn-primary" id="of-zk">Verder: zekeringkast verdelen →</button>` : `<button class="btn btn-primary" id="of-ok">Sluiten</button>`}`);
     ov2.querySelector("#of-ok").addEventListener("click", ofSluit);
     if(ov2.querySelector("#of-zk")) ov2.querySelector("#of-zk").addEventListener("click", ()=>{ ofSluit(); zkOpen({nieuw:true}); });
+    if(ov2.querySelector("#of-plan")) ov2.querySelector("#of-plan").addEventListener("click", ()=>{ ofSluit(); plOpen(); });
     if(ov2.querySelector("#of-koppel")) ov2.querySelector("#of-koppel").addEventListener("click", ()=>{ ofSluit(); akOpen(); });
     ov2.querySelector("#of-toewijs").addEventListener("click", ()=>{ ofSluit(); azOpen(); });
     ov2.querySelector("#of-undo").addEventListener("click", ()=>{
@@ -23648,6 +23651,402 @@ function ofToonVoorstel(V, bestandsnaam){
   });
 }
 document.getElementById("btnOfferte") && document.getElementById("btnOfferte").addEventListener("click", ()=> ofStart());
+
+/* =========================================================================
+   PLANNEN INLEZEN — kamers, trap en kasten op de architectenplannen (20/11/2026, op vraag van Peter:
+   "Kan het nuttig zijn om de plannen ook door te sturen om analyse te maken van waar de kamers zijn?
+   Zodat kabels zo kort mogelijk zijn." + "kun je de plannen inlezen knop er nog bij voorzien?").
+   De plannen (AutoCAD/Vectorworks-PDF's) bevatten de kamernamen als tekst: pdf.js leest tekst + positie.
+   Stappen: PDF's kiezen en per blad het niveau (of meerdere zones op één blad) -> trap, zekeringkast en
+   driverkasten aanklikken -> kamers koppelen (automatisch op naam; slaapkamer + badkamer + dressing mogen
+   samen bij één offertekamer horen) -> bewaren in state.planAnalyse.
+   Gebruik: het stappenvenster van de zekeringkast neemt de verdieping per kamer over, voegt stopcontacten
+   enkel samen met buurkamers en rekent een geschatte kabellengte per kring.
+   ========================================================================= */
+const PL_NABIJ_M = 10;       // kamers binnen deze afstand gelden als buren
+const PL_TOESLAG_M = 3;      // op- en afgaan, in de kast, doos
+const PL_PDFJS = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.5.141/pdf.worker.min.js";
+const plDocs = new Map();    // bestandId -> pdf.js document (enkel in het geheugen)
+const plNorm = s=> String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase()
+  .replace(/\bslpk\.?/g,"slaapkamer").replace(/\bbadk\.?/g,"badkamer").replace(/\bslk\.?/g,"slaapkamer")
+  .replace(/[^a-z0-9]+/g," ").trim();
+function plLeeg(){ return {versie:1, bestanden:[], zones:[], kamers:{}, kast:null, driverkasten:{}, hoogte:3}; }
+async function plLaadPdf(bestand, buf){
+  if(!window.pdfjsLib) throw new Error("PDF-lezer niet geladen (geen internet?)");
+  if(!pdfjsLib.GlobalWorkerOptions.workerSrc) pdfjsLib.GlobalWorkerOptions.workerSrc = PL_PDFJS;
+  if(plDocs.has(bestand.id)) return plDocs.get(bestand.id);
+  if(!buf){
+    if(!bestand.url) throw new Error("Plan "+bestand.naam+" is niet bewaard — kies het bestand opnieuw.");
+    buf = await (await fetch(bestand.url)).arrayBuffer();
+  }
+  const doc = await pdfjsLib.getDocument({data: buf}).promise;
+  plDocs.set(bestand.id, doc);
+  return doc;
+}
+// teksten van een blad met positie (PDF-punten, y naar boven) en letterhoogte; woorden op één lijn samengevoegd
+async function plTeksten(page){
+  const tc = await page.getTextContent();
+  const it = tc.items.filter(i=> i.str && i.str.trim()).map(i=>{
+    const t = i.transform; const h = Math.hypot(t[2], t[3]) || Math.abs(t[3]) || 1;
+    return {s:i.str.trim(), x:t[4], y:t[5], w:i.width||0, h, rot: Math.abs(t[1])>0.01};
+  });
+  const rest = it.filter(i=> !i.rot).sort((a,b)=> (b.y-a.y) || (a.x-b.x));
+  const lijnen = [];
+  rest.forEach(i=>{
+    const l = lijnen.find(l=> Math.abs(l.y-i.y) < i.h*0.3 && Math.abs(l.h-i.h) < i.h*0.25 && i.x - (l.x+l.w) > -i.h*0.2 && i.x - (l.x+l.w) < i.h*1.2);
+    if(l){ l.s += " "+i.s; l.w = i.x + i.w - l.x; }
+    else lijnen.push(Object.assign({}, i));
+  });
+  return [...lijnen, ...it.filter(i=> i.rot)].map(l=>({s:l.s, n:plNorm(l.s), x:l.x + l.w/2, y:l.y + l.h/2, h:l.h}));
+}
+function plSchaal(teksten){
+  const tel = {};
+  teksten.forEach(t=>{ const m = t.s.match(/(?:^|\s|schaal\s*:?\s*)1\s*[\/:]\s*(\d{2,3})(?!\d)/i); if(m) tel[m[1]] = (tel[m[1]]||0)+1; });
+  const best = Object.entries(tel).sort((a,b)=> (b[0]==="50") - (a[0]==="50") || b[1]-a[1])[0];
+  return best ? parseInt(best[0]) : 50;
+}
+const plInZone = (z, p)=> !z.rect || (p.x>=Math.min(z.rect[0],z.rect[2]) && p.x<=Math.max(z.rect[0],z.rect[2]) && p.y>=Math.min(z.rect[1],z.rect[3]) && p.y<=Math.max(z.rect[1],z.rect[3]));
+const plRuimteAchtig = t=> t.n.length>=3 && t.n.length<=32 && /[a-z]{3}/.test(t.n) && !/\b(schaal|plan|legende|project|opdrachtgever|datum|getekend|architect|www|tel|fax|cm|mm|m2|kw|ma|vac)\b/.test(t.n) && !/^\d/.test(t.n);
+// kandidaten (labels) per zone: unieke teksten, grootste letter eerst
+function plLabels(A, zone){
+  const b = A.__teksten && A.__teksten[zone.bestandId+"#"+zone.pagina];
+  if(!b) return [];
+  return b.filter(t=> plInZone(zone, t) && plRuimteAchtig(t));
+}
+// automatisch koppelen: exacte naam, of de delen van een suite ("Slpk 2 + badk 2" -> slaapkamer 2, badkamer 2, dressing 2)
+function plZoekKamer(A, kamer){
+  const delen = String(kamer).split(/\s*\+\s*|\s+en\s+|\s*&\s*/).map(plNorm).filter(Boolean);
+  const nr = (String(kamer).match(/\d+/)||[""])[0];
+  if(delen.length>1 && nr && /slaapkamer/.test(delen[0])) delen.push("dressing "+nr);
+  const doelen = [plNorm(kamer), ...(delen.length>1 ? delen : [])];
+  const gevonden = [];
+  A.zones.filter(z=> z.niveau).forEach(z=>{
+    const L = plLabels(A, z);
+    doelen.forEach((d,i)=>{
+      const hits = L.filter(t=> t.n===d).sort((a,b)=> b.h-a.h);
+      if(hits.length && (i===0 || !gevonden.some(g=> g.d===doelen[0]))) gevonden.push({d, zoneId:z.id, x:hits[0].x, y:hits[0].y, s:hits[0].s});
+    });
+  });
+  const exact = gevonden.filter(g=> g.d===doelen[0]);
+  const keuze = exact.length ? [exact.sort((a,b)=>0)[0]] : gevonden;
+  // alle punten in dezelfde zone houden (eerste zone met een treffer)
+  if(!keuze.length) return null;
+  const z0 = keuze[0].zoneId;
+  return {zoneId:z0, punten: keuze.filter(g=> g.zoneId===z0).map(g=>({x:g.x, y:g.y, s:g.s})), bron:"auto"};
+}
+// positie in meter t.o.v. de trap van de zone (zodat verdiepingen op elkaar liggen)
+function plPos(A, zoneId, x, y){
+  const z = A.zones.find(z=> z.id===zoneId); if(!z) return null;
+  const f = 0.0254/72 * (parseFloat(z.schaal)||50);
+  const t = z.trap || {x:0, y:0};
+  const niv = (state.verdiepingen||[]).findIndex(v=> v.code===z.niveau);
+  return {niveau:z.niveau, nivIdx: niv<0 ? 0 : niv, x:(x - t.x)*f, y:(y - t.y)*f, trap:!!z.trap, zoneId};
+}
+function plKamerPos(A, kamer){
+  const k = A && A.kamers && A.kamers[kamer]; if(!k || !k.punten || !k.punten.length) return null;
+  const x = k.punten.reduce((s,p)=> s+p.x, 0)/k.punten.length, y = k.punten.reduce((s,p)=> s+p.y, 0)/k.punten.length;
+  return plPos(A, k.zoneId, x, y);
+}
+function plAfstand(A, a, b){
+  if(!a || !b) return null;
+  const vlak = (p,q)=> Math.abs(p.x-q.x) + Math.abs(p.y-q.y);
+  if(a.niveau===b.niveau && (a.zoneId===b.zoneId || (a.trap && b.trap))) return vlak(a,b);
+  if(!a.trap || !b.trap) return null;
+  return Math.abs(a.x)+Math.abs(a.y) + Math.abs(a.nivIdx-b.nivIdx)*(parseFloat(A.hoogte)||3) + Math.abs(b.x)+Math.abs(b.y);
+}
+// geschatte kabellengte: van de kast langs de dichtstbijzijnde kamer naar de volgende … + toeslag
+function plKringLengte(A, kamers){
+  if(!A || !A.kast) return null;
+  const kast = plPos(A, A.kast.zoneId, A.kast.x, A.kast.y);
+  let rest = kamers.map(k=> plKamerPos(A, k)).filter(Boolean);
+  if(!rest.length || rest.length < kamers.length) return null;
+  let pos = kast, tot = 0;
+  while(rest.length){
+    rest.sort((p,q)=> (plAfstand(A,pos,p)??1e9) - (plAfstand(A,pos,q)??1e9));
+    const d = plAfstand(A, pos, rest[0]); if(d==null) return null;
+    tot += d; pos = rest.shift();
+  }
+  return Math.ceil(tot + PL_TOESLAG_M);
+}
+function plKamerAfstand(A, k1, k2){ return plAfstand(A, plKamerPos(A, k1), plKamerPos(A, k2)); }
+function plVerdieping(kamer){ const A = state.planAnalyse; const k = A && A.kamers && A.kamers[kamer]; if(!k) return ""; const z = A.zones.find(z=> z.id===k.zoneId); return z ? z.niveau : ""; }
+
+/* ---------- venster ---------- */
+function plCss(){
+  if(document.getElementById("plw-css")) return;
+  const st = document.createElement("style"); st.id = "plw-css";
+  st.textContent = `
+  #plw-modal .modal-box{max-width:1180px;width:calc(100vw - 24px);}
+  #plw-modal .plw-stappen{display:flex;gap:4px;flex-wrap:wrap;margin:0 0 12px;}
+  #plw-modal .plw-stap{border:1px solid var(--line,#dde3e0);border-radius:999px;padding:4px 10px;font-size:12.5px;background:var(--panel,#fff);cursor:pointer;color:var(--ink-soft,#5b6b63);}
+  #plw-modal .plw-stap.on{background:var(--green,#1d6b3e);border-color:var(--green,#1d6b3e);color:#fff;font-weight:600;}
+  #plw-modal .plw-bladen{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;}
+  #plw-modal .plw-blad{border:1px solid var(--line,#dde3e0);border-radius:10px;padding:8px;font-size:12.5px;background:var(--panel,#fff);}
+  #plw-modal .plw-blad img{width:100%;height:140px;object-fit:contain;background:#f6f7f6;border-radius:6px;}
+  #plw-modal .plw-blad select, #plw-modal .plw-blad input{width:100%;box-sizing:border-box;margin-top:4px;padding:4px 6px;min-height:32px;}
+  #plw-modal .plw-bar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:0 0 8px;position:sticky;top:0;background:var(--panel,#fff);z-index:3;padding:4px 0;}
+  #plw-modal .plw-bar .btn.on{background:var(--green,#1d6b3e);color:#fff;border-color:var(--green,#1d6b3e);}
+  #plw-modal .plw-doek{position:relative;overflow:auto;max-height:62vh;border:1px solid var(--line,#dde3e0);border-radius:8px;background:#fff;touch-action:pan-x pan-y;}
+  #plw-modal .plw-doek canvas{display:block;}
+  #plw-modal .plw-pin{position:absolute;transform:translate(-50%,-100%);font-size:11px;font-weight:700;padding:2px 6px;border-radius:999px;color:#fff;white-space:nowrap;pointer-events:none;box-shadow:0 1px 3px rgba(0,0,0,.35);}
+  #plw-modal .plw-pin.kast{background:#c0392b;} #plw-modal .plw-pin.trap{background:#1f5f9e;} #plw-modal .plw-pin.dk{background:#7a5aa6;}
+  #plw-modal .plw-pin.kamer{background:#1d6b3e;font-weight:600;transform:translate(-50%,-50%);opacity:.9;}
+  #plw-modal .plw-zone{position:absolute;border:2px dashed #e67e22;background:rgba(230,126,34,.06);pointer-events:none;}
+  #plw-modal .plw-zone span{position:absolute;top:2px;left:4px;background:#e67e22;color:#fff;font-size:11px;padding:1px 6px;border-radius:4px;}
+  #plw-modal .plw-tabel{width:100%;border-collapse:collapse;font-size:13px;}
+  #plw-modal .plw-tabel th{text-align:left;font-size:11.5px;color:var(--ink-soft,#5b6b63);padding:4px 5px;border-bottom:1px solid var(--line,#dde3e0);}
+  #plw-modal .plw-tabel td{padding:3px 5px;border-bottom:1px solid var(--line,#eef1ef);}
+  #plw-modal .plw-tabel select{width:100%;min-height:32px;}
+  #plw-modal .plw-ok{color:#1d6b3e;font-weight:600;} #plw-modal .plw-mis{color:#a33;}
+  #plw-modal .plw-melding{background:#fff4e0;border:1px solid #f0c674;color:#7a4b00;border-radius:10px;padding:8px 12px;font-size:13px;margin:8px 0;}
+  `;
+  document.head.appendChild(st);
+}
+async function plOpen(){
+  if(!currentProjectId){ toast("Kies eerst een project."); return; }
+  plCss();
+  const A = state.planAnalyse ? JSON.parse(JSON.stringify(state.planAnalyse)) : plLeeg();
+  A.__teksten = {};
+  let stap = A.zones.length ? 1 : 0, gereedschap = "trap", zoneIdx = 0, zoom = 1, kamerDoel = "";
+  const ov = document.createElement("div");
+  ov.className = "modal-overlay"; ov.id = "plw-modal";
+  ov.innerHTML = `<div class="modal-box"><h2>📐 Plannen inlezen</h2><div class="modal-body"></div>
+    <div class="modal-actions"><button class="btn btn-ghost" id="plw-sluit" style="margin-right:auto">Sluiten</button><button class="btn btn-secondary" id="plw-terug">← Vorige</button><button class="btn btn-primary" id="plw-verder">Volgende →</button></div></div>`;
+  document.body.appendChild(ov);
+  const body = ov.querySelector(".modal-body");
+  const STAPPEN = ["Bladen & niveaus","Trap & kasten aanduiden","Kamers koppelen"];
+  ov.querySelector("#plw-sluit").addEventListener("click", ()=> ov.remove());
+  ov.querySelector("#plw-terug").addEventListener("click", ()=>{ if(stap>0){ stap--; teken(); } });
+  ov.querySelector("#plw-verder").addEventListener("click", ()=>{ if(stap<2){ stap++; teken(); } else bewaar(); });
+  // teksten van de gekende bestanden laden (bij heropenen)
+  async function laadTeksten(){
+    for(const z of A.zones){
+      const sleutel = z.bestandId+"#"+z.pagina; if(A.__teksten[sleutel]) continue;
+      const b = A.bestanden.find(b=> b.id===z.bestandId); if(!b) continue;
+      try{ const doc = await plLaadPdf(b); A.__teksten[sleutel] = await plTeksten(await doc.getPage(z.pagina)); }
+      catch(e){ console.warn("CaDos: plan niet geladen", e); }
+    }
+  }
+  const vdOpts = (h)=> [["","— niet gebruiken —"], ...(state.verdiepingen||[]).map(v=>[v.code, v.code+" — "+v.label]), ["__zones","Meerdere niveaus op dit blad"]]
+    .map(([v,l])=>`<option value="${escapeHtml(v)}" ${h===v?"selected":""}>${escapeHtml(l)}</option>`).join("");
+  async function teken(){
+    let h = `<div class="plw-stappen">${STAPPEN.map((s,i)=>`<button class="plw-stap ${i===stap?"on":""}" data-s="${i}">${i+1}. ${escapeHtml(s)}</button>`).join("")}</div>`;
+    ov.querySelector("#plw-terug").style.visibility = stap ? "visible" : "hidden";
+    ov.querySelector("#plw-verder").textContent = stap===2 ? "✓ Bewaren" : "Volgende →";
+    if(stap===0) h += await stap1();
+    if(stap===1) h += stap2();
+    if(stap===2) h += stap3();
+    body.innerHTML = h;
+    body.querySelectorAll(".plw-stap").forEach(b=> b.addEventListener("click", ()=>{ stap = parseInt(b.dataset.s); teken(); }));
+    if(stap===0) bind1();
+    if(stap===1) await bind2();
+    if(stap===2) bind3();
+  }
+  // ---- stap 1: bestanden en bladen ----
+  async function stap1(){
+    let h = `<p class="hint">Kies de plannen zoals je ze van de architect krijgt (PDF uit AutoCAD, Revit, Vectorworks …). Geef per blad het niveau. Staan er meerdere niveaus op één blad, kies dan "Meerdere niveaus" en trek in de volgende stap een kader rond elk niveau.</p>
+      <label class="btn btn-secondary" style="display:inline-block">📄 Plannen kiezen (PDF)<input type="file" id="plw-files" accept="application/pdf,.pdf" multiple hidden></label>
+      <div class="plw-bladen" style="margin-top:10px">`;
+    for(const b of A.bestanden){
+      for(let p=1; p<=b.paginas; p++){
+        const zones = A.zones.filter(z=> z.bestandId===b.id && z.pagina===p);
+        const keuze = zones.length>1 || (zones.length===1 && zones[0].rect) ? "__zones" : zones.length ? zones[0].niveau : "";
+        const thumb = b.thumbs && b.thumbs[p] ? `<img src="${b.thumbs[p]}" alt="">` : `<div class="hint" style="height:140px;display:flex;align-items:center;justify-content:center">blad ${p}</div>`;
+        h += `<div class="plw-blad">${thumb}<div><b>${escapeHtml(b.naam)}</b> · blad ${p}</div>
+          <select class="plw-niv" data-b="${b.id}" data-p="${p}">${vdOpts(keuze)}</select>
+          <label class="hint" style="display:flex;gap:6px;align-items:center;margin-top:4px">Schaal 1:<input class="plw-schaal" data-b="${b.id}" data-p="${p}" type="number" value="${escapeHtml((zones[0]&&zones[0].schaal)||b.schaal&&b.schaal[p]||50)}" style="width:70px;margin:0"></label></div>`;
+      }
+    }
+    h += `</div>`;
+    if(!A.bestanden.length) h += `<p class="hint">Nog geen plannen.</p>`;
+    return h;
+  }
+  function bind1(){
+    body.querySelector("#plw-files").addEventListener("change", async e=>{
+      const files = [...e.target.files]; if(!files.length) return;
+      body.insertAdjacentHTML("beforeend", `<p class="hint" id="plw-bezig">Plannen worden gelezen…</p>`);
+      for(const f of files){
+        try{
+          const buf = await f.arrayBuffer();
+          const b = {id:cryptoId(), naam:f.name.replace(/\.pdf$/i,""), url:"", paginas:0, thumbs:{}, schaal:{}};
+          const doc = await plLaadPdf(b, buf.slice(0));
+          b.paginas = doc.numPages;
+          for(let p=1; p<=doc.numPages; p++){
+            const page = await doc.getPage(p);
+            const vp = page.getViewport({scale:1}); const sc = 360/vp.width;
+            const c = document.createElement("canvas"); const v2 = page.getViewport({scale:sc}); c.width = v2.width; c.height = v2.height;
+            await page.render({canvasContext:c.getContext("2d"), viewport:v2}).promise;
+            b.thumbs[p] = c.toDataURL("image/jpeg", 0.7);
+            const tk = await plTeksten(page); A.__teksten[b.id+"#"+p] = tk; b.schaal[p] = plSchaal(tk);
+            // niveau raden uit de bestandsnaam / bladtitel (NIV0, NIV-1, gelijkvloers …)
+            const titel = plNorm(f.name+" "+tk.filter(t=> t.h>=Math.max(...tk.map(x=>x.h))*0.5).map(t=>t.s).join(" "));
+            const codes = (state.verdiepingen||[]).map(v=> v.code);
+            const raad = /niv\s*-\s*1|niveau\s*-\s*1|kelder/.test(titel) ? "K" : /niv\s*0|niveau\s*0|gelijkvloers/.test(titel) ? "G" : /niv\s*1|niveau\s*1|verdieping/.test(titel) ? "V1" : "";
+            if(doc.numPages===1 && codes.includes(raad)) A.zones.push({id:cryptoId(), bestandId:b.id, pagina:p, niveau:raad, schaal:b.schaal[p], rect:null, trap:null});
+          }
+          A.bestanden.push(b);
+          // origineel bewaren (zoals ontvangen) zodat je later opnieuw kan aanduiden
+          try{ if(window.dbUploadFile){ b.url = await window.dbUploadFile("project-plannen", new File([buf], f.name, {type:"application/pdf"})); } }
+          catch(err){ console.warn("CaDos: plan niet bewaard in de opslag", err); }
+        }catch(err){ console.error(err); toast("⚠️ "+f.name+" kon niet gelezen worden: "+(err.message||err)); }
+      }
+      teken();
+    });
+    body.querySelectorAll(".plw-niv").forEach(sel=> sel.addEventListener("change", e=>{
+      const bId = sel.dataset.b, p = parseInt(sel.dataset.p);
+      const b = A.bestanden.find(b=> b.id===bId);
+      A.zones = A.zones.filter(z=> !(z.bestandId===bId && z.pagina===p));
+      if(e.target.value && e.target.value!=="__zones") A.zones.push({id:cryptoId(), bestandId:bId, pagina:p, niveau:e.target.value, schaal:(b.schaal&&b.schaal[p])||50, rect:null, trap:null});
+      if(e.target.value==="__zones"){ b.zonesBlad = b.zonesBlad||{}; b.zonesBlad[p] = true; } else if(b.zonesBlad) delete b.zonesBlad[p];
+    }));
+    body.querySelectorAll(".plw-schaal").forEach(inp=> inp.addEventListener("change", e=>{
+      const b = A.bestanden.find(b=> b.id===inp.dataset.b), p = parseInt(inp.dataset.p);
+      b.schaal = b.schaal||{}; b.schaal[p] = parseInt(e.target.value)||50;
+      A.zones.filter(z=> z.bestandId===b.id && z.pagina===p).forEach(z=> z.schaal = b.schaal[p]);
+    }));
+  }
+  // ---- stap 2: aanduiden op het plan ----
+  function bladen(){
+    const out = [];
+    A.bestanden.forEach(b=>{ for(let p=1;p<=b.paginas;p++){ const zs = A.zones.filter(z=> z.bestandId===b.id && z.pagina===p); if(zs.length || (b.zonesBlad&&b.zonesBlad[p])) out.push({b, p, zs}); } });
+    return out;
+  }
+  function stap2(){
+    const B = bladen();
+    if(!B.length) return `<div class="plw-melding">Geef in stap 1 minstens één blad een niveau.</div>`;
+    zoneIdx = Math.min(zoneIdx, B.length-1);
+    const cur = B[zoneIdx];
+    const dk = state.driverkast.kasten.filter(k=> k.items.length);
+    const knop = (id, lab)=> `<button class="btn small ${gereedschap===id?"on":""}" data-g="${escapeHtml(id)}">${escapeHtml(lab)}</button>`;
+    const zonder = A.zones.filter(z=> !z.trap).map(z=> z.niveau);
+    return `<div class="plw-bar">
+        <select id="plw-blad" style="min-height:32px">${B.map((x,i)=>`<option value="${i}" ${i===zoneIdx?"selected":""}>${escapeHtml(x.b.naam)} · blad ${x.p} (${x.zs.map(z=>z.niveau).join(", ")||"zones tekenen"})</option>`).join("")}</select>
+        ${knop("trap","🪜 Trap")}${knop("kast","⚡ Zekeringkast")}${dk.map((k,i)=> knop("dk:"+k.id, "💡 "+(k.naam||"Driverkast "+(i+1)))).join("")}
+        ${(cur.b.zonesBlad&&cur.b.zonesBlad[cur.p]) ? `${knop("zone","▭ Zone tekenen")}<select id="plw-zoneniv" style="min-height:32px">${(state.verdiepingen||[]).map(v=>`<option value="${escapeHtml(v.code)}">${escapeHtml(v.code)}</option>`).join("")}</select>` : ""}
+        <span style="margin-left:auto"></span><button class="btn small" id="plw-zoomuit">−</button><button class="btn small" id="plw-zoomin">+</button></div>
+      <p class="hint" style="margin:0 0 6px">Klik op het plan om het gekozen punt te zetten. De trap legt de verdiepingen op elkaar (zet hem op elk niveau op dezelfde plek). Groene labels = herkende kamers.</p>
+      ${zonder.length ? `<div class="plw-melding">Nog geen trap op: ${escapeHtml(zonder.join(", "))}.</div>` : ""}
+      ${!A.kast ? `<div class="plw-melding">Nog geen zekeringkast aangeduid.</div>` : ""}
+      <div class="plw-doek" id="plw-doek"><canvas></canvas></div>`;
+  }
+  async function bind2(){
+    const B = bladen(); if(!B.length) return;
+    autoKoppel();
+    const cur = B[zoneIdx];
+    body.querySelector("#plw-blad").addEventListener("change", e=>{ zoneIdx = parseInt(e.target.value); teken(); });
+    body.querySelectorAll("[data-g]").forEach(b=> b.addEventListener("click", ()=>{ gereedschap = b.dataset.g; body.querySelectorAll("[data-g]").forEach(x=> x.classList.toggle("on", x===b)); }));
+    body.querySelector("#plw-zoomin").addEventListener("click", ()=>{ zoom = Math.min(6, zoom*1.5); teken(); });
+    body.querySelector("#plw-zoomuit").addEventListener("click", ()=>{ zoom = Math.max(0.5, zoom/1.5); teken(); });
+    const doek = body.querySelector("#plw-doek"), canvas = doek.querySelector("canvas");
+    let doc;
+    try{ doc = await plLaadPdf(cur.b); }catch(e){ doek.innerHTML = `<p class="hint" style="padding:10px">${escapeHtml(e.message)}</p>`; return; }
+    const page = await doc.getPage(cur.p);
+    const v1 = page.getViewport({scale:1});
+    const breedte = Math.min(9000, (doek.clientWidth||1000) * zoom);
+    const vp = page.getViewport({scale: breedte / v1.width});
+    canvas.width = vp.width; canvas.height = vp.height;
+    await page.render({canvasContext:canvas.getContext("2d"), viewport:vp}).promise;
+    if(!A.__teksten[cur.b.id+"#"+cur.p]) A.__teksten[cur.b.id+"#"+cur.p] = await plTeksten(page);
+    const pin = (x, y, cls, lab)=>{ const [cx, cy] = vp.convertToViewportPoint(x, y); const d = document.createElement("div"); d.className = "plw-pin "+cls; d.style.left = cx+"px"; d.style.top = cy+"px"; d.textContent = lab; doek.appendChild(d); };
+    cur.zs.forEach(z=>{
+      if(z.rect){ const [x0,y0] = vp.convertToViewportPoint(z.rect[0], z.rect[1]), [x1,y1] = vp.convertToViewportPoint(z.rect[2], z.rect[3]);
+        const d = document.createElement("div"); d.className = "plw-zone"; Object.assign(d.style, {left:Math.min(x0,x1)+"px", top:Math.min(y0,y1)+"px", width:Math.abs(x1-x0)+"px", height:Math.abs(y1-y0)+"px"}); d.innerHTML = `<span>${escapeHtml(z.niveau)}</span>`; doek.appendChild(d); }
+      if(z.trap) pin(z.trap.x, z.trap.y, "trap", "🪜 "+z.niveau);
+    });
+    if(A.kast && cur.zs.some(z=> z.id===A.kast.zoneId)) pin(A.kast.x, A.kast.y, "kast", "⚡ Zekeringkast");
+    Object.entries(A.driverkasten).forEach(([id,p])=>{ if(cur.zs.some(z=> z.id===p.zoneId)){ const k = state.driverkast.kasten.find(k=>k.id===id); pin(p.x, p.y, "dk", "💡 "+((k&&k.naam)||"Driverkast")); } });
+    Object.entries(A.kamers).forEach(([kamer, k])=>{ if(cur.zs.some(z=> z.id===k.zoneId)) (k.punten||[]).forEach(p=> pin(p.x, p.y, "kamer", kamer)); });
+    const naarPdf = e=>{ const r = canvas.getBoundingClientRect(); return vp.convertToPdfPoint(e.clientX - r.left, e.clientY - r.top); };
+    let sleep = null;
+    canvas.addEventListener("pointerdown", e=>{ if(gereedschap==="zone"){ sleep = naarPdf(e); e.preventDefault(); } });
+    canvas.addEventListener("pointerup", e=>{
+      const [x, y] = naarPdf(e);
+      if(gereedschap==="zone"){
+        if(!sleep) return; const s = sleep; sleep = null;
+        if(Math.abs(s[0]-x) < 20 || Math.abs(s[1]-y) < 20) return;
+        const niv = body.querySelector("#plw-zoneniv").value;
+        A.zones = A.zones.filter(z=> !(z.bestandId===cur.b.id && z.pagina===cur.p && z.niveau===niv));
+        A.zones.push({id:cryptoId(), bestandId:cur.b.id, pagina:cur.p, niveau:niv, schaal:(cur.b.schaal&&cur.b.schaal[cur.p])||50, rect:[s[0], s[1], x, y], trap:null});
+        teken(); return;
+      }
+      const zone = cur.zs.find(z=> plInZone(z, {x, y}));
+      if(!zone){ toast(cur.zs.length ? "Klik binnen een zone (niveau)." : "Teken eerst een zone voor dit niveau."); return; }
+      if(gereedschap==="trap") zone.trap = {x, y};
+      else if(gereedschap==="kast") A.kast = {zoneId:zone.id, x, y};
+      else if(gereedschap.startsWith("dk:")) A.driverkasten[gereedschap.slice(3)] = {zoneId:zone.id, x, y};
+      else if(gereedschap==="kamer" && kamerDoel){ A.kamers[kamerDoel] = {zoneId:zone.id, punten:[{x, y, s:"aangeklikt"}], bron:"hand"}; gereedschap = "trap"; stap = 2; }
+      teken();
+    });
+  }
+  // ---- stap 3: kamers koppelen ----
+  function autoKoppel(){
+    state.kamers.filter(Boolean).forEach(k=>{ if(!A.kamers[k] || A.kamers[k].bron==="auto"){ const r = plZoekKamer(A, k); if(r) A.kamers[k] = r; else if(A.kamers[k] && A.kamers[k].bron==="auto") delete A.kamers[k]; } });
+  }
+  function stap3(){
+    autoKoppel();
+    let alleLabels = [];
+    A.zones.filter(z=> z.niveau).forEach(z=> plLabels(A, z).forEach(t=> alleLabels.push({z, t})));
+    // enkel teksten met ongeveer de lettergrootte van de herkende kamernamen (geen notities, maten …)
+    const hRef = Object.values(A.kamers).filter(g=> g.bron==="auto").flatMap(g=> g.punten.map(p=> (alleLabels.find(x=> x.z.id===g.zoneId && x.t.s===p.s)||{t:{}}).t.h)).filter(Boolean).sort((a,b)=>a-b);
+    if(hRef.length >= 3){ const med = hRef[Math.floor(hRef.length/2)]; alleLabels = alleLabels.filter(x=> x.t.h >= med*0.7 && x.t.h <= med*1.6); }
+    const uniek = new Map(); alleLabels.forEach(({z,t})=>{ const key = z.id+"|"+t.n; const o = uniek.get(key); if(!o || t.h>o.t.h) uniek.set(key, {z,t}); });
+    const opties = [...uniek.values()].sort((a,b)=> a.t.n.localeCompare(b.t.n));
+    const nGek = state.kamers.filter(k=> k && A.kamers[k]).length;
+    let h = `<p class="hint">Gekoppeld: <b>${nGek}</b> van ${state.kamers.filter(Boolean).length} kamers. Wat niet gevonden is: kies het label op het plan, of klik 📍 en duid de kamer aan. Slaapkamer + badkamer + dressing mogen samen bij één kamer horen (kies extra labels met "+").</p>`;
+    if(!A.kast) h += `<div class="plw-melding">Duid de zekeringkast aan (stap 2) om kabellengtes te kunnen rekenen.</div>`;
+    const kastPos = A.kast ? plPos(A, A.kast.zoneId, A.kast.x, A.kast.y) : null;
+    h += `<div style="overflow-x:auto"><table class="plw-tabel"><thead><tr><th>Kamer (offerte/dossier)</th><th>Niveau</th><th>Op het plan</th><th></th><th>Tot de kast</th></tr></thead><tbody>
+      ${state.kamers.filter(Boolean).map(k=>{
+        const g = A.kamers[k]; const z = g && A.zones.find(z=> z.id===g.zoneId);
+        const d = g ? plAfstand(A, kastPos, plKamerPos(A, k)) : null;
+        const sel = `<select class="plw-k" data-k="${escapeHtml(k)}"><option value="">— niet op het plan —</option>${opties.map((o,i)=>`<option value="${i}" ${g && g.punten && g.punten.some(p=> p.s===o.t.s && g.zoneId===o.z.id)?"selected":""}>${escapeHtml(o.z.niveau+" · "+o.t.s)}</option>`).join("")}${g && g.bron==="hand"?`<option value="hand" selected>📍 aangeklikt (${escapeHtml(z?z.niveau:"")})</option>`:""}</select>`;
+        return `<tr><td>${escapeHtml(k)}</td><td>${escapeHtml(z?z.niveau:"")}</td><td>${sel}${g && g.punten && g.punten.length>1 ? `<div class="hint">${g.punten.map(p=>escapeHtml(p.s)).join(" + ")}</div>`:""}</td>
+          <td style="white-space:nowrap"><button class="btn small plw-plus" data-k="${escapeHtml(k)}" title="nog een ruimte bij deze kamer (bv. badkamer, dressing)" ${g?"":"disabled"}>+</button> <button class="btn small plw-klik" data-k="${escapeHtml(k)}" title="aanduiden op het plan">📍</button></td>
+          <td class="${g?"plw-ok":"plw-mis"}">${g ? (d!=null ? "≈ "+Math.round(d)+" m" : "✓") : "—"}</td></tr>`;
+      }).join("")}</tbody></table></div>
+      <label class="hint" style="display:flex;gap:6px;align-items:center;margin-top:8px">Verdiepingshoogte <input type="number" id="plw-hoogte" value="${escapeHtml(A.hoogte)}" step="0.1" style="width:70px"> m</label>`;
+    A.__opties = opties;
+    return h;
+  }
+  function bind3(){
+    body.querySelectorAll(".plw-k").forEach(sel=> sel.addEventListener("change", e=>{
+      const k = sel.dataset.k, v = e.target.value;
+      if(v==="") delete A.kamers[k];
+      else if(v!=="hand"){ const o = A.__opties[parseInt(v)]; A.kamers[k] = {zoneId:o.z.id, punten:[{x:o.t.x, y:o.t.y, s:o.t.s}], bron:"keuze"}; }
+      teken();
+    }));
+    body.querySelectorAll(".plw-plus").forEach(b=> b.addEventListener("click", ()=>{
+      const k = b.dataset.k, g = A.kamers[k]; if(!g) return;
+      const opts = A.__opties.map((o,i)=>({o,i})).filter(({o})=> o.z.id===g.zoneId);
+      const keuze = prompt("Extra ruimte bij "+k+" (typ de naam zoals op het plan, bv. BADKAMER 2 of DRESSING):");
+      if(!keuze) return;
+      const hit = opts.find(({o})=> o.t.n===plNorm(keuze)) || opts.find(({o})=> o.t.n.includes(plNorm(keuze)));
+      if(!hit){ toast("Niet gevonden op hetzelfde niveau: "+keuze); return; }
+      g.punten.push({x:hit.o.t.x, y:hit.o.t.y, s:hit.o.t.s}); g.bron = "keuze"; teken();
+    }));
+    body.querySelectorAll(".plw-klik").forEach(b=> b.addEventListener("click", ()=>{ kamerDoel = b.dataset.k; gereedschap = "kamer"; stap = 1; toast("Klik op het plan waar "+kamerDoel+" ligt"); teken(); }));
+    const hg = body.querySelector("#plw-hoogte"); if(hg) hg.addEventListener("change", e=>{ A.hoogte = parseFloat(e.target.value)||3; teken(); });
+  }
+  function bewaar(){
+    const schoon = JSON.parse(JSON.stringify(A, (k,v)=> (k==="__teksten"||k==="__opties"||k==="thumbs") ? undefined : v));
+    // kleine thumbnails mogen mee (voor de herkenning in stap 1), maar enkel als ze klein zijn
+    schoon.bestanden.forEach((b,i)=>{ const t = A.bestanden[i].thumbs||{}; const som = Object.values(t).reduce((s,x)=> s+x.length, 0); if(som < 400000) b.thumbs = t; });
+    state.planAnalyse = schoon;
+    // verdieping per kamer ook op de kringen zetten waar die nog leeg is
+    state.kringen.items.forEach(k=>{ if(!k.verdieping){ const v = plVerdieping(k.kamer); if(v) k.verdieping = v; } });
+    save();
+    const n = Object.keys(schoon.kamers).length;
+    body.innerHTML = `<div class="plw-melding" style="background:#eef7f1;border-color:#9cc7ad;color:#1d5a36">✓ Plannen bewaard: ${n} kamers op het plan${schoon.kast?", zekeringkast aangeduid":""}. Het stappenvenster van de zekeringkast gebruikt nu de verdiepingen, voegt enkel buurkamers samen en rekent kabellengtes.</div>`;
+    const acts = ov.querySelector(".modal-actions");
+    acts.innerHTML = `<button class="btn btn-ghost" id="plw-x" style="margin-right:auto">Sluiten</button><button class="btn btn-primary" id="plw-zk">⚡ Zekeringkast verdelen</button>`;
+    acts.querySelector("#plw-x").addEventListener("click", ()=> ov.remove());
+    acts.querySelector("#plw-zk").addEventListener("click", ()=>{ ov.remove(); zkOpen({nieuw: !(state.zkOntwerp && state.zkOntwerp.toegepast)}); });
+    if(typeof selectTab==="function" && document.querySelector("#tab-zekeringen, [data-tab=zekeringen]")) {}
+  }
+  body.innerHTML = `<p class="hint">Plannen laden…</p>`;
+  await laadTeksten();
+  teken();
+}
 
 /* =========================================================================
    ZEKERINGKAST VERDELEN VOLGENS HET AREI (20/11/2026, op vraag van Peter: "Bij de import vanaf de
@@ -23725,16 +24124,16 @@ const ZK_BUITEN = /tuin|buiten|terras|poolhouse|carport|oprit/i;
 function zkKamerSoort(k){
   k = String(k||"");
   if(ZK_BUITEN.test(k)) return "buiten";
-  // 20/11/2026 (Peter): slaapkamer + badkamer + dressing = 1 kamer in de offerte, maar de badkamer krijgt een eigen kring
+  // 20/11/2026 (Peter): slaapkamer + badkamer + dressing = 1 kamer; alles 30 mA, dus samen op de kring(en) van die kamer, niet met andere kamers
   if(/slpk|slaap|master/i.test(k) && /badk|badkamer/i.test(k)) return "suite";
   if(ZK_NAT.test(k)) return "nat";
   if(/keuken/i.test(k) && !/bijkeuken/i.test(k)) return "keuken";
   return "normaal";
 }
-const ZK_KAMERSOORT_LABEL = {normaal:"Normaal", suite:"Slaapkamer + badkamer (badkamer apart)", keuken:"Keuken (apart)", nat:"Natte ruimte (apart)", buiten:"Buiten (apart)"};
+const ZK_KAMERSOORT_LABEL = {normaal:"Normaal", suite:"Slaapkamer + badkamer (samen, apart)", keuken:"Keuken (apart)", nat:"Natte ruimte (apart)", buiten:"Buiten (apart)"};
 const zkZonderBad = k=> String(k||"").replace(/\s*\+\s*badk(amer)?\.?\s*\d*/i,"").trim() || k;
-const zkDeelNaam = d=> d.deel==="bad" ? "Badkamer "+zkZonderBad(d.kamer) : (zkKamerSoort(d.kamer)==="suite" ? zkZonderBad(d.kamer) : d.kamer);
-const zkDeelSoort = (O, d)=> d.deel==="bad" ? "nat" : ((O.kamerSoort[d.kamer]||"normaal")==="suite" ? "normaal" : (O.kamerSoort[d.kamer]||"normaal"));
+const zkDeelNaam = d=> d.deel==="bad" ? "Badkamer "+zkZonderBad(d.kamer) : d.kamer;
+const zkDeelSoort = (O, d)=> d.deel==="bad" ? "nat" : (O.kamerSoort[d.kamer]||"normaal");
 function zkRaadVerdieping(k){
   const codes = (state.verdiepingen||[]).map(v=>v.code);
   const kies = c=> codes.includes(c) ? c : "";
@@ -23823,8 +24222,7 @@ function zkNieuwOntwerp(bron){
     overspanning: !!bron.overspanning, reservePct: bron.reservePct!=null ? bron.reservePct : 20, reserveSoort:"automaten",
     rijMaat: 36, domoticaApart:false, verdiepingen:{}, kamerSoort:{}, stop:[], stopKringen:null, toestellen:[], vast:[], vervangen:true};
   const kamersVan = new Set();
-  bron.stop.forEach(s=>{ const tot = s.muur + s.vloer;
-    O.stop.push({id:cryptoId(), kamer:s.kamer, muur:s.muur, vloer:s.vloer, geschakeld:s.geschakeld, bad: zkKamerSoort(s.kamer)==="suite" ? Math.min(tot>2 ? 2 : 1, Math.max(0, tot-1)) : 0}); kamersVan.add(s.kamer); });
+  bron.stop.forEach(s=>{ O.stop.push({id:cryptoId(), kamer:s.kamer, muur:s.muur, vloer:s.vloer, geschakeld:s.geschakeld}); kamersVan.add(s.kamer); });
   // voedingen per kamer groeperen om per kamer een reeks toestellen te raden
   const perKamer = new Map();
   bron.voedingen.forEach(v=>{ const k = v.kamer||""; if(!perKamer.has(k)) perKamer.set(k, []); perKamer.get(k).push(v); });
@@ -23850,10 +24248,12 @@ function zkNieuwOntwerp(bron){
   O.vast = zkVasteVoorzieningen(bron);
   [...kamersVan].forEach(k=>{
     const kr = state.kringen.items.find(x=> x.kamer===k && x.verdieping);
-    O.verdiepingen[k] = (state.zkOntwerp && state.zkOntwerp.verdiepingen && state.zkOntwerp.verdiepingen[k]) || (kr && kr.verdieping) || zkRaadVerdieping(k);
+    const vPlan = typeof plVerdieping==="function" ? plVerdieping(k) : "";
+    O.verdiepingen[k] = vPlan || (state.zkOntwerp && state.zkOntwerp.verdiepingen && state.zkOntwerp.verdiepingen[k]) || (kr && kr.verdieping) || zkRaadVerdieping(k);
+    if(!vPlan) O.geradenKamers = (O.geradenKamers||0) + 1;
     O.kamerSoort[k] = zkKamerSoort(k);
   });
-  O.geraden = true;
+  O.geraden = !!O.geradenKamers;
   return O;
 }
 
@@ -23865,11 +24265,7 @@ function zkStopVoorstel(O){
   O.stop.forEach(s=>{
     const tot = (parseInt(s.muur)||0) + (parseInt(s.vloer)||0);
     const soort = O.kamerSoort[s.kamer] || zkKamerSoort(s.kamer);
-    if(soort==="suite"){
-      const bad = Math.min(tot, Math.max(0, parseInt(s.bad)||0));
-      delen.push({kamer:s.kamer, n:tot-bad, soort:"normaal"});
-      delen.push({kamer:s.kamer, n:bad, soort:"nat", deel:"bad"});
-    } else delen.push({kamer:s.kamer, n:tot, soort});
+    delen.push({kamer:s.kamer, n:tot, soort});
   });
   delen.forEach(s=>{
     const n = s.n;
@@ -23880,7 +24276,14 @@ function zkStopVoorstel(O){
     const verdeel = Array.from({length:stukken}, (_,i)=> Math.floor(n/stukken) + (i < n%stukken ? 1 : 0));
     verdeel.forEach(x=>{
       if(soort==="normaal" && stukken===1){
-        const doel = kringen.find(k=> k.soort==="normaal" && !k.vol && k.verdieping===vd && k.punten + x <= 8);
+        let kand = kringen.filter(k=> k.soort==="normaal" && !k.vol && k.verdieping===vd && k.punten + x <= 8);
+        // met plannen: enkel buurkamers samen (dichtstbijzijnde eerst)
+        const A = state.planAnalyse;
+        if(A && typeof plKamerAfstand==="function" && plKamerPos(A, s.kamer)){
+          const afst = k=> Math.min(...k.delen.map(d=> plKamerAfstand(A, s.kamer, d.kamer) ?? 1e9));
+          kand = kand.map(k=>({k, d:afst(k)})).filter(x=> x.d <= PL_NABIJ_M).sort((a,b)=> a.d-b.d).map(x=> x.k);
+        }
+        const doel = kand[0];
         if(doel){ doel.delen.push(Object.assign({kamer:s.kamer, n:x}, s.deel?{deel:s.deel}:{})); doel.punten += x; return; }
       }
       kringen.push({id:cryptoId(), soort, verdieping:vd, punten:x, delen:[Object.assign({kamer:s.kamer, n:x}, s.deel?{deel:s.deel}:{})], vol: stukken>1});
@@ -23908,7 +24311,8 @@ function zkAlleKringen(O){
   O.stopKringen.forEach(k=>{
     if(!k.delen.length) return;
     const st = S.stopcontacten;
-    lijst.push({id:k.id, bron:"stop", soort:"stopcontacten", naam:"STOPCONTACTEN "+zkUp(k.delen.map(zkDeelNaam).join(" ")), polen:st.polen, A:st.A, diff:"30",
+    const lengte = zkLengte([...new Set(k.delen.map(d=>d.kamer))]);
+    lijst.push({id:k.id, bron:"stop", lengte, soort:"stopcontacten", naam:"STOPCONTACTEN "+zkUp(k.delen.map(zkDeelNaam).join(" ")), polen:st.polen, A:st.A, diff:"30",
       W:st.W, kabel:st.kabel, curve:st.curve, orde:st.orde, fase:(O.faseHand||{})[k.id]||"auto", kamer:k.delen[0].kamer, delen:k.delen});
   });
   O.stop.forEach(s=>{
@@ -23916,7 +24320,7 @@ function zkAlleKringen(O){
     const st = S.geschakeld, stukken = Math.ceil(n/8);
     for(let i=0;i<stukken;i++){
       const id = s.id+"-g"+i;
-      lijst.push({id, bron:"gesch", soort:"geschakeld", naam:"GESCHAKELDE STOPCONTACTEN "+zkUp(s.kamer)+(stukken>1?" "+(i+1):""), polen:st.polen, A:st.A, diff:"30",
+      lijst.push({id, bron:"gesch", lengte:zkLengte([s.kamer]), soort:"geschakeld", naam:"GESCHAKELDE STOPCONTACTEN "+zkUp(s.kamer)+(stukken>1?" "+(i+1):""), polen:st.polen, A:st.A, diff:"30",
         W:st.W, kabel:st.kabel, curve:st.curve, orde:st.orde, fase:(O.faseHand||{})[id]||"auto", kamer:s.kamer});
     }
   });
@@ -23932,11 +24336,26 @@ function zkAlleKringen(O){
       naam = zkUp(s.label.replace(/ \(te bepalen\)| \/ .*$/,"") + (generiek && t.kamer ? " "+t.kamer : ""));
       if(tel[t.soort] > 1 && !generiek){ nr[t.soort] = (nr[t.soort]||0)+1; naam += " "+nr[t.soort]; }
     }
-    lijst.push({id:t.id, bron:t.bron, soort:t.soort, naam, polen:t.polen, A:t.A, diff:t.diff, W:parseInt(t.W)||0, kabel:t.kabel, curve:t.curve||"C",
+    lijst.push({id:t.id, bron:t.bron, lengte: zkToestelLengte(t), soort:t.soort, naam, polen:t.polen, A:t.A, diff:t.diff, W:parseInt(t.W)||0, kabel:t.kabel, curve:t.curve||"C",
       orde:s.orde, fase:t.fase||"auto", kamer:t.kamer, ref:t.ref, t});
   });
   if(O.fasen===1) lijst.forEach(k=>{ if(k.polen==="4P"||k.polen==="3P") k.polen = "2P"; });
   return lijst;
+}
+// geschatte kabellengte uit de plannen (null zonder plan/kast)
+function zkLengte(kamers){
+  const A = state.planAnalyse;
+  if(!A || typeof plKringLengte!=="function") return null;
+  return plKringLengte(A, kamers.filter(Boolean));
+}
+function zkToestelLengte(t){
+  const A = state.planAnalyse;
+  if(!A || !A.kast || typeof plAfstand!=="function") return null;
+  if(t.ref && t.ref.type==="driverkast" && A.driverkasten[t.ref.kastId]){
+    const p = A.driverkasten[t.ref.kastId], d = plAfstand(A, plPos(A, A.kast.zoneId, A.kast.x, A.kast.y), plPos(A, p.zoneId, p.x, p.y));
+    return d==null ? null : Math.ceil(d + PL_TOESLAG_M);
+  }
+  return t.kamer ? zkLengte([t.kamer]) : null;
 }
 function zkVerdeel(O){
   const K = zkAlleKringen(O);
@@ -24049,7 +24468,7 @@ function zkLayout(O, R, extraModules){
       isHoofd: g.soort==="hoofd", isRem:false, fase:g.fase, kabelOpKlemmen:false, kabelType:"", kabelAantal:1, zkAuto:true, zkGroep:g.soort};
     const aut = g.items.map(k=>({id:cryptoId(), categorie:"Automaat", type:"Resi9 "+(k.curve||"C")+" 3kA", curve:k.curve||"C", polen:k.polen, mA:"", A:k.A,
       breedte:polenToBreedte(k.polen), naam:k.naam, isRem:false, fase:(k.polen==="4P"||k.polen==="3P") ? "L1L2L3N" : k.fase, linkedDiffId:diff.id,
-      kabelOpKlemmen:!!k.kabel, kabelType:k.kabel||"", kabelAantal:1, zkAuto:true, __k:k}));
+      kabelOpKlemmen:!!k.kabel, kabelType:k.kabel||"", kabelAantal:1, kabelLengte:k.lengte||null, zkAuto:true, __k:k}));
     const breedte = [diff, ...aut].reduce((t,m)=> t + moduleBreedte(m), 0);
     if(g.soort!=="laadpaal" && breedte <= maat && vrij() < breedte) nieuweRij();
     else if(g.soort!=="laadpaal" && breedte > maat && vrij() < moduleBreedte(diff) + 2) nieuweRij();
@@ -24099,7 +24518,7 @@ function zkPasToe(O){
     const k = m.__k; delete m.__k; if(!k) return;
     if(k.bron==="stop"){
       const kr = newKringItem(); kr.kamer = k.delen[0].kamer; kr.verdieping = O.verdiepingen[kr.kamer]||"";
-      kr.info = "Stopcontacten "+k.delen.map(d=> zkDeelNaam(d)+" ("+d.n+")").join(", "); kr.zekeringModuleId = m.id; kr.zkStop = true;
+      kr.info = "Stopcontacten "+k.delen.map(d=> zkDeelNaam(d)+" ("+d.n+")").join(", "); kr.zekeringModuleId = m.id; kr.zkStop = true; if(k.lengte) kr.kabelLengte = k.lengte;
       state.kringen.items.push(kr);
     } else if(k.bron==="gesch"){
       const bestaand = state.kringen.items.filter(x=> x.kamer===k.kamer && /geschakeld/i.test(x.info||"") && /stopcontact/i.test(x.info||""));
@@ -24295,7 +24714,7 @@ async function zkOpen(opties){
   function stap1(){
     const bronTekst = O.bronType==="offerte" ? "Gegevens uit de ingelezen offerte." : O.bronType==="pdf" ? "Gegevens uit de gekozen offerte-PDF (enkel voor de zekeringkast gelezen)." :
       O.bronType==="dossier" ? `Dit dossier heeft nog geen stopcontacten/voedingen uit een offerte — toestellen komen uit de bestaande automaten.` : "";
-    return `<div class="zkw-ok">${escapeHtml(bronTekst)} <button class="btn small" id="zkw-pdf" style="margin-left:6px">📄 Stopcontacten & voedingen uit offerte-PDF halen</button>${state.zkOntwerp?` <button class="btn small ghost" id="zkw-herbegin">⟲ Opnieuw beginnen</button>`:""}</div>
+    return `<div class="zkw-ok">${escapeHtml(bronTekst)} <button class="btn small" id="zkw-pdf" style="margin-left:6px">📄 Stopcontacten & voedingen uit offerte-PDF halen</button> <button class="btn small" id="zkw-plan">📐 Plannen inlezen</button>${state.zkOntwerp?` <button class="btn small ghost" id="zkw-herbegin">⟲ Opnieuw beginnen</button>`:""}</div>
     <div class="zkw-grid">
       <div><label>Aansluiting</label>${selectHtml([[3,"3-fase (3N 400V)"],[1,"1-fase (230V)"]], O.fasen, "zkw-fasen")}<div class="hint">Hoofddifferentieel 300 mA type A, ${O.fasen===1?"2P":"4P"}.</div></div>
       <div><label>Aansluitstroom (teller)</label>${selectHtml(["25A","32A","40A","50A","63A","80A","100A"].map(a=>[a,a]), O.aansluitingA, "zkw-aansl")}<div class="hint">Hoofdautomaat zit in de teller. REM = deze waarde.</div></div>
@@ -24310,14 +24729,14 @@ async function zkOpen(opties){
   function stap2(){
     if(!O.stopKringen) zkStopVoorstel(O);
     const kamers = [...new Set([...O.stop.map(s=>s.kamer)])];
-    let h = `<p class="hint">Kies per kamer de verdieping en kijk het aantal stopcontacten na (dubbel = 1 punt). Max. 8 per kring; samenvoegen enkel op dezelfde verdieping; keuken, natte ruimtes en buiten altijd apart; bij een slaapkamer met badkamer (en dressing) gaat de badkamer op een eigen kring — vul in hoeveel stopcontacten er in de badkamer zitten; geschakelde stopcontacten krijgen een eigen kring (5G2,5).</p>`;
-    if(O.geraden) h += `<div class="zkw-let">De verdiepingen zijn <b>geraden</b> uit de kamernaam — kijk ze even na.</div>`;
-    h += `<div class="zkw-scroll"><table class="zkw-tabel"><thead><tr><th>Kamer</th><th>Verdieping</th><th>Soort ruimte</th><th>Wand</th><th>Vloer</th><th>Waarvan badkamer</th><th>Geschakeld</th><th></th></tr></thead><tbody>
+    let h = `<p class="hint">Kies per kamer de verdieping en kijk het aantal stopcontacten na (dubbel = 1 punt). Max. 8 per kring; samenvoegen enkel op dezelfde verdieping; keuken, natte ruimtes en buiten altijd apart; een slaapkamer met badkamer (en dressing) blijft samen op eigen kring(en); geschakelde stopcontacten krijgen een eigen kring (5G2,5).</p>`;
+    if(O.geraden) h += `<div class="zkw-let">${state.planAnalyse ? O.geradenKamers+" kamer(s) niet op het plan gevonden: die verdiepingen zijn <b>geraden</b> uit de kamernaam." : "De verdiepingen zijn <b>geraden</b> uit de kamernaam — kijk ze even na, of lees de plannen in (📐 in stap 1) voor verdiepingen, buurkamers en kabellengtes."}</div>`;
+    else if(state.planAnalyse) h += `<div class="zkw-ok">Verdiepingen uit de plannen; stopcontacten worden enkel met buurkamers (binnen ${PL_NABIJ_M} m) samengevoegd.</div>`;
+    h += `<div class="zkw-scroll"><table class="zkw-tabel"><thead><tr><th>Kamer</th><th>Verdieping</th><th>Soort ruimte</th><th>Wand</th><th>Vloer</th><th>Geschakeld</th><th></th></tr></thead><tbody>
       ${O.stop.map((s,i)=>`<tr data-i="${i}"><td><input class="zkw-s-kamer" value="${escapeHtml(s.kamer)}" list="zkw-dl-kamers" style="min-width:130px"></td>
         <td>${selectHtml(vdOpts(), O.verdiepingen[s.kamer]||"", "zkw-s-vd")}</td>
         <td>${selectHtml(Object.entries(ZK_KAMERSOORT_LABEL), O.kamerSoort[s.kamer]||zkKamerSoort(s.kamer), "zkw-s-soort")}</td>
         <td><input type="number" min="0" class="zkw-s-muur" value="${s.muur}"></td><td><input type="number" min="0" class="zkw-s-vloer" value="${s.vloer}"></td>
-        <td>${(O.kamerSoort[s.kamer]||zkKamerSoort(s.kamer))==="suite" ? `<input type="number" min="0" class="zkw-s-bad" value="${parseInt(s.bad)||0}" title="stopcontacten in de badkamer (eigen kring)">` : `<span class="zkw-oms">—</span>`}</td>
         <td><input type="number" min="0" class="zkw-s-gesch" value="${s.geschakeld}"></td><td><button class="rowdel zkw-s-del" title="verwijderen">✕</button></td></tr>`).join("")}
       </tbody></table></div><datalist id="zkw-dl-kamers">${state.kamers.filter(Boolean).map(k=>`<option value="${escapeHtml(k)}">`).join("")}</datalist>
       <button class="addbtn" id="zkw-s-add">+ kamer</button>`;
@@ -24330,7 +24749,8 @@ async function zkOpen(opties){
       if(!k.delen.length) return "";
       const inf = zkStopKringInfo(O, k);
       const cls = inf.fouten.some(f=>f.startsWith("meer")) ? "fout" : inf.fouten.length ? "let" : "";
-      return `<div class="zkw-kring ${cls}"><h4>Kring ${i+1}<span>${inf.punten} stopc. · ${escapeHtml(inf.verdieping||"—")}</span></h4>
+      const lg = zkLengte([...new Set(k.delen.map(d=>d.kamer))]);
+      return `<div class="zkw-kring ${cls}"><h4>Kring ${i+1}<span>${inf.punten} stopc. · ${escapeHtml(inf.verdieping||"—")}${lg?" · ≈ "+lg+" m":""}</span></h4>
         ${k.delen.map((d,j)=>`<div class="zkw-deel">${escapeHtml(zkDeelNaam(d))} <span class="zkw-oms">(${d.n})</span>${selectHtml(kringOpts, i, "zkw-verplaats\" data-k=\""+i+"\" data-d=\""+j)}</div>`).join("")}
         ${inf.fouten.map(f=>`<div class="zkw-melding ${f.startsWith("meer")?"":"let"}">⚠ ${escapeHtml(f)}</div>`).join("")}</div>`;
     }).join("")}</div>`;
@@ -24373,7 +24793,7 @@ async function zkOpen(opties){
           const kan = k.bron!=="rem" && k.bron!=="reserve" && k.diff!=="eigen";
           const vierP = k.polen==="4P"||k.polen==="3P";
           return `<tr data-id="${escapeHtml(k.id)}" data-bron="${escapeHtml(k.bron)}"><td class="zkw-code" style="width:46px">${escapeHtml(k.code)}</td><td>${escapeHtml(k.naam)}${k.kamer && !k.naam.includes(zkUp(k.kamer))?` <span class="zkw-oms">${escapeHtml(k.kamer)}</span>`:""}</td>
-            <td style="white-space:nowrap">${escapeHtml(k.polen)} ${escapeHtml(k.A)} ${k.curve&&k.curve!=="C"?escapeHtml(k.curve)+"-curve":""}</td><td style="white-space:nowrap">${escapeHtml(k.kabel||"")}</td>
+            <td style="white-space:nowrap">${escapeHtml(k.polen)} ${escapeHtml(k.A)} ${k.curve&&k.curve!=="C"?escapeHtml(k.curve)+"-curve":""}</td><td style="white-space:nowrap">${escapeHtml(k.kabel||"")}${k.lengte?` <span class="zkw-oms">≈ ${k.lengte} m</span>`:""}</td>
             <td style="width:90px">${kan && !vierP && fasen.length ? selectHtml(faseOpts, (O.faseHand||{})[k.id] || (k.t && k.t.fase) || "auto", "zkw-d-fase") : escapeHtml(k.fase||"")}</td>
             <td style="width:100px">${kan && k.bron!=="stop" && k.bron!=="gesch" ? selectHtml([["30","30 mA"],["300","300 mA"]], k.diff, "zkw-d-diff") : ""}</td></tr>`;
         }).join("")}</tbody></table></div></div>`;
@@ -24425,6 +24845,7 @@ async function zkOpen(opties){
     op(".zkw-ressoort","change", e=>{ O.reserveSoort = e.target.value; });
     op(".zkw-maat","change", e=>{ O.rijMaat = parseInt(e.target.value); });
     op(".zkw-domo","change", e=>{ O.domoticaApart = !!e.target.value; });
+    op("#zkw-plan","click", ()=>{ zkSluit(); plOpen(); });
     op("#zkw-herbegin","click", ()=>{ if(!confirm("Opnieuw beginnen vanaf de offerte/het dossier? Je keuzes in dit venster gaan verloren.")) return; zkSluit(); zkOpen({nieuw:true}); });
     op("#zkw-pdf","click", ()=>{
       const inp = document.createElement("input"); inp.type = "file"; inp.accept = "application/pdf,.pdf"; inp.style.display = "none";
@@ -24447,8 +24868,8 @@ async function zkOpen(opties){
       if(!(s.kamer in O.kamerSoort)) O.kamerSoort[s.kamer] = zkKamerSoort(s.kamer);
       zkStopVoorstel(O); teken(); }));
     qa("tr[data-i] .zkw-s-vd").forEach(sel=> sel.addEventListener("change", e=>{ const s = O.stop[parseInt(e.target.closest("tr").dataset.i)]; O.verdiepingen[s.kamer] = e.target.value; O.geraden = false; zkStopVoorstel(O); teken(); }));
-    qa("tr[data-i] .zkw-s-soort").forEach(sel=> sel.addEventListener("change", e=>{ const s = O.stop[parseInt(e.target.closest("tr").dataset.i)]; O.kamerSoort[s.kamer] = e.target.value; if(e.target.value==="suite" && !s.bad) s.bad = 1; zkStopVoorstel(O); teken(); }));
-    [["zkw-s-muur","muur"],["zkw-s-vloer","vloer"],["zkw-s-bad","bad"],["zkw-s-gesch","geschakeld"]].forEach(([c,veld])=> qa("tr[data-i] ."+c).forEach(inp=> inp.addEventListener("change", e=>{
+    qa("tr[data-i] .zkw-s-soort").forEach(sel=> sel.addEventListener("change", e=>{ const s = O.stop[parseInt(e.target.closest("tr").dataset.i)]; O.kamerSoort[s.kamer] = e.target.value; zkStopVoorstel(O); teken(); }));
+    [["zkw-s-muur","muur"],["zkw-s-vloer","vloer"],["zkw-s-gesch","geschakeld"]].forEach(([c,veld])=> qa("tr[data-i] ."+c).forEach(inp=> inp.addEventListener("change", e=>{
       O.stop[parseInt(e.target.closest("tr").dataset.i)][veld] = Math.max(0, parseInt(e.target.value)||0); zkStopVoorstel(O); teken(); })));
     qa(".zkw-s-del").forEach(b=> b.addEventListener("click", e=>{ O.stop.splice(parseInt(e.target.closest("tr").dataset.i),1); zkStopVoorstel(O); teken(); }));
     op("#zkw-s-add","click", ()=>{ O.stop.push({id:cryptoId(), kamer:"", muur:0, vloer:0, geschakeld:0}); teken(); });
@@ -25477,6 +25898,7 @@ window.CaDosApp = {
   koppelvoorstel: { open: kvOpen, bereken: kvBereken, pasToe: kvPasToe },
   kringen: { samenvoegen: ksVoegSamen, open: ksOpen },
   // 19/11/2026: driverkast -> 230V, verdelen over kasten
+  plannen: { open: plOpen, teksten: plTeksten, schaal: plSchaal, zoekKamer: plZoekKamer, kamerPos: plKamerPos, afstand: plAfstand, kringLengte: plKringLengte, laadPdf: plLaadPdf, norm: plNorm },
   zekeringkast: { open: zkOpen, nieuwOntwerp: zkNieuwOntwerp, verdeel: zkVerdeel, controles: zkControles, pasToe: zkPasToe, lijst: zkLijstKringen, print: zkPrintLijst, stopVoorstel: zkStopVoorstel, bronUitDossier: zkBronUitDossier },
   driverkast: { naar230: dkNaar230, open230: dk230Open, verdeel: dkVerdeelOpen, maxDrivers: dkMaxDrivers, verdeelAlles: dkVerdeelAlles, bewaarMax: dkBewaarMax }
 };
