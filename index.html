@@ -26258,7 +26258,8 @@ window.CaDosApp = {
        (ronde 27b) -- hergebruikt window.dbListVerslagenVoorProject/window.openVerslagFromCados
        rechtstreeks, geen nieuwe databanklogica. Zelfde .cc-tab-full/.cc-tab-short-patroon (ronde 51,
        Fix 5) als de andere 3 knoppen, zodat alle 4 op 390px blijven passen. -->
-  <button data-tab="werfverslagen"><span class="cc-tab-full">4. Werfverslagen</span><span class="cc-tab-short">4. Verslagen</span></button>
+  <!-- 2026-11-20: knop "4. Werfverslagen" weg uit CaCalc (Peter: "dat mag daar weg"). Het tabblad
+       (#cc-tab-werfverslagen) blijft verborgen staan; switchTab() stuurt een bewaard 'werfverslagen' door. -->
 </nav>
 
 <main>
@@ -26970,6 +26971,16 @@ const REF = { normtabel: NORMTABEL, datatabel: DATATABEL };
 //      nabijheid van andere kabels" (multipolair / monopolair in laag /
 //      monopolair in klaverblad).
 // ---------------------------------------------------------------------------
+// 2026-11-20 -- weerstand bij 20 °C voor de MAXIMALE kortsluitstromen (IEC 60909-0: ρ20 Cu = 1/54,
+// Al = 1/34 Ω·mm²/m; zelfde waarden als Caneco/UTE C 15-105 ρ0). DATATABEL.resistivity (Cu 0,023 /
+// Al 0,036, ≈ 1,25·ρ20 = warme kabel) blijft gebruikt voor Ik min, spanningsval en de toetsen die
+// daarop steunen. Peter (20/11, n.a.v. Caneco-rapport Familie Valcke): "pas maar alles aan, zodat we
+// beter caneco benaderen" -- met ρ20 kwam CaCalc op 1 à 3 % van Caneco i.p.v. 8 à 14 % te laag.
+DATATABEL.resistivity20 = { Koper: 1 / 54, Aluminium: 1 / 34 };
+// Warme weerstand afgerond op exact 1,25 · ρ20 (UTE C 15-105 ρ1, zoals Caneco): Cu 0,023 -> 0,02315,
+// Al 0,036 -> 0,03676 (+0,6 % / +2,1 %). Gebruikt voor Ik min en de spanningsval.
+DATATABEL.resistivity.Koper = 1.25 / 54;
+DATATABEL.resistivity.Aluminium = 1.25 / 34;
 DATATABEL.iecGrondD1D2 = {
   // [D1 in buis, D2 direct in de grond] in A, drie belaste geleiders
   Koper: {
@@ -27208,6 +27219,30 @@ DATATABEL.grondBundelAantal = {
 
   /* Core cable electrical calc shared by root (ALSB) and child boards.
    * Returns {C18, Iz, Rkabel, Xkabel} for this segment. */
+  /* 2026-11-20 -- impedantie van het hoogspanningsnet, teruggerekend naar LS (IEC 60909-0):
+   * ZQ = c·Un²/S"kQ, XQ = 0,995·ZQ, RQ = 0,1·XQ. c = 1,1 voor de max-keten, 1,0 voor de min-keten
+   * (zelfde als Caneco: 433 MVA -> XQ 0,000425 Ω). Leeg = oneindig sterk net (= vroeger gedrag). */
+  /* 2026-11-20 -- spanningsfactor voor de MAXIMALE kortsluitstromen: IEC 60909-0 tabel 1, LS-net met
+   * spanningstolerantie +10 % (230/400 V in België) -> cmax = 1,10 (vroeger 1,05). cmin blijft 0,95.
+   * Samen met de transfo-impedantie op de nullastspanning (UrT = 1,025 · Un, zoals Caneco "400 V / 410 V")
+   * blijft Ik aan de transfoklemmen zo goed als gelijk, maar komen Ik max én Ik min verderop binnen
+   * ±2 % van Caneco (Valcke: Ik1min hoofdbord 7364 A tegen 7380 A, vroeger 8047 A). */
+  var C_MAX = 1.1;
+  function hsNet(Un, mva, c) {
+    var s = Number(mva);
+    if (!(s > 0)) return { R: 0, X: 0, actief: false };
+    var Z = (c * Un * Un) / (s * 1e6);
+    var X = 0.995 * Z;
+    return { R: 0.1 * X, X: X, actief: true, mva: s };
+  }
+  /* 2026-11-20 -- spanningsval per fase: I·(R·cos φ + X·sin φ) (IEC 60364-5-52 bijlage G), met de
+   * warme weerstand. Vroeger enkel I·R (cos φ = 1, zonder reactantie). */
+  function dvFactor(R, X, cosPhi) {
+    var c = (cosPhi > 0 && cosPhi <= 1) ? cosPhi : 0.8;
+    var sn = Math.sqrt(Math.max(0, 1 - c * c));
+    return R * c + (X || 0) * sn;
+  }
+
   function cableSegment(REF, b) {
     var isolatie = isolatieForMantel(REF, b.mantel);
     var amp = lookupAmpacity(REF, b.materiaal, isolatie, b.sectie, b.kabeltype);
@@ -27272,6 +27307,11 @@ DATATABEL.grondBundelAantal = {
     var RkabelFase = (rho * b.lengte) / (b.sectie * b.aantal);
     var RkabelNeutraal = (rho * b.lengte) / (nSectie * nAantal);
     var Rkabel = RkabelFase + RkabelNeutraal;
+    // 2026-11-20: dezelfde weerstanden bij 20 °C -- enkel voor de MAX-keten (Ik3max/Ik1max), zie
+    // DATATABEL.resistivity20. Ontbreekt de waarde, dan valt dit terug op de warme weerstand.
+    var rho20 = (REF.datatabel.resistivity20 && REF.datatabel.resistivity20[b.materiaal]) || rho;
+    var RkabelFaseMax = (rho20 * b.lengte) / (b.sectie * b.aantal);
+    var RkabelMax = RkabelFaseMax + (rho20 * b.lengte) / (nSectie * nAantal);
     var XkabelFase = reactPerM == null ? null : (reactPerM * b.lengte) / b.aantal;
     var XkabelNeutraal = reactPerMN == null ? null : (reactPerMN * b.lengte) / nAantal;
     var Xkabel = (XkabelFase == null || XkabelNeutraal == null) ? null : XkabelFase + XkabelNeutraal;
@@ -27279,6 +27319,7 @@ DATATABEL.grondBundelAantal = {
     return {
       basisstroom: basisstroom, Iz: Iz, Rkabel: Rkabel, Xkabel: Xkabel,
       RkabelFase: RkabelFase, XkabelFase: XkabelFase, isolatie: isolatie, rho: rho,
+      rho20: rho20, RkabelMax: RkabelMax, RkabelFaseMax: RkabelFaseMax,
       tempLabel: tempLabel, tempCorr: tempCorr, constructieFactor: constructieFactor,
       bundelFactor: bundelFactor, kCumul: kCumul, grond: grond, bodemFactor: bodemFactor, neutraalApart: neutraalApart,
       nAantal: nAantal, nSectie: nSectie
@@ -27408,12 +27449,15 @@ DATATABEL.grondBundelAantal = {
     // Als de kabel tussen transfo en dit bord buiten scope valt, wordt ze
     // niet gemodelleerd: geen spanningsval voor dit (onbekende) segment --
     // de cumulatieve spanningsval start dan bij dit bord (0%).
-    var spanningsvalV = buitenScopeActief ? 0 : (Math.sqrt(3) * Ib * board.lengte * seg.rho) / (board.sectie * board.aantal);
+    // 2026-11-20: met cos φ (bordveld, leeg = 0,8) en de reactantie van de kabel -- zie dvFactor().
+    var cosPhiDv = board.cosPhi != null && board.cosPhi !== '' && Number(board.cosPhi) > 0 ? Number(board.cosPhi) : 0.8;
+    var spanningsvalV = buitenScopeActief ? 0 : Math.sqrt(3) * Ib * dvFactor(seg.RkabelFase, seg.XkabelFase, cosPhiDv);
     var spanningsvalFrac = buitenScopeActief ? 0 : spanningsvalV / Un;
 
     var Rtotaal, Xtotaal, RtotaalMin, XtotaalMin;
     var Rtotaal3f, Xtotaal3f, Rtotaal3fMin, Xtotaal3fMin;
     var Ztr = null, Rtr = null, Xtr = null, Ucc = null, uccBron = null;
+    var hsMax = { R: 0, X: 0, actief: false }, hsMin = { R: 0, X: 0, actief: false };
     var Ik3net = null, ik3NetBron = null;
     var ik2maxGegeven = null, ik2minGegeven = null, ifmaxGegeven = null, ifminGegeven = null;
 
@@ -27441,8 +27485,8 @@ DATATABEL.grondBundelAantal = {
       var IccA3fMax = Number(bsv.ik3max) * 1000;
       var IccA1fMax = Number(bsv.ik1max) * 1000;
       var IccA1fMin = Number(bsv.ik1min) * 1000;
-      var Z3fMaxEff = (1.05 * Un) / (Math.sqrt(3) * IccA3fMax);
-      var Z1fMaxEff = (1.05 * U0) / IccA1fMax;
+      var Z3fMaxEff = (C_MAX * Un) / (Math.sqrt(3) * IccA3fMax);
+      var Z1fMaxEff = (C_MAX * U0) / IccA1fMax;
       var Z1fMinEff = (0.95 * U0) / IccA1fMin;
       Rtotaal3f = Z3fMaxEff * 0.31; Xtotaal3f = Z3fMaxEff * 0.95;
       Rtotaal = Z1fMaxEff * 0.31; Xtotaal = Z1fMaxEff * 0.95;
@@ -27481,7 +27525,7 @@ DATATABEL.grondBundelAantal = {
       // dezelfde, al gevalideerde formules gebruiken -- enkel het
       // startpunt van de keten wordt hier ingevuld i.p.v. berekend.
       var IccA = Number(board.buitenScopeIcc) * 1000;
-      var ZtrEff = (1.05 * Un) / (Math.sqrt(3) * IccA);
+      var ZtrEff = (C_MAX * Un) / (Math.sqrt(3) * IccA);
       Ztr = ZtrEff;
       Rtr = ZtrEff * 0.31;
       Xtr = ZtrEff * 0.95;
@@ -27525,16 +27569,17 @@ DATATABEL.grondBundelAantal = {
       // Xa = 0.995 x Za, Ra = 0.1 x Xa (dus overwegend reactief, met een
       // kleine resistieve component) -- dezelfde bron die dit project al
       // gebruikt voor de k-factor/H07RN-F-data.
-      var Znet = (1.05 * Un) / (Math.sqrt(3) * Ik3net);
+      var Znet = (C_MAX * Un) / (Math.sqrt(3) * Ik3net);
       Ztr = Znet;
       Xtr = 0.995 * Znet;
       Rtr = 0.1 * Xtr;
-      Rtotaal = Rtr + seg.Rkabel;
+      // 2026-11-20: max-keten met ρ20, min-keten met de warme weerstand
+      Rtotaal = Rtr + seg.RkabelMax;
       Xtotaal = Xtr + seg.Xkabel;
-      Rtotaal3f = Rtr + seg.RkabelFase;
+      Rtotaal3f = Rtr + seg.RkabelFaseMax;
       Xtotaal3f = Xtr + seg.XkabelFase;
-      RtotaalMin = Rtotaal; XtotaalMin = Xtotaal;
-      Rtotaal3fMin = Rtotaal3f; Xtotaal3fMin = Xtotaal3f;
+      RtotaalMin = Rtr + seg.Rkabel; XtotaalMin = Xtotaal;
+      Rtotaal3fMin = Rtr + seg.RkabelFase; Xtotaal3fMin = Xtotaal3f;
     } else if (isRoot) {
       var SnVA2 = project.SnKVA * 1000;
       // Ucc (kortsluitspanning, %) van de transfo: standaard een generieke
@@ -27554,21 +27599,28 @@ DATATABEL.grondBundelAantal = {
         ? Number(project.uccFabrikant) / 100 : null;
       Ucc = uccOverride != null ? uccOverride : lookupUcc(REF, project.SnKVA);
       uccBron = uccOverride != null ? 'fabrikant' : 'tabel';
-      Ztr = (Ucc * Un * Un) / SnVA2;
+      // 2026-11-20: transfo-impedantie op de nullastspanning UrT = 1,025 · Un (IEC 60909 ZT = ukr·UrT²/SrT;
+      // Caneco "400 V / 410 V"), zie C_MAX.
+      var UrT = 1.025 * Un;
+      Ztr = (Ucc * UrT * UrT) / SnVA2;
       Rtr = Ztr * 0.31;
       Xtr = Ztr * 0.95;
-      Rtotaal = Rtr + seg.Rkabel;
-      Xtotaal = Xtr + seg.Xkabel;
-      Rtotaal3f = Rtr + seg.RkabelFase;
-      Xtotaal3f = Xtr + seg.XkabelFase;
-      RtotaalMin = Rtotaal; XtotaalMin = Xtotaal;
-      Rtotaal3fMin = Rtotaal3f; Xtotaal3fMin = Xtotaal3f;
+      // 2026-11-20: optioneel HS-net (board.skqMax/skqMin, MVA) vóór de transfo; max-keten met ρ20,
+      // min-keten met de warme weerstand en het zwakste HS-net.
+      hsMax = hsNet(Un, board.skqMax, 1.1);
+      hsMin = hsNet(Un, (Number(board.skqMin) > 0 ? board.skqMin : board.skqMax), 1.0);
+      Rtotaal = Rtr + hsMax.R + seg.RkabelMax;
+      Xtotaal = Xtr + hsMax.X + seg.Xkabel;
+      Rtotaal3f = Rtr + hsMax.R + seg.RkabelFaseMax;
+      Xtotaal3f = Xtr + hsMax.X + seg.XkabelFase;
+      RtotaalMin = Rtr + hsMin.R + seg.Rkabel; XtotaalMin = Xtr + hsMin.X + seg.Xkabel;
+      Rtotaal3fMin = Rtr + hsMin.R + seg.RkabelFase; Xtotaal3fMin = Xtr + hsMin.X + seg.XkabelFase;
     } else {
       var Rboven = parentResult.Rtotaal;
       var Xboven = parentResult.Xtotaal;
-      Rtotaal = Rboven + seg.Rkabel;
+      Rtotaal = Rboven + seg.RkabelMax; // 2026-11-20: ρ20 voor de max-keten
       Xtotaal = Xboven + seg.Xkabel;
-      Rtotaal3f = parentResult.Rtotaal3f + seg.RkabelFase;
+      Rtotaal3f = parentResult.Rtotaal3f + seg.RkabelFaseMax; // 2026-11-20: ρ20
       Xtotaal3f = parentResult.Xtotaal3f + seg.XkabelFase;
       // RtotaalMin/XtotaalMin/Rtotaal3fMin/Xtotaal3fMin: dezelfde kabel-R/X
       // (fysiek 1 kabel, geen apart "min"-exemplaar) bovenop de "min"-keten
@@ -27648,7 +27700,7 @@ DATATABEL.grondBundelAantal = {
     // an earlier session. The eindgroepen (final-circuit) formula already
     // used U0 correctly (see calcEindgroep below). (U0 is nu hierboven aan
     // het begin van deze functie gedefinieerd, zie die toelichting.)
-    var Ik3max = (1.05 * Un) / (Math.sqrt(3) * Ztotaal3f);
+    var Ik3max = (C_MAX * Un) / (Math.sqrt(3) * Ztotaal3f);
     // Ik3min/Ik1min gebruiken voortaan de aparte "min"-impedanties
     // (Ztotaal3fMin/ZminMin) i.p.v. dezelfde Ztotaal3f/Zmin als hun max-
     // tegenhanger -- voor elk bestaand pad zijn die twee gelijk (zie
@@ -27657,7 +27709,7 @@ DATATABEL.grondBundelAantal = {
     // vraag om een extern opgegeven, niet noodzakelijk 1,05/0,95-verhouding
     // tussen max en min getrouw te kunnen overnemen i.p.v. af te dwingen.
     var Ik3min = (0.95 * Un) / (Math.sqrt(3) * Ztotaal3fMin);
-    var Ik1max = (1.05 * U0) / Zmin;
+    var Ik1max = (C_MAX * U0) / Zmin;
     var Ik1min = (0.95 * U0) / ZminMin;
 
     // cumulative spanningsval (from transfo up to and including this board)
@@ -27739,7 +27791,7 @@ DATATABEL.grondBundelAantal = {
       // vangnetwaarde mocht dat ooit wijzigen.
       IkStart = Ik3max;
     } else if (isRoot) {
-      IkStart = (1.05 * Un) / (Math.sqrt(3) * Ztr);
+      IkStart = (C_MAX * Un) / (Math.sqrt(3) * (hsMax.actief ? Math.sqrt(Math.pow(Rtr + hsMax.R, 2) + Math.pow(Xtr + hsMax.X, 2)) : Ztr));
     } else {
       IkStart = parentResult.Ik3max;
     }
@@ -27835,7 +27887,13 @@ DATATABEL.grondBundelAantal = {
       // Ik2/If: enkel gevuld bij buitenScopeVolledigActief (extern opgegeven,
       // puur informatief -- zie hierboven), anders null zoals voorheen (deze
       // velden bestonden nog niet).
-      Ik2max: ik2maxGegeven, Ik2min: ik2minGegeven, Ifmax: ifmaxGegeven, Ifmin: ifminGegeven,
+      // 2026-11-20: Ik2 (fase-fase) = √3/2 · Ik3 -- zelfde als Caneco en elec calc (nagerekend op
+      // 6 punten). Extern opgegeven waarden ("volledige tabel") krijgen voorrang.
+      Ik2max: ik2maxGegeven != null ? ik2maxGegeven : Ik3max * Math.sqrt(3) / 2,
+      Ik2min: ik2minGegeven != null ? ik2minGegeven : Ik3min * Math.sqrt(3) / 2,
+      Ik2Bron: ik2maxGegeven != null ? 'opgegeven' : 'berekend',
+      hsMaxMVA: hsMax.actief ? hsMax.mva : null, hsMinMVA: hsMin.actief ? hsMin.mva : null,
+      Ifmax: ifmaxGegeven, Ifmin: ifminGegeven,
       buitenScopeMode: buitenScopeMode, buitenScopeVolledigActief: buitenScopeVolledigActief,
       icuOk: icuOk, icuRefIk3max: icuRefIk3max, kfactor: kfactor, IkStart: IkStart, Smin: Smin, thermischOk: thermischOk,
       peApart: peApart, SminPe: SminPe, thermischOkPe: thermischOkPe,
@@ -27895,7 +27953,9 @@ DATATABEL.grondBundelAantal = {
 
     var U0 = project.Un / Math.sqrt(3);
     var c = 0.95;
-    var Znet = boardResult.Zmin;
+    // 2026-11-20: de minimale foutstroom vertrekt van de MIN-keten van het bord (warme weerstand,
+    // zwakste HS-net) -- zonder HS-net gelijk aan vroeger.
+    var Znet = boardResult.ZminMin != null ? boardResult.ZminMin : boardResult.Zmin;
     var R = (2 * eg.lengte * seg.rho) / (eg.sectie * eg.aantal);
     var IkMin = (c * U0) / (Znet + R);
 
@@ -27972,7 +28032,12 @@ DATATABEL.grondBundelAantal = {
     // conservative convention already used for Ib on a non-root board).
     var dvB = (eg.polen === "3P" || eg.polen === "3P+N") ? Math.sqrt(3) : 2;
     var dvUref = dvB === 2 ? U0 : project.Un;
-    var spanningsvalV = (dvB * eg.In * eg.lengte * seg.rho) / (eg.sectie * eg.aantal);
+    // 2026-11-20: met cos φ (kringveld, leeg = 0,8) en de reactantie, zie dvFactor().
+    var egR1 = (eg.lengte * seg.rho) / (eg.sectie * eg.aantal);
+    var egXm = lookupReactancePerM(REF, eg.sectie);
+    var egX1 = egXm == null ? 0 : (egXm * eg.lengte) / eg.aantal;
+    var egCos = eg.cosPhi != null && eg.cosPhi !== '' && Number(eg.cosPhi) > 0 ? Number(eg.cosPhi) : 0.8;
+    var spanningsvalV = dvB * eg.In * dvFactor(egR1, egX1, egCos);
     var spanningsvalFrac = dvUref ? (spanningsvalV / dvUref) : null;
 
     // TT: automatische uitschakeling bij onrechtstreekse aanraking loopt via
@@ -28032,7 +28097,7 @@ DATATABEL.grondBundelAantal = {
     if (!Ib || !nk || !nk.lengte || !nk.sectie) return null;
     var seg = cableSegment(REF, nk);
     var Un = project.Un;
-    var spanningsvalV = (Math.sqrt(3) * Ib * nk.lengte * seg.rho) / (nk.sectie * nk.aantal);
+    var spanningsvalV = Math.sqrt(3) * Ib * dvFactor(seg.RkabelFase, seg.XkabelFase, Number(nk.cosPhi) > 0 ? Number(nk.cosPhi) : 0.8); // 2026-11-20
     var spanningsvalFrac = spanningsvalV / Un;
     var iz_ok = seg.Iz != null ? (Ib <= seg.Iz) : null;
     return {
@@ -28749,6 +28814,12 @@ function renderBoardDetail() {
       html += '<p class="hint">Ik3 aan de teller toegepast: <strong>' + (r && r.ik3NetEff != null ? fmtKA(r.ik3NetEff) : '—') + '</strong>' + (r && r.ik3NetBron === 'opgegeven' ? ' (opgegeven door netbeheerder)' : ' (standaard Synergrid-regel, 3kA/6kA)') + ' — instelbaar bij <strong>1. Project → Voeding &amp; normen</strong>. Deze kabel (teller &rarr; dit bord) wordt hieronder wél volledig berekend.</p>';
     } else if (isRoot) {
       html += '<p class="hint">Ucc transfo toegepast: <strong>' + (r && r.uccEff != null ? (r.uccEff * 100).toFixed(2) + '%' : '—') + '</strong>' + (r && r.uccBron === 'fabrikant' ? ' (fabrikant, ingevuld)' : ' (standaard tabelwaarde, geïnterpoleerd)') + ' — instelbaar bij <strong>1. Project → Voeding &amp; normen</strong>.</p>';
+      // 2026-11-20: kortsluitvermogen van het HS-net (zoals in Caneco "S"kQ HS max/min").
+      html += '<div class="grid">';
+      html += field('Kortsluitvermogen HS-net max (MVA)', input('skqMax', b.skqMax, 'number'));
+      html += field('Kortsluitvermogen HS-net min (MVA)', input('skqMin', b.skqMin, 'number'));
+      html += '</div>';
+      html += '<p class="hint">Optioneel, op te vragen bij de netbeheerder (bv. 433 / 125 MVA). Leeg = oneindig sterk net (enkel de transfo telt). Max gaat in Ik max, min in Ik min.</p>';
     }
     html += '<div class="grid">';
     html += field('Kabeltype', kabeltypeLeggingHtml(b, 'data-f'));
@@ -28879,7 +28950,7 @@ function renderBoardDetail() {
     '<input type="checkbox" data-f="toonBijkomendeGegevens"' + (b.toonBijkomendeGegevens !== false ? ' checked' : '') + '> Invullen &amp; tonen in rapport</label></div>';
   if (b.toonBijkomendeGegevens !== false) {
     html += '<div class="grid">';
-    html += field('Cos φ (leeg = 0,8)', input('cosPhi', b.cosPhi, 'number'));
+    html += field('Cos φ (leeg = 0,8 — telt mee in de spanningsval)', input('cosPhi', b.cosPhi, 'number'));
     html += field('GebruiksF. (leeg = 1,0)', input('gebruiksFactor', b.gebruiksFactor, 'number'));
     html += field('Icm (kA) (leeg = Icu)', input('icm', b.icm, 'number'));
     html += field('Ip — piekstroom (kA) (leeg = geschat)', input('ip', b.ip, 'number'));
@@ -28959,8 +29030,12 @@ function renderBoardDetail() {
     html += '<div class="section-title">Kortsluitstromen</div>';
     html += '<table class="results"><tr><td>Ik3 max</td><td class="num">' + fmtKA(r.Ik3max) + '</td></tr>' +
       '<tr><td>Ik3 min</td><td class="num">' + fmtKA(r.Ik3min) + '</td></tr>' +
+      '<tr><td>Ik2 max</td><td class="num">' + fmtKA(r.Ik2max) + '</td></tr>' +
+      '<tr><td>Ik2 min</td><td class="num">' + fmtKA(r.Ik2min) + '</td></tr>' +
       '<tr><td>Ik1 max</td><td class="num">' + fmtKA(r.Ik1max) + '</td></tr>' +
-      '<tr><td>Ik1 min</td><td class="num">' + fmtKA(r.Ik1min) + '</td></tr></table>';
+      '<tr><td>Ik1 min</td><td class="num">' + fmtKA(r.Ik1min) + '</td></tr></table>' +
+      '<p class="hint">Max-waarden met de kabelweerstand bij 20 °C, min-waarden met de warme kabel (zoals Caneco). Ik2 = √3/2 × Ik3.' +
+      (r.hsMaxMVA ? ' HS-net meegerekend: ' + r.hsMaxMVA + ' MVA (max)' + (r.hsMinMVA ? ' / ' + r.hsMinMVA + ' MVA (min)' : '') + '.' : '') + '</p>';
 
     html += '<div class="section-title">Kortsluitbeveiliging — uitschakelvermogen</div>';
     (function () {
@@ -29826,7 +29901,7 @@ function onFieldChange(b, el) {
     'hoofdschakelaarIn', 'hoofdschakelaarIcu', 'aantalAders',
     'cosPhi', 'gebruiksFactor', 'icm', 'ip', 'eenpoligeIcu', 'buitenScopeIcc',
     'neutraalAantal', 'neutraalSectie', 'peAantal', 'peSectie',
-    'hoofdschakelaarFiliatieIcu', 'bodemweerstand'].indexOf(f) !== -1) { b[f] = val === '' ? '' : Number(val); }
+    'hoofdschakelaarFiliatieIcu', 'bodemweerstand', 'skqMax', 'skqMin'].indexOf(f) !== -1) { b[f] = val === '' ? '' : Number(val); }
   else { b[f] = val; }
   // reset dependent dropdowns when omgeving changes (mirrors old macro's clear-on-change)
   if (f === 'omgeving') {
@@ -30382,8 +30457,9 @@ function renderBoardBlad(b, r, parent, project) {
     bf('Ik3 min', fmtKA(r.Ik3min)) +
     bf('Ik1 max', fmtKA(r.Ik1max)) +
     bf('Ik1 min', fmtKA(r.Ik1min)) +
-    (r.Ik2max != null ? bf('Ik2 max (extern opgegeven, informatief)', fmtKA(r.Ik2max)) : '') +
-    (r.Ik2min != null ? bf('Ik2 min (extern opgegeven, informatief)', fmtKA(r.Ik2min)) : '') +
+    (r.Ik2max != null ? bf('Ik2 max' + (r.Ik2Bron === 'opgegeven' ? ' (extern opgegeven)' : ''), fmtKA(r.Ik2max)) : '') +
+    (r.Ik2min != null ? bf('Ik2 min' + (r.Ik2Bron === 'opgegeven' ? ' (extern opgegeven)' : ''), fmtKA(r.Ik2min)) : '') +
+    (isRoot && r.hsMaxMVA ? bf('HS-net', r.hsMaxMVA + ' MVA max' + (r.hsMinMVA ? ' / ' + r.hsMinMVA + ' MVA min' : '')) : '') +
     (r.Ifmax != null ? bf('If max (extern opgegeven, informatief)', fmtKA(r.Ifmax)) : '') +
     (r.Ifmin != null ? bf('If min (extern opgegeven, informatief)', fmtKA(r.Ifmin)) : '') +
     bf('Automatische uitschakeling', badge(r.uitschakelingToepasbaar ? r.uitschakelingOk : null, 'Ik1min ≥ Im', 'niet OK') + (r.uitschakelingToepasbaar ? '' : ' (TN-methode, n.v.t. voor ' + escapeHtml(r.netstelsel) + ')'), true));
@@ -31272,6 +31348,7 @@ function renderNetkabelPanel() {
    Tabs
    ============================================================ */
 function switchTab(name) {
+  if (name === 'werfverslagen') name = 'topologie'; // 2026-11-20: tabblad Werfverslagen weg uit CaCalc
   state.activeTab = name;
   ['topologie', 'schema', 'rapport', 'werfverslagen'].forEach(function (t) {
     document.getElementById('cc-tab-' + t).style.display = (t === name) ? '' : 'none';
