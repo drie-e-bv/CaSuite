@@ -8,6 +8,6 @@ const D=process.argv[2]; const stub=fs.readFileSync(path.join(D,'tests/koppelen/
   await pg.route('https://fonts.googleapis.com/**',r=>r.fulfill({contentType:'text/css',body:''})); await pg.route('https://fonts.gstatic.com/**',r=>r.abort());
   await pg.goto('file://'+path.join(D,app+'.html')); await pg.waitForTimeout(1500);
   const n = await pg.evaluate(()=>{ const nav=document.querySelector('#cacalc-app nav.tabs'); return nav ? [...nav.querySelectorAll('button')].map(b=>b.textContent.trim()) : null; });
-  const geen = n && !n.some(t=>/Werfverslag|Verslagen/.test(t)) && n.length===3;
+  const geen = n && !n.some(t=>/Werfverslag|Verslagen/.test(t)) && n.length===2;
   console.log(app,w, JSON.stringify(n), geen?'OK':'FOUT', f.length?'pageerror '+f[0]:''); if(!geen||f.length) ok=false; await pg.close(); }
  await b.close(); process.exit(ok?0:1); })();

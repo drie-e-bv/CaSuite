@@ -1,0 +1,65 @@
+import { chromium } from '/opt/npm-tools/node_modules/playwright/index.mjs';
+const b=await chromium.launch({executablePath:'/usr/bin/google-chrome',args:['--no-sandbox']});
+const p=await b.newPage({viewport:{width:1400,height:950}});const errs=[];
+p.on('pageerror',e=>errs.push('PAGEERR '+e.message+' @ '+(e.stack||'').split('\n').slice(1,3).join(' ')));
+p.on('dialog',d=>d.accept());
+await p.route(/^https?:\/\/(?!localhost)/,r=>{const u=r.request().url();
+ if(/supabase/.test(u))return r.fulfill({path:'stub3.js',contentType:'text/javascript'});
+ if(/pdf\.worker/.test(u))return r.fulfill({path:'pdf.worker.min.js',contentType:'text/javascript'});
+ if(/pdf\.min\.js/.test(u))return r.fulfill({path:'pdf.min.js',contentType:'text/javascript'});
+ return r.fulfill({body:'',contentType:'text/javascript'})});
+await p.goto('http://localhost:8771/index.html');await p.waitForTimeout(2500);
+await p.click('#main-nav-btn-cados');await p.waitForTimeout(600);
+const [fc]=await Promise.all([p.waitForEvent('filechooser'), p.selectOption('#global-project-select','__uit_offerte__')]);
+await fc.setFiles('a508e6fe-Offerte_2600124_v7_0006.pdf');
+await p.waitForSelector('#of-modal summary input',{timeout:30000});
+await p.click('#of-modal #of-ok');await p.waitForTimeout(800);
+if(await p.$('.dq-ok')) await p.click('.dq-ok');
+await p.waitForSelector('#of-modal #of-verder',{timeout:20000});
+await p.click('#of-modal #of-verder'); await p.click('#of-modal #of-plan-over');
+await p.waitForSelector('#zkw-modal .zkw-stap');
+const acties=()=>p.$$eval('.dv-stap[data-stap="zekeringkast"] .dv-actie',bs=>bs.map(b=>b.textContent).join(' '));
+console.log('P10 vóór verdeling stappenbalk:', await p.evaluate(()=>[...document.querySelectorAll('.dv-stap[data-stap="zekeringkast"] .dv-actie')].map(b=>b.textContent).join(' ')));
+for(let i=0;i<5;i++){ await p.click('#zkw-verder'); await p.waitForTimeout(300); }
+if(await p.$eval('#zkw-verder',x=>x.disabled)) await p.check('#zkw-negeer');
+await p.click('#zkw-verder'); await p.waitForTimeout(1500); await p.click('#zkw-sluit');
+await p.waitForSelector('#kv-modal .kp-tabs'); console.log('P10 ketting → Koppelen-venster tab:', await p.$eval('#kv-modal .kp-tabs button.actief',b=>b.textContent));
+await p.click('#kv-modal .kp-tabs button[data-t="lijst"]'); await p.waitForSelector('#az-modal .kp-tabs');
+console.log('P10 tab Open lijst → toewijzen:', await p.$eval('#az-modal h2',h=>h.textContent), '| kv weg:', !(await p.$('#kv-modal')));
+await p.evaluate(()=>document.querySelectorAll('.modal-overlay').forEach(m=>m.remove())); await p.waitForTimeout(600);
+console.log('P10 na verdeling stappenbalk:', await acties());
+await p.click('.dv-stap[data-stap="zekeringkast"] .dv-actie >> nth=1'); await p.waitForSelector('#zkw-modal .zkw-stap');
+console.log('A13 zonder handwerk → meteen AREI-venster (geen waarschuwing):', !(await p.$('#zksnel-modal')));
+console.log('P23 snel opnieuw → stap:', await p.$eval('.zkw-stap.on, .zkw-stap.actief, .zkw-stap[aria-current]',b=>b.textContent).catch(async()=>await p.$eval('#zkw-verder',b=>b.textContent)));
+await p.click('#zkw-annul');
+// AREI-venster via plannen-knop/API -> doorverwijzing
+await p.evaluate(()=>CaDosApp.zekeringkast.open()); await p.waitForSelector('#zkdoor-modal');
+console.log('P9 AREI na verdeling:', await p.$$eval('#zkdoor-modal .modal-actions button',bs=>bs.map(b=>b.textContent).join(' | ')));
+await p.click('#zkdoor-modal .zkd-herschik'); await p.waitForTimeout(600);
+console.log('P9 → Herschikken venster open:', await p.evaluate(()=>[...document.querySelectorAll('.modal-overlay')].map(m=>m.id||m.querySelector('h2')?.textContent).join(',')));
+// audit 13: één automaat met de hand herschikken, daarna Snel opnieuw verdelen -> waarschuwing met overzicht
+const gewijzigd = await p.evaluate(()=>{ const sel=[...document.querySelectorAll('#zkg-modal .zkg-diff')].find(s=>[...s.options].some(o=>!o.disabled && !o.selected && o.value)); if(!sel) return null; const o=[...sel.options].find(o=>!o.disabled && !o.selected && o.value); sel.value=o.value; sel.dispatchEvent(new Event('change',{bubbles:true})); return o.textContent; });
+await p.waitForTimeout(800);
+await p.evaluate(()=>document.querySelectorAll('.modal-overlay').forEach(m=>m.remove())); await p.waitForTimeout(800);
+await p.click('.dv-stap[data-stap="zekeringkast"] .dv-actie >> nth=1'); await p.waitForTimeout(800);
+console.log('A13 na herschikken ('+(gewijzigd||'-')+') → waarschuwing:', !!(await p.$('#zksnel-modal')), '| lijst:', await p.$$eval('#zksnel-modal li',l=>l.map(x=>x.textContent).join(' ; ')).catch(()=>'-'));
+await p.click('#zksnel-modal .zks-ok'); await p.waitForSelector('#zkw-modal .zkw-stap'); console.log('A13 Toch opnieuw verdelen → AREI-venster open'); await p.click('#zkw-annul');
+await p.evaluate(()=>document.querySelectorAll('.modal-overlay').forEach(m=>m.remove()));
+// selectiemodus
+await p.click('#toggleSelect'); await p.waitForTimeout(300);
+await p.evaluate(()=>{ const m=[...document.querySelectorAll('#kastwrap .module, #kastwrap [data-id]')].find(x=>/AA|BA|CA/.test(x.textContent)); m && m.click(); }); await p.waitForTimeout(400);
+console.log('P9 selectiemodus: select weg:', !(await p.$('.zk-sel-diff')), '| knoppen:', await p.$$eval('#moveBanner button',bs=>bs.map(b=>b.textContent).join(' | ')));
+await p.click('#toggleSelect').catch(()=>{});
+// punt 24: Kringen
+await p.click('#tabgroups button[data-grp="Domotica"]'); await p.waitForTimeout(300);
+await p.click('#tabbar button[data-id="kringen"]'); await p.waitForTimeout(600);
+const n1=await p.$$eval('#krOverzicht .ov-automaat',x=>x.length);
+await p.selectOption('#krOverzicht .ov-automaat >> nth=0', {index:3}); await p.waitForTimeout(300);
+const gekozen=await p.$eval('#krOverzicht .ov-automaat',x=>x.value); await p.waitForTimeout(1500);
+console.log('P24 kringen: selects', n1, '| bewaard:', await p.evaluate((v)=>{const d=__DB.project_elektro_dossiers[__DB.project_elektro_dossiers.length-1].data;return d.kringen.items.filter(k=>!k.leeg)[0].zekeringModuleId===v},gekozen));
+await p.click('#tabbar button[data-id="knoppen"]'); await p.waitForTimeout(600);
+console.log('P24 knoppen: kolom', await p.$$eval('table.grid thead th',ths=>ths.some(t=>/Automaat \(kring\)/.test(t.textContent))), '| selects', await p.$$eval('.ov-kring-auto select',x=>x.length), '| zonder kring', await p.$$eval('.ov-kring-auto .hint',x=>x.length));
+await p.click('#tabgroups button[data-grp="Elektro"]'); await p.waitForTimeout(300);
+await p.click('#tabbar button[data-id="laadpalen"]'); await p.waitForTimeout(600);
+console.log('P24 laadpalen: selects', await p.$$eval('.ov-automaat',x=>x.length));
+console.log(errs.join('\n')||'no errors');await b.close();

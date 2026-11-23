@@ -1,0 +1,71 @@
+import { chromium } from '/opt/npm-tools/node_modules/playwright/index.mjs';
+const b=await chromium.launch({executablePath:'/usr/bin/google-chrome',args:['--no-sandbox']});
+const p=await b.newPage({viewport:{width:1400,height:950}});const errs=[];
+p.on('pageerror',e=>errs.push('PAGEERR '+e.message+' @ '+(e.stack||'').split('\n').slice(1,3).join(' ')));
+p.on('dialog',d=>d.accept());
+await p.route(/^https?:\/\/(?!localhost)/,r=>{const u=r.request().url();
+ if(/supabase/.test(u))return r.fulfill({path:'stub3.js',contentType:'text/javascript'});
+ if(/pdf\.worker/.test(u))return r.fulfill({path:'pdf.worker.min.js',contentType:'text/javascript'});
+ if(/pdf\.min\.js/.test(u))return r.fulfill({path:'pdf.min.js',contentType:'text/javascript'});
+ return r.fulfill({body:'',contentType:'text/javascript'})});
+await p.goto('http://localhost:8771/index.html');await p.waitForTimeout(2500);
+await p.click('#main-nav-btn-cados');await p.waitForTimeout(600);
+const [fc]=await Promise.all([p.waitForEvent('filechooser'), p.selectOption('#global-project-select','__uit_offerte__')]);
+await fc.setFiles('a508e6fe-Offerte_2600124_v7_0006.pdf');
+await p.waitForSelector('#of-modal summary input',{timeout:30000});
+await p.click('#of-modal #of-ok');await p.waitForTimeout(800);
+if(await p.$('.dq-ok')) await p.click('.dq-ok');
+await p.waitForSelector('#of-modal #of-verder',{timeout:20000});
+await p.click('#of-modal #of-verder'); await p.click('#of-modal #of-plan-over');
+await p.waitForSelector('#zkw-modal .zkw-stap');
+for(let i=0;i<5;i++){ await p.click('#zkw-verder'); await p.waitForTimeout(300); }
+if(await p.$eval('#zkw-verder',x=>x.disabled)) await p.check('#zkw-negeer');
+await p.click('#zkw-verder'); await p.waitForTimeout(1500); await p.click('#zkw-sluit');
+await p.waitForSelector('#kv-modal'); await p.click('#kv-modal .kv-annul'); await p.waitForTimeout(800);
+console.log('P7 Elektro-tabs:', await p.$$eval('#tabbar button',bs=>bs.map(b=>b.textContent+(b.classList.contains('active')?'*':'')).join(', ')));
+console.log('P7 weergaven:', await p.$$eval('.zk-weergaven button',bs=>bs.map(b=>b.textContent+(b.classList.contains('actief')?'*':'')).join(' | ')));
+console.log('P19 werkbalk opbouw:', await p.$$eval('.builder-side .toolbar-row button',bs=>bs.map(b=>b.textContent.replace(/\s+/g,' ').trim()).join(' | ')));
+await p.click('#zkKoppelen'); await p.waitForSelector('#az-modal .kp-tabs'); console.log('P19 Koppelen-tabs:', await p.$$eval('#az-modal .kp-tabs button',bs=>bs.map(b=>b.textContent).join(' | ')));
+
+await p.evaluate(()=>document.querySelectorAll('.modal-overlay').forEach(m=>m.remove()));
+// Bedrading
+await p.click('.zk-weergaven button[data-w="uitvoering"]'); await p.waitForTimeout(800);
+console.log('P7 bedrading: tab actief', await p.$eval('#tabbar button.active',b=>b.textContent), '| weergave', await p.$eval('.zk-weergaven button.actief',b=>b.textContent));
+console.log('P20 werkbalk boven tekening:', await p.$$eval('.uv-tekenbalk > *',xs=>xs.map(x=>x.tagName==='SELECT'?'[select '+x.className+']':x.textContent.trim()).filter(Boolean).join(' | ')));
+console.log('P20 secties:', await p.$$eval('details.uv-sec-klap',ds=>ds.map(d=>d.dataset.sec+(d.open?'(open)':'(dicht)')).join(' ')));
+console.log('P7 bedrading: ＋module uit bib?', !!(await p.$('.uv-bib-plaats')));
+await p.click('.uv-tekenbalk .uv-tool[data-tool="kam"]'); await p.waitForTimeout(200);
+console.log('P20 kam actief:', await p.$eval('.uv-tekenbalk .uv-tool[data-tool="kam"]',b=>b.classList.contains('actief')));
+await p.click('.uv-tekenbalk .uv-tool[data-tool="draad"]');
+await p.click('details[data-sec="lagen"] summary'); await p.waitForTimeout(200);
+// draad: twee klemmen
+const kl=await p.$$('#uvCanvas .uv-klem'); const nW0=await p.evaluate(()=>CaDosApp.state? 0:0);
+for(const i of [0,5]){ await p.evaluate((i)=>{const k=document.querySelectorAll('#uvCanvas .uv-klem')[i];k.dispatchEvent(new MouseEvent('click',{bubbles:true}));},i); await p.waitForTimeout(200); } await p.waitForTimeout(400);
+console.log('DBG status', await p.$eval('#uvStatus',x=>x.textContent), await p.evaluate(()=>{const k=document.querySelectorAll('#uvCanvas .uv-klem');return [k.length,k[0]&&k[0].getAttribute('data-m'),k[5]&&k[5].getAttribute('data-m')].join(',')}));
+console.log('P7 draad getrokken in bedrading:', await p.$$eval('#uvCanvas .uv-draad',x=>x.length));
+// naar tekening en terug: secties onthouden
+await p.click('.zk-weergaven button[data-w="zktekening"]'); await p.waitForTimeout(800);
+console.log('P7 tekening: werkbalk', !!(await p.$('.uv-tekenbalk')), '| secties', await p.$$eval('details.uv-sec-klap',ds=>ds.map(d=>d.dataset.sec+(d.open?'(open)':'(dicht)')).join(' ')), '| knoppen', await p.$$eval('details[data-sec="afdruk"] button',bs=>bs.map(b=>b.textContent.trim()).join(' | ')));
+const d0=await p.$$eval('#uvCanvas .uv-draad',x=>x.length);
+for(const i of [1,6]){ await p.evaluate((i)=>{const k=document.querySelectorAll('#uvCanvas .uv-klem')[i];k.dispatchEvent(new MouseEvent('click',{bubbles:true}));},i); await p.waitForTimeout(200); } await p.waitForTimeout(400);
+console.log('P7 tekening klikken tekent niets:', d0, '→', await p.$$eval('#uvCanvas .uv-draad',x=>x.length), '| draadlijst:', await p.$eval('#uvLijst',x=>x.innerHTML.length));
+await p.screenshot({path:'/tmp/b4-tek.png'});
+await p.click('.zk-weergaven button[data-w="uitvoering"]'); await p.waitForTimeout(800);
+console.log('P20 lagen blijft open:', await p.$eval('details[data-sec="lagen"]',d=>d.open));
+await p.screenshot({path:'/tmp/b4-bed.png'});
+// nav-knop Zekeringkast onthoudt weergave
+await p.click('#tabbar button[data-id="driverkast"]'); await p.waitForTimeout(500);
+await p.click('#tabbar button[data-id="zekeringen"]'); await p.waitForTimeout(800);
+console.log('P7 terug via tabblad → weergave:', await p.$eval('.zk-weergaven button.actief',b=>b.textContent));
+await p.click('.zk-weergaven button[data-w="zekeringen"]'); await p.waitForTimeout(800);
+await p.screenshot({path:'/tmp/b4-opb.png'});
+await p.click('.zk-weergaven button[data-w="uitvoering"]'); await p.waitForTimeout(800);
+console.log('A3 kop-link:', await p.$eval('.uv-naar-layout',a=>a.textContent), '| hint:', await p.$eval('.uv-sidebody .hint, .card .hint',h=>h.textContent).catch(()=>'-'));
+await p.click('#tabgroups button[data-grp="Project"]'); await p.waitForTimeout(300); await p.click('#tabbar button[data-id="export"]'); await p.waitForTimeout(500);
+console.log('A11 printcentrum:', await p.$$eval('#exportChecklijst td:first-child',t=>t.map(x=>x.textContent.replace(/\(nog leeg\)/,'').trim()).filter(x=>/Uitvoering/.test(x)).join(',')));
+await p.click('#tabgroups button[data-grp="Domotica"]'); await p.waitForTimeout(300); await p.click('#tabbar button[data-id="kringen"]'); await p.waitForTimeout(500);
+await p.click('.zk-weergaven button[data-w="verlichting"]'); await p.waitForTimeout(500);
+console.log('A12 titel:', await p.$eval('#panel-verlichting h2',h=>h.textContent), '| filter:', await p.$eval('.zk-weergaven button.actief',b=>b.textContent));
+await p.click('#main-nav-btn-cacalc'); await p.waitForTimeout(2000);
+console.log('A4 CaCalc tabs:', await p.$$eval('#cacalc-app nav.tabs button',bs=>bs.filter(b=>b.offsetParent).map(b=>b.innerText.trim()).join(' | ')));
+console.log(errs.join('\n')||'no errors');await b.close();

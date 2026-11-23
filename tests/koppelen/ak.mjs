@@ -11,12 +11,12 @@ await p.route(/^https?:\/\/(?!localhost)/,r=>{const u=r.request().url();
 await p.goto('http://localhost:8771/index.html');await p.waitForTimeout(2500);
 console.log('catalogus in DB',await p.evaluate(()=>__DB.elektro_catalogus_armaturen.map(a=>a.naam).join(', ')));
 await p.click('#main-nav-btn-cados');await p.waitForTimeout(500);
-await p.locator('#cados-proj-list >> text=Leeg project').first().click();await p.waitForTimeout(800);
+await p.evaluate(()=>{const s=document.getElementById('global-project-select');const o=[...s.options].find(o=>/Leeg project/.test(o.textContent));s.value=o.value;s.dispatchEvent(new Event('change'));});await p.waitForTimeout(800);
 let [fc]=await Promise.all([p.waitForEvent('filechooser'),p.click('#cados-aanmaken-offerte-btn')]);
 await fc.setFiles(PDF);await p.waitForSelector('#of-modal summary input',{timeout:15000});
 await p.click('#of-modal #of-ok');await p.waitForTimeout(800);if(await p.$('.dq-ok'))await p.click('.dq-ok');await p.waitForSelector('#of-modal #of-undo');
 console.log('knop in resultaat:',await p.evaluate(()=>(document.querySelector('#of-koppel')||{}).textContent||'GEEN'));
-await p.click('#of-koppel');await p.waitForSelector('#ak-modal .ak-rij');await p.waitForTimeout(300);
+await p.evaluate(()=>{const m=document.getElementById('of-modal');if(m)m.remove();});await p.evaluate(()=>{[...document.querySelectorAll('#tabbar button')].find(x=>x.dataset.id==='driverkast').click();});await p.waitForTimeout(400);await p.click('#dkKoppel');await p.waitForSelector('#ak-modal .ak-rij');await p.waitForTimeout(300);
 const rijen=await p.evaluate(()=>[...document.querySelectorAll('#ak-modal .ak-rij')].map(r=>r.querySelector('b').textContent.slice(0,60)+' => '+(r.querySelector('.ak-keuze').value||'-')+' | '+r.querySelector('.ak-tip').textContent));
 console.log(rijen.join('\n'));
 await p.screenshot({path:'ak1.png'});
@@ -32,7 +32,7 @@ console.log('catalogus nu',await p.evaluate(()=>__DB.elektro_catalogus_armaturen
 console.log('badge driverkast:',await p.evaluate(()=>{document.querySelector('#tabbar button[data-id="driverkast"]').click();return (document.querySelector('#dkKoppel')||{}).textContent}));
 await p.waitForTimeout(400);await p.screenshot({path:'ak3.png'});
 // tweede import: namen meteen catalogus
-[fc]=await Promise.all([p.waitForEvent('filechooser'),p.evaluate(()=>document.getElementById('btnOfferte').click())]);
+[fc]=await Promise.all([p.waitForEvent('filechooser'),p.evaluate(()=>CaDosApp.offerte.start())]);
 await fc.setFiles(PDF);await p.waitForSelector('#of-modal summary input',{timeout:15000});
 const V=await p.evaluate(async()=>{return document.querySelectorAll('#of-modal details')[3].innerText.slice(0,200)});
 await p.click('#of-modal #of-ok');await p.waitForTimeout(800);if(await p.$('.dq-ok'))await p.click('.dq-ok');await p.waitForSelector('#of-modal #of-undo');await p.waitForTimeout(900);

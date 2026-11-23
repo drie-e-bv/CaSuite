@@ -274,10 +274,10 @@ function keep(old,fresh){
  const ok={},og={};old.borden.forEach(b=>{if(b.hoofd&&b.hoofd.bron)og[b.hoofd.bron]=b.hoofd;b.groepen.forEach(g=>{if(g.bron)og[g.bron]=g;g.kringen.forEach(k=>{if(k.bron)ok[k.bron]=k})})});
  const seen=new Set();
  fresh.borden.forEach(b=>{if(og[b.hoofd.bron])b.hoofd.type=og[b.hoofd.bron].type||b.hoofd.type;
-  const ob=old.borden.find(x=>x.kastId&&x.kastId===b.kastId);if(ob)b.id=ob.id;
+  const ob=old.borden.find(x=>x.kastId&&x.kastId===b.kastId);if(ob){b.id=ob.id;if(ob.calcBoardId)b.calcBoardId=ob.calcBoardId}
   b.groepen.forEach(g=>{const o=og[g.bron];if(o&&g.sub){g.id=o.id;g.type=o.type||g.type}
    g.kringen.forEach(k=>{const o=ok[k.bron];if(!o)return;seen.add(o.id);
-    Object.assign(k,{id:o.id,curve:o.curve,kA:o.kA,kabelType:o.kabelType,lengte:o.lengte,punten:o.punten,calc:o.calc});
+    Object.assign(k,{id:o.id,curve:o.curve,kA:o.kA,kabelType:o.kabelType,lengte:o.lengte,punten:o.punten,calc:o.calc,calcId:o.calcId});
     if(k.kabelBron==='standaard'&&o.kabel){k.kabel=o.kabel;if(o.kabelBron!=='standaard')delete k.kabelBron}})})});
  old.borden.forEach(ob=>{const b=fresh.borden.find(x=>x.kastId&&x.kastId===ob.kastId)||(!ob.kastId?null:fresh.borden[0]);
   if(!ob.kastId&&ob.groepen.some(g=>g.kringen.length)){fresh.borden.push(ob);return}
@@ -357,18 +357,28 @@ function syncCodes(d){S.borden.forEach(b=>{const kast=kastVan(d,b.kastId);if(!ka
 function calcKring(eg){const pol=eg.polen||'2P',n={ '1P':3,'2P':3,'1P+N':3,'3P':4,'3P+N':5,'4P':5}[pol]||3;
  return{A:+eg.In||'',curve:String(eg.curve||'C').replace(/-?curve/i,'').trim()||'C',polen:pol,kA:eg.icu===''||eg.icu==null?'':+eg.icu,kabelType:eg.mantel||'XVB',
   kabel:eg.sectie?`${n}G${String(eg.sectie).replace('.',',')}`:'',lengte:eg.lengte??''}}
+/* 22/11/2026 (punt 18): koppeling CaCalc <-> CaDraw op id i.p.v. naam, zodat hernoemen niets breekt.
+   Volgorde: 1) CaCalc-eindgroep met cadosId = automaat-id van de kring (k.bron); 2) eerder gelegde koppeling
+   k.calcId = id van de CaCalc-eindgroep; 3) enkel als er nog geen koppeling is: op naam (eenmalig), daarna
+   wordt de id bewaard (k.calcId, b.calcBoardId). */
 function mergeCaCalc(st,calc){let n=0;const boards=(calc&&calc.boards)||[];
- st.borden.forEach(b=>{let cb=boards.find(x=>norm(x.naam)===norm(b.naam));
+ st.borden.forEach(b=>{let cb=(b.calcBoardId&&boards.find(x=>x.id===b.calcBoardId))||boards.find(x=>norm(x.naam)===norm(b.naam));
   if(!cb){const c=boards.filter(x=>(x.eindgroepen||[]).length);if(c.length===1&&st.borden.length===1)cb=c[0]}
-  if(!cb)return;const m={};(cb.eindgroepen||[]).forEach(e=>{m[norm(e.naam)]=e});
-  b.groepen.forEach(g=>g.kringen.forEach(k=>{const e=m[norm(k.naam)];if(!e||!norm(k.naam))return;const c=calcKring(e);
-   Object.keys(c).forEach(f=>{if(c[f]!==''&&c[f]!=null)k[f]=c[f]});delete k.kabelBron;k.calc=true;n++}))});
+  if(!cb)return;if(cb.id)b.calcBoardId=cb.id;
+  const opId={},opCados={},opNaam={};(cb.eindgroepen||[]).forEach(e=>{if(e.id)opId[e.id]=e;if(e.cadosId)opCados[e.cadosId]=e;if(norm(e.naam))opNaam[norm(e.naam)]=e});
+  const gebruikt=new Set();b.groepen.forEach(g=>g.kringen.forEach(k=>{if(k.calcId&&opId[k.calcId])gebruikt.add(k.calcId)}));
+  b.groepen.forEach(g=>g.kringen.forEach(k=>{
+   let e=(k.bron&&opCados[k.bron])||(k.calcId&&opId[k.calcId])||null;
+   if(!e&&!k.calcId&&norm(k.naam)){const kand=opNaam[norm(k.naam)];if(kand&&!gebruikt.has(kand.id))e=kand}
+   if(!e)return;const c=calcKring(e);
+   Object.keys(c).forEach(f=>{if(c[f]!==''&&c[f]!=null)k[f]=c[f]});delete k.kabelBron;k.calc=true;if(e.id){k.calcId=e.id;gebruikt.add(e.id)}n++}))});
  return n}
 function fromCaCalc(calc){const st=blank();st.borden=[];
  (calc.boards||[]).filter(b=>(b.eindgroepen||[]).length).forEach(cb=>{const b=newBord({naam:cb.naam||'Bord'}),dm={};
   (cb.differentielen||[]).forEach((d,i)=>{if(i===0&&+d.mA>=100){b.hoofd={mA:+d.mA,A:+d.stroom||40,polen:d.polen||'4P',type:d.type||'A'};dm[d.id]=b.groepen[0]}
    else{const g=newGroep({mA:+d.mA||30,A:+d.stroom||40,polen:d.polen||'2P',type:d.type||'A'});b.groepen.push(g);dm[d.id]=g}});
-  (cb.eindgroepen||[]).forEach(e=>(dm[e.differentieelId]||b.groepen[0]).kringen.push(newKring(Object.assign({naam:e.naam||'',calc:true},calcKring(e)))));
+  if(cb.id)b.calcBoardId=cb.id;
+  (cb.eindgroepen||[]).forEach(e=>(dm[e.differentieelId]||b.groepen[0]).kringen.push(newKring(Object.assign({naam:e.naam||'',calc:true,calcId:e.id||undefined},calcKring(e)))));
   st.borden.push(b)});
  if(!st.borden.length)throw new Error('Geen borden met eindgroepen gevonden in de CaCalc-gegevens.');return st}
 function sample(){
@@ -686,7 +696,7 @@ function allPages(st,parts){parts=parts||{schema:true,plan:true};setFormaat(st);
    draw.bg={data:pl.bg&&pl.bg.data,x:ox,y:oy,w:1000*k,h:H*k};draw.d.o.push(...xform(planFlat(st,pl,laag),0,k,ox,oy))}})})});
  if(parts.kringen)out.push(...tablePages('Lijst met kringen',[['Kring',0,8,'s',1],['Benaming',16,46],['Beveiliging',104,18],['Kabel',136,22],['Lengte',178,8],['Differentieel',196,30],['Punten',276,5,'e']],
   st.borden.flatMap(b=>b.groepen.flatMap(g=>g.kringen.map(k=>[cd.k[k.id],(st.borden.length>1?b.naam+' - ':'')+k.naam,`${k.polen} ${k.curve}${k.A}A ${k.kA?k.kA+'kA':''}`,`${k.kabelType} ${k.kabel}`,k.lengte?k.lengte+' m':'',`${g.sub?g.mA:b.hoofd.mA} mA - ${g.sub?g.A:b.hoofd.A}A type ${g.sub?g.type:b.hoofd.type}`,k.punten.length])))));
- if(parts.mat)out.push(...tablePages('Materiaallijst',[['Omschrijving',0,110],['Aantal',276,10,'e']],materials(st)));
+ if(parts.mat&&!(EMB&&EMB.naarCaMat))out.push(...tablePages('Materiaallijst',[['Omschrijving',0,110],['Aantal',276,10,'e']],materials(st)));
  return out.map((p,i)=>{const d=mk(),draw={d,bg:null};p.f(draw);titleBlock(d,st,i,out.length,p.soort,p.sub);return{ops:d.o,bg:draw.bg,soort:p.soort}})}
 /* SVG backend */
 function opsSVG(ops,edit){const f={n:'none',w:'#fff',b:'#000'};let s='',top='';
@@ -838,9 +848,11 @@ function vExtra(){const sel=(i,f,v,opts)=>`<select data-cfg="${i}.${f}">${opts.m
 function kringTabel(){const cd=codes(S);
  const rows=S.borden.flatMap(b=>b.groepen.flatMap(g=>g.kringen.map(k=>`<tr data-a="goK" data-kid="${k.id}" style="cursor:pointer"><td><b>${cd.k[k.id]}</b></td><td>${S.borden.length>1?esc(b.naam)+' - ':''}${esc(k.naam)}</td><td>${esc(k.polen)} ${esc(k.curve)}${esc(k.A)}A</td><td>${esc(k.kabelType)} ${esc(k.kabel)}</td><td>Δ${g.sub?g.mA:b.hoofd.mA}mA</td><td class="n">${k.punten.length}</td></tr>`))).join('');
  return`<div class="card"><h2>Lijst met kringen</h2><div class="tw"><table><tr><th>Kring</th><th>Benaming</th><th>Beveiliging</th><th>Kabel</th><th>Differentieel</th><th class="n">Punten</th></tr>${rows}</table></div></div>`}
-function vMat(){return`<div class="card"><h2>Materiaallijst <small>afgeleid uit het schema; kabellengtes uit het veld Lengte per kring</small><span style="flex:1"></span><button class="sm" data-a="csv">Exporteren naar Excel (CSV)</button></h2><div class="tw"><table><tr><th>Omschrijving</th><th class="n">Aantal</th></tr>${materials(S).map(m=>`<tr><td>${esc(m[0])}</td><td class="n">${m[1]}</td></tr>`).join('')}</table></div></div>`}
+/* 22/11/2026 (punt 16): in CaSuite is CaMat de enige materiaallijst -- hier één knop "Naar CaMat" */
+function vMat(){if(EMB&&EMB.naarCaMat){const n=materials(S).length;return`<div class="card"><h2>Materiaal</h2><p class="note">De materiaallijst van dit project staat in <b>CaMat › Project</b>. Uit dit schema worden ${n} regel(s) afgeleid (kabellengtes uit het veld Lengte per kring); ze komen daar bij, of worden bijgewerkt.</p><div class="row"><button class="pri" data-a="naarCaMat">Naar CaMat →</button></div></div>`}
+ return`<div class="card"><h2>Materiaallijst <small>afgeleid uit het schema; kabellengtes uit het veld Lengte per kring</small><span style="flex:1"></span><button class="sm" data-a="csv">Exporteren naar Excel (CSV)</button></h2><div class="tw"><table><tr><th>Omschrijving</th><th class="n">Aantal</th></tr>${materials(S).map(m=>`<tr><td>${esc(m[0])}</td><td class="n">${m[1]}</td></tr>`).join('')}</table></div></div>`}
 function vPrint(){const pr=S.print||(S.print={schema:true,plan:true,kringen:true,mat:false}),pg=allPages(S,pr);if(!pr.formaat)pr.formaat='A4';
- return`<div class="card"><h2>Dossier samenstellen</h2>${[['schema','Eendraadschema'],['plan','Situatieplan elektro'],['planMuziek','Situatieplan muziek'],['planAlarm','Situatieplan alarm'],['planNetwerk','Situatieplan netwerk'],['kringen','Lijst met kringen'],['mat','Materiaallijst']].map(x=>`<label class="chkl"><input type="checkbox" data-c="print.${x[0]}" data-r${pr[x[0]]?' checked':''}>${x[1]}</label>`).join('')}
+ return`<div class="card"><h2>Dossier samenstellen</h2>${[['schema','Eendraadschema'],['plan','Situatieplan elektro'],['planMuziek','Situatieplan muziek'],['planAlarm','Situatieplan alarm'],['planNetwerk','Situatieplan netwerk'],['kringen','Lijst met kringen'],['mat','Materiaallijst']].filter(x=>!(x[0]==='mat'&&EMB&&EMB.naarCaMat)).map(x=>`<label class="chkl"><input type="checkbox" data-c="print.${x[0]}" data-r${pr[x[0]]?' checked':''}>${x[1]}</label>`).join('')}
  <div class="row"><button class="pri" data-a="pdf">PDF maken (${pg.length} blad${pg.length===1?'':'en'})</button><button class="sm" data-a="zo">−</button><button class="sm" data-a="zi">+</button><label class="pck" style="margin-left:6px">Papier <select data-b="print.formaat" data-r style="width:auto">${Object.keys(FORMATEN).map(f=>`<option${pr.formaat===f?' selected':''}>${f}</option>`).join('')}</select> liggend</label><span class="note">Elke laag van het situatieplan komt op een eigen blad. Titelblok: zie tabblad Document.</span></div></div>
  <div class="pages">${pg.map(p=>pageSVG(p,false)).join('')||'<p style="color:#fff;padding:20px">Niets geselecteerd.</p>'}</div>`}
 function vPlan(){P.pi=clamp(P.pi,0,S.plannen.length-1);const pl=S.plannen[P.pi],H=pl.h||707,ix=pindex(S),gs=laagGroepen(P.laag),cd=codes(S);if(!pl.teksten)pl.teksten=[];
@@ -883,8 +895,8 @@ function vPlan(){P.pi=clamp(P.pi,0,S.plannen.length-1);const pl=S.plannen[P.pi],
   <span class="pzoom">${ck('transp','Transparant')}${ck('grid','Toon grid')}${ck('snapGrid','Kleef aan grid')}${ck('snapMuur','Kleef aan muren')}</span>
   <span class="pzoom"><b style="font-size:13px">Toon:</b>${LAGEN.map(([k,n])=>`<label class="pck"><input type="checkbox" data-a="ptoon" data-k="${k}"${P.toon[k]||P.laag===k?' checked':''}${P.laag===k?' disabled':''}>${n}</label>`).join('')}</span></div>
  <div class="row"><input data-b="plannen.${P.pi}.naam" data-r value="${esc(pl.naam)}" style="width:140px" title="Naam verdieping">
-  <label class="sm filel">Achtergrond (AutoCAD, PDF, afbeelding)<input type="file" id="bgFile" accept=".dxf,.dwg,image/*,application/pdf" style="display:none"></label>${pl.cad?`<button class="sm" data-a="cadLagen">Lagen (${pl.cad.lagen.filter(l=>l.aan!==false).length}/${pl.cad.lagen.length})</button>`:''}
-  ${CLOUD&&cloud.plannen.length?`<select id="casnap" style="max-width:180px"><option value="">Plan uit CaSnap...</option>${cloud.plannen.map((p,i)=>`<option value="${i}">${esc(p.naam||'Naamloos plan')}</option>`).join('')}</select>`:''}
+  ${CLOUD?`<label class="sm filel" title="Plannen (PDF/afbeelding) komen uit Dossier › Plannen; hier enkel nog AutoCAD">Achtergrond (AutoCAD)<input type="file" id="bgFile" accept=".dxf,.dwg" style="display:none"></label>`:`<label class="sm filel">Achtergrond (AutoCAD, PDF, afbeelding)<input type="file" id="bgFile" accept=".dxf,.dwg,image/*,application/pdf" style="display:none"></label>`}${pl.cad?`<button class="sm" data-a="cadLagen">Lagen (${pl.cad.lagen.filter(l=>l.aan!==false).length}/${pl.cad.lagen.length})</button>`:''}
+  ${CLOUD&&cloud.pid?(cloud.planVoor(pl)?`<button class="sm" data-a="planVd" title="Het plan van deze verdieping uit Dossier › Plannen">📐 Plan ${pl.bgPlanId&&String(pl.bgPlanId)===String(cloud.planVoor(pl).id)?'opnieuw ophalen':'van deze verdieping'}</button>`:(EMB&&EMB.naarDossierTab?`<span class="note">Geen plan voor deze verdieping</span> <button class="sm" data-a="naarPlannen" title="Plannen laad je op in CaDos › Project › Plannen, met de verdieping erbij">Plan opladen →</button>`:`<span class="note" title="Plannen laad je op in CaDos › Project › Plannen, met de verdieping erbij">Geen plan voor deze verdieping (Dossier › Plannen)</span>`)):''}
   ${pl.bg?`<button class="sm" data-a="noBg">Achtergrond weg</button>`:''}
   <select data-b="plannen.${P.pi}.sym" data-n data-r title="Symboolgrootte"><option value="2"${pl.sym==2?' selected':''}>Symbolen klein</option><option value="3"${pl.sym==3?' selected':''}>Symbolen normaal</option><option value="4.2"${pl.sym==4.2?' selected':''}>Symbolen groot</option></select>
   <select data-b="plannen.${P.pi}.mw" data-n data-r title="Muurdikte"><option value="2"${pl.mw==2?' selected':''}>Muur dun</option><option value="3.2"${(pl.mw||3.2)==3.2?' selected':''}>Muur normaal</option><option value="6"${pl.mw==6?' selected':''}>Muur dik</option></select>
@@ -897,7 +909,7 @@ function vPlan(){P.pi=clamp(P.pi,0,S.plannen.length-1);const pl=S.plannen[P.pi],
   <div class="pcols"><div class="plet">${lets}</div><div class="pcomp">${comp}</div></div></div>
  <div><p class="note" style="margin:0 0 6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span>${hint}</span>${rotKnop}</p><div class="pages">${svg}</div></div></div>`}
 function render(){gc();const nw=checks(S).filter(x=>x.lvl==='w').length;
- $('#tabs').innerHTML=[['doc','Document'],['schema','Eendraadschema'],['plan','Situatieplan'],['kring','Kringen'+(nw?`<span class="badge">${nw}</span>`:'')],['mat','Materiaallijst'],['print','Afdrukken'],['extra','Extra']].map(t=>`<button data-tab="${t[0]}" class="${tab===t[0]?'on':''}">${t[1]}</button>`).join('');
+ $('#tabs').innerHTML=[['doc','Document'],['schema','Eendraadschema'],['plan','Situatieplan'],['kring','Kringen'+(nw?`<span class="badge">${nw}</span>`:'')],['mat',EMB&&EMB.naarCaMat?'Materiaal':'Materiaallijst'],['print','Afdrukken'],['extra','Extra']].map(t=>`<button data-tab="${t[0]}" class="${tab===t[0]?'on':''}">${t[1]}</button>`).join('');
  const sc=document.querySelector('.pages'),sx=sc?sc.scrollLeft:0,sy=sc?sc.scrollTop:0,sd=$('.lib'),ls=sd?sd.scrollTop:0;
  $('#v').innerHTML=tab==='doc'?vDoc():tab==='kring'?vKring():tab==='mat'?vMat():tab==='print'?vPrint():tab==='extra'?vExtra():tab==='plan'?vPlan():vSchema();
  const s2=document.querySelector('.pages');if(s2&&sc){s2.scrollLeft=sx;s2.scrollTop=sy}const l2=$('.lib');if(l2)l2.scrollTop=ls}
@@ -1135,7 +1147,10 @@ document.addEventListener('click',async e=>{
  else if(a==='delTx')mut('Tekst gewist',()=>{pl.teksten=pl.teksten.filter(t=>t.id!==P.sel);P.sel=null});
  else if(a==='addPlan'){const n=await ask('Naam van de verdieping','Verdieping '+S.plannen.length);if(n)mut('',()=>{S.plannen.push(newPlan(n));P.pi=S.plannen.length-1})}
  else if(a==='delPlan')mut('Verdieping verwijderd',()=>{S.plannen.splice(P.pi,1);P.pi=0});
- else if(a==='noBg')mut('Achtergrond verwijderd',()=>{pl.bg=null});
+ else if(a==='naarPlannen'){(async()=>{try{if(cloud.dirty)await cloud.save();await EMB.naarDossierTab('plannen')}catch(err){toast('Openen mislukt: '+(err.message||err))}})()}
+ else if(a==='naarCaMat'){(async()=>{try{if(cloud.dirty)await cloud.save();const r=await EMB.naarCaMat(materials(S));toast(`Naar CaMat: ${r.nieuw} nieuw, ${r.bij} bijgewerkt`)}catch(err){toast('Naar CaMat mislukt: '+(err.message||err))}})()}
+ else if(a==='noBg')mut('Achtergrond verwijderd',()=>{pl.bg=null;delete pl.bgPlanId});
+ else if(a==='planVd'){const pp=cloud.planVoor(pl);if(pp){(async()=>{try{toast('Plan ophalen...');const r=await fetch(pp.afbeelding_url);if(!r.ok)throw new Error('HTTP '+r.status);const bg=await blobToBg(await r.blob());setBg(bg);pl.bgPlanId=pp.id}catch(err){toast('Plan ophalen mislukt: '+(err.message||err))}})()}}
  else if(a==='cadLagen')cadLagenDialoog();
  else if(a==='cadWeg'){$('#ovl').style.display='none';mut('AutoCAD-laag verwijderd',()=>{delete pl.cad})}
  else if(a==='rot'){const it=pl.items.find(i=>i.id===P.sel);if(it)mut('',()=>{it.rot=((it.rot||0)+1)%4})}
@@ -1188,7 +1203,13 @@ document.addEventListener('keydown',e=>{if(tab!=='plan'||/INPUT|SELECT|TEXTAREA/
  else if((e.key==='Delete'||e.key==='Backspace')&&P.sel){const pl=S.plannen[P.pi];mut('Van het plan gehaald',()=>{pl.items=pl.items.filter(i=>i.id!==P.sel);pl.teksten=(pl.teksten||[]).filter(t=>t.id!==P.sel);P.sel=null})}});
 
 /* ================= CaSuite-koppeling (Supabase) ================= */
-const cloud={sb:null,pid:null,proj:null,projecten:[],plannen:[],dirty:false,t:null,who:'',backup:false,saving:false,
+const cloud={sb:null,pid:null,proj:null,projecten:[],plannen:[],planMeta:{},vds:[],
+ /* 22/11/2026 (punt 12): het plan per verdieping komt uit CaDos › Plannen (dossier.plannenMeta) */
+ planVoor(pl){const vd=(this.vds||[]).find(v=>v&&(v.label===pl.naam||v.code===pl.naam));if(!vd)return null;const m=this.planMeta||{},id=Object.keys(m).find(k=>m[k]&&m[k].verdieping===vd.code);return id?this.plannen.find(p=>String(p.id)===String(id))||null:null},
+ async planAuto(){let n=0;for(const pl of S.plannen){const pp=this.planVoor(pl);if(!pp||pl.cad)continue;if(pl.bg&&(!pl.bgPlanId||String(pl.bgPlanId)===String(pp.id)))continue;
+   try{const r=await fetch(pp.afbeelding_url);if(!r.ok)continue;const bg=await blobToBg(await r.blob());const oh=pl.h||707,nh=Math.round(1000*bg.h/bg.w);pl.bg=bg;pl.h=nh;pl.bgPlanId=pp.id;if(nh<oh){pl.items.forEach(i=>i.y=Math.min(i.y,nh-10));pl.muren.forEach(m=>{m[1]=Math.min(m[1],nh);m[3]=Math.min(m[3],nh)})}n++}catch(e){}}
+  if(n){persist();render();toast(n+' plan(nen) uit Dossier › Plannen geplaatst')}},
+ dirty:false,t:null,who:'',backup:false,saving:false,
  status(s){$('#cst').textContent=s},
  async init(){
   $('#bproj').style.display='';this.status('Verbinden...');
@@ -1213,6 +1234,7 @@ const cloud={sb:null,pid:null,proj:null,projecten:[],plannen:[],dirty:false,t:nu
   try{const sb=this.sb,[own,dos,pls]=await Promise.all([sb.from('project_cadraw_data').select('*').eq('project_id',pid).maybeSingle(),sb.from('project_elektro_dossiers').select('*').eq('project_id',pid).maybeSingle(),sb.from('project_plannen').select('id,naam,afbeelding_url').eq('project_id',pid).order('created_at',{ascending:true})]);
    if(own.error)throw own.error;if(dos.error)throw dos.error;
    this.pid=pid;this.ver=own.data?own.data.updated_at:null;this.proj=this.projecten.find(p=>p.id===pid);this.plannen=(pls.data||[]).filter(p=>p.afbeelding_url);this.backup=false;
+   this.planMeta=(dos.data&&dos.data.data&&dos.data.data.plannenMeta)||{};this.vds=(dos.data&&dos.data.data&&dos.data.data.verdiepingen)||[];
    try{localStorage.setItem('cadraw-project',pid)}catch(e){}
    let st=own.data&&own.data.data&&own.data.data.borden?migrate(own.data.data):null,nieuw=!st,msg='';
    if(dos.data&&dos.data.data&&dos.data.data.zekeringen){const fresh=fromCaDos(dos.data.data);delete fresh._over;st=st?keep(st,fresh):fresh}
@@ -1223,6 +1245,7 @@ const cloud={sb:null,pid:null,proj:null,projecten:[],plannen:[],dirty:false,t:nu
     msg=(dos.data?'Opgebouwd uit CaDos':'Nieuw CaDraw-dossier')+msg}
    S=st;BASIS=dos.data&&dos.data.data&&dos.data.data.zekeringen?basisVan(S):null;bi=0;P.pi=0;P.sel=null;undoStack=[];E.sel=null;this.dirty=false;$('#bproj').textContent=(this.proj?this.proj.naam:'Project')+' ▾';this.status(nieuw?'Nog niet bewaard':'Geladen');render();
    if(msg)toast(msg);
+   this.planAuto();
   }catch(err){this.status('Fout');toast('Laden mislukt: '+(err.message||err))}},
  lock:Promise.resolve(),
  excl(fn){const p=this.lock.then(fn,fn);this.lock=p.catch(()=>{});return p},
@@ -1258,7 +1281,7 @@ const cloud={sb:null,pid:null,proj:null,projecten:[],plannen:[],dirty:false,t:nu
   this.status(r.ok?'CaDos bijgewerkt':'');if(r.ok)this.dirty=true;return r})},
  async resync(){await this.save();await this.open(this.pid);toast('CaDos opnieuw ingelezen')},
  async calc(){try{const c=await this.sb.from('project_cacalc_data').select('data').eq('project_id',this.pid).maybeSingle();if(!c.data||!c.data.data){toast('Dit project heeft geen CaCalc-berekening.');return}
-  snap();const n=mergeCaCalc(S,c.data.data);persist();render();toast(n?`${n} kringen aangevuld uit CaCalc (koppeling op naam)`:'Geen kringen met dezelfde naam gevonden in CaCalc',!!n)}catch(err){toast('CaCalc lezen mislukt: '+(err.message||err))}}
+  snap();const n=mergeCaCalc(S,c.data.data);persist();render();toast(n?`${n} kringen aangevuld uit CaCalc (gekoppeld op id; naam enkel bij de eerste koppeling)`:'Geen gekoppelde kringen gevonden in CaCalc',!!n)}catch(err){toast('CaCalc lezen mislukt: '+(err.message||err))}}
 };
 const allK=st=>st.borden.reduce((n,b)=>n+b.groepen.reduce((m,g)=>m+g.kringen.length,0),0);
 window.addEventListener('beforeunload',e=>{if(CLOUD&&(cloud.dirty||bezig)){cloud.save();e.preventDefault();e.returnValue=''}});

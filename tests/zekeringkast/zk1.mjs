@@ -12,7 +12,7 @@ await p.route(/^https?:\/\/(?!localhost)/,r=>{const u=r.request().url();
  return r.fulfill({body:'',contentType:'text/javascript'})});
 await p.goto('http://localhost:8771/index.html');await p.waitForTimeout(2500);
 await p.click('#main-nav-btn-cados');await p.waitForTimeout(500);
-await p.locator('#cados-proj-list >> text=Leeg project').first().click();await p.waitForTimeout(800);
+await p.evaluate(()=>{const s=document.getElementById('global-project-select');const o=[...s.options].find(o=>/Leeg project/.test(o.textContent));s.value=o.value;s.dispatchEvent(new Event('change'));});await p.waitForTimeout(800);
 const [fc]=await Promise.all([p.waitForEvent('filechooser'),p.click('#cados-aanmaken-offerte-btn')]);
 await fc.setFiles(PDF);
 await p.waitForSelector('#of-modal summary input',{timeout:20000});
@@ -20,8 +20,8 @@ await p.click('#of-modal #of-ok');
 // drivers-venster
 await p.waitForTimeout(800);
 if(await p.$('.dq-ok')) await p.click('.dq-ok');
-await p.waitForSelector('#of-modal #of-zk',{timeout:20000});
-await p.click('#of-modal #of-zk');
+await p.waitForSelector('#of-modal #of-verder',{timeout:20000});
+await p.click('#of-modal #of-verder');await p.click('#of-modal #of-plan-over');
 await p.waitForSelector('#zkw-modal .zkw-stap');
 const tag=PDF.slice(0,4);
 for(let i=0;i<6;i++){
@@ -39,7 +39,7 @@ if(dis){ await p.check('#zkw-negeer'); }
 await p.click('#zkw-verder');
 await p.waitForTimeout(1500);
 await p.screenshot({path:`zk_${tag}_klaar.png`});
-await p.click('#zkw-sluit');await p.waitForTimeout(600);
+await p.click('#zkw-sluit');await p.waitForSelector('#kv-modal',{timeout:8000});console.log('KETTING: koppelvoorstel open');await p.click('#kv-modal .kv-annul');await p.waitForTimeout(600);
 await p.screenshot({path:`zk_${tag}_tab.png`,fullPage:true});
 const r=await p.evaluate(()=>{const row=__DB.project_elektro_dossiers.find(r=>r.project_id==='p2');const d=row.data;
  const k=d.zekeringen.kasten; return {kasten:k.map(x=>({naam:x.naam,maat:x.maat,rijen:x.rijen.length,mods:x.rijen.reduce((t,r)=>t+r.items.length,0)})),
