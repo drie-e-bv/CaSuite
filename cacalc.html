@@ -7413,7 +7413,9 @@ function zkVoedingVan(kast, d){
   const hoofdIdx = flat.findIndex(m=> m.categorie==="Differentieel" && m.isHoofd);
   if(hoofdIdx >= 0 && flat.indexOf(d) < hoofdIdx) return null; // laadpaal e.d. vóór het hoofddifferentieel: rechtstreeks van de teller
   if(d.voedingVan){ const b = flat.find(m=> m.id===d.voedingVan); if(b) return b; }
-  if(String(d.mA||"").startsWith("30") && !String(d.mA).startsWith("300")){ const rem = flat.find(zkIsRem); if(rem) return rem; }
+  // automatisch: een REM ná het hoofddifferentieel (onder Diff A) voedt de 30 mA-groepen; een REM vóór het
+  // hoofddifferentieel (isRem) voedt het hoofddifferentieel zelf, dus dan komen de groepen van het hoofddifferentieel
+  if(String(d.mA||"").startsWith("30") && !String(d.mA).startsWith("300")){ const rem = flat.find(x=> zkIsRem(x) && !x.isRem && flat.indexOf(x) > hoofdIdx); if(rem) return rem; }
   return hoofdIdx >= 0 ? flat[hoofdIdx] : null;
 }
 function zkVastKoppelen(kast){
@@ -17505,8 +17507,28 @@ function uvAutoOmzet(kast){
       vorige = a;
     });
   });
+  // 20/11/2026 (Peter): voeding van elk differentieel vanuit de REM of het hoofddifferentieel, op de juiste fase
+  // (een 2P-differentieel op L2 krijgt L2 + N, niet altijd L1)
+  const verbindFase = (bron, doel, label)=>{
+    const meer = ["3P","4P","3P+N"].includes(doel.polen);
+    if(meer || !doel.fase || doel.fase==="L1L2L3N"){ verbind(bron, "onder", doel, "boven", "10", label); return; }
+    const kb = klemmenVoorModule(bron).filter(k=> zijdeVanKlem(k)==="onder"), kd = klemmenVoorModule(doel).filter(k=> zijdeVanKlem(k)==="boven");
+    [[doel.fase, "L"], ["N", "N"]].forEach(([fb, fd])=>{
+      const b = zoekKlem(kb, fb) || (fb!=="N" ? zoekKlem(kb, "L") : null), d = zoekKlem(kd, fd);
+      if(!b || !d) return;
+      const a = {m: bron.id, k: b.id}, z = {m: doel.id, k: d.id};
+      if(bestaat(a, z)) return;
+      kast.bedrading.push({id: cryptoId(), a, b: z, kleur: standaardKleurVoorFunctie(fb==="N" ? "N" : fb), kleurAuto: true, sectie: "10", label: label+" "+fb, auto: true});
+      rapport.draden++;
+    });
+  };
   if(hoofd){
-    flat.forEach(m=>{ if(m.categorie==="Differentieel" && m!==hoofd) verbind(hoofd, "onder", m, "boven", "10", "voeding diff."); });
+    flat.forEach(m=>{
+      if(m.categorie!=="Differentieel" || m===hoofd) return;
+      const bron = typeof zkVoedingVan==="function" ? zkVoedingVan(kast, m) : hoofd;
+      if(!bron) return; // vóór het hoofddifferentieel (bv. laadpaal): rechtstreeks van de teller
+      verbindFase(bron, m, zkIsRem(bron) ? "voeding diff. van REM" : "voeding diff.");
+    });
     const rems = flat.filter(m=> m.categorie==="Automaat" && m.isRem);
     if(rems.length) verbind(rems[rems.length-1], "onder", hoofd, "boven", "16", "hoofdvoeding");
   }
@@ -24320,6 +24342,7 @@ const ZK_SOORTEN_BASIS = {
   radiator:["El. radiator badkamer","2P","20A","30","3G2,5",1000,"C",1],
   pomp:["Pomp (Aqualex)","2P","20A","30","3G2,5",1000,"C",4],
   tuin:["Tuinverlichting","2P","16A","30","3G2,5",300,"C",6],
+  kastverlichting:["Ledverlichting kasten","2P","16A","30","5G1,5",300,"C",6],
   toestel:["Toestel (te bepalen)","2P","20A","30","3G2,5",1500,"C",4],
   toestel3f:["3F-toestel (te bepalen)","4P","20A","30","5G2,5",5000,"C",3],
   motoren:["Zonnewering / motoren","2P","16A","30","",300,"C",7],
@@ -24423,6 +24446,8 @@ function zkVasteVoorzieningen(bron){
   motor.forEach((m,i)=> voeg("motoren", "Zonnewering "+(i+1), {type:"motoractor", moduleId:m.id}));
   if(state.verwarming.items.some(z=>!z.leeg) || alleMods.some(m=> m.categorie==="HVAC")) voeg("verwarming","Verwarming collectoren",{type:"verwarming"});
   if((state.zonnepanelen.items||[]).some(p=>!p.leeg) || bron.pv) voeg("pv","Zonnepanelen",{type:"pv"});
+  // kastverlichting (in-motion in de kast, geen actor): eigen voeding, zoals "LEDVERLICHTING KASTEN" op de plannen
+  if(state.kringen.items.some(k=> !k.leeg && /kastverlichting/i.test(k.info||""))) voeg("kastverlichting","Ledverlichting kasten",{type:"kastverlichting"});
   state.laadpalen.items.filter(l=>!l.leeg).forEach((l,i)=> voeg("laadpaal", "Autolader "+(i+1), {type:"laadpaal", laadpaalId:l.id}));
   return out;
 }
@@ -24761,6 +24786,7 @@ function zkPasToe(O){
       if(r.type==="alarm" && leeg(state.alarmCentrale.zekeringModuleId)) state.alarmCentrale.zekeringModuleId = m.id;
       if(r.type==="verwarming") state.verwarming.items.forEach(z=>{ if(leeg(z.zekeringModuleId)) z.zekeringModuleId = m.id; });
       if(r.type==="pv") (state.zonnepanelen.items||[]).forEach(p=>{ if(leeg(p.zekeringModuleId)) p.zekeringModuleId = m.id; });
+      if(r.type==="kastverlichting") state.kringen.items.forEach(k=>{ if(/kastverlichting/i.test(k.info||"") && leeg(k.zekeringModuleId)) k.zekeringModuleId = m.id; });
       if(r.type==="actor" || r.type==="motoractor"){
         let mod = null; state.zekeringen.kasten.forEach(kk=> kk.rijen.forEach(rr=> rr.items.forEach(x=>{ if(x.id===r.moduleId) mod = x; })));
         if(mod){
@@ -25695,9 +25721,17 @@ function kvBereken(){
   // e. 230V-kringen (geen drivers) -> vrije uitgangen van schakelactoren
   const krBezet = new Set(alleZekeringUitgangen().filter(e=>e.uitgang.type==="kring" && e.uitgang.targetId).map(e=>e.uitgang.targetId));
   const vrijSchak = kvAlleUitgangen("Relais", /schakel|switch/i).filter(e=> !e.uitgang.targetId);
-  state.kringen.items.filter(k=> !k.leeg && !krBezet.has(k.id) && !driversInKring(k.id).length).forEach(k=>{
+  // 20/11/2026 (Peter): "Kastverlichting is gestuurd via in-motion in de kast, daarvoor moet geen relais voorzien
+  // worden" -- kastverlichting en gewone (niet-geschakelde) stopcontactkringen krijgen geen actoruitgang
+  const zonderActor = k=> /kastverlichting/i.test(k.info||"") || (k.zkStop && !/geschakeld/i.test(k.info||""));
+  state.kringen.items.filter(k=> !k.leeg && !krBezet.has(k.id) && !driversInKring(k.id).length && !zonderActor(k)).forEach(k=>{
     const u = vrijSchak.shift(); if(!u) return;
     wijz.push({soort:"230V-kringen → schakelactor", tekst:`kring ${kc[k.id]||""} ${k.kamer||""} ${k.info||""} → ${u.module.naam||"actor"} uitgang ${u.module.uitgangen.indexOf(u.uitgang)+1}`, doe:()=>{ u.uitgang.type="kring"; u.uitgang.targetId=k.id; }});
+  });
+  // opkuis: kastverlichting die (uit een vroegere import) toch op een actor staat, terug losmaken
+  alleZekeringUitgangen().filter(e=> e.uitgang.type==="kring" && e.uitgang.targetId).forEach(e=>{
+    const k = state.kringen.items.find(x=> x.id===e.uitgang.targetId);
+    if(k && /kastverlichting/i.test(k.info||"")) wijz.push({soort:"Kastverlichting (in-motion in de kast) → van de actor halen", tekst:`kring ${kc[k.id]||""} ${k.kamer||""} ${k.info||""} los van ${e.module.naam||"actor"} uitgang ${e.module.uitgangen.indexOf(e.uitgang)+1}`, doe:()=>{ e.uitgang.targetId = ""; }});
   });
   return wijz;
 }
