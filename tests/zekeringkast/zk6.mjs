@@ -40,6 +40,7 @@ await p.click('#zkw-verder');
 await p.waitForTimeout(1500);
 await p.screenshot({path:`zk_${tag}_klaar.png`});
 await p.click('#zkw-sluit');await p.waitForSelector('#kv-modal',{timeout:8000});console.log('KETTING: koppelvoorstel open');await p.click('#kv-modal .kv-annul');await p.waitForTimeout(600);
+await p.evaluate(()=>[...document.querySelectorAll('#tabbar button')].find(x=>x.dataset.id==='zekeringen').click()); await p.waitForTimeout(1200);
 await p.screenshot({path:`zk_${tag}_tab.png`,fullPage:true});
 
 const kl=()=>p.evaluate(()=>{const d=__DB.project_elektro_dossiers.find(r=>r.project_id==='p2').data;return d.interlex.items.length});
@@ -59,7 +60,7 @@ console.log('GESCH', await p.evaluate(()=>{const O=CaDosApp.zekeringkast.nieuwOn
 
 await p.evaluate(()=>window.scrollTo(0,0)); await p.screenshot({path:'z8_zek.png'});
 await p.click('#addModuleGlobal'); await p.waitForTimeout(800); await p.screenshot({path:'z8_add.png'});
-await p.evaluate(()=>{ const b=[...document.querySelectorAll('button')].find(x=>x.textContent.trim()==='Bedrading'); b&&b.click(); }); await p.waitForTimeout(2500);
+await p.evaluate(()=>{ const b=[...document.querySelectorAll('button')].find(x=>x.textContent.trim()==='Plan'); b&&b.click(); }); await p.waitForTimeout(2500);
 await p.screenshot({path:'z8_uv.png'});
 await p.evaluate(()=>window.scrollTo(0,400)); await p.waitForTimeout(300);
 console.log('SCROLL', await p.evaluate(async()=>{const y0=scrollY; const w=document.querySelector('.uv-canvas-wrap'); w.scrollTop=150; const t0=w.scrollTop; document.querySelector('.zk-weergaven button[data-w="uitvoering"]').click(); await new Promise(r=>setTimeout(r,600)); return [y0, scrollY, t0, document.querySelector('.uv-canvas-wrap').scrollTop].join(' ');}));

@@ -40,6 +40,7 @@ await p.click('#zkw-verder');
 await p.waitForTimeout(1500);
 await p.screenshot({path:`zk_${tag}_klaar.png`});
 await p.click('#zkw-sluit');await p.waitForSelector('#kv-modal',{timeout:8000});console.log('KETTING: koppelvoorstel open');await p.click('#kv-modal .kv-annul');await p.waitForTimeout(600);
+await p.evaluate(()=>[...document.querySelectorAll('#tabbar button')].find(x=>x.dataset.id==='zekeringen').click()); await p.waitForTimeout(1200);
 await p.screenshot({path:`zk_${tag}_tab.png`,fullPage:true});
 
 const kastInfo=()=>p.evaluate(()=>{const d=__DB.project_elektro_dossiers.find(r=>r.project_id==='p2').data;const k=d.zekeringen.kasten[0];return k.rijen.map(r=>r.items.reduce((t,x)=>t+(Number(x.breedte)||0),0)).join(',')});

@@ -40,6 +40,7 @@ await p.click('#zkw-verder');
 await p.waitForTimeout(1500);
 await p.screenshot({path:`zk_${tag}_klaar.png`});
 await p.click('#zkw-sluit');await p.waitForSelector('#kv-modal',{timeout:8000});console.log('KETTING: koppelvoorstel open');await p.click('#kv-modal .kv-annul');await p.waitForTimeout(600);
+await p.evaluate(()=>[...document.querySelectorAll('#tabbar button')].find(x=>x.dataset.id==='zekeringen').click()); await p.waitForTimeout(1200);
 await p.screenshot({path:`zk_${tag}_tab.png`,fullPage:true});
 
 await p.evaluate(()=>{ const b=document.querySelector('.zk-weergaven button[data-w="uitvoering"]'); b.click(); }); await p.waitForTimeout(2500);

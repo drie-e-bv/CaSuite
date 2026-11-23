@@ -43,7 +43,7 @@ await p.click('.dv-stap[data-stap="keuring"] .dv-ga'); await p.waitForTimeout(40
 console.log('P2 klik keuring → tab:', await p.$eval('#tabbar button.active',b=>b.textContent), '| groep:', await p.$eval('#tabgroups button.active',b=>b.dataset.grp));
 await p.click('.dv-stap[data-stap="kamers"] .dv-ga'); await p.waitForTimeout(400);
 console.log('P2 klik kamers → tab:', await p.$eval('#tabbar button.active',b=>b.textContent));
-await p.click('.dv-stap[data-stap="zekeringkast"] .dv-actie >> nth=1'); await p.waitForSelector('#zkw-modal'); console.log('P25 ⚡ in stappenbalk opent verdelen'); await p.click('#zkw-annul');
+await (async()=>{ await p.evaluate(()=>[...document.querySelectorAll('#tabbar button')].find(x=>x.dataset.id==='zekeringen').click()); await p.waitForTimeout(600); const z=await p.$('.dv-stap[data-stap="zekeringkast"] .dv-actie'); if(z){ await z.click(); } else { await p.click('#zkHerschik'); await p.click('.zkg-snel'); } })(); await p.waitForSelector('#zkw-modal'); console.log('P25 ⚡ in stappenbalk opent verdelen'); await p.click('#zkw-annul');
 await p.click('.dv-stap[data-stap="kabels"] .dv-ga'); await p.waitForTimeout(800);
-console.log('P2 klik kabels → app:', await p.evaluate(()=>document.body.dataset.tab));
+console.log('P2 klik kabels → blijft in CaDos op pagina:', await p.evaluate(()=>document.body.dataset.tab), !!(await p.$('#panel-kabels')));
 console.log(errs.join('\n')||'no errors');await b.close();

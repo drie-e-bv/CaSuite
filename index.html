@@ -3764,6 +3764,13 @@
 #cados-app div.panel-head > .hint-panel{flex-basis:100%;}
 #cados-app #kastTabbar{margin:0;}
 #cados-app .toolbar-card:has(> #kastTabbar){margin-bottom:8px !important;padding:4px 6px;}
+#cados-app .kast-werkbalk{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin-top:6px;padding-top:6px;border-top:1px solid var(--line,#dde3e0);}
+#cados-app .kast-werkbalk > input, #cados-app .kast-werkbalk > select{width:auto;max-width:170px;min-height:32px;}
+#cados-app .kast-werkbalk .kw-sep{flex:0 0 1px;align-self:stretch;background:var(--line,#dde3e0);margin:0 2px;}
+#cados-app .kast-werkbalk .addbtn{width:auto;min-height:32px;padding:0 12px;}
+#cados-app .kast-werkbalk .kw-lbl{font-size:12px;font-weight:700;color:var(--ink-dim);}
+#cados-app .rb-aut{font-size:11px;max-width:96px;min-height:22px;padding:0 2px;}
+#cados-app #panel-driverkast .cat-driver .rackitem-btns{flex:1 1 100%;min-width:0;max-width:100%;flex-wrap:wrap;row-gap:4px;}
 #cados-app .zk-acties{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px;}
 /* 22/11/2026 (punt 7/19/20): pagina Zekeringkast -- weergaven, werkbalk boven de tekening, inklapbare zijkolom */
 #cados-app .zk-weergaven{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin:0 0 10px;}
@@ -5834,7 +5841,7 @@
   <!-- 23/11/2026 (punt 21/15): zichtbaar enkel Printcentrum en Offerte inlezen; Exporteer JSON,
        Importeer JSON en Dossier leegmaken zitten altijd achter "⋯" (zelfde ids/handlers). -->
   <div id="topbar" class="cd-toolbar">
-    <button class="btn cd-act cd-act-print" id="btnPrint" title="Printcentrum: kies wat je wil afdrukken of exporteren">Printcentrum</button>
+    <!-- 23/11/2026: Printcentrum is een vaste hoofdgroep in de navigatie, geen losse knop meer bovenaan -->
     <!-- 23/11/2026 (audit 2): "Offerte inlezen" weg uit de werkbalk -- via de projectkiezer (＋ Uit offerte) en stap 1 van Dossierverloop -->
     <button type="button" class="btn tb-more-btn" id="cd-more-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="actions" aria-label="Meer dossieracties" title="Meer: JSON exporteren/importeren, dossier leegmaken"><span class="tb-more-dots" aria-hidden="true">⋯</span></button>
     <div id="actions" class="tb-menu" role="menu">
@@ -6197,7 +6204,9 @@
 #cados-app .rij-head .rij-title{font-weight:700;font-size:13.5px;display:flex;align-items:center;gap:8px;}
 #cados-app .rij-head select{width:auto;padding:5px 8px;}
 #cados-app .rij-stats{font-size:11.5px;color:var(--ink-dim);font-family:var(--mono);}
-#cados-app .kast-locatie{display:flex;gap:6px;align-items:center;}
+#cados-app .kast-locatie{display:flex;gap:6px;align-items:center;flex-wrap:wrap;min-width:0;}
+#cados-app #panel-driverkast .kast-locatie{flex:1 1 100%;}
+#cados-app #panel-driverkast .kast-locatie :is(input, select){flex:1 1 110px;max-width:none;}
 #cados-app .kast-locatie input,
 #cados-app .kast-locatie select{width:auto;min-width:90px;max-width:140px;padding:4px 6px;font-size:12px;}
 #cados-app .rij-stats.over{color:var(--danger);font-weight:700;}
@@ -7405,6 +7414,8 @@ const MAX_AUTOMATEN_PER_GROEPDIFF = 8;
 // Ontkoppelt alles dat naar een specifieke zekering-module verwijst, zodat er
 // geen dode verwijzingen overblijven wanneer die module verwijderd wordt.
 function ontkoppelZekeringModule(moduleId){
+  // 23/11/2026: relais/actoren onthouden hun voedende automaat (keten lichtpunt → relais → automaat)
+  state.zekeringen.kasten.forEach(k=> k.rijen.forEach(r=> r.items.forEach(x=>{ if(x.zekeringModuleId===moduleId) x.zekeringModuleId=""; })));
   alleDrivers().forEach(d=>{ if(d.zekeringModuleId===moduleId) d.zekeringModuleId=""; });
   state.patchkast.kasten.forEach(kast=> kast.items.forEach(it=>{ if(it.zekeringModuleId===moduleId) it.zekeringModuleId=""; }));
   state.laadpalen.items.forEach(lp=>{ if(lp.zekeringModuleId===moduleId) lp.zekeringModuleId=""; });
@@ -7634,6 +7645,7 @@ function zkGroepenVenster(naKlaar){
     ov.innerHTML = `<div class="modal-box" style="max-width:860px"><h2>⇄ Automaten herschikken</h2><div class="modal-body">
       <div class="zkg-orden" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 10px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--sunken,#f4f6f5)">
         <button type="button" class="btn btn-secondary btn-sm zkg-netjes">⇅ Netjes ordenen</button>
+        ${zkIsVerdeeld() ? `<button type="button" class="btn btn-ghost btn-sm zkg-snel" title="AREI-verdeling opnieuw met de bewaarde keuzes (meteen naar het Overzicht)">↻ Snel opnieuw verdelen</button>` : ""}
         <span class="hint" style="margin:0">Zet elk differentieel met zijn automaten aaneen, binnen het huidige formaat (${escapeHtml(zkFormaatTekst(kast))}${kast.formaatVast?" 🔒":""}). Koppelingen, kringen en draden blijven.</span></div>
       <p class="hint">Kies per automaat het differentieel. De automaat verhuist op de rail mee naar die groep (achter de laatste automaat); de codes en de fase volgen vanzelf. Volle 30 mA-groepen (8) kan je niet kiezen.</p>
       ${[...diffs.map(d=> ({d, l:leden(d)})), ...(los.length?[{d:null, l:los}]:[])].map(({d,l})=>`
@@ -7646,6 +7658,7 @@ function zkGroepenVenster(naKlaar){
         </div>`).join("")}
       </div><div class="modal-actions"><button class="btn btn-primary" id="zkg-ok">Klaar</button></div></div>`;
     ov.querySelector("#zkg-ok").addEventListener("click", ()=>{ ov.remove(); if(naKlaar) naKlaar(); });
+    const sn = ov.querySelector(".zkg-snel"); if(sn) sn.addEventListener("click", ()=>{ ov.remove(); zkSnelOpnieuw(); });
     ov.querySelector(".zkg-netjes").addEventListener("click", ()=>{
       let n = 0;
       if(!zkMetFormaat(kast, ()=>{ n = zkNetjesOrdenen(kast); })) return;
@@ -7838,6 +7851,12 @@ const TABS = [
   // 2026-10-29: plan van de driverkast (kastmaat, drivers op schaal, rijgklemmen per spot, draden)
   // 22/11/2026 (punt 14): Driverkast plan = weergave "Plan" van het tabblad Driverkast (verborgen in de tabbalk)
   {grp:"Elektro", id:"driverplan", label:"Driverkast — plan", toggle:"driverkast", verborgen:true},
+  {grp:"Elektro", id:"dktekening", label:"Driverkast — uitvoering", toggle:"driverkast", verborgen:true},
+  // 23/11/2026: Koppelen = eigen pagina (stap 6 van het Dossierverloop) i.p.v. een venster
+  {grp:"Elektro", id:"koppelen", label:"Koppelen"},
+  // 23/11/2026: stap 7 en 8 van het Dossierverloop = eigen tussenpagina's in CaDos (niet meer meteen naar CaCalc/CaDraw)
+  {grp:"Elektro", id:"kabels", label:"Kabels", verborgen:true},
+  {grp:"Elektro", id:"schema", label:"Schema", verborgen:true},
   // 22/11/2026 (punt 1/3): Laadpalen en Zonnepanelen in de groep Elektro, bij Zekeringen.
   {grp:"Elektro", id:"laadpalen", label:"Laadpalen", toggle:"laadpalen"},
   {grp:"Elektro", id:"zonnepanelen", label:"Zonnepanelen", toggle:"zonnepanelen"},
@@ -7871,7 +7890,7 @@ const TABS = [
   // Ronde 52 (punt 4, op vraag van Peter): materiaalbestel-/leveranciersstatus -- vlak vóór
   // "Export", zelfde plek in de volgorde als de andere "Project"-brede lijsten hierboven.
   {grp:"Project", id:"materialen", label:"Materiaal"},
-  {grp:"Project", id:"export", label:"Printcentrum"}, // 23/11/2026 (punt 15): vroeger "Export"
+  {grp:"Printcentrum", id:"export", label:"Printcentrum"}, // 23/11/2026: eigen vaste hoofdgroep (vroeger Project › Export)
   {grp:"Project", id:"werfverslagen", label:"Werfverslagen"},
   // Ronde 52 (punt 3, op vraag van Peter): AREI/RGIE-keuringsopvolging -- vlak vóór "Oplevering",
   // die twee horen inhoudelijk bij elkaar.
@@ -7888,16 +7907,18 @@ const TAB_GROEPEN = [
   {id:"Domotica", kort:"Domotica", ico:'<svg viewBox="0 0 24 24"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/><path d="M9.5 15a3.5 3.5 0 0 1 5 0M11 17.5a1.4 1.4 0 0 1 2 0"/></svg>'},
   {id:"Data & sturing", kort:"Sturing", ico:'<svg viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>'},
   {id:"Beveiliging", kort:"Beveiliging", ico:'<svg viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.5 3 8.5 7 10 4-1.5 7-5.5 7-10V6z"/><path d="m9 12 2 2 4-4"/></svg>'},
+  {id:"Printcentrum", kort:"Print", ico:'<svg viewBox="0 0 24 24"><path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M6 14h12v7H6z"/></svg>'},
   {id:"Project", kort:"Project", ico:'<svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>'},
 ];
 const LAATSTE_TAB_KEY = "cados-laatste-tab-per-groep";
 let laatsteTabPerGroep = {};
 try{ laatsteTabPerGroep = JSON.parse(localStorage.getItem(LAATSTE_TAB_KEY)||"{}")||{}; }catch(e){ laatsteTabPerGroep = {}; }
-const ZK_WEERGAVEN = [{id:"zekeringen", label:"Opbouw"}, {id:"zktekening", label:"Tekening"}, {id:"uitvoering", label:"Bedrading"}];
+// 23/11/2026: Zekeringkast en Driverkast identiek: Lijst (opbouw) → Plan (draden) → Uitvoering (alleen-lezen + afdrukken)
+const ZK_WEERGAVEN = [{id:"zekeringen", label:"Lijst"}, {id:"uitvoering", label:"Plan"}, {id:"zktekening", label:"Uitvoering"}];
 // 22/11/2026 (punt 7, 14, 17): tabbladen met meerdere weergaven -- één knop in de tabbalk, schakelaar op de pagina.
 const TAB_FAMILIES = {
   zekeringen: {leden: ZK_WEERGAVEN, aria:"Weergave zekeringkast"},
-  driverkast: {leden: [{id:"driverkast", label:"Lijst"}, {id:"driverplan", label:"Plan"}], aria:"Weergave driverkast"},
+  driverkast: {leden: [{id:"driverkast", label:"Lijst"}, {id:"driverplan", label:"Plan"}, {id:"dktekening", label:"Uitvoering"}], aria:"Weergave driverkast"},
   kringen: {leden: [{id:"kringen", label:"Kringen"}, {id:"verlichting", label:"230V-lichtpunten"}], aria:"Filter kringen", prefix:"Toon:"},
 };
 const familieLaatste = {zekeringen:"zekeringen", driverkast:"driverkast", kringen:"kringen"};
@@ -8669,35 +8690,59 @@ function exportVolledigDossier(){
 // niet mee verhuizen (hangt onlosmakelijk vast aan CaDos' eigen renderfuncties zoals
 // exportVolledigDossier/computeKringCodes/de .pe-page-opbouw hieronder) en blijft daarom hier
 // staan als een kleine, aparte tab "Export".
+// 23/11/2026: Printcentrum herwerkt tot één rustige verzamelpagina (vaste hoofdgroep in de navigatie):
+// 1. alles in één keer, 2. zelf samenstellen per hoofdgroep, 3. losse documenten. Kastplannen met
+// papierformaat drukken af in Zekeringkast/Driverkast › Uitvoering.
+const PC_SECTIE_GROEP = {zekering:"Elektro", uitvoering:"Elektro", driverkast:"Elektro", interlex:"Elektro", kringen:"Elektro", verlichting:"Elektro", laadpalen:"Elektro",
+  motoren:"Domotica", knoppen:"Domotica", muziek:"Domotica", verwarming:"Domotica", data:"Data & sturing", camerabewaking:"Beveiliging", alarm:"Beveiliging", toegangscontrole:"Beveiliging"};
 function renderExportTab(){
-  const wrap = el(`<div class="panel" id="panel-export">
+  const wrap = el(`<div class="panel pc-pagina" id="panel-export">
     <div class="panel-head">
       <h2>Printcentrum</h2>
-      <p>Alles afdrukken of exporteren op één plek: vink de onderdelen aan. De printknoppen op de andere tabbladen brengen je hierheen met hun onderdeel al aangevinkt.</p>
+      <p>Alle documenten van dit dossier op één plek: alles in één keer, of zelf samengesteld.</p>
     </div>
-    <div class="card pc-snel" style="margin-bottom:12px;"><div class="card-body" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
-      <b style="font-size:13px;">Losse documenten:</b>
-      <button class="btn small ghost" id="pcLijstKringen" title="Afdrukbare lijst kringen (legende voor de kastdeur)">📄 Lijst kringen (kastdeur)</button>
-      ${printVanTab && RENDERERS[printVanTab] ? `<button class="btn small ghost" id="pcScherm" title="Het tabblad afdrukken zoals het op het scherm staat (zoals de vroegere knop Afdrukken)">🖨 ${escapeHtml((TABS.find(t=>t.id===printVanTab)||{}).label||"Tabblad")} afdrukken zoals op het scherm</button>` : ""}
-    </div></div>
-    <div class="card">
-      <div class="card-body">
-        <p class="hint" style="margin:0 0 10px;">Bundelt alle ingevulde tabbladen in één doorlopende export — lege tabbladen worden gewoon overgeslagen.</p>
-        <button class="btn" id="exportVolledig">Exporteer alles (PDF)</button>
-        <button class="btn ghost" id="exportExcel" style="margin-left:8px;">Exporteer alle lijsten (Excel)</button>
-        <div class="hint" style="margin:14px 0 6px;font-weight:700;">Of kies zelf wat erin moet</div>
-        <div class="toolbar-row" style="margin-bottom:8px;">
-          <button class="btn small ghost" id="expAlles">Alles</button>
-          <button class="btn small ghost" id="expAlleSchemas">Alle schema's</button>
-          <button class="btn small ghost" id="expAlleLijsten">Alle lijsten</button>
-          <button class="btn small ghost" id="expGeen">Niets</button>
-        </div>
-        <div id="exportChecklijst"></div>
-        <button class="btn" id="exportSelectie" style="margin-top:10px;">Exporteer selectie (PDF)</button>
+    <div class="card pc-blok"><div class="card-body">
+      <div class="pc-blok-kop"><span class="pc-nr">1</span><div><strong>Volledig dossier</strong><div class="hint">Alle ingevulde onderdelen in één document — lege onderdelen worden overgeslagen.</div></div></div>
+      <div class="pc-knoppen">
+        <button class="btn primary" id="exportVolledig">🖨 Alles afdrukken (PDF)</button>
+        <button class="btn ghost" id="exportExcel">⬇ Alle lijsten (Excel)</button>
       </div>
-    </div>
+    </div></div>
+    <div class="card pc-blok"><div class="card-body">
+      <div class="pc-blok-kop"><span class="pc-nr">2</span><div><strong>Zelf samenstellen</strong><div class="hint">Vink per onderdeel het schema en/of de lijst aan.</div></div></div>
+      <div class="pc-snelkeuze">
+        <span class="hint">Snel kiezen:</span>
+        <button class="btn small ghost" id="expAlles">Alles</button>
+        <button class="btn small ghost" id="expAlleSchemas">Enkel schema's</button>
+        <button class="btn small ghost" id="expAlleLijsten">Enkel lijsten</button>
+        <button class="btn small ghost" id="expGeen">Niets</button>
+      </div>
+      <div id="exportChecklijst"></div>
+      <div class="pc-knoppen"><button class="btn primary" id="exportSelectie">🖨 Selectie afdrukken (PDF)</button><span class="hint pc-telling"></span></div>
+    </div></div>
+    <div class="card pc-blok"><div class="card-body">
+      <div class="pc-blok-kop"><span class="pc-nr">3</span><div><strong>Losse documenten</strong></div></div>
+      <div class="pc-knoppen">
+        <button class="btn small ghost" id="pcLijstKringen" title="Afdrukbare lijst kringen (legende voor de kastdeur)">📄 Lijst kringen (kastdeur)</button>
+      </div>
+      <p class="hint" style="margin:8px 0 0;">Een kastplan op een gekozen papierformaat (A4/A3/A2) met componentenlijst druk je af in <b>Zekeringkast › Uitvoering</b> of <b>Driverkast › Uitvoering</b>.</p>
+    </div></div>
   </div>`);
-
+  if(!document.getElementById("pc-css")){ const st = document.createElement("style"); st.id = "pc-css";
+    st.textContent = `#cados-app .pc-pagina{max-width:980px;}
+    #cados-app .pc-blok{margin-bottom:12px;}
+    #cados-app .pc-blok-kop{display:flex;gap:12px;align-items:flex-start;margin-bottom:10px;}
+    #cados-app .pc-nr{flex:0 0 26px;height:26px;border-radius:50%;background:var(--app-dossier,#1e6b43);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;}
+    #cados-app .pc-knoppen{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;}
+    #cados-app .pc-snelkeuze{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px;}
+    #cados-app .pc-groep{border-top:1px solid var(--line,#dde3e0);}
+    #cados-app .pc-groep:first-child{border-top:0;}
+    #cados-app .pc-groep-kop{font-size:12px;font-weight:700;color:var(--ink-soft,#5b6b63);text-transform:uppercase;letter-spacing:.04em;padding:10px 0 4px;}
+    #cados-app .pc-rij{display:grid;grid-template-columns:1fr 90px 90px;align-items:center;padding:5px 0;gap:6px;}
+    #cados-app .pc-rij label{display:inline-flex;gap:6px;align-items:center;font-size:13px;cursor:pointer;}
+    #cados-app .pc-rij input{width:auto;}
+    #cados-app .pc-rij.leeg{opacity:.5;}`;
+    document.head.appendChild(st); }
   const checklijstBox = wrap.querySelector("#exportChecklijst");
   function rebuildChecklijst(){
     checklijstBox.innerHTML = "";
@@ -8710,20 +8755,33 @@ function renderExportTab(){
       checklijstBox.appendChild(el(`<div class="hint">geen onderdelen aanwezig in dit project</div>`));
       return;
     }
-    const tabel = el(`<table class="grid"><thead><tr><th>Onderdeel</th><th style="width:90px;">Schema</th><th style="width:90px;">Lijst</th></tr></thead><tbody></tbody></table>`);
-    const tbody = tabel.querySelector("tbody");
-    aanwezig.forEach(s=>{
-      const leeg = !s.heeftData();
-      const tr = el(`<tr${leeg?' style="opacity:.55;"':''}>
-        <td>${escapeHtml(s.label)}${leeg?` <span class="hint">(nog leeg)</span>`:""}</td>
-        <td>${s.schema ? `<input type="checkbox" class="exp-schema" data-key="${s.key}" ${!voor || voor===s.key ? "checked" : ""}>` : "—"}</td>
-        <td><input type="checkbox" class="exp-lijst" data-key="${s.key}" ${!voor || voor===s.key ? "checked" : ""}></td>
-      </tr>`);
-      if(voor===s.key){ tr.classList.add("pc-voorgeselecteerd"); tr.style.background = "var(--brand-soft, #e8f3ec)"; }
-      tbody.appendChild(tr);
+    const tabel = el(`<div class="pc-lijst"></div>`);
+    const groepen = [...new Set(TAB_GROEPEN.map(g=> g.id))];
+    groepen.forEach(g=>{
+      const hier = aanwezig.filter(s=> (PC_SECTIE_GROEP[s.key]||"Elektro")===g);
+      if(!hier.length) return;
+      const blok = el(`<div class="pc-groep"><div class="pc-groep-kop">${escapeHtml(g)}</div></div>`);
+      hier.forEach(s=>{
+        const leeg = !s.heeftData();
+        const aan = !voor || voor===s.key;
+        const tr = el(`<div class="pc-rij${leeg?" leeg":""}" data-key="${s.key}">
+          <div>${escapeHtml(s.label)}${leeg?` <span class="hint">(nog leeg)</span>`:""}</div>
+          <div>${s.schema ? `<label><input type="checkbox" class="exp-schema" data-key="${s.key}" ${aan && !leeg ? "checked" : ""}> schema</label>` : `<span class="hint">—</span>`}</div>
+          <div><label><input type="checkbox" class="exp-lijst" data-key="${s.key}" ${aan && !leeg ? "checked" : ""}> lijst</label></div>
+        </div>`);
+        if(voor===s.key){ tr.classList.add("pc-voorgeselecteerd"); tr.style.background = "var(--brand-soft, #e8f3ec)"; }
+        blok.appendChild(tr);
+      });
+      tabel.appendChild(blok);
     });
     checklijstBox.appendChild(tabel);
+    telSelectie();
   }
+  function telSelectie(){
+    const n = checklijstBox.querySelectorAll("input[type=checkbox]:checked").length;
+    const t = wrap.querySelector(".pc-telling"); if(t) t.textContent = n ? n+" aangevinkt" : "niets aangevinkt";
+  }
+  checklijstBox.addEventListener("change", telSelectie);
   rebuildChecklijst();
 
   function huidigeSelectie(){
@@ -8737,22 +8795,24 @@ function renderExportTab(){
   }
   wrap.querySelector("#expAlles").addEventListener("click", ()=>{
     checklijstBox.querySelectorAll("input[type=checkbox]").forEach(cb=> cb.checked=true);
+  telSelectie();
   });
   wrap.querySelector("#expGeen").addEventListener("click", ()=>{
     checklijstBox.querySelectorAll("input[type=checkbox]").forEach(cb=> cb.checked=false);
+  telSelectie();
   });
   wrap.querySelector("#expAlleSchemas").addEventListener("click", ()=>{
     checklijstBox.querySelectorAll(".exp-schema").forEach(cb=> cb.checked=true);
     checklijstBox.querySelectorAll(".exp-lijst").forEach(cb=> cb.checked=false);
+  telSelectie();
   });
   wrap.querySelector("#expAlleLijsten").addEventListener("click", ()=>{
     checklijstBox.querySelectorAll(".exp-schema").forEach(cb=> cb.checked=false);
     checklijstBox.querySelectorAll(".exp-lijst").forEach(cb=> cb.checked=true);
+  telSelectie();
   });
   wrap.querySelector("#exportSelectie").addEventListener("click", ()=> exportMetSelectie(huidigeSelectie()));
   wrap.querySelector("#pcLijstKringen").addEventListener("click", ()=> zkPrintLijst());
-  const pcScherm = wrap.querySelector("#pcScherm");
-  if(pcScherm) pcScherm.addEventListener("click", ()=>{ const t = printVanTab; selectTab(t); setTimeout(()=> window.print(), 300); });
   wrap.querySelector("#exportVolledig").addEventListener("click", exportVolledigDossier);
   wrap.querySelector("#exportExcel").addEventListener("click", exportAllesAlsExcel);
 
@@ -8896,7 +8956,19 @@ function renderZekeringen(){
       Lang indrukken op een geplaatste module = meteen verplaatsen. Alles vóór het hoofddifferentieel krijgt een aparte X-reeks (XA, XB…).
       Meerdere fysieke kasten? Voeg er hieronder gerust bij — elke kast heeft zijn eigen, opnieuw startende lettering.`
     )}
-    <div class="toolbar-card" style="margin-bottom:12px;"><div class="toolbar-row" id="kastTabbar" style="flex-wrap:wrap;"></div></div>
+    <!-- 23/11/2026: compacte werkbalk bovenaan (zelfde opbouw als de Driverkast), kast er direct onder -->
+    <div class="toolbar-card kast-werkbalk-kaart" style="margin-bottom:10px;"><div class="toolbar-row" id="kastTabbar" style="flex-wrap:wrap;"></div>
+      <div class="toolbar-row kast-werkbalk">
+        <input class="zk-kamer" list="dl-kamers-zekering" placeholder="Kamer" value="${escapeHtml(kast.kamer||"")}" title="kamer waar de kast hangt">
+        ${verdiepingSelectHtml(kast.verdieping, "zk-verdieping")}
+        <datalist id="dl-kamers-zekering">${state.kamers.filter(Boolean).map(k=>`<option value="${escapeHtml(k)}">`).join("")}</datalist>
+        <select class="kast-maat" title="modules per rij (hele kast)" ${kast.formaatVast?"disabled":""}>${ZEKERING_MAAT_OPTIES.map(m=>`<option value="${m}" ${kast.maat===m?"selected":""}>${m} modules/rij</option>`).join("")}</select>
+        <label class="zk-vast" title="Vast = aantal rijen en modules per rij veranderen niet meer door automatische acties of herschikkingen; past iets niet, dan krijg je een melding"><input type="checkbox" class="kast-vast" ${kast.formaatVast?"checked":""}> 🔒 Formaat vast (${kast.rijen.length} × ${kast.maat||24})</label>
+        <span class="kw-sep"></span>
+        <div class="zk-add-groep"><button class="addbtn" id="addModuleGlobal">+ Module toevoegen</button><button class="addbtn zk-add-bib" id="addModuleBib" title="een module uit de bibliotheek in deze kast zetten (naast de geselecteerde module, of op de eerste rij met plaats)">uit bibliotheek</button></div>
+        <button class="btn small" id="zkHerschik" title="Automaten naar een ander differentieel verplaatsen (lijst per groep) — ook Netjes ordenen en Snel opnieuw verdelen">⇄ Herschikken</button>
+        <button class="btn small" id="toggleSelect">Selecteren</button>
+      </div></div>
     <div class="builder-layout">
       <div class="builder-main">
         <div class="kastwrap" id="kastwrap"></div>
@@ -8906,30 +8978,6 @@ function renderZekeringen(){
       <div class="builder-side">
         <div class="sticky-controls">
           <div id="moveBanner"></div>
-          <div class="toolbar-card">
-            <div class="toolbar-row">
-              <div class="zk-add-groep"><button class="addbtn" id="addModuleGlobal">+ Module toevoegen</button><button class="addbtn zk-add-bib" id="addModuleBib" title="een module uit de bibliotheek in deze kast zetten (naast de geselecteerde module, of op de eerste rij met plaats)">uit bibliotheek</button></div>
-              <div class="toolbar-settings">
-                <label>Modules per rij (hele kast)</label>
-                <select class="kast-maat" ${kast.formaatVast?"disabled":""}>${ZEKERING_MAAT_OPTIES.map(m=>`<option value="${m}" ${kast.maat===m?"selected":""}>${m} modules</option>`).join("")}</select>
-                <label class="zk-vast" title="Vast = aantal rijen en modules per rij veranderen niet meer door automatische acties of herschikkingen; past iets niet, dan krijg je een melding"><input type="checkbox" class="kast-vast" ${kast.formaatVast?"checked":""}> 🔒 Formaat vast (${kast.rijen.length} × ${kast.maat||24})</label>
-                <!-- 20/11/2026 (Peter: "de balk er boven is te groot geworden, waardoor die weg scrollt"): knoppen compact in 2 kolommen -->
-                <!-- 22/11/2026 (punt 19): werkbalk enkel Module toevoegen, Herschikken, Koppelen, Selecteren.
-                     AREI verdelen en Plannen: stappenbalk Dossierverloop. Lijst kringen en Werf-PDF: weergave Tekening. -->
-                <div class="zk-acties">
-                  <button class="btn small" id="zkHerschik" title="Automaten naar een ander differentieel verplaatsen (lijst per groep)">⇄ Herschikken</button>
-                  <button class="btn small" id="zkKoppelen" title="Automaten toewijzen of het koppelvoorstel toepassen">🔗 Koppelen${(()=>{ const n = azLijstMetStroom().filter(r=>!azAutomaatVan(r.obj)).length; return n ? ` <span class="ak-badge">${n}</span>` : ""; })()}</button>
-                  <button class="btn small" id="toggleSelect">Selecteren</button>
-                </div>
-              </div>
-              <div class="toolbar-settings">
-                <label>Locatie kast</label>
-                <input class="zk-kamer" list="dl-kamers-zekering" placeholder="Kamer" value="${escapeHtml(kast.kamer||"")}" style="width:auto;max-width:140px;">
-                ${verdiepingSelectHtml(kast.verdieping, "zk-verdieping")}
-                <datalist id="dl-kamers-zekering">${state.kamers.filter(Boolean).map(k=>`<option value="${escapeHtml(k)}">`).join("")}</datalist>
-              </div>
-            </div>
-          </div>
         </div>
         <div id="stagingSlot"></div>
       </div>
@@ -9232,7 +9280,6 @@ function renderZekeringen(){
     save(); rebuild();
   });
   // punt 19/10: één knop Koppelen -> venster met tabs Open lijst / Voorstel
-  wrap.querySelector("#zkKoppelen").addEventListener("click", ()=> koppelOpen("lijst"));
   wrap.querySelector("#addModuleBib").addEventListener("click", ()=>{
     const kastNu = huidigeZekeringKast();
     openModuleBibliotheek({ plaats: (row)=>{
@@ -9664,7 +9711,8 @@ function renderModuleEditor(m, codes, rebuildAll, selectModule, onDelete, rij, s
         <div class="field"><label>Type kabel (elke kabel)</label><input class="me-kabeltype" value="${escapeHtml(m.kabelType)}" placeholder="bv. 5G1.5"></div>
       </div>
     </div>
-    ${velden.includes("uitgangen") ? `<div class="field wide" style="margin-top:2px;">
+    ${velden.includes("uitgangen") ? `<div class="field wide" style="margin-top:2px;"><label>Gevoed door automaat</label>${automaatKeuzeHtml(m.zekeringModuleId||"", "me-relais-aut", "— geen —")}</div>
+    <div class="field wide" style="margin-top:2px;">
       <label>Aantal uitgangen</label><input type="number" min="1" class="me-uitgangen-n" value="${(m.uitgangen||[]).length||1}">
     </div>
     <div class="me-uitgangen-body"></div>` : ""}
@@ -9740,6 +9788,8 @@ function renderModuleEditor(m, codes, rebuildAll, selectModule, onDelete, rij, s
   box.querySelector(".me-kabelaantal").addEventListener("input", e=>{ m.kabelAantal=Math.max(1,parseInt(e.target.value)||1); save(); });
   box.querySelector(".me-kabelaantal").addEventListener("change", ()=>{ if(m.kabelOpKlemmen){ zkKlemmenOpnieuw(m); save(); rebuildAll(); } });
   if(velden.includes("uitgangen")){
+    const relAut = box.querySelector(".me-relais-aut");
+    if(relAut) relAut.addEventListener("change", e=>{ m.zekeringModuleId = e.target.value; save(); });
     const uitgangenBody = box.querySelector(".me-uitgangen-body");
     const kringCodes = computeKringCodes(), verwCodes = computeVerwarmingCodes();
     function rebuildUitgangen(){
@@ -10208,7 +10258,6 @@ function renderPatchkast(){
             <div class="toolbar-row">
               <div class="toolbar-settings">
                 <button class="btn" id="addKast">+ Kast toevoegen</button>
-                <button class="btn" id="exportPatch">Exporteer voor werf (PDF)</button>
               </div>
               <button class="addbtn" id="addComponentGlobal">+ Component toevoegen</button>
             </div>
@@ -10365,7 +10414,6 @@ function renderPatchkast(){
     state.patchkast.kasten.push(newKast());
     save(); rebuild();
   });
-  wrap.querySelector("#exportPatch").addEventListener("click", exportPatchkastVoorWerf);
 
   function syncGlobalAddForm(){
     const cat = wrap.querySelector(".pf-cat").value;
@@ -11270,10 +11318,9 @@ function renderDriverkast(){
     )}
     <div class="sticky-controls">
       <div id="dkMoveBanner"></div>
-      <div class="toolbar-card">
-        <div class="toolbar-row">
+      <div class="toolbar-card kast-werkbalk-kaart">
+        <div class="toolbar-row kast-werkbalk" style="margin-top:0;padding-top:0;border-top:0;">
           <button class="addbtn" id="addDriverkast">+ Kast toevoegen</button>
-          <button class="btn" id="exportDriverkast">Exporteer voor werf (PDF)</button>
           <button class="btn" id="dkVerdeel" title="Drivers per kamer naar een andere (nieuwe) kast verplaatsen">⇄ Verdelen over kasten</button>
           <button class="btn" id="dkHerreken" title="Alle drivers opnieuw over de kasten verdelen (max. aantal per kast)">⟳ Herrekenen</button>
           <button class="btn" id="dkKoppel" title="Armaturen zonder match koppelen aan de catalogus">🔗 Armaturen koppelen${(()=>{ const n = akOngekoppeld().length; return n ? ` <span class="ak-badge">${n}</span>` : ""; })()}</button>
@@ -11400,7 +11447,6 @@ function renderDriverkast(){
     state.driverkast.kasten.push(newDriverKast());
     save(); rebuild();
   });
-  wrap.querySelector("#exportDriverkast").addEventListener("click", exportDriverkastVoorWerf);
   // 19/11/2026: drivers die eerder zonder stroomcontrole gekozen werden -> voorstel om opnieuw te kiezen
   (()=>{
     const fout = [];
@@ -11458,6 +11504,7 @@ function renderDriverKastCard(kast, ki, rebuildAll, editingId, selectItem, codes
       <div class="kast-locatie">
         <input class="kast-kamer" list="dl-kamers" placeholder="Kamer" value="${escapeHtml(kast.kamer||"")}">
         ${verdiepingSelectHtml(kast.verdieping, "kast-verdieping")}
+        ${automaatKeuzeHtml(dkPlan(kast).voedingZek||"", "dk-kast-aut", "Automaat: — kies —").replace('<select ', '<select title="voedende automaat van deze driverkast (uit de zekeringkast)" ')}
       </div>
       <div class="rij-stats">
         Sturing: <select class="dk-sturing" style="width:auto;display:inline-block;">
@@ -11485,6 +11532,12 @@ function renderDriverKastCard(kast, ki, rebuildAll, editingId, selectItem, codes
   });
   card.querySelector(".kast-kamer").addEventListener("input", e=>{ kast.kamer=e.target.value; save(); });
   card.querySelector(".kast-verdieping").addEventListener("change", e=>{ kast.verdieping=e.target.value; save(); });
+  // 23/11/2026: voedende automaat van de kast = dezelfde als in Driverkast › Plan (plan.voedingZek), ook voor de opgesplitste delen
+  card.querySelector(".dk-kast-aut").addEventListener("change", e=>{
+    const v = e.target.value;
+    [kast].concat(kast.planDelen||[]).forEach(h=>{ const pl = dkPlan(h); if(v) pl.voedingZek = v; else delete pl.voedingZek; });
+    save(); rebuildAll();
+  });
   card.querySelector(".kastdel").addEventListener("click", ()=>{
     if(kast.items.length && !confirm("Deze kast bevat drivers. Toch verwijderen?")) return;
     const idx = state.driverkast.kasten.indexOf(kast);
@@ -11635,7 +11688,8 @@ function renderDriverChip(driver, kast, rebuildAll, selected, selectItem, onDele
       </span>
       <button class="rb-copy" title="kopiëren (tik daarna op de gewenste positie)">⧉</button>
       <button class="rb-linkarm" title="armatuur koppelen aan deze driver">↳＋</button>
-      ${driver.leeg ? "" : `<button class="rb-230" title="Driver verwijderen en de armaturen als lichtpunten naar Verlichting 230V verplaatsen (zelfde kamer en kring)">230V</button>`}
+      ${driver.leeg ? "" : automaatKeuzeHtml(driver.zekeringModuleId||"", "rb-aut", "aut. —").replace('<select class="rb-aut" style="min-width:150px;"', '<select class="rb-aut" title="gekoppelde automaat van deze driver"')}
+      ${driver.leeg ? "" : `<button class="rb-230" title="Staat deze driver hier per ongeluk (bv. een 230V LEDTL)? Verplaats naar 230V-lichtpunten — zelfde kamer, kring en automaat">↪ 230V</button>`}
       ${!isMoveModeActive ? `<button class="rb-move" title="verplaatsen naar een specifieke plek">📍</button>` : ""}
       ${leegToggleBtnHtml(driver)}
     </span>
@@ -11650,6 +11704,9 @@ function renderDriverChip(driver, kast, rebuildAll, selected, selectItem, onDele
   if(moveBtn) moveBtn.addEventListener("click", stop(()=> startMovingDriver(driver, kast)));
   // 19/11/2026 (Peter: "Verplaatsen naar 230V moet bij de driver knop komen: driver verwijderen en
   // naar 230V verplaatsen")
+  const bAut = block.querySelector(".rb-aut");
+  if(bAut){ ["click","pointerdown","mousedown","touchstart"].forEach(t=> bAut.addEventListener(t, e=> e.stopPropagation()));
+    bAut.addEventListener("change", e=>{ driver.zekeringModuleId = e.target.value; save(); rebuildAll(); }); }
   const b230 = block.querySelector(".rb-230");
   if(b230) b230.addEventListener("click", stop(()=>{
     const arms = (driver.armaturen||[]).filter(a=> a.naam || a.aantal);
@@ -11658,7 +11715,7 @@ function renderDriverChip(driver, kast, rebuildAll, selected, selectItem, onDele
     let n;
     if(arms.length) n = dkNaar230(arms.map(arm=>({arm, driver})), {kring:true, legeDriversWeg:true});
     else {
-      const v = newVerlichtingItem(); v.kamer = dkKamerVanDriver(driver); v.kringId = driver.kringId || ""; v.info = driver.type || "";
+      const v = newVerlichtingItem(); v.kamer = dkKamerVanDriver(driver); v.kringId = driver.kringId || ""; v.zekeringModuleId = driver.zekeringModuleId || ""; v.info = driver.type || "";
       state.verlichting.items.push(v); if(state.modules) state.modules.verlichting = true; n = 1;
     }
     // driver zeker weg (ook als hij lege armatuur-regels had)
@@ -12128,10 +12185,13 @@ function renderVerlichtingChip(item, rebuildAll, selected, selectItem, onDelete,
       </span>
       <button class="rb-copy" title="kopiëren (tik daarna op de gewenste positie)">⧉</button>
       ${!isMoveModeActive ? `<button class="rb-move" title="verplaatsen naar een specifieke plek">📍</button>` : ""}
+      ${item.leeg ? "" : `<button class="rb-naardk" title="Hoort dit lichtpunt op een driver? Verplaats naar de Driverkast — zelfde kamer, kring en automaat">↪ DK</button>`}
       ${leegToggleBtnHtml(item)}
     </span>
   </div>`);
   wireLeegToggle(block, item, rebuildAll);
+  const bNaarDk = block.querySelector(".rb-naardk");
+  if(bNaarDk) bNaarDk.addEventListener("click", (e)=>{ e.preventDefault(); e.stopPropagation(); vlNaarDriverkast(item); });
   const stop = (fn)=>(e)=>{ e.preventDefault(); e.stopPropagation(); fn(); };
   block.querySelectorAll(".rackitem-btns button").forEach(b=>b.addEventListener("pointerdown", e=>e.stopPropagation()));
   block.querySelector(".rb-remove").addEventListener("click", stop(()=>{ onDelete(); save(); rebuildAll(); }));
@@ -15210,7 +15270,7 @@ function renderDomoticaOverzicht(){
     ${panelHeadHtml(
       "Domotica overzicht",
       "Alle knoppen en domotica-modules uit de zekeringkast op één lijst — handig om te zien wat nog openstaat.",
-      `Deze lijst is enkel om te overzien wat er al is en wat nog moet ingevuld worden — bewerken doe je nog steeds op het eigen tabblad (Knoppen of Zekeringkast › weergave Opbouw). Rijen met een "openstaand"-markering missen nog een naam en/of kamer.`
+      `Deze lijst is enkel om te overzien wat er al is en wat nog moet ingevuld worden — bewerken doe je nog steeds op het eigen tabblad (Knoppen of Zekeringkast › weergave Lijst). Rijen met een "openstaand"-markering missen nog een naam en/of kamer.`
     )}
     <div class="card"><div class="card-body" style="padding:0;overflow-x:auto;">
       <table class="grid">
@@ -18593,7 +18653,7 @@ const UV_CTX_ZEK = {
   kast: ()=> huidigeZekeringKast(),
   kasten: ()=> state.zekeringen.kasten.map(k=> ({id: k.id, naam: k.naam})),
   kiesKast: (id)=>{ zekeringHuidigeKastId = id; },
-  layoutTab: "zekeringen", layoutTitel: "opbouw aanpassen in de weergave Opbouw", layoutLabel: "weergave Opbouw",
+  layoutTab: "zekeringen", layoutTitel: "opbouw aanpassen in de weergave Lijst", layoutLabel: "weergave Lijst",
   moduleSleep: UV_ZEK_SLEEP,
   export: ()=> exportUitvoeringVoorWerf(true),
 };
@@ -18613,7 +18673,7 @@ function metFamilieBalk(id, render){
   return node;
 }
 function zkWeergaveBalk(actief){
-  const balk = el(`<div class="zk-weergaven" role="tablist" aria-label="Weergave zekeringkast">${ZK_WEERGAVEN.map(w=>`<button type="button" data-w="${w.id}" class="${w.id===actief?"actief":""}">${w.label}</button>`).join("")}<span class="zk-weergave-uitleg">${actief==="zekeringen" ? "modules plaatsen en bewerken" : actief==="uitvoering" ? "enkel draden en kamgeleiders" : "bekijken, afdrukken en exporteren"}</span></div>`);
+  const balk = el(`<div class="zk-weergaven" role="tablist" aria-label="Weergave zekeringkast">${ZK_WEERGAVEN.map(w=>`<button type="button" data-w="${w.id}" class="${w.id===actief?"actief":""}">${w.label}</button>`).join("")}<span class="zk-weergave-uitleg">${actief==="zekeringen" ? "modules plaatsen en bewerken" : actief==="uitvoering" ? "draden en kamgeleiders" : "eindweergave: bekijken en afdrukken"}</span></div>`);
   balk.querySelectorAll("button").forEach(b=> b.addEventListener("click", ()=>{ if(b.dataset.w!==currentTab) selectTab(b.dataset.w); }));
   return balk;
 }
@@ -18622,8 +18682,8 @@ function zkPagina(id){
   if(id==="zekeringen") node = renderZekeringen();
   else node = renderUitvoeringsplan(Object.assign({}, UV_CTX_ZEK, {
     modus: id==="zktekening" ? "tekening" : "bedrading", tab: id, titel: "Zekeringkast",
-    moduleSleep: null, layoutTab: "zekeringen", layoutTitel: "opbouw aanpassen (weergave Opbouw)", layoutLabel: "weergave Opbouw",
-    hulpTekst: "De opbouw (welke module waar) pas je aan in de weergave Opbouw. Het eendraadschema staat in Schema & plan (CaDraw).",
+    moduleSleep: null, layoutTab: "zekeringen", layoutTitel: "opbouw aanpassen (weergave Lijst)", layoutLabel: "weergave Lijst",
+    hulpTekst: "De opbouw (welke module waar) pas je aan in de weergave Lijst. Het eendraadschema staat in Schema & plan (CaDraw).",
   }));
   node.insertBefore(zkWeergaveBalk(id), node.firstChild);
   return node;
@@ -18722,7 +18782,7 @@ function renderUitvoeringsplan(ctxArg){
       <span><kbd>⌫</kbd> laatste knikpunt</span><span><kbd>O</kbd> haaks aan/uit</span><span><kbd>F</kbd> volledige kast</span><span><kbd>W</kbd> breedte</span>
       <span><kbd>Z</kbd> zoomvenster</span><span><kbd>+</kbd>/<kbd>−</kbd> zoom</span><span><kbd>Ctrl</kbd>+<kbd>Z</kbd> ongedaan</span><span><kbd>Ctrl</kbd>+<kbd>Y</kbd> opnieuw</span>
     </div>
-    <div class="hint">${escapeHtml(ctx.hulpTekst || "De opbouw (welke module waar) pas je aan in de weergave Opbouw. Het eendraadschema staat in Schema & plan (CaDraw).")}</div>
+    <div class="hint">${escapeHtml(ctx.hulpTekst || "De opbouw (welke module waar) pas je aan in de weergave Lijst. Het eendraadschema staat in Schema & plan (CaDraw).")}</div>
   </div></div>`;
 
   if(ctx.kam === false) uvKamModus = false;
@@ -18749,16 +18809,14 @@ function renderUitvoeringsplan(ctxArg){
       ${sec("lagen", "Lagen", lagenHtml, false)}
       ${sec("meer", "Meer", `
         <button class="btn small ghost uv-bib">🔌 Modulebibliotheek</button>
-        <button class="btn small ghost uv-export">⎙ Exporteer (PDF)</button>
-        <button class="btn small ghost uv-dxf" title="tekening als DXF voor AutoCAD — in mm, schaal 1:1, met lagen">⬇ DXF (AutoCAD)</button>
-        <button class="btn small ghost uv-wis" title="alle draden en kamgeleiders van deze kast wissen">🗑 Alles wissen</button>`, false)}
+        <button class="btn small ghost uv-wis" title="alle draden en kamgeleiders van deze kast wissen">🗑 Alles wissen</button>
+        <p class="hint" style="margin:4px 0 0;">Afdrukken en DXF: weergave <b>Uitvoering</b>.</p>`, false)}
     </div></div>`;
   else if(ctx.modus==="tekening") gereedschap.innerHTML = `
     <div class="card"><div class="card-body uv-sidebody uv-tools-kaart">
       ${sec("afdruk", "Afdrukken &amp; export", `
-        <button class="btn small primary uv-export">⎙ Uitvoeringsplan (PDF)</button>
-        <button class="btn small ghost zk-lijst" title="Afdrukbare lijst kringen (legende voor de kastdeur)">📄 Lijst kringen</button>
-        <button class="btn small ghost zk-werfpdf" title="Exporteer voor werf (PDF)">⎙ Werf-PDF</button>
+        <button class="btn small primary uv-afdruk" title="tekening + componentenlijst, passend geschaald op het gekozen papier">🖨 Afdrukken…</button>
+        ${ctx.zekering ? `<button class="btn small ghost zk-lijst" title="Afdrukbare lijst kringen (legende voor de kastdeur)">📄 Lijst kringen</button>` : ""}
         <button class="btn small ghost uv-dxf" title="tekening als DXF voor AutoCAD — in mm, schaal 1:1, met lagen">⬇ DXF (AutoCAD)</button>`, true)}
       ${sec("lagen", "Lagen", lagenHtml, false)}
     </div></div>`;
@@ -18800,8 +18858,6 @@ function renderUitvoeringsplan(ctxArg){
         <button class="btn small ${uvCheck ? "primary" : "ghost"} uv-check" title="op de werf: noteer de kabels aan deze kast — groen = aanwezig, rood = ontbreekt, oranje = aan een andere kast">✓ Kabelcheck${uvCheck ? " (aan)" : ""}</button>
         <button class="btn small ghost uv-bib">🔌 Modulebibliotheek</button>
         ${ctx.zekering ? `<button class="btn small primary uv-bib-plaats" title="een module uit de bibliotheek in deze kast zetten (naast de geselecteerde module, of op de eerste rij met plaats)">＋ Module uit bibliotheek</button>` : ""}
-        <button class="btn small ghost uv-export">⎙ Exporteer (PDF)</button>
-        <button class="btn small ghost uv-dxf" title="tekening als DXF voor AutoCAD — in mm, schaal 1:1, met lagen">⬇ DXF (AutoCAD)</button>
         <button class="btn small ghost uv-wis" title="alle draden en kamgeleiders van deze kast wissen">🗑 Alles wissen</button>
       </div>
     </div></div>` : `
@@ -18889,7 +18945,7 @@ function renderUitvoeringsplan(ctxArg){
   function teken(){
     if(ctx.voorTeken) ctx.voorTeken(kast);
     if(!heeftModules){
-      canvas.innerHTML = `<div class="uv-leeg-melding">Deze kast heeft nog geen modules. ${ctx.zekering ? "Bouw de kast eerst op in de weergave <strong>Opbouw</strong>." : "Bouw eerst de layout op het tabblad <strong>Zekeringen</strong>."}</div>`;
+      canvas.innerHTML = `<div class="uv-leeg-melding">Deze kast heeft nog geen modules. ${ctx.zekering ? "Bouw de kast eerst op in de weergave <strong>Lijst</strong>." : "Bouw eerst de layout op het tabblad <strong>Zekeringen</strong>."}</div>`;
       detail.innerHTML = ""; lijst.innerHTML = ""; banner.innerHTML = ""; status.textContent = "";
       return;
     }
@@ -18925,7 +18981,7 @@ function renderUitvoeringsplan(ctxArg){
     else if(uvKamModus) t = `Kamgeleider ${(KAM_TYPES[uvKamType]||{}).label||uvKamType}: sleep onderaan over de modules · Esc = stoppen`;
     else if(uvZoomVenster) t = "Zoomvenster: sleep een rechthoek rond wat je wil zien · Esc = stoppen";
     else if(uvSelWire) t = "Draad gekozen: sleep een draadstuk of knikpunt · sleep ▪ begin/einde naar een andere klem · Del = verwijderen";
-    else if(view==="tekening") t = "Tekening — enkel bekijken: sleep om te verschuiven · Ctrl + muiswiel = zoomen · draden en kammen in de weergave Bedrading";
+    else if(view==="tekening") t = "Uitvoering — alleen-lezen: sleep om te verschuiven · Ctrl + muiswiel = zoomen · draden en kammen in de weergave Plan";
     else t = "Tik een klem om een draad te starten · sleep op een lege plek om te verschuiven · Ctrl + muiswiel = zoomen";
     status.textContent = t;
   }
@@ -19596,7 +19652,7 @@ function renderUitvoeringsplan(ctxArg){
     if(!zkMetFormaat(kast, ()=>{ plek = uvPlaatsInKast(kast, m, uvSelMod); })) return;
     uvSelMod = m.id; uvSelWire = null;
     save(); uvSyncEnOpruimen(kast);
-    toast(`${row.naam} geplaatst in rij ${plek + 1}${ctx.layoutTab ? " — schuif hem eventueel in de weergave Opbouw naar de juiste plaats" : ""}.`);
+    toast(`${row.naam} geplaatst in rij ${plek + 1}${ctx.layoutTab ? " — schuif hem eventueel in de weergave Lijst naar de juiste plaats" : ""}.`);
     selectTab(ctx.tab);
   };
   aan(".uv-check", "click", ()=>{ uvCheck = !uvCheck; uvSelWire = null; uvSelMod = null; uvSelKam = null; uvSelExtra = null; uvPending = null; uvCheckFocus = uvCheck; selectTab(ctx.tab); });
@@ -19604,6 +19660,7 @@ function renderUitvoeringsplan(ctxArg){
   aan(".uv-bib", "click", ()=> openModuleBibliotheek({ plaats: (ctx.zekering && !ctx.modus) ? plaatsUitBib : null, naSluiten: ()=>{ uvSyncEnOpruimen(kast); teken(); } }));
   aan(".uv-bib-plaats", "click", ()=> openModuleBibliotheek({ plaats: plaatsUitBib, naSluiten: ()=>{ uvSyncEnOpruimen(kast); teken(); } }));
   wrap.querySelectorAll(".uv-export").forEach(b=> b.addEventListener("click", ()=> ctx.export()));
+  wrap.querySelectorAll(".uv-afdruk").forEach(b=> b.addEventListener("click", ()=> uvAfdrukVenster(ctx)));
   aan(".zk-lijst", "click", ()=> zkPrintLijst());
   aan(".zk-werfpdf", "click", exportZekeringVoorWerf);
   wrap.querySelectorAll("details.uv-sec-klap").forEach(d=> d.addEventListener("toggle", ()=>{ uvSecOpen[d.dataset.sec] = d.open; }));
@@ -19709,6 +19766,104 @@ function renderUitvoeringsplan(ctxArg){
   return wrap;
 }
 
+// 23/11/2026 (punt 3): één afdrukknop op de eindweergave Uitvoering (zekeringkast én driverkast):
+// eerst papierformaat kiezen, dan tekening (passend geschaald) + componentenlijst
+const UV_PAPIER = {A4:[297,210], A3:[420,297], A2:[594,420]};
+function uvAfdrukVenster(ctx){
+  const kastenLijst = (ctx.kasten ? ctx.kasten() : []).filter(k=> k.id!=="__alle");
+  const ov = azModal("uv-afdruk-modal", "🖨 Afdrukken", `
+    <p class="hint">De tekening wordt automatisch passend geschaald op het gekozen papier; de componentenlijst volgt op de volgende pagina.</p>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;">
+      <label style="display:flex;flex-direction:column;gap:4px;">Papierformaat<select class="uva-fmt">${Object.keys(UV_PAPIER).map(f=>`<option ${f===(state.instellingen.uvPapier||"A3")?"selected":""}>${f}</option>`).join("")}</select></label>
+      <label style="display:flex;flex-direction:column;gap:4px;">Richting<select class="uva-or"><option value="landscape">liggend</option><option value="portrait" ${state.instellingen.uvRichting==="portrait"?"selected":""}>staand</option></select></label>
+      ${kastenLijst.length>1 ? `<label style="display:flex;gap:6px;align-items:center;"><input type="checkbox" class="uva-alle" style="width:auto"> alle ${kastenLijst.length} kasten</label>` : ""}
+      <label style="display:flex;gap:6px;align-items:center;"><input type="checkbox" class="uva-lijst" style="width:auto" checked> componentenlijst</label>
+    </div>`, `<button class="btn btn-ghost uva-annul">Annuleren</button><button class="btn btn-primary uva-ok">🖨 Afdrukken</button>`);
+  ov.querySelector(".uva-annul").addEventListener("click", ()=> ov.remove());
+  ov.querySelector(".uva-ok").addEventListener("click", ()=>{
+    const fmt = ov.querySelector(".uva-fmt").value, richting = ov.querySelector(".uva-or").value;
+    const alle = !!(ov.querySelector(".uva-alle") && ov.querySelector(".uva-alle").checked);
+    const metLijst = ov.querySelector(".uva-lijst").checked;
+    state.instellingen.uvPapier = fmt; state.instellingen.uvRichting = richting; save();
+    ov.remove();
+    uvAfdrukken(ctx, {fmt, richting, alle, metLijst, kastenLijst});
+  });
+}
+function uvComponentenTabel(ctx, id){
+  const th = (cols)=> `<thead><tr>${cols.map(c=>`<th>${c}</th>`).join("")}</tr></thead>`;
+  if(ctx.zekering){
+    const kast = state.zekeringen.kasten.find(k=> k.id===id) || huidigeZekeringKast();
+    const codes = computeZekeringCodes();
+    const rijen = [];
+    kast.rijen.forEach((rij, ri)=> rij.items.forEach(m=>{
+      if(m.categorie==="Leeg") return;
+      const verbr = azLijstMetStroom().filter(x=> azAutomaatVan(x.obj)===m.id && x.soort!=="Relais").map(x=> [x.code, x.kamer].filter(Boolean).join(" ")).slice(0, 8);
+      rijen.push(`<tr><td><b>${escapeHtml(codes[m.id]||"")}</b></td><td>${ri+1}</td><td>${escapeHtml(m.categorie||"")}${m.type?" "+escapeHtml(m.type):""}</td><td>${escapeHtml(m.naam||"")}</td>
+        <td>${escapeHtml([m.polen, m.A, m.mA].filter(Boolean).join(" "))}</td><td>${escapeHtml(m.kabelType||"")}</td><td>${escapeHtml(verbr.join(", "))}</td></tr>`);
+    }));
+    return `<table class="pe-porttable">${th(["Code","Rij","Component","Benoeming","Polen / A / mA","Kabel","Verbruikers"])}<tbody>${rijen.join("") || `<tr><td colspan="7">Geen componenten.</td></tr>`}</tbody></table>`;
+  }
+  const dk = dkFysiekeKasten().find(k=> k.id===id) || dkHuidig();
+  if(!dk) return "";
+  const dc = computeDriverCodes();
+  let aut = []; try{ aut = alleZekeringAutomaten(); }catch(_e){}
+  const lab = (aid)=> { const a = aut.find(x=> x.id===aid); return a ? [a.code, a.naam].filter(Boolean).join(" ") : ""; };
+  const voed = dk.plan && dk.plan.voedingZek ? lab(dk.plan.voedingZek) : "";
+  const rijen = dkDrivers(dk).map(d=> `<tr><td><b>${escapeHtml(dc[d.id]||"")}</b></td><td>${escapeHtml(d.naam||d.type||"Driver")}</td>
+    <td>${escapeHtml((d.armaturen||[]).filter(a=> a.naam||a.aantal).map(a=> (a.aantal||1)+"× "+(a.naam||"armatuur")).join(", "))}</td>
+    <td>${escapeHtml(dkKamerVanDriver(d))}</td><td>${escapeHtml(lab(azAutomaatVan(d)) || (voed ? "via kast: "+voed : ""))}</td></tr>`);
+  return (voed ? `<p style="margin:0 0 6px;font-size:12px;">Voedende automaat driverkast: <b>${escapeHtml(voed)}</b> · sturing ${escapeHtml(dk.sturing||"")}</p>` : "") +
+    `<table class="pe-porttable">${th(["Code","Driver","Armaturen","Kamer","Automaat"])}<tbody>${rijen.join("") || `<tr><td colspan="5">Geen drivers.</td></tr>`}</tbody></table>`;
+}
+function uvAfdrukken(ctx, o){
+  const container = document.getElementById("printExport");
+  container.innerHTML = "";
+  const [pw0, ph0] = UV_PAPIER[o.fmt] || UV_PAPIER.A3;
+  const pw = o.richting==="portrait" ? ph0 : pw0, ph = o.richting==="portrait" ? pw0 : ph0;
+  const marge = 10, kop = 16;
+  const projectNaam = state.instellingen.project || "Naamloos project";
+  const adres = state.instellingen.adres || "";
+  const vorige = ctx.huidigId ? ctx.huidigId() : (ctx.zekering ? (huidigeZekeringKast()||{}).id : null);
+  const ids = o.alle ? o.kastenLijst.map(k=> k.id) : [vorige && vorige!=="__alle" ? vorige : (o.kastenLijst[0]||{}).id];
+  ids.forEach(id=>{
+    if(id && ctx.kiesKast) ctx.kiesKast(id);
+    const kast = ctx.kast(); if(!kast) return;
+    uvSyncEnOpruimen(kast);
+    const naam = (o.kastenLijst.find(k=> k.id===id)||{}).naam || ctx.titel;
+    const svg = bouwBedradingSvg(kast, false).svg;
+    container.appendChild(el(`<div class="pe-page uv-print uv-afdruk-pagina" data-content="schema">
+      <div class="pe-title">${escapeHtml(projectNaam)}</div>
+      <div class="pe-sub">${escapeHtml(ctx.zekering ? "Zekeringkast" : "Driverkast")} — ${escapeHtml(naam)}${adres ? " · "+escapeHtml(adres) : ""} · ${new Date().toLocaleDateString("nl-BE")} · ${o.fmt}</div>
+      <div class="uv-print-svg">${svg}</div></div>`));
+    if(o.metLijst) container.appendChild(el(`<div class="pe-panel-page uv-afdruk-pagina" data-content="lijst">
+      <div class="pe-panel-head"><h2>Componentenlijst — ${escapeHtml(naam)}</h2><div class="pe-meta">${escapeHtml(projectNaam)}</div></div>
+      ${uvComponentenTabel(ctx, id)}</div>`));
+  });
+  if(vorige && ctx.kiesKast) ctx.kiesKast(vorige);
+  if(!container.children.length){ alert("Er is nog niets om af te drukken."); return; }
+  // tekening passend: breedte én hoogte binnen de bedrukbare zone
+  const maxH = ph - 2*marge - kop, maxB = pw - 2*marge;
+  container.querySelectorAll(".uv-print-svg svg").forEach(svg=>{
+    svg.removeAttribute("width"); svg.removeAttribute("height");
+    svg.style.width = "auto"; svg.style.height = "auto"; svg.style.maxWidth = maxB + "mm"; svg.style.maxHeight = maxH + "mm";
+    const vb = (svg.getAttribute("viewBox")||"").split(/[\s,]+/).map(Number);
+    if(vb.length===4 && vb[2]>0 && vb[3]>0){
+      const sc = Math.min(maxB / vb[2], maxH / vb[3]);
+      svg.style.width = (vb[2]*sc).toFixed(1) + "mm"; svg.style.height = (vb[3]*sc).toFixed(1) + "mm";
+    }
+    svg.style.display = "block"; svg.style.margin = "0 auto";
+  });
+  [...container.children].forEach((p, i)=>{ if(i>0) p.style.pageBreakBefore = "always"; });
+  let st = document.getElementById("uvAfdrukPagina");
+  if(!st){ st = document.createElement("style"); st.id = "uvAfdrukPagina"; }
+  st.textContent = `@page{size:${o.fmt} ${o.richting};margin:${marge}mm;} @media print{ .uv-afdruk-pagina{width:auto !important;max-width:none !important;} }`;
+  document.head.appendChild(st);
+  document.body.classList.add("print-patchkast");
+  window.print();
+  const cleanup = ()=>{ document.body.classList.remove("print-patchkast"); const x = document.getElementById("uvAfdrukPagina"); if(x) x.remove(); window.removeEventListener("afterprint", cleanup); };
+  window.addEventListener("afterprint", cleanup);
+  setTimeout(cleanup, 5000);
+}
 function exportUitvoeringVoorWerf(standalone=true){
   const kasten = state.zekeringen.kasten.filter(k=> k.rijen.some(r=> r.items.some(m=> m.categorie!=="Leeg")));
   if(!kasten.length){ if(standalone) alert("Er staan nog geen modules in de zekeringkast om te exporteren."); return; }
@@ -22713,7 +22868,7 @@ const UV_CTX_DK = {
   kiesKast: (id)=>{ if(id === "__alle"){ dkOverzicht = true; return; } dkOverzicht = false; dkHuidigId = id; },
   alleenSlepen: (kast)=> !!kast._alle,
   linksPaneel: (zone, h)=> dkLijstPaneel(zone, h),
-  layoutTab: "driverkast", layoutTitel: "drivers en armaturen aanpassen op het tabblad Driverkast",
+  layoutTab: "driverkast", layoutTitel: "drivers en armaturen aanpassen in de weergave Lijst",
   omzetLabel: "Draden voorstellen", omzetTitel: "werkschakelaar, verdeelblokken (L/N/DALI of push) en de uitgangen naar de rijgklemmen automatisch tekenen",
   omzet: (p)=>{
     if(!p._alle) return dkOmzet(p);
@@ -22938,7 +23093,17 @@ function renderDriverplan(){
       <strong>Driverkast plan</strong><p class="hint">Er staan nog geen drivers in een driverkast. Voeg ze eerst toe op het tabblad Driverkast.</p></div></div></div>`);
   }
   if(!cadosInstGeladen) laadAllesVoorUitvoering().then(()=>{ if(document.getElementById("panel-driverplan")) selectTab("driverplan"); });
-  return renderUitvoeringsplan(UV_CTX_DK);
+  return renderUitvoeringsplan(Object.assign({}, UV_CTX_DK, {modus:"bedrading", layoutLabel:"weergave Lijst"}));
+}
+// 23/11/2026: Driverkast › Uitvoering = alleen-lezen eindweergave met afdrukken (zelfde als Zekeringkast › Uitvoering)
+function renderDriverUitvoering(){
+  const dk = dkHuidig();
+  if(!dk || !dkDrivers(dk).length){
+    return el(`<div class="panel" id="panel-driverplan"><div class="card"><div class="card-body">
+      <strong>Driverkast — uitvoering</strong><p class="hint">Er staan nog geen drivers in een driverkast. Voeg ze eerst toe in de weergave Lijst.</p></div></div></div>`);
+  }
+  if(!cadosInstGeladen) laadAllesVoorUitvoering().then(()=>{ if(document.getElementById("panel-driverplan")) selectTab("dktekening"); });
+  return renderUitvoeringsplan(Object.assign({}, UV_CTX_DK, {modus:"tekening", tab:"dktekening", layoutLabel:"weergave Lijst", linksPaneel:null, moduleSleep:null}));
 }
 
 
@@ -23098,6 +23263,10 @@ const RENDERERS = {
   uitvoering: ()=> zkPagina("uitvoering"),
   driverkast: ()=> metFamilieBalk("driverkast", renderDriverkast),
   driverplan: ()=> metFamilieBalk("driverplan", renderDriverplan),
+  dktekening: ()=> metFamilieBalk("dktekening", renderDriverUitvoering),
+  koppelen: renderKoppelenPagina,
+  kabels: renderKabelsPagina,
+  schema: renderSchemaPagina,
   kamers: renderKamersVerdiepingenTab,
   data: renderPatchkast,
   verlichting: ()=> metFamilieBalk("verlichting", renderVerlichting),
@@ -23167,6 +23336,7 @@ function kiesGroep(g){
   const nav = document.getElementById("tabbar");
   const tabs = zichtbareTabs().filter(t=>t.grp===g);
   if(!tabs.length) return;
+  if(tabs.length===1){ nav.classList.remove("open"); actieveGroep = g; selectTab(tabs[0].id); return; }
   if(isGsmNav()){
     const wasOpen = nav.classList.contains("open") && actieveGroep===g;
     actieveGroep = g; buildNav();
@@ -23268,7 +23438,18 @@ function dvStappen(){
   stappen.push({id:"kamers", label:"Kamers", st: !kamers.length?"open":(zonderVd?"warn":"ok"),
     info: !kamers.length ? "Nog geen kamers" : (zonderVd ? meervoud(zonderVd,"kamer","kamers")+" zonder verdieping" : meervoud(kamers.length,"kamer","kamers")+", allemaal met verdieping"),
     ga: ()=> selectTab("kamers")});
-  // 4. driverkast
+  // 4. zekeringkast (vóór de driverkast: de automaten bestaan dan al) (+ de melding "nog niet verdeeld", vroeger bovenaan Zekeringen)
+  const nietVerdeeld = !!(state.zkBron && !(state.zkOntwerp && state.zkOntwerp.toegepast));
+  stappen.push({id:"zekeringkast", label:"Zekeringkast", st: nietVerdeeld?"warn":(autos.length?"ok":"open"),
+    info: nietVerdeeld ? "De automaten en differentiëlen uit de offerte zijn nog niet verdeeld" : (autos.length ? meervoud(autos.length,"automaat","automaten") : "Nog geen automaten"),
+    // punt 10/23: Verdelen (AREI) enkel voor een nieuwe kast; daarna Herschikken en Snel opnieuw verdelen
+    // 23/11/2026: enkel ⚡ Verdelen voor een nieuwe kast; Herschikken en Snel opnieuw verdelen zitten in Zekeringkast › ⇄ Herschikken
+    ga: ()=> selectTab("zekeringen"), acties: zkIsVerdeeld() ? [] : [{label:"⚡", titel:"Verdelen (AREI) — stappenvenster: stopcontacten, toestellen en differentiëlen volgens het AREI", doe: ()=> zkOpen()}],
+    melding: nietVerdeeld ? {
+      tekst: "⚡ De automaten en differentiëlen uit de offerte zijn nog niet verdeeld.",
+      hint: state.zkBron.stop.reduce((t,x)=>t+x.muur+x.vloer+(x.media||0),0)+" stopcontacten en "+state.zkBron.voedingen.length+" voedingen wachten op de AREI-verdeling.",
+      knop: "Zekeringkast verdelen", doe: ()=> zkOpen() } : null});
+  // 5. driverkast
   if(state.modules && state.modules.driverkast===false){
     stappen.push({id:"driverkast", label:"Driverkast", st:"na", info:"Niet van toepassing (uitgevinkt)", ga: null});
   } else {
@@ -23278,48 +23459,36 @@ function dvStappen(){
       info: !drv.length ? "Nog geen drivers" : (zonderKring ? meervoud(zonderKring,"driver","drivers")+" zonder kring" : meervoud(drv.length,"driver","drivers")+", allemaal op een kring"),
       ga: ()=> selectTab("driverkast")});
   }
-  // 5. zekeringkast (+ de melding "nog niet verdeeld", vroeger bovenaan Zekeringen)
-  const nietVerdeeld = !!(state.zkBron && !(state.zkOntwerp && state.zkOntwerp.toegepast));
-  stappen.push({id:"zekeringkast", label:"Zekeringkast", st: nietVerdeeld?"warn":(autos.length?"ok":"open"),
-    info: nietVerdeeld ? "De automaten en differentiëlen uit de offerte zijn nog niet verdeeld" : (autos.length ? meervoud(autos.length,"automaat","automaten") : "Nog geen automaten"),
-    // punt 10/23: Verdelen (AREI) enkel voor een nieuwe kast; daarna Herschikken en Snel opnieuw verdelen
-    ga: ()=> selectTab("zekeringen"), acties: zkIsVerdeeld()
-      ? [{label:"⇄", titel:"Herschikken — automaat aan een ander differentieel hangen", doe: ()=>{ if(currentTab!=="zekeringen") selectTab("zekeringen"); zkGroepenVenster(()=> selectTab("zekeringen")); }},
-         {label:"↻", titel:"Snel opnieuw verdelen — bewaarde keuzes, meteen naar het Overzicht", doe: zkSnelOpnieuw}]
-      : [{label:"⚡", titel:"Verdelen (AREI) — stappenvenster: stopcontacten, toestellen en differentiëlen volgens het AREI", doe: ()=> zkOpen()}],
-    melding: nietVerdeeld ? {
-      tekst: "⚡ De automaten en differentiëlen uit de offerte zijn nog niet verdeeld.",
-      hint: state.zkBron.stop.reduce((t,x)=>t+x.muur+x.vloer+(x.media||0),0)+" stopcontacten en "+state.zkBron.voedingen.length+" voedingen wachten op de AREI-verdeling.",
-      knop: "Zekeringkast verdelen", doe: ()=> zkOpen() } : null});
   // 6. koppelen
   let zonderAuto = 0, metStroom = 0, armOngekoppeld = 0;
-  try{ const L = azLijstMetStroom(); metStroom = L.length; zonderAuto = L.filter(x=> !azAutomaatVan(x.obj)).length; }catch(e){}
+  try{ const L = azLijstMetStroom(); metStroom = L.length; zonderAuto = L.filter(x=> !azKetenRond(x.obj)).length; }catch(e){}
   try{ armOngekoppeld = akOngekoppeld().length; }catch(e){}
   const kopInfo = [zonderAuto ? meervoud(zonderAuto,"verbruiker","verbruikers")+" zonder automaat" : "", armOngekoppeld ? meervoud(armOngekoppeld,"armatuur","armaturen")+" niet gekoppeld" : ""].filter(Boolean).join(", ");
   stappen.push({id:"koppelen", label:"Koppelen", st: (!metStroom && !armOngekoppeld)?"open":(kopInfo?"warn":"ok"),
     info: kopInfo || (metStroom ? "Alles heeft een automaat" : "Nog niets te koppelen"),
-    ga: ()=> selectTab("zekeringen"), actie: zonderAuto ? {label:"🔗 Koppelen", titel:"Automaten toewijzen (Open lijst) of koppelvoorstel", doe: ()=> koppelOpen("lijst")} : (armOngekoppeld ? {label:"🔗", titel:"Armaturen koppelen", doe: ()=> akOpen()} : null)});
+    ga: ()=> selectTab("koppelen")});
   // 7. kabels (CaCalc) en 8. schema (CaDraw)
   const dekking = (namen, ids)=> autos.filter(m=> !(ids.has(m.id) || (m.naam && namen.has(String(m.naam).trim().toLowerCase())))).length;
   if(!extGeladen){
-    stappen.push({id:"kabels", label:"Kabels", st:"open", info:"Kabelberekening laden…", ga: ()=> dvApp("cacalc")});
-    stappen.push({id:"schema", label:"Schema", st:"open", info:"Schema laden…", ga: ()=> dvApp("cadraw")});
+    stappen.push({id:"kabels", label:"Kabels", st: kbNodig()===false ? "ok" : "open", info: kbNodig()===false ? "Geen kabelberekening nodig" : "Kabelberekening laden…", ga: ()=> selectTab("kabels")});
+    stappen.push({id:"schema", label:"Schema", st:"open", info:"Schema laden…", ga: ()=> selectTab("schema")});
   } else {
     const egs = []; ((ext.cacalc && ext.cacalc.boards) || []).forEach(b=> (b.eindgroepen||[]).forEach(e=> egs.push(e)));
     const ccIds = new Set(egs.map(e=> e.cadosId).filter(Boolean));
     const ccNamen = new Set(); egs.forEach(e=>{ [e.naam, ...((e.kringen||[]).map(k=>k.naam))].forEach(n=>{ if(n) ccNamen.add(String(n).trim().toLowerCase()); }); });
     const misCc = dekking(ccNamen, ccIds);
-    stappen.push({id:"kabels", label:"Kabels", st: !egs.length?"open":(misCc?"warn":"ok"),
-      info: !egs.length ? "Nog geen kabelberekening — klik om Kabelberekening te openen" : (misCc ? meervoud(misCc,"automaat","automaten")+" nog niet in de kabelberekening" : meervoud(egs.length,"eindgroep","eindgroepen")+" berekend"),
-      ga: ()=> dvApp("cacalc")});
+    if(kbNodig()===false) stappen.push({id:"kabels", label:"Kabels", st:"ok", info:"Geen kabelberekening nodig", ga: ()=> selectTab("kabels")});
+    else stappen.push({id:"kabels", label:"Kabels", st: !egs.length?"open":(misCc?"warn":"ok"),
+      info: !egs.length ? (kbNodig()===null ? "Nog te beslissen: kabelberekening nodig?" : "Nog geen kabelberekening") : (misCc ? meervoud(misCc,"automaat","automaten")+" nog niet in de kabelberekening" : meervoud(egs.length,"eindgroep","eindgroepen")+" berekend"),
+      ga: ()=> selectTab("kabels")});
     const bronnen = new Set(), schemaNamen = new Set(); let kringen = 0;
     (function loop(o){ if(!o || typeof o!=="object") return; if(Array.isArray(o)){ o.forEach(loop); return; }
       if(typeof o.bron==="string" && o.bron){ bronnen.add(o.bron); kringen++; if(o.naam) schemaNamen.add(String(o.naam).trim().toLowerCase()); }
       Object.keys(o).forEach(k=>{ if(o[k] && typeof o[k]==="object") loop(o[k]); }); })(ext.cadraw && ext.cadraw.borden);
     const misDr = dekking(new Set(), bronnen);
     stappen.push({id:"schema", label:"Schema", st: !ext.cadraw?"open":(misDr && autos.length?"warn":"ok"),
-      info: !ext.cadraw ? "Nog geen eendraadschema — klik om Schema & plan te openen" : (misDr && autos.length ? meervoud(misDr,"automaat","automaten")+" nog niet in het schema" : meervoud(kringen,"kring","kringen")+" in het schema"),
-      ga: ()=> dvApp("cadraw")});
+      info: !ext.cadraw ? "Nog geen eendraadschema" : (misDr && autos.length ? meervoud(misDr,"automaat","automaten")+" nog niet in het schema" : meervoud(kringen,"kring","kringen")+" in het schema"),
+      ga: ()=> selectTab("schema")});
   }
   // 9. keuring
   const k = state.keuring || {};
@@ -23335,12 +23504,144 @@ function dvStappen(){
   return stappen;
 }
 // naar een andere CaSuite-app (Kabelberekening / Schema & plan) -- dezelfde knoppen als de hoofdnavigatie
+// ===== 23/11/2026: stap 7 Kabels en stap 8 Schema als tussenpagina in CaDos =====
+function kbNodig(){ const k = state.kabelberekening; return k && typeof k.nodig==="boolean" ? k.nodig : null; }
+function dvDossierCijfers(){
+  const codes = computeZekeringCodes();
+  const kasten = state.zekeringen.kasten.map(k=>{
+    const flat = []; k.rijen.forEach(r=> r.items.forEach(m=> flat.push(m)));
+    const aut = flat.filter(m=> m.categorie==="Automaat");
+    const verbr = new Set(); let L = []; try{ L = azLijstMetStroom(); }catch(_e){}
+    L.forEach(x=>{ const a = azKeten(x.obj); if(a && aut.some(m=> m.id===a.id)) verbr.add(a.id); });
+    return {naam: k.naam || "Zekeringkast", kamer: k.kamer || "", diff: flat.filter(m=> m.categorie==="Differentieel").length,
+      aut: aut.length, metKabel: aut.filter(m=> (m.kabelType||"").trim()).length, metVerbr: aut.filter(m=> verbr.has(m.id)).length,
+      zonderKabel: aut.filter(m=> !(m.kabelType||"").trim()).map(m=> codes[m.id]||m.naam||"?")};
+  });
+  let open = 0; try{ open = azLijstMetStroom().filter(x=> !azKetenRond(x.obj)).length; }catch(_e){}
+  return {kasten, aut: kasten.reduce((t,k)=>t+k.aut,0), open, kringen: state.kringen.items.filter(k=>!k.leeg).length,
+    kamers: (state.kamers||[]).filter(Boolean).length, verdiepingen: (state.verdiepingen||[]).filter(v=> v && (v.label||v)).length};
+}
+function dvHandtekening(){ // verandert als de bordstructuur of kabels wijzigen
+  return state.zekeringen.kasten.map(k=> k.rijen.map(r=> r.items.map(m=> [m.id,m.categorie,m.A,m.polen,m.kabelType,m.naam].join("~")).join("|")).join("/")).join("#");
+}
+function dvKastTabel(c){
+  return `<table class="grid dv-tabel"><thead><tr><th>Kast</th><th>Differentiëlen</th><th>Automaten</th><th>Met kabeltype</th><th>Met verbruikers</th></tr></thead><tbody>${
+    c.kasten.map(k=>`<tr><td><b>${escapeHtml(k.naam)}</b>${k.kamer?` <span class="hint">${escapeHtml(k.kamer)}</span>`:""}</td><td>${k.diff}</td><td>${k.aut}</td>
+      <td>${k.metKabel===k.aut?"✓ "+k.metKabel:`<span class="dv-warn">${k.metKabel} / ${k.aut}</span>`}</td><td>${k.metVerbr===k.aut?"✓ "+k.metVerbr:`${k.metVerbr} / ${k.aut}`}</td></tr>`).join("")
+  }</tbody></table>`;
+}
+function dvCss(){
+  if(document.getElementById("dv-pagina-css")) return;
+  const st = document.createElement("style"); st.id = "dv-pagina-css";
+  st.textContent = `#cados-app .dv-pagina .card{margin-bottom:12px;}
+  #cados-app .dv-vraag{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  #cados-app .dv-vraag .btn.actief{background:var(--app-dossier,#1e6b43);color:#fff;border-color:var(--app-dossier,#1e6b43);}
+  #cados-app .dv-tabel td, #cados-app .dv-tabel th{padding:6px 10px;}
+  #cados-app .dv-warn{color:#a35a00;font-weight:600;}
+  #cados-app .dv-check{list-style:none;margin:0;padding:0;display:grid;gap:4px;}
+  #cados-app .dv-check li{display:flex;gap:8px;align-items:baseline;}
+  #cados-app .dv-acties{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:4px;}
+  #cados-app .dv-klaar{color:var(--app-dossier,#1e6b43);font-weight:600;}`;
+  document.head.appendChild(st);
+}
+function dvCheck(ok, tekst){ return `<li><span>${ok===true?"✅":ok===false?"⚠️":"ℹ️"}</span><span>${tekst}</span></li>`; }
+function renderKabelsPagina(){
+  dvCss();
+  const nodig = kbNodig();
+  const kb = state.kabelberekening || {};
+  const wrap = el(`<div class="panel dv-pagina" id="panel-kabels">
+    ${panelHeadHtml("Kabels", "Stap 7 — kabelberekening in CaCalc (Kabelberekening).", "Kies eerst of dit project een kabelberekening nodig heeft. Zo ja: kijk na welke gegevens klaarstaan, zet ze klaar met Exporteer naar CaCalc en open CaCalc pas wanneer jij dat wil.")}
+    <div class="card"><div class="card-body">
+      <strong>Is er een kabelberekening nodig?</strong>
+      <div class="dv-vraag" style="margin-top:8px;">
+        <button type="button" class="btn kb-ja ${nodig===true?"actief":""}">Ja</button>
+        <button type="button" class="btn kb-nee ${nodig===false?"actief":""}">Nee</button>
+        ${nodig===null ? `<span class="hint">Kies om verder te gaan.</span>` : ""}
+      </div>
+    </div></div>
+    <div class="kb-inhoud"></div>
+  </div>`);
+  wireHintToggle(wrap);
+  const zet = (v)=>{ state.kabelberekening = Object.assign({}, state.kabelberekening||{}, {nodig: v}); save(); selectTab("kabels"); try{ renderDossierverloop(); }catch(_e){} };
+  wrap.querySelector(".kb-ja").addEventListener("click", ()=> zet(true));
+  wrap.querySelector(".kb-nee").addEventListener("click", ()=> zet(false));
+  const inhoud = wrap.querySelector(".kb-inhoud");
+  if(nodig===false){
+    inhoud.innerHTML = `<div class="card"><div class="card-body"><p style="margin:0;">✅ Geen kabelberekening nodig voor dit project — stap 7 staat op afgewerkt. Je kan dit altijd wijzigen met <b>Ja</b> hierboven.</p></div></div>`;
+    return wrap;
+  }
+  if(nodig!==true) return wrap;
+  const c = dvDossierCijfers();
+  const ext = (typeof dvExtern!=="undefined" && dvExtern.pid===currentProjectId) ? dvExtern : null;
+  let egs = 0; if(ext && ext.cacalc) ((ext.cacalc.boards)||[]).forEach(b=> egs += (b.eindgroepen||[]).length);
+  const zonderKabel = c.kasten.flatMap(k=> k.zonderKabel);
+  const gewijzigd = kb.export && kb.export.sig !== dvHandtekening();
+  inhoud.innerHTML = `
+    <div class="card"><div class="card-body">
+      <strong>Beschikbare dossierdata voor de berekening</strong>
+      <p class="hint" style="margin:4px 0 10px;">CaCalc neemt de bordstructuur (kasten, differentiëlen, automaten met polen/A/curve en kabeltype) over uit dit dossier; lengtes en legwijze vul je in CaCalc aan.</p>
+      ${c.kasten.length ? dvKastTabel(c) : `<p class="hint">Nog geen zekeringkast.</p>`}
+      <ul class="dv-check" style="margin-top:10px;">
+        ${dvCheck(c.aut>0, c.aut ? `${c.aut} automaten in ${c.kasten.length} kast${c.kasten.length===1?"":"en"}` : "Nog geen automaten — bouw eerst de zekeringkast op (stap 4)")}
+        ${dvCheck(!zonderKabel.length, zonderKabel.length ? `${zonderKabel.length} automaten zonder kabeltype: ${escapeHtml(zonderKabel.slice(0,12).join(", "))}${zonderKabel.length>12?" …":""}` : "Alle automaten hebben een kabeltype")}
+        ${dvCheck(!c.open, c.open ? `${c.open} verbruikers nog niet gekoppeld (stap 6)` : "Alle verbruikers zijn gekoppeld")}
+        ${dvCheck(null, `${c.kringen} kringen · ${c.kamers} kamers · spanning ${escapeHtml(state.instellingen.spanning||"—")}`)}
+        ${ext ? dvCheck(ext.cacalc ? true : null, ext.cacalc ? `In CaCalc: ${egs} eindgroepen berekend` : "Nog geen kabelberekening in CaCalc") : ""}
+      </ul>
+    </div></div>
+    <div class="card"><div class="card-body">
+      <strong>Naar CaCalc</strong>
+      <div class="dv-acties" style="margin-top:8px;">
+        <button type="button" class="btn primary kb-export" ${c.aut?"":"disabled"}>⇪ Exporteer naar CaCalc</button>
+        ${kb.export ? `<span class="${gewijzigd?"dv-warn":"dv-klaar"}">${gewijzigd ? "⚠️ Dossier gewijzigd sinds de export van "+new Date(kb.export.t).toLocaleString("nl-BE")+" — opnieuw exporteren" : "✓ Klaargezet op "+new Date(kb.export.t).toLocaleString("nl-BE")+" ("+kb.export.aut+" automaten)"}</span>` : `<span class="hint">Zet de gegevens klaar; je blijft op deze pagina.</span>`}
+      </div>
+      ${kb.export ? `<div class="dv-acties" style="margin-top:10px;"><button type="button" class="btn kb-open">Open in CaCalc →</button><span class="hint">Schakelt over naar Kabelberekening.</span></div>` : ""}
+    </div></div>`;
+  inhoud.querySelector(".kb-export").addEventListener("click", async (e)=>{
+    const b = e.currentTarget; b.disabled = true; b.textContent = "Bezig…";
+    state.kabelberekening = Object.assign({}, state.kabelberekening||{}, {nodig:true, export:{t: Date.now(), aut: c.aut, kasten: c.kasten.length, sig: dvHandtekening()}});
+    save();
+    try{ await flushSave(); toast("Klaargezet voor CaCalc: "+c.aut+" automaten"); }
+    catch(err){ toast("Klaargezet; bewaren op de server lukt nu niet (wordt automatisch opnieuw geprobeerd)."); }
+    selectTab("kabels");
+  });
+  const op = inhoud.querySelector(".kb-open");
+  if(op) op.addEventListener("click", ()=> dvApp("cacalc"));
+  return wrap;
+}
+function renderSchemaPagina(){
+  dvCss();
+  const c = dvDossierCijfers();
+  const ext = (typeof dvExtern!=="undefined" && dvExtern.pid===currentProjectId) ? dvExtern : null;
+  let stappen = []; try{ stappen = dvStappen(); }catch(_e){}
+  const st = (id)=> stappen.find(x=> x.id===id);
+  const rij = (id)=>{ const x = st(id); return x ? dvCheck(x.st==="ok" ? true : x.st==="warn" ? false : null, `<b>${escapeHtml(x.label)}</b> — ${escapeHtml(x.info||"")}`) : ""; };
+  const wrap = el(`<div class="panel dv-pagina" id="panel-schema">
+    ${panelHeadHtml("Schema", "Stap 8 — eendraadschema en situatieplan in CaDraw (Schema & plan).", "CaDraw leest de zekeringkast, kringen, kamers en verdiepingen uit dit dossier. Kijk hier na wat klaarstaat en open CaDraw pas wanneer jij dat wil — je blijft tot dan in het Dossier.")}
+    <div class="card"><div class="card-body">
+      <strong>Gegevens voor het schema</strong>
+      ${c.kasten.length ? `<div style="margin-top:8px;">${dvKastTabel(c)}</div>` : `<p class="hint">Nog geen zekeringkast.</p>`}
+      <ul class="dv-check" style="margin-top:10px;">
+        ${dvCheck(null, `${c.kringen} kringen · ${c.kamers} kamers · ${c.verdiepingen} verdiepingen`)}
+        ${rij("plannen")}${rij("zekeringkast")}${rij("koppelen")}${rij("kabels")}
+        ${ext ? dvCheck(st("schema") && st("schema").st==="ok" ? true : (ext.cadraw ? false : null), escapeHtml((st("schema")||{}).info || "")) : dvCheck(null, "Status van CaDraw wordt geladen…")}
+      </ul>
+    </div></div>
+    <div class="card"><div class="card-body">
+      <div class="dv-acties"><button type="button" class="btn primary sc-open">Open in CaDraw →</button><span class="hint">Bewaart het dossier en schakelt over naar Schema &amp; plan.</span></div>
+    </div></div>
+  </div>`);
+  wireHintToggle(wrap);
+  wrap.querySelector(".sc-open").addEventListener("click", async ()=>{ save(); try{ await flushSave(); }catch(_e){} dvApp("cadraw"); });
+  if(!ext) setTimeout(()=>{ if(currentTab==="schema" && typeof dvExtern!=="undefined" && dvExtern.pid===currentProjectId && document.getElementById("panel-schema")) selectTab("schema"); }, 1500);
+  return wrap;
+}
 function dvApp(tab){
   try{ flushSave(); }catch(e){}
   const b = document.getElementById("main-nav-btn-"+tab);
   if(b) b.click(); else toast("Deze app is hier niet beschikbaar.");
 }
-const DV_TAB_VAN = {plannen:"plannen", kamers:"kamers", driverkast:"driverkast", zekeringkast:"zekeringen", koppelen:"zekeringen", keuring:"keuring", oplevering:"oplevering"};
+const DV_TAB_VAN = {plannen:"plannen", kamers:"kamers", driverkast:"driverkast", zekeringkast:"zekeringen", koppelen:"koppelen", kabels:"kabels", schema:"schema", keuring:"keuring", oplevering:"oplevering"};
 let dvRenderTimer = null;
 function renderDossierverloopUitgesteld(){ clearTimeout(dvRenderTimer); dvRenderTimer = setTimeout(renderDossierverloop, 350); }
 function renderDossierverloop(){
@@ -23354,7 +23655,7 @@ function renderDossierverloop(){
   zone.innerHTML = "";
   const balk = el(`<div class="dv-balk"><span class="dv-kop">Dossierverloop</span></div>`);
   stappen.forEach((st, i)=>{
-    const hier = DV_TAB_VAN[st.id] && DV_TAB_VAN[st.id]===navTabVan(currentTab) && (st.id!=="koppelen" || !stappen.some(x=>x.id==="zekeringkast" && x.st!=="ok"));
+    const hier = DV_TAB_VAN[st.id] && DV_TAB_VAN[st.id]===navTabVan(currentTab);
     const chip = el(`<div class="dv-stap ${st.st}${hier?" hier":""}" data-stap="${st.id}"><button type="button" class="dv-ga" title="${escapeHtml(st.info)}"><span class="dv-ico">${ICO[st.st]}</span>${i+1}. ${escapeHtml(st.label)}</button></div>`);
     if(st.ga) chip.querySelector(".dv-ga").addEventListener("click", st.ga); else chip.querySelector(".dv-ga").disabled = true;
     [...(st.acties||[]), ...(st.actie ? [st.actie] : [])].forEach(ac=>{
@@ -23428,7 +23729,7 @@ function selectTab(id){
 const TAB_NAAR_PRINTSECTIE = {zekeringen:"zekering", zktekening:"uitvoering", uitvoering:"uitvoering", driverkast:"driverkast", driverplan:"driverkast",
   data:"data", verlichting:"verlichting", knoppen:"knoppen", kringen:"kringen", muziek:"muziek", verwarming:"verwarming",
   camerabewaking:"camerabewaking", alarm:"alarm", motoren:"motoren", laadpalen:"laadpalen", toegangscontrole:"toegangscontrole", interlex:"interlex"};
-const PRINTKNOP_NAAR_SECTIE = {exportPatch:"data", exportDriverkast:"driverkast", exportVerlichting:"verlichting", exportKnoppen:"knoppen",
+const PRINTKNOP_NAAR_SECTIE = {exportVerlichting:"verlichting", exportKnoppen:"knoppen",
   exportKringen:"kringen", exportMuziek:"muziek", exportVerwarming:"verwarming", exportCamerabewaking:"camerabewaking", exportLaadpalen:"laadpalen",
   toegangscontroleExport:"toegangscontrole", ilExport:"interlex", moExport:"motoren", exportAlarmKabellijst:"alarm"};
 let printVoorselectie = null, printVanTab = null;
@@ -23460,7 +23761,7 @@ function markeerPrintKnoppen(node){
     b.title = "Naar het Printcentrum, met dit onderdeel al aangevinkt";
   });
 }
-document.getElementById("btnPrint").addEventListener("click", ()=> naarPrintcentrum(TAB_NAAR_PRINTSECTIE[currentTab] || null));
+// 23/11/2026: geen losse Printcentrum-knop meer bovenaan (zie hoofdgroep Printcentrum)
 // 23/11/2026 (punt 21): eigen bevestigingsvenster (typ LEEGMAKEN) i.p.v. een browser-confirm
 function bevestigLeegmaken(){
   return new Promise(res=>{
@@ -26348,6 +26649,38 @@ async function akOpen(){
 
 // ---------- gemeenschappelijk ----------
 function azKring(id){ return id ? state.kringen.items.find(k=>k.id===id) : null; }
+// 23/11/2026 (punt 6): is de keten rond? Geeft de automaat (+ hoe) terug, of null.
+//  - eigen automaat of via kring (zoals vroeger)
+//  - driver → driverkast → automaat (plan.voedingZek, ook in Driverkast › Lijst te kiezen)
+//  - lichtpunt 230V / kring → relais (uitgang naar die kring) → automaat (relais.zekeringModuleId)
+function azKeten(obj){
+  if(!obj) return null;
+  const eigen = azAutomaatVan(obj);
+  let aut = null; try{ aut = new Set(alleZekeringAutomaten().map(a=> a.id)); }catch(_e){ aut = new Set(); }
+  if(eigen) return {id: eigen, via: obj.zekeringModuleId ? "" : "kring"};
+  try{
+    for(const v of dkFysiekeKasten()){
+      if((v.items||[]).includes(obj)){ const p = v.plan; if(p && p.voedingZek && aut.has(p.voedingZek)) return {id: p.voedingZek, via: "driverkast"}; break; }
+    }
+  }catch(_e){}
+  const kringId = state.kringen.items.includes(obj) ? obj.id : obj.kringId;
+  if(kringId){
+    let hit = null;
+    state.zekeringen.kasten.forEach(k=> k.rijen.forEach(r=> r.items.forEach(m=>{
+      if(!hit && m.zekeringModuleId && aut.has(m.zekeringModuleId) && (m.uitgangen||[]).some(u=> u.targetId===kringId && u.type!=="motor" && u.type!=="verwarming")) hit = m;
+    })));
+    if(hit) return {id: hit.zekeringModuleId, via: "relais"};
+  }
+  if(state.kringen.items.includes(obj)){
+    const leden = alleDrivers().filter(d=> !d.leeg && d.kringId===obj.id).concat(state.verlichting.items.filter(v=> !v.leeg && v.kringId===obj.id));
+    if(leden.length){
+      const k = leden.map(azKeten);
+      if(k.every(Boolean)) return {id: k[0].id, via: k[0].via || "verbruikers"};
+    }
+  }
+  return null;
+}
+function azKetenRond(obj){ return !!azKeten(obj); }
 function azAutomaatVan(obj){ return obj.zekeringModuleId || ((azKring(obj.kringId)||{}).zekeringModuleId) || ""; }
 function azAutomaatLabel(id, lijst){
   if(!id) return "";
@@ -26371,6 +26704,8 @@ function azLijstMetStroom(){
   ((state.motoren&&state.motoren.items)||[]).forEach(m=> rijen.push({soort:"Motor", code:mc[m.id], naam:m.naam||m.soort, kamer:m.kamer, obj:m}));
   state.verwarming.items.forEach(z=>{ if(!z.leeg) rijen.push({soort:"Verwarming", code:wc[z.id], naam:z.naam||z.info, kamer:z.kamer, obj:z}); });
   state.zonnepanelen.items.forEach(p=>{ if(!p.leeg) rijen.push({soort:"Zonnepanelen", code:"", naam:p.naam, kamer:p.kamer, obj:p}); });
+  { const zc = computeZekeringCodes(); state.zekeringen.kasten.forEach(kast=> kast.rijen.forEach(rij=> rij.items.forEach(m=>{
+    if(m.categorie==="Relais" && !(m.uitgangen||[]).some(u=> u.type==="motor")) rijen.push({soort:"Relais", code:zc[m.id]||"", naam:m.naam||"Relais", kamer:kast.naam||"Zekeringkast", obj:m}); }))); }
   state.patchkast.kasten.forEach((kast,ki)=> kast.items.forEach(it=>{ if(it.categorie==="Leeg" || it.categorie==="Kabelgoot") return;
     rijen.push({soort:"Patchkast", code:"", naam:it.naam || it.categorie, kamer:kast.kamer || "Patchkast "+(ki+1), obj:it}); }));
   return rijen;
@@ -26399,7 +26734,18 @@ function azNieuweAutomaat(naam, A, polen, diffId){
 }
 
 // ---------- 1. toewijslijst ----------
+function azCssInline(){
+  if(document.getElementById("kp-inline-css")) return;
+  const st = document.createElement("style"); st.id = "kp-inline-css";
+  st.textContent = `#cados-app .az-inline.modal-overlay, .az-inline.modal-overlay{position:static;inset:auto;background:none;display:block;padding:0;z-index:auto;backdrop-filter:none;}
+  .az-inline .modal-box{max-width:none;width:auto;max-height:none;box-shadow:none;margin:0;border:1px solid var(--line,#dde3e0);}
+  .az-inline .modal-box > h2{display:none;}
+  .az-inline .modal-actions{position:sticky;bottom:0;background:var(--card,#fff);}
+  .kp-pagina-tabs{margin:8px 0 10px;}`;
+  document.head.appendChild(st);
+}
 function azCss(){
+  azCssInline();
   if(document.getElementById("az-css")) return;
   const st = document.createElement("style"); st.id = "az-css";
   st.textContent = `
@@ -26421,6 +26767,9 @@ function azCss(){
   .az-modal .az-filter label{display:flex;gap:6px;align-items:center;}
   .az-modal .kv-lijst div{padding:3px 0;border-bottom:1px dashed var(--line,#e5e9e7);font-size:13px;}
   .az-modal .az-kring-lijst label{display:flex;gap:8px;align-items:center;padding:4px 0;font-size:13px;}
+  .kp-pagina-tabs{display:flex;gap:4px;border-bottom:1px solid var(--line,#dde3e0);}
+  .kp-pagina-tabs button{border:0;background:none;font:inherit;font-size:14px;font-weight:650;padding:8px 14px;color:var(--ink-soft,#5b6b63);border-bottom:2px solid transparent;margin-bottom:-1px;cursor:pointer;}
+  .kp-pagina-tabs button.actief{color:var(--app-dossier,#1e6b43);border-bottom-color:var(--app-dossier,#1e6b43);}
   .az-modal .kp-tabs{display:flex;gap:4px;margin:0 0 10px;border-bottom:1px solid var(--line,#dde3e0);}
   .az-modal .kp-tabs button{border:0;background:none;font:inherit;font-size:14px;font-weight:650;padding:8px 14px;color:var(--ink-soft,#5b6b63);border-bottom:2px solid transparent;margin-bottom:-1px;cursor:pointer;}
   .az-modal .kp-tabs button.actief{color:var(--app-dossier,#1e6b43);border-bottom-color:var(--app-dossier,#1e6b43);}
@@ -26433,18 +26782,55 @@ function azModal(id, titel, body, acties){
   const ov = document.createElement("div");
   ov.className = "modal-overlay az-modal"; ov.id = id;
   ov.innerHTML = `<div class="modal-box"><h2>${titel}</h2><div class="modal-body">${body}</div><div class="modal-actions">${acties}</div></div>`;
-  document.body.appendChild(ov);
+  // 23/11/2026 (punt 5): op de pagina Koppelen komen lijst en voorstel ín de pagina, niet als venster
+  const slot = (id==="az-modal" || id==="kv-modal") && currentTab==="koppelen" ? document.getElementById("kpSlot") : null;
+  if(slot){ ov.classList.add("az-inline"); slot.innerHTML = ""; slot.appendChild(ov); }
+  else document.body.appendChild(ov);
   return ov;
+}
+let kpPaginaTab = "lijst";
+function renderKoppelenPagina(){
+  const wrap = el(`<div class="panel" id="panel-koppelen">
+    ${panelHeadHtml("Koppelen", "Elke verbruiker aan zijn automaat: rechtstreeks, via zijn kring, via de driverkast of via een relais.",
+      "Open lijst = alles waarvan de keten nog niet rond is (driver → driverkast → automaat, of 230V-lichtpunt → relais → automaat). Zodra de keten rond is, verdwijnt de regel vanzelf. Voorstel = lege koppelingen automatisch laten invullen.")}
+    <div class="kp-pagina-tabs"></div>
+    <div id="kpSlot" class="kp-slot"></div>
+    <div class="kp-extra"></div>
+  </div>`);
+  wireHintToggle(wrap);
+  const tabsEl = wrap.querySelector(".kp-pagina-tabs");
+  let n = 0; try{ n = azLijstMetStroom().filter(x=> !azKetenRond(x.obj)).length; }catch(e){}
+  tabsEl.className = "kp-tabs kp-pagina-tabs";
+  tabsEl.innerHTML = `<button type="button" data-t="lijst" class="${kpPaginaTab==="lijst"?"actief":""}">Open lijst${n ? ` <span class="ak-badge">${n}</span>` : ""}</button><button type="button" data-t="voorstel" class="${kpPaginaTab==="voorstel"?"actief":""}">Voorstel</button>`;
+  tabsEl.querySelectorAll("button").forEach(b=> b.addEventListener("click", ()=>{ kpPaginaTab = b.dataset.t; selectTab("koppelen"); }));
+  const extra = wrap.querySelector(".kp-extra");
+  let nArm = 0; try{ nArm = akOngekoppeld().length; }catch(e){}
+  if(nArm){
+    const b = el(`<p class="hint" style="margin-top:10px;">${nArm} armatu${nArm===1?"ur":"ren"} nog niet aan de catalogus gekoppeld — <button type="button" class="btn small ghost">🔗 Armaturen koppelen</button></p>`);
+    b.querySelector("button").addEventListener("click", ()=> akOpen());
+    extra.appendChild(b);
+  }
+  setTimeout(()=>{
+    const slot = document.getElementById("kpSlot");
+    if(!slot || !wrap.contains(slot)) return;
+    if(!slot.children.length){ if(kpPaginaTab==="voorstel") kvOpen(); else azOpen(); }
+    // venster "gesloten" (Klaar / Annuleren / Sluiten) → pagina opnieuw tonen
+    const mo = new MutationObserver(()=>{ if(!slot.children.length && document.body.contains(slot)){ mo.disconnect(); selectTab("koppelen"); } });
+    mo.observe(slot, {childList:true});
+  }, 0);
+  return wrap;
 }
 // 22/11/2026 (punt 10): Toewijzen + Koppelvoorstel = één venster "Koppelen" met de tabs Open lijst / Voorstel.
 function koppelOpen(tab){
   tab = tab==="voorstel" ? "voorstel" : "lijst";
+  // 23/11/2026 (punt 5): Koppelen is een pagina in het Dossierverloop
+  if(tabZichtbaarRuw("koppelen")){ kpPaginaTab = tab; selectTab("koppelen"); return; }
   ["az-modal","kv-modal"].forEach(id=>{ const m = document.getElementById(id); if(m) m.remove(); });
   if(tab==="voorstel") kvOpen(); else azOpen();
   const ov = document.getElementById(tab==="voorstel" ? "kv-modal" : "az-modal");
   if(!ov) return;
   const h = ov.querySelector("h2"); if(h) h.textContent = "🔗 Koppelen";
-  let n = 0; try{ n = azLijstMetStroom().filter(x=> !azAutomaatVan(x.obj)).length; }catch(e){}
+  let n = 0; try{ n = azLijstMetStroom().filter(x=> !azKetenRond(x.obj)).length; }catch(e){}
   const tabs = document.createElement("div");
   tabs.className = "kp-tabs";
   tabs.innerHTML = `<button type="button" data-t="lijst" class="${tab==="lijst"?"actief":""}">Open lijst${n ? ` <span class="ak-badge">${n}</span>` : ""}</button><button type="button" data-t="voorstel" class="${tab==="voorstel"?"actief":""}">Voorstel</button>`;
@@ -26491,7 +26877,7 @@ function azOpen(){
     const soort = soortSel.value;
     const rijen = azLijstMetStroom().filter(r=>{
       if(soort && r.soort!==soort) return false;
-      if(enkelLeeg && azAutomaatVan(r.obj)) return false;
+      if(enkelLeeg && azKetenRond(r.obj)) return false;
       if(q && ![r.kamer, r.code, r.naam, r.soort].join(" ").toLowerCase().includes(q)) return false;
       return true;
     });
@@ -26503,10 +26889,11 @@ function azOpen(){
       html += `<tr class="az-kamer"><td colspan="5"><label><input type="checkbox" class="az-kamer-cb" data-kamer="${escapeHtml(kamer)}"> ${escapeHtml(kamer)} <span class="az-via">(${lijst.length})</span></label></td></tr>`;
       lijst.forEach(r=>{
         const eigen = r.obj.zekeringModuleId || "";
-        const viaK = !eigen && r.viaKring ? ((azKring(r.obj.kringId)||{}).zekeringModuleId || "") : "";
+        const ket = !eigen ? azKeten(r.obj) : null;
+        const viaK = ket ? ket.id : "";
         html += `<tr data-id="${r.obj.id}" data-kamer="${escapeHtml(kamer)}"><td><input type="checkbox" class="az-cb" ${gekozen.has(r.obj.id)?"checked":""}></td>
           <td>${escapeHtml(r.soort)}</td><td><b>${escapeHtml(r.code||"")}</b></td><td>${escapeHtml(r.naam||"")}</td>
-          <td><select class="az-rij-sel"><option value="">${viaK ? "via kring: "+escapeHtml(azAutomaatLabel(viaK, aut)) : "— geen —"}</option>${opts}</select>
+          <td><select class="az-rij-sel"><option value="">${viaK ? "via "+(ket.via||"kring")+": "+escapeHtml(azAutomaatLabel(viaK, aut)) : "— geen —"}</option>${opts}</select>
           ${!eigen && !viaK ? `<div class="az-via az-leeg">nog geen automaat</div>` : ""}</td></tr>`;
       });
     });
@@ -26721,6 +27108,24 @@ function ksOpen(){
    import in 1 kast. Moeten we kunnen verplaatsen").
    ========================================================================= */
 const DK230_SLEUTEL = "offerte_armaturen_230v";
+// 23/11/2026: omgekeerde richting — een 230V-lichtpunt dat op een driver hoort naar de driverkast (kamer, kring, automaat blijven)
+function vlNaarDriverkast(v){
+  if(!v || v.leeg) return;
+  const kasten = state.driverkast.kasten;
+  if(!kasten.length) kasten.push(newDriverKast());
+  const kast = kasten.find(k=> v.kamer && (k.kamer===v.kamer || k.items.some(d=> dkKamerVanDriver(d)===v.kamer))) || kasten[0];
+  if(!confirm(`"${v.naam||"Lichtpunt"}"${v.kamer?" ("+v.kamer+")":""} naar de driverkast${kast.kamer?" "+kast.kamer:""} verplaatsen als nieuwe driver?`)) return;
+  const d = newDriverItem();
+  d.kringId = v.kringId || ""; d.zekeringModuleId = v.zekeringModuleId || "";
+  const a = newDriverArmatuur(); a.naam = v.naam || ""; a.ruimte = v.kamer || ""; if(v.offerteNaam) a.offerteNaam = v.offerteNaam;
+  d.armaturen.push(a);
+  try{ d.naam = computeDriverMatch(d, kast.sturing).naam || ""; }catch(_e){}
+  kast.items.push(d);
+  state.verlichting.items = state.verlichting.items.filter(x=> x!==v);
+  if(state.modules) state.modules.driverkast = true;
+  save(); selectTab(currentTab||"verlichting");
+  toast("Lichtpunt naar de driverkast verplaatst als nieuwe driver");
+}
 function dkKamerVanDriver(d){ return (d.armaturen||[]).map(a=>a.ruimte).find(Boolean) || ((d.kringId && (state.kringen.items.find(k=>k.id===d.kringId)||{}).kamer) || ""); }
 // verhuist armaturen (lijst van {arm, driver, kast}) naar Verlichting 230V; geeft aantal nieuwe lichtpunten
 function dkNaar230(lijst, opties){
@@ -26734,6 +27139,7 @@ function dkNaar230(lijst, opties){
       const v = newVerlichtingItem();
       v.naam = arm.naam; v.kamer = arm.ruimte || "";
       v.kringId = opties.kring ? (driver.kringId||"") : "";
+      if(opties.kring && driver.zekeringModuleId) v.zekeringModuleId = driver.zekeringModuleId;
       v.info = per ? "" : ("aantal "+arm.aantal);
       if(arm.offerteNaam) v.offerteNaam = arm.offerteNaam;
       state.verlichting.items.push(v); n++;

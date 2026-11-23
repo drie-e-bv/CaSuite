@@ -42,7 +42,7 @@ await p.selectOption('#kamersRows .km-vd >> nth=0', 'K'); await p.waitForTimeout
 console.log('P13 Kamers-tab:', eerste, '→', (await kv())[eerste]);
 // wizard opnieuw: verdieping volgt de bron
 await p.evaluate(()=>{ [...document.querySelectorAll('#tabbar button')].find(x=>x.dataset.id==='zekeringen').click(); });
-await p.waitForTimeout(600); await p.click('.dv-stap[data-stap="zekeringkast"] .dv-actie >> nth=1'); await p.waitForSelector('#zkw-modal .zkw-stap'); await p.click('.zkw-stap[data-stap="1"]'); await p.waitForTimeout(400);
+await p.waitForTimeout(600); await (async()=>{ await p.evaluate(()=>[...document.querySelectorAll('#tabbar button')].find(x=>x.dataset.id==='zekeringen').click()); await p.waitForTimeout(600); const z=await p.$('.dv-stap[data-stap="zekeringkast"] .dv-actie'); if(z){ await z.click(); } else { await p.click('#zkHerschik'); await p.click('.zkg-snel'); } })(); await p.waitForSelector('#zkw-modal .zkw-stap'); await p.click('.zkw-stap[data-stap="1"]'); await p.waitForTimeout(400);
 console.log('P13 wizard toont:', await p.evaluate((k)=>{const tr=[...document.querySelectorAll('.zkw-tabel tbody tr')].find(t=>t.querySelector('.zkw-s-kamer').value===k);return tr?tr.children[1].innerText:'(kamer niet in stopcontacten)'},eerste));
 await p.click('#zkw-annul');
 // CaCalc

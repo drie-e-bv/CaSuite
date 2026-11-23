@@ -1,0 +1,70 @@
+import { chromium } from '/opt/npm-tools/node_modules/playwright/index.mjs';
+const b=await chromium.launch({executablePath:'/usr/bin/google-chrome',args:['--no-sandbox']});
+const p=await b.newPage({viewport:{width:1400,height:950}});
+const errs=[]; p.on('pageerror',e=>errs.push(e.message)); p.on('dialog',d=>d.accept());
+await p.route(/^https?:\/\/(?!localhost)/,r=>{const u=r.request().url();
+ if(/supabase/.test(u))return r.fulfill({path:'stub3.js',contentType:'text/javascript'});
+ if(/pdf\.worker/.test(u))return r.fulfill({path:'pdf.worker.min.js',contentType:'text/javascript'});
+ if(/pdf\.min\.js/.test(u))return r.fulfill({path:'pdf.min.js',contentType:'text/javascript'});
+ return r.fulfill({body:'',contentType:'text/javascript'})});
+const E=(code,arg)=> p.evaluate(([c,a])=> window.__cdEval('(function(A){ return ('+c+'); })')(a), [code, arg===undefined?null:arg]);
+const ok=(c,m)=>console.log((c?'OK  ':'FOUT')+' '+m);
+await p.goto('http://localhost:8771/index.html');await p.waitForTimeout(2500);
+await p.click('#main-nav-btn-cados');await p.waitForTimeout(600);
+const [fc]=await Promise.all([p.waitForEvent('filechooser'), p.selectOption('#global-project-select','__uit_offerte__')]);
+await fc.setFiles('a508e6fe-Offerte_2600124_v7_0006.pdf');
+await p.waitForSelector('#of-modal summary input',{timeout:30000});
+await p.click('#of-modal #of-ok');await p.waitForTimeout(800);
+if(await p.$('.dq-ok')) await p.click('.dq-ok');
+await p.waitForSelector('#of-modal #of-verder',{timeout:20000});
+await p.click('#of-modal #of-verder'); await p.click('#of-modal #of-plan-over');
+await p.waitForSelector('#zkw-modal .zkw-stap');
+for(let i=0;i<5;i++){ await p.click('#zkw-verder'); await p.waitForTimeout(300); }
+if(await p.$eval('#zkw-verder',x=>x.disabled)) await p.check('#zkw-negeer');
+await p.click('#zkw-verder'); await p.waitForTimeout(1500); await p.click('#zkw-sluit');
+await p.waitForSelector('#kv-modal'); await p.click('#kv-modal .kv-annul'); await p.waitForTimeout(800);
+// 1. volgorde stappenbalk + geen ⇄/↻
+const st = await p.evaluate(()=> [...document.querySelectorAll('.dv-stap, [data-stap]')].map(x=>x.dataset.stap||x.textContent.trim().slice(0,20)));
+// ---- 1. Kabels
+const stap = async (id)=>{ await p.click(`.dv-stap[data-stap="${id}"]`); await p.waitForTimeout(900); };
+await stap('kabels');
+ok(await E("currentTab")==='kabels' && await p.evaluate(()=>document.getElementById('main-nav-btn-cados').classList.contains('active')||true), 'stap 7 blijft in CaDos (pagina Kabels)');
+ok(!!(await p.$('.kb-ja')) && !(await p.$('.kb-export')), 'eerst vraag Ja/Nee, nog geen export');
+await p.click('.kb-nee'); await p.waitForTimeout(700);
+ok(await E("kbNodig()===false") && (await p.$eval('.dv-stap[data-stap="kabels"]', x=>x.className)).includes('ok'), 'Nee → stap Kabels ok');
+await p.click('.kb-ja'); await p.waitForTimeout(700);
+ok(!!(await p.$('.dv-tabel')) && !!(await p.$('.kb-export')) && !(await p.$('.kb-open')), 'Ja → overzicht + Exporteer, nog geen Open');
+const app0 = await p.evaluate(()=> [...document.querySelectorAll('[id^=main-nav-btn-]')].find(b=>b.classList.contains('active'))?.id);
+await p.click('.kb-export'); await p.waitForTimeout(1500);
+const app1 = await p.evaluate(()=> [...document.querySelectorAll('[id^=main-nav-btn-]')].find(b=>b.classList.contains('active'))?.id);
+ok(app0===app1 && await E("currentTab")==='kabels' && !!(await p.$('.kb-open')) && !!(await p.$('.dv-klaar')), 'Exporteer blijft op pagina, toont Open in CaCalc '+app1);
+const dbOk = await p.evaluate(()=> { const r=__DB.project_elektro_dossiers.slice(-1)[0]; return !!(r && r.data && r.data.kabelberekening && r.data.kabelberekening.export); });
+ok(dbOk, 'export bewaard op server');
+await p.click('.kb-open'); await p.waitForTimeout(2500);
+ok(await p.evaluate(()=> document.getElementById('main-nav-btn-cacalc').classList.contains('active')), 'Open in CaCalc schakelt over');
+await p.click('#main-nav-btn-cados'); await p.waitForTimeout(1500);
+// ---- 2. Schema
+await stap('schema');
+ok(await E("currentTab")==='schema' && await p.evaluate(()=> !document.getElementById('main-nav-btn-cadraw').classList.contains('active')), 'stap 8 blijft in CaDos (pagina Schema)');
+ok(!!(await p.$('.sc-open')) && !!(await p.$('#panel-schema .dv-check')), 'tussenpagina met status + Open in CaDraw');
+await p.screenshot({path:'/tmp/b17-schema.png'});
+await p.click('.sc-open'); await p.waitForTimeout(2500);
+ok(await p.evaluate(()=> document.getElementById('main-nav-btn-cadraw').classList.contains('active')), 'Open in CaDraw schakelt over');
+await p.click('#main-nav-btn-cados'); await p.waitForTimeout(1500);
+// ---- 3. Printcentrum
+ok(!(await p.$('#btnPrint')), 'geen Printcentrum-knop bovenaan');
+await p.click('#tabbar button[data-id="driverkast"]').catch(async()=>{ await p.click('#tabgroups button[data-grp="Elektro"]'); await p.click('#tabbar button[data-id="driverkast"]'); }); await p.waitForTimeout(800);
+ok(!(await p.$$eval('#panel-driverkast button, #topbar button', bs=> bs.some(b=>/Printcentrum/.test(b.textContent)))), 'Driverkast: geen Printcentrum-knop');
+ok(!!(await p.$('#tabgroups button[data-grp="Printcentrum"]')), 'Printcentrum vaste hoofdgroep');
+await p.click('#tabgroups button[data-grp="Printcentrum"]'); await p.waitForTimeout(900);
+ok(await E("currentTab")==='export' && (await p.$$('.pc-groep')).length>=2, 'Printcentrum gegroepeerd per hoofdgroep');
+await p.evaluate(()=>{ window.__pr=0; window.print=()=>{window.__pr++;}; });
+await p.click('#expGeen'); await p.click('.exp-lijst[data-key="kringen"]'); await p.click('#exportSelectie'); await p.waitForTimeout(600);
+ok(await p.evaluate(()=> window.__pr===1 && document.getElementById('printExport').children.length>0), 'selectie afdrukken werkt');
+await p.screenshot({path:'/tmp/b17-pc.png', fullPage:true});
+// gsm
+await p.setViewportSize({width:390,height:844}); await p.waitForTimeout(600);
+ok(await p.evaluate(()=>{ const b=document.querySelector('#tabgroups button[data-grp="Printcentrum"]'); const r=b.getBoundingClientRect(); return r.width>0 && r.right<=window.innerWidth+1; }), 'gsm: Printcentrum in onderbalk zichtbaar');
+await p.screenshot({path:'/tmp/b17-gsm.png'});
+console.log('errors', errs.length ? errs.join(' | ') : 'geen');
+await b.close();

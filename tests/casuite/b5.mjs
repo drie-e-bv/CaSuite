@@ -23,12 +23,12 @@ console.log('P10 vóór verdeling stappenbalk:', await p.evaluate(()=>[...docume
 for(let i=0;i<5;i++){ await p.click('#zkw-verder'); await p.waitForTimeout(300); }
 if(await p.$eval('#zkw-verder',x=>x.disabled)) await p.check('#zkw-negeer');
 await p.click('#zkw-verder'); await p.waitForTimeout(1500); await p.click('#zkw-sluit');
-await p.waitForSelector('#kv-modal .kp-tabs'); console.log('P10 ketting → Koppelen-venster tab:', await p.$eval('#kv-modal .kp-tabs button.actief',b=>b.textContent));
-await p.click('#kv-modal .kp-tabs button[data-t="lijst"]'); await p.waitForSelector('#az-modal .kp-tabs');
+await p.waitForSelector('#kpSlot #kv-modal'); console.log('P10 ketting → Koppelen-pagina tab:', await p.$eval('.kp-pagina-tabs button.actief',b=>b.textContent));
+await p.click('.kp-pagina-tabs button[data-t="lijst"]'); await p.waitForSelector('#kpSlot #az-modal');
 console.log('P10 tab Open lijst → toewijzen:', await p.$eval('#az-modal h2',h=>h.textContent), '| kv weg:', !(await p.$('#kv-modal')));
-await p.evaluate(()=>document.querySelectorAll('.modal-overlay').forEach(m=>m.remove())); await p.waitForTimeout(600);
+await p.evaluate(()=>[...document.querySelectorAll('#tabbar button')].find(x=>x.dataset.id==='zekeringen').click()); await p.waitForTimeout(600);
 console.log('P10 na verdeling stappenbalk:', await acties());
-await p.click('.dv-stap[data-stap="zekeringkast"] .dv-actie >> nth=1'); await p.waitForSelector('#zkw-modal .zkw-stap');
+await (async()=>{ await p.evaluate(()=>[...document.querySelectorAll('#tabbar button')].find(x=>x.dataset.id==='zekeringen').click()); await p.waitForTimeout(600); const z=await p.$('.dv-stap[data-stap="zekeringkast"] .dv-actie'); if(z){ await z.click(); } else { await p.click('#zkHerschik'); await p.click('.zkg-snel'); } })(); await p.waitForSelector('#zkw-modal .zkw-stap');
 console.log('A13 zonder handwerk → meteen AREI-venster (geen waarschuwing):', !(await p.$('#zksnel-modal')));
 console.log('P23 snel opnieuw → stap:', await p.$eval('.zkw-stap.on, .zkw-stap.actief, .zkw-stap[aria-current]',b=>b.textContent).catch(async()=>await p.$eval('#zkw-verder',b=>b.textContent)));
 await p.click('#zkw-annul');
@@ -41,7 +41,7 @@ console.log('P9 → Herschikken venster open:', await p.evaluate(()=>[...documen
 const gewijzigd = await p.evaluate(()=>{ const sel=[...document.querySelectorAll('#zkg-modal .zkg-diff')].find(s=>[...s.options].some(o=>!o.disabled && !o.selected && o.value)); if(!sel) return null; const o=[...sel.options].find(o=>!o.disabled && !o.selected && o.value); sel.value=o.value; sel.dispatchEvent(new Event('change',{bubbles:true})); return o.textContent; });
 await p.waitForTimeout(800);
 await p.evaluate(()=>document.querySelectorAll('.modal-overlay').forEach(m=>m.remove())); await p.waitForTimeout(800);
-await p.click('.dv-stap[data-stap="zekeringkast"] .dv-actie >> nth=1'); await p.waitForTimeout(800);
+await (async()=>{ await p.evaluate(()=>[...document.querySelectorAll('#tabbar button')].find(x=>x.dataset.id==='zekeringen').click()); await p.waitForTimeout(600); const z=await p.$('.dv-stap[data-stap="zekeringkast"] .dv-actie'); if(z){ await z.click(); } else { await p.click('#zkHerschik'); await p.click('.zkg-snel'); } })(); await p.waitForTimeout(800);
 console.log('A13 na herschikken ('+(gewijzigd||'-')+') → waarschuwing:', !!(await p.$('#zksnel-modal')), '| lijst:', await p.$$eval('#zksnel-modal li',l=>l.map(x=>x.textContent).join(' ; ')).catch(()=>'-'));
 await p.click('#zksnel-modal .zks-ok'); await p.waitForSelector('#zkw-modal .zkw-stap'); console.log('A13 Toch opnieuw verdelen → AREI-venster open'); await p.click('#zkw-annul');
 await p.evaluate(()=>document.querySelectorAll('.modal-overlay').forEach(m=>m.remove()));
