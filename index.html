@@ -12275,6 +12275,20 @@ function exportVerlichtingVoorWerf(standalone=true){
 // 26/11/2026 (Peter): "3 kabels die gebrugd worden in de kamer" -- één lichtpunt (één nummer, één kabel) kan
 // meerdere armaturen voeden. Veld `aantal` (leeg = 1).
 function vlAantal(item){ const n = parseInt(item && item.aantal); return n > 1 ? n : 1; }
+// 26/11/2026 (Peter): bevestigingsvenster voor verwijderen en hernummeren
+function vlBevestig(titel, tekst, okLabel, fn){
+  const ov = azModal("vl-bev-modal", titel, `<p style="margin:0;">${tekst}</p>`,
+    `<button class="btn btn-ghost vlb-annul">Annuleren</button><button class="btn btn-primary vlb-ok">${okLabel}</button>`);
+  ov.querySelector(".vlb-annul").addEventListener("click", ()=> ov.remove());
+  ov.querySelector(".vlb-ok").addEventListener("click", ()=>{ ov.remove(); fn(); });
+  return ov;
+}
+// Alle 230V-lichtpunten opnieuw doorlopend nummeren vanaf 100 (alle vaste nummers vervallen).
+function vlHernummer(){
+  state.verlichting.items.forEach(it=>{ it.manueelNummer = ""; });
+  try{ autoVerlichtingKlemmen(); }catch(_e){}
+  save();
+}
 // Gewoon verwijderen, zoals overal: de volgende lichtpunten schuiven één nummer op.
 function verlVerwijderGewoon(item){
   const items = state.verlichting.items, i = items.indexOf(item);
@@ -12288,7 +12302,12 @@ function verlVerwijder(item){
   if(volg && (volg.manueelNummer==="" || volg.manueelNummer==null)) volg.manueelNummer = codes[volg.id];
   items.splice(i, 1);
 }
-const VL_AANSLUITINGEN = [["klemmen","Op klemmen"], ["schakelcontact","Op schakelcontact"], ["dali","Klaar voor DALI"]];
+// 26/11/2026 (Peter): "Op klemmen" is een apart vinkje (opKlemmen); de keuzelijst houdt schakelcontact / DALI.
+const VL_AANSLUITINGEN = [["schakelcontact","Op schakelcontact"], ["dali","Klaar voor DALI"]];
+function vlOpKlemmen(it){
+  if(it && it.aansluiting==="klemmen"){ it.opKlemmen = true; it.aansluiting = ""; }   // oude waarde omzetten
+  return !!(it && it.opKlemmen);
+}
 const VL_KABELS = ["XVB 3G1,5","XVB 5G1,5","XVB 3G2,5","XGB 3G1,5","XGB 5G1,5","EXVB 3G1,5","VTMB 3G1,5","H07RN-F 3G1,5","H05VV-F 3G1,5","3G1,5","5G1,5"];
 // 26/11/2026 (Peter): snelle overzichtslijst bovenaan -- alles meteen aanpasbaar, aansluiting + kabel als keuzelijst, verwijderen.
 function renderVerlichtingOverzicht(codes, herteken){
@@ -12297,14 +12316,14 @@ function renderVerlichtingOverzicht(codes, herteken){
     <div class="card-head"><h3>Snelle lijst 230V-lichtpunten</h3><span class="hint">${items.length} stuk(s) · wijzigingen worden meteen bewaard</span></div>
     <div class="card-body" style="padding:0;overflow-x:auto;">
       <table class="grid vl-tabel">
-        <thead><tr><th>Nr.</th><th>Armatuur</th><th title="Aantal armaturen op deze ene kabel (gebrugd in de kamer)">Aantal</th><th>Kamer</th><th>Aansluiting</th><th>Type kabel</th><th>Schakelkring</th><th title="Gevoed door automaat — leeg = de automaat van de schakelkring">Automaat</th><th>Info</th><th></th></tr></thead>
+        <thead><tr><th>Nr.</th><th>Armatuur</th><th title="Aantal armaturen op deze ene kabel (gebrugd in de kamer)">Aantal</th><th>Kamer</th><th title="Op klemmen in de rijgklemmenmodule">Op klemmen</th><th>Aansluiting</th><th>Type kabel</th><th>Schakelkring</th><th title="Gevoed door automaat — leeg = de automaat van de schakelkring">Automaat</th><th>Info</th><th></th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
   </div>`);
   const tbody = wrap.querySelector("tbody");
   if(items.length===0){
-    tbody.appendChild(el(`<tr class="emptyrow"><td colspan="10">Nog geen armaturen toegevoegd.</td></tr>`));
+    tbody.appendChild(el(`<tr class="emptyrow"><td colspan="11">Nog geen armaturen toegevoegd.</td></tr>`));
   }
   const kringCodes = computeKringCodes();
   const automaten = alleZekeringAutomaten();
@@ -12323,6 +12342,7 @@ function renderVerlichtingOverzicht(codes, herteken){
       <td><input class="ov-naam" list="dl-verl-armaturen" value="${escapeHtml(item.naam)}" style="min-width:150px;"></td>
       <td><input class="ov-aantal" type="number" min="1" step="1" value="${vlAantal(item)}" style="width:62px;" title="Aantal armaturen op deze ene kabel"></td>
       <td><input class="ov-kamer" list="dl-verl-kamers" value="${escapeHtml(item.kamer)}" style="min-width:110px;"></td>
+      <td style="text-align:center;"><input type="checkbox" class="ov-klemmen" style="width:auto;" title="Op klemmen: krijgt automatisch klemmen op de rijgklemmenmodule van de kast met zijn automaat" ${vlOpKlemmen(item)?"checked":""}></td>
       <td><select class="ov-aansl"><option value="">—</option>${VL_AANSLUITINGEN.map(([v,l])=>`<option value="${v}" ${item.aansluiting===v?"selected":""}>${l}</option>`).join("")}</select></td>
       <td><select class="ov-typekabel">${kabelOpties(item.typeKabel||"")}</select></td>
       <td><select class="ov-kring"><option value="">— geen —</option>${state.kringen.items.map(k=>`<option value="${k.id}" ${item.kringId===k.id?"selected":""}>${escapeHtml(kringLabel(k, kringCodes[k.id]))}</option>`).join("")}</select></td>
@@ -12333,8 +12353,9 @@ function renderVerlichtingOverzicht(codes, herteken){
     tr.querySelector(".ov-naam").addEventListener("input", e=>{ item.naam=e.target.value; save(); updateVerlichtingVisual(item); });
     tr.querySelector(".ov-kamer").addEventListener("input", e=>{ item.kamer=e.target.value; save(); updateVerlichtingVisual(item); });
     tr.querySelector(".ov-kamer").addEventListener("change", e=> ensureKamerInLijst(e.target.value));
-    const klemmenBij = ()=>{ try{ if(autoVerlichtingKlemmen()) toast(item.aansluiting==="klemmen" ? "Klemmen aangemaakt in Rijgklemmen" : "Klemmen bijgewerkt in Rijgklemmen"); }catch(_e){} };
-    tr.querySelector(".ov-aansl").addEventListener("change", e=>{ item.aansluiting=e.target.value; klemmenBij(); save(); });
+    const klemmenBij = ()=>{ try{ if(autoVerlichtingKlemmen()) toast(vlOpKlemmen(item) ? "Klemmen aangemaakt in Rijgklemmen" : "Klemmen bijgewerkt in Rijgklemmen"); }catch(_e){} };
+    tr.querySelector(".ov-aansl").addEventListener("change", e=>{ item.aansluiting=e.target.value; save(); });
+    tr.querySelector(".ov-klemmen").addEventListener("change", e=>{ item.opKlemmen = e.target.checked; klemmenBij(); save(); });
     tr.querySelector(".ov-automaat").addEventListener("change", e=>{ item.zekeringModuleId=e.target.value; save(); });
     tr.querySelector(".ov-typekabel").addEventListener("change", e=>{
       let v = e.target.value;
@@ -12356,8 +12377,11 @@ function renderVerlichtingOverzicht(codes, herteken){
       if(herteken) herteken(); else selectTab("verlichting");
       toast("Lichtpunt " + nr + " verwijderd" + (behoud ? " — de andere nummers blijven" : " — de volgende nummers schuiven op"));
     };
-    tr.querySelector(".vl-weg").addEventListener("click", ()=> verwijder(false));
-    tr.querySelector(".vl-weg-behoud").addEventListener("click", ()=> verwijder(true));
+    const vraag = (behoud)=> vlBevestig("Lichtpunt verwijderen?",
+      `Lichtpunt <b>${escapeHtml(codes[item.id]||"")}</b> ${escapeHtml(item.naam||"")}${item.kamer ? " (" + escapeHtml(item.kamer) + ")" : ""} verwijderen?<br>` +
+      (behoud ? "De andere lichtpunten houden hun nummer." : "De volgende lichtpunten schuiven één nummer op."), "🗑 Verwijderen", ()=> verwijder(behoud));
+    tr.querySelector(".vl-weg").addEventListener("click", ()=> vraag(false));
+    tr.querySelector(".vl-weg-behoud").addEventListener("click", ()=> vraag(true));
     tbody.appendChild(tr);
   });
   return wrap;
@@ -12377,6 +12401,7 @@ function renderVerlichting(){
         <div class="toolbar-row">
           <button class="addbtn" id="vlAdd">+ Armatuur toevoegen</button>
           <button class="btn" id="vlKoppel" title="Armaturen zonder match koppelen aan de catalogus">🔗 Armaturen koppelen${(()=>{ const n = akOngekoppeld().length; return n ? ` <span class="ak-badge">${n}</span>` : ""; })()}</button>
+          <button class="btn" id="vlHernummer" title="Alle 230V-lichtpunten opnieuw doorlopend nummeren vanaf 100">🔢 Opnieuw nummeren</button>
         </div>
       </div>
     </div>
@@ -12479,6 +12504,12 @@ function renderVerlichting(){
     if(el2 && el2.scrollIntoView) el2.scrollIntoView({behavior:"smooth", block:"center", inline:"center"});
   });
   wrap.querySelector("#vlKoppel").addEventListener("click", ()=> akOpen());
+  wrap.querySelector("#vlHernummer").addEventListener("click", ()=>{
+    const n = state.verlichting.items.filter(it=> !it.leeg).length, vast = state.verlichting.items.filter(it=> it.manueelNummer!=="" && it.manueelNummer!=null).length;
+    vlBevestig("Opnieuw nummeren?", `Alle ${n} lichtpunten krijgen opnieuw een doorlopend nummer vanaf <b>100</b>, in de volgorde van de lijst.` +
+      (vast ? `<br>${vast} vast(e) nummer(s) vervallen.` : "") + `<br>Let op: nummers op plannen of labels die al gemaakt zijn, kloppen daarna niet meer.`,
+      "🔢 Opnieuw nummeren", ()=>{ vlHernummer(); rebuild(); toast("Lichtpunten opnieuw genummerd vanaf 100"); });
+  });
 
   return wrap;
 }
@@ -12552,11 +12583,11 @@ function renderVerlichtingEditor(item, rebuildAll, selectItem, code, onDelete){
     const n = Math.max(1, parseInt(e.target.value)||1); e.target.value = n;
     item.aantal = n > 1 ? n : ""; save(); updateVerlichtingVisual(item); rebuildAll();
   });
-  box.querySelector(".me-delete-behoud").addEventListener("click", ()=>{ verlVerwijder(item); try{ autoVerlichtingKlemmen(); }catch(_e){} selectItem(item.id); save(); rebuildAll(); });
+  box.querySelector(".me-delete-behoud").addEventListener("click", ()=> vlBevestig("Lichtpunt verwijderen?", `Lichtpunt <b>${escapeHtml(code||"")}</b> verwijderen? De andere lichtpunten houden hun nummer.`, "🗑 Verwijderen", ()=>{ verlVerwijder(item); try{ autoVerlichtingKlemmen(); }catch(_e){} selectItem(item.id); save(); rebuildAll(); }));
   box.querySelector(".ve-zekering").addEventListener("change", e=>{ item.zekeringModuleId=e.target.value; save(); });
   box.querySelector(".ve-kring").addEventListener("change", e=>{ item.kringId=e.target.value; save(); rebuildAll(); });
   box.querySelector(".me-close").addEventListener("click", ()=> selectItem(item.id));
-  box.querySelector(".me-delete").addEventListener("click", ()=>{ verlVerwijderGewoon(item); try{ autoVerlichtingKlemmen(); }catch(_e){} selectItem(item.id); save(); rebuildAll(); });
+  box.querySelector(".me-delete").addEventListener("click", ()=> vlBevestig("Lichtpunt verwijderen?", `Lichtpunt <b>${escapeHtml(code||"")}</b> verwijderen? De volgende lichtpunten schuiven één nummer op.`, "🗑 Verwijderen", ()=>{ verlVerwijderGewoon(item); try{ autoVerlichtingKlemmen(); }catch(_e){} selectItem(item.id); save(); rebuildAll(); }));
   const csTekenV = akCatalogusSlot(box.querySelector(".ak-cs-slot"), ()=> item.naam, {
     info: ()=> "230V", zet: (n)=>{ item.naam = n; }, klaar: ()=>{ rebuildAll(); } });
   box.querySelector(".ve-naam").addEventListener("input", e=>{ item.naam=e.target.value; save(); updateVerlichtingVisual(item); csTekenV(); });
@@ -21927,7 +21958,7 @@ function autoVerlichtingKlemmen(){
   let gewijzigd = false;
   const bronLijst = snelmodusBronnen("verlichting");
   const perId = new Map(bronLijst.map(b=> [b.id, b]));
-  const gewenst = new Map(state.verlichting.items.filter(it=> !it.leeg && it.aansluiting==="klemmen").map(it=> [it.id, it]));
+  const gewenst = new Map(state.verlichting.items.filter(it=> !it.leeg && vlOpKlemmen(it)).map(it=> [it.id, it]));
   const rkVan = (kast)=> kast && kast.rijen.flatMap(r=> r.items).find(m=> m.categorie==="Rijgklemmenmodule");
   const haalVanModules = (ids)=> state.zekeringen.kasten.forEach(kast=> kast.rijen.forEach(r=> r.items.forEach(m=>{
     if(m.categorie==="Rijgklemmenmodule" && Array.isArray(m.rijgklemKlemIds) && m.rijgklemKlemIds.some(id=> ids.has(id))){
