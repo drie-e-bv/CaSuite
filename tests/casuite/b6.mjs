@@ -29,9 +29,9 @@ await p.click('#tabbar button[data-id="driverkast"]'); await p.waitForTimeout(12
 console.log('P14 terug → onthoudt Plan:', !!(await p.$('#panel-driverplan')));
 await p.click('#tabgroups button[data-grp="Domotica"]'); await p.waitForTimeout(500);
 console.log('Domotica:', await tabs());
-await p.click('#tabbar button[data-id="kringen"]'); await p.waitForTimeout(600);
+await p.evaluate(()=>selectTab('kringen')); await p.waitForTimeout(600);
 console.log('P17 kringen balk:', await balk());
-await p.click('.zk-weergaven button[data-w="verlichting"]'); await p.waitForTimeout(600);
+await p.evaluate(()=>selectTab('verlichting')); await p.waitForTimeout(600);
 console.log('P17 230V: panel', !!(await p.$('#panel-verlichting')), '| tab actief', await p.$eval('#tabbar button.active',b=>b.textContent), '| groep', await p.$eval('#tabgroups button.active',b=>b.dataset.grp));
 await p.click('#tabgroups button[data-grp="Data & sturing"]'); await p.waitForTimeout(500);
 console.log('Data & sturing:', await tabs());
