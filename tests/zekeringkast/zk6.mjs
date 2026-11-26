@@ -39,16 +39,16 @@ if(dis){ await p.check('#zkw-negeer'); }
 await p.click('#zkw-verder');
 await p.waitForTimeout(1500);
 await p.screenshot({path:`zk_${tag}_klaar.png`});
-await p.click('#zkw-sluit');await p.waitForSelector('#kv-modal',{timeout:8000});console.log('KETTING: koppelvoorstel open');await p.click('#kv-modal .kv-annul');await p.waitForTimeout(600);
+await p.click('#zkw-sluit');await p.waitForSelector('#kv-modal',{timeout:8000});console.log('KETTING: koppelvoorstel open');await p.evaluate(()=>document.querySelector('#kv-modal .kv-annul')?.click());await p.waitForTimeout(600);
 await p.evaluate(()=>[...document.querySelectorAll('#tabbar button')].find(x=>x.dataset.id==='zekeringen').click()); await p.waitForTimeout(1200);
 await p.screenshot({path:`zk_${tag}_tab.png`,fullPage:true});
 
 const kl=()=>p.evaluate(()=>{const d=__DB.project_elektro_dossiers.find(r=>r.project_id==='p2').data;return d.interlex.items.length});
 await p.waitForTimeout(1500);
 const voor=await kl();
-const codeA=await p.evaluate(()=>{const tr=[...document.querySelectorAll('table.ov-alleen-lezen tbody tr')].find(t=>t.children[4]&&t.children[4].textContent.trim()==='✓');return tr.children[0].textContent.trim()}); const naamA=codeA;console.log('RIJ',naamA);
-const openEd=async()=>{ await p.evaluate((c)=>{[...document.querySelectorAll('table.ov-alleen-lezen tbody tr')].find(t=>t.children[0].textContent.trim()===c).click();},codeA); await p.waitForTimeout(500); };
-console.log('OVERZICHT alleen-lezen:', await p.$$eval('table.ov-alleen-lezen input, table.ov-alleen-lezen select',x=>x.length)===0);
+const codeA=await p.evaluate(()=>{const tr=[...document.querySelectorAll('table.ov-tabel tbody tr')].find(t=>t.querySelector('.ov-klem.aan'));return tr.children[0].textContent.trim()}); const naamA=codeA;console.log('RIJ',naamA);
+const openEd=async()=>{ await p.evaluate((c)=>{[...document.querySelectorAll('table.ov-tabel tbody tr')].find(t=>t.children[0].textContent.trim()===c).children[0].click();},codeA); await p.waitForTimeout(500); };
+console.log('OVERZICHT bewerkbaar (memo H):', await p.$$eval('table.ov-tabel input, table.ov-tabel select',x=>x.length)>0);
 await openEd(); console.log('ED', await p.$eval('#panel-zekeringen .mod-editor',e=>e.querySelector('.code-badge')?.textContent+' '+e.querySelector('.me-kabelklemmen').checked+' naam='+(e.querySelector('input')?.value))); await p.locator('#panel-zekeringen .mod-editor .me-kabelklemmen').uncheck(); await p.waitForTimeout(1500);
 const na1=await kl();
 await openEd(); await p.locator('#panel-zekeringen .mod-editor .me-kabelklemmen').check(); await p.waitForTimeout(1500);

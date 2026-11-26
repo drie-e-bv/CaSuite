@@ -30,9 +30,7 @@ console.log('P21 annuleren → dossier intact, kringen', n0);
 // punt 15
 await p.click('#tabgroups button[data-grp="Domotica"]'); await p.waitForTimeout(300);
 await p.click('#tabbar button[data-id="kringen"]'); await p.waitForTimeout(600);
-console.log('P15 knop op Kringen:', await p.$eval('#exportKringen',b=>b.textContent));
-await p.click('#exportKringen'); await p.waitForTimeout(600);
-console.log('P15 → tab', await p.$eval('#tabbar button.active',b=>b.textContent), '| aangevinkt:', await p.$$eval('#exportChecklijst .pc-rij',trs=>trs.filter(tr=>tr.querySelector('input:checked')).map(tr=>tr.children[0].textContent.replace(/\(nog leeg\)/,'').trim()).join(', ')), '| schermknop:', await p.$eval('#pcScherm',b=>b.textContent).catch(()=>'-'));
+console.log('P15 knop op Kringen weg:', !(await p.$('#exportKringen')));
 await p.click('#tabgroups button[data-grp="Elektro"]'); await p.waitForTimeout(300);
 await p.click('#tabbar button[data-id="zekeringen"]'); await p.waitForTimeout(500);
 await p.click('.zk-weergaven button[data-w="zktekening"]'); await p.waitForTimeout(800);

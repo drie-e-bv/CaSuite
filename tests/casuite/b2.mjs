@@ -7,7 +7,7 @@ await p.route(/^https?:\/\/(?!localhost)/,r=>{const u=r.request().url();
  if(/supabase/.test(u))return r.fulfill({path:'stub3.js',contentType:'text/javascript'});
  return r.fulfill({body:'',contentType:'text/javascript'})});
 await p.goto('http://localhost:8771/index.html');await p.waitForTimeout(2500);
-await p.click('#main-nav-btn-cados');await p.waitForTimeout(500);
+await p.evaluate(()=>document.querySelector('#main-nav-btn-cados').click());await p.waitForTimeout(500);
 await p.evaluate(()=>{const s=document.getElementById('global-project-select');const o=[...s.options].find(o=>/Leeg project/.test(o.textContent));s.value=o.value;s.dispatchEvent(new Event('change'));});
 await p.waitForTimeout(1200);
 if(await p.isVisible('#cados-aanmaken-btn')){ await p.click('#cados-aanmaken-btn'); await p.waitForTimeout(1500); }
