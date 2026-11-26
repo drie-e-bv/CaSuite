@@ -1,0 +1,31 @@
+// 26/11/2026 release-chat: 230V-lichtpunten (aantal, verwijderen, klemmen, automaat). Draaien op een testkopie van index.html met
+// 'window.__cdEval = (c)=> eval(c);' vlak voor 'function vlAantal(item){', geserveerd op poort 8790, met stub3.js in de werkmap.
+import { chromium } from '/opt/npm-tools/node_modules/playwright/index.mjs';
+const b=await chromium.launch({executablePath:'/usr/bin/google-chrome',args:['--no-sandbox']});
+const p=await b.newPage({viewport:{width:1400,height:950}});
+const errs=[]; p.on('pageerror',e=>errs.push(e.message)); p.on('dialog',d=>d.accept());
+await p.route(/^https?:\/\/(?!localhost)/,r=>{const u=r.request().url();
+ if(/supabase/.test(u))return r.fulfill({path:'stub3.js',contentType:'text/javascript'});
+ return r.fulfill({body:'',contentType:'text/javascript'})});
+const E=(c)=> p.evaluate((c)=> window.__cdEval(c), c);
+const ok=(c,m)=>console.log((c?'OK  ':'FOUT')+' '+m);
+await p.goto('http://localhost:8790/index.html');await p.waitForTimeout(2500);
+await p.click('#main-nav-btn-cados');await p.waitForTimeout(600);
+console.log(await E(`JSON.stringify({kasten:state.zekeringen.kasten.length, rijen: state.zekeringen.kasten.map(k=>k.rijen.length)})`));
+await E(`(()=>{ const k1=state.zekeringen.kasten[0], k2={...JSON.parse(JSON.stringify(k1)), id:cryptoId(), naam:'Kast 2'};
+  state.zekeringen.kasten.push(k2);
+  const a={id:'autAH', categorie:'Automaat', naam:'LEDVERLICHTING KASTEN', A:'16', polen:'2P', breedte:1};
+  k2.rijen[0].items.push(a, {id:'rk2', categorie:'Rijgklemmenmodule', rijgklemKlemIds:[], breedte:1});
+  k1.rijen[0].items.push({id:'rk1', categorie:'Rijgklemmenmodule', rijgklemKlemIds:[], breedte:1});
+  state.modules.verlichting=true; state.verlichting.items=[]; const it=newVerlichtingItem(); it.naam='Kastverlichting'; it.typeKabel='XVB 3G1,5'; state.verlichting.items.push(it); save(); selectTab('verlichting'); return 1; })()`);
+await p.waitForTimeout(800);
+const opts = await p.evaluate(()=>[...document.querySelectorAll('.vl-tabel .ov-automaat option')].map(o=>o.value+'='+o.textContent));
+console.log(opts);
+await p.evaluate(()=>{ const s=document.querySelector('.vl-tabel .ov-automaat'); s.value='autAH'; s.dispatchEvent(new Event('change')); });
+await p.evaluate(()=>{ const s=document.querySelector('.vl-tabel .ov-aansl'); s.value='klemmen'; s.dispatchEvent(new Event('change')); }); await p.waitForTimeout(300);
+ok(await E(`state.verlichting.items[0].zekeringModuleId==='autAH'`), 'automaat AH bewaard');
+const rk = await E(`JSON.stringify(state.zekeringen.kasten.flatMap(k=>k.rijen.flatMap(r=>r.items)).filter(m=>m.categorie==='Rijgklemmenmodule').map(m=>m.id+':'+(m.rijgklemKlemIds||[]).length))`);
+console.log(rk);
+ok(rk.includes('rk2:1') && rk.includes('rk1:0'), 'klemmen op rijgklemmenmodule van de kast met automaat AH');
+ok(errs.length===0, 'geen JS-fouten '+errs.join(' | '));
+await b.close();

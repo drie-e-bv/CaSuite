@@ -7221,7 +7221,6 @@ body.print-patchkast #printExport{display:block !important;}
 /* 26/11: snelle lijst 230V-lichtpunten */
 #cados-app .vl-tabel select{min-width:120px;}
 #cados-app .vl-tabel .ov-aansl{min-width:165px;}
-#cados-app .vl-tabel .vl-weg.zeker{background:#c0392b;color:#fff;border-color:#c0392b;}
 </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script>
@@ -8688,10 +8687,10 @@ function exportAllesAlsExcel(){
   // Verlichting 230V
   {
     const codes = computeVerlichtingCodes();
-    const rows = [["Code","Naam","Kamer","Type kabel","Info"]];
+    const rows = [["Code","Naam","Aantal","Kamer","Type kabel","Info"]];
     state.verlichting.items.forEach(it=>{
       if(it.leeg) return;
-      rows.push([codes[it.id]||"", it.naam||"", it.kamer||"", it.typeKabel||"", it.info||""]);
+      rows.push([codes[it.id]||"", it.naam||"", vlAantal(it), it.kamer||"", it.typeKabel||"", it.info||""]);
     });
     addSheet("Verlichting 230V", rows);
   }
@@ -12224,6 +12223,7 @@ function verlichtingSpecText(item){
     const a = armatuurLookup(item.naam);
     bits.push(a ? a.wattage+"W" : "geen match in catalogus");
   }
+  if(vlAantal(item) > 1) bits.unshift(vlAantal(item)+" armaturen op 1 kabel");
   if(item.kamer) bits.push(item.kamer);
   if(item.typeKabel) bits.push(item.typeKabel);
   return bits.join(" · ");
@@ -12256,7 +12256,7 @@ function exportVerlichtingVoorWerf(standalone=true){
   const tbody = page.querySelector("tbody");
   state.verlichting.items.forEach(item=>{
     tbody.appendChild(el(`<tr>
-      <td>${escapeHtml(codes[item.id]||"")}</td><td>${escapeHtml(item.naam)}</td><td>${escapeHtml(item.kamer)}</td>
+      <td>${escapeHtml(codes[item.id]||"")}</td><td>${vlAantal(item)>1 ? vlAantal(item)+"× " : ""}${escapeHtml(item.naam)}</td><td>${escapeHtml(item.kamer)}</td>
       <td>${escapeHtml(item.typeKabel)}</td><td>${escapeHtml(item.info)}</td>
     </tr>`));
   });
@@ -12273,6 +12273,14 @@ function exportVerlichtingVoorWerf(standalone=true){
 
 // 26/11/2026 (Peter): verwijderen "met behoud van nummer" -- het volgende lichtpunt krijgt zijn huidige nummer vast,
 // zodat de nummers van alle andere lichtpunten niet verspringen.
+// 26/11/2026 (Peter): "3 kabels die gebrugd worden in de kamer" -- één lichtpunt (één nummer, één kabel) kan
+// meerdere armaturen voeden. Veld `aantal` (leeg = 1).
+function vlAantal(item){ const n = parseInt(item && item.aantal); return n > 1 ? n : 1; }
+// Gewoon verwijderen, zoals overal: de volgende lichtpunten schuiven één nummer op.
+function verlVerwijderGewoon(item){
+  const items = state.verlichting.items, i = items.indexOf(item);
+  if(i >= 0) items.splice(i, 1);
+}
 function verlVerwijder(item){
   const items = state.verlichting.items, i = items.indexOf(item);
   if(i < 0) return;
@@ -12290,16 +12298,22 @@ function renderVerlichtingOverzicht(codes, herteken){
     <div class="card-head"><h3>Snelle lijst 230V-lichtpunten</h3><span class="hint">${items.length} stuk(s) · wijzigingen worden meteen bewaard</span></div>
     <div class="card-body" style="padding:0;overflow-x:auto;">
       <table class="grid vl-tabel">
-        <thead><tr><th>Nr.</th><th>Armatuur</th><th>Kamer</th><th>Aansluiting</th><th>Type kabel</th><th>Schakelkring</th><th>Info</th><th></th></tr></thead>
+        <thead><tr><th>Nr.</th><th>Armatuur</th><th title="Aantal armaturen op deze ene kabel (gebrugd in de kamer)">Aantal</th><th>Kamer</th><th>Aansluiting</th><th>Type kabel</th><th>Schakelkring</th><th title="Gevoed door automaat — leeg = de automaat van de schakelkring">Automaat</th><th>Info</th><th></th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
   </div>`);
   const tbody = wrap.querySelector("tbody");
   if(items.length===0){
-    tbody.appendChild(el(`<tr class="emptyrow"><td colspan="8">Nog geen armaturen toegevoegd.</td></tr>`));
+    tbody.appendChild(el(`<tr class="emptyrow"><td colspan="10">Nog geen armaturen toegevoegd.</td></tr>`));
   }
   const kringCodes = computeKringCodes();
+  const automaten = alleZekeringAutomaten();
+  const autOpties = (item)=>{
+    const k = azKring(item.kringId);
+    const viaKring = k && k.zekeringModuleId ? "via kring: " + escapeHtml(azAutomaatLabel(k.zekeringModuleId)) : "— geen —";
+    return `<option value="">${viaKring}</option>` + automaten.map(a=>`<option value="${a.id}" ${item.zekeringModuleId===a.id?"selected":""}>${escapeHtml([a.code, a.naam, a.A, a.polen].filter(Boolean).join(" "))}</option>`).join("");
+  };
   const kabelOpties = (huidig)=>{
     const l = VL_KABELS.slice(); if(huidig && !l.includes(huidig)) l.unshift(huidig);
     return `<option value="">— kies —</option>` + l.map(k=>`<option ${k===huidig?"selected":""}>${escapeHtml(k)}</option>`).join("") + `<option value="__ander">Andere…</option>`;
@@ -12308,31 +12322,43 @@ function renderVerlichtingOverzicht(codes, herteken){
     const tr = el(`<tr data-id="${item.id}">
       <td class="codecell">${escapeHtml(codes[item.id]||"")}</td>
       <td><input class="ov-naam" list="dl-verl-armaturen" value="${escapeHtml(item.naam)}" style="min-width:150px;"></td>
+      <td><input class="ov-aantal" type="number" min="1" step="1" value="${vlAantal(item)}" style="width:62px;" title="Aantal armaturen op deze ene kabel"></td>
       <td><input class="ov-kamer" list="dl-verl-kamers" value="${escapeHtml(item.kamer)}" style="min-width:110px;"></td>
       <td><select class="ov-aansl"><option value="">—</option>${VL_AANSLUITINGEN.map(([v,l])=>`<option value="${v}" ${item.aansluiting===v?"selected":""}>${l}</option>`).join("")}</select></td>
       <td><select class="ov-typekabel">${kabelOpties(item.typeKabel||"")}</select></td>
       <td><select class="ov-kring"><option value="">— geen —</option>${state.kringen.items.map(k=>`<option value="${k.id}" ${item.kringId===k.id?"selected":""}>${escapeHtml(kringLabel(k, kringCodes[k.id]))}</option>`).join("")}</select></td>
+      <td><select class="ov-automaat" style="min-width:150px;">${autOpties(item)}</select></td>
       <td><input class="ov-info" value="${escapeHtml(item.info||"")}" style="min-width:140px;"></td>
-      <td><button type="button" class="btn small ghost vl-weg" title="Verwijderen — de nummers van de andere lichtpunten blijven behouden">🗑</button></td>
+      <td style="white-space:nowrap;"><button type="button" class="btn small ghost vl-weg" title="Verwijderen — de volgende lichtpunten schuiven één nummer op">🗑</button> <button type="button" class="btn small ghost vl-weg-behoud" title="Verwijderen met behoud van nummer — de andere lichtpunten houden hun nummer">🗑 #</button></td>
     </tr>`);
     tr.querySelector(".ov-naam").addEventListener("input", e=>{ item.naam=e.target.value; save(); updateVerlichtingVisual(item); });
     tr.querySelector(".ov-kamer").addEventListener("input", e=>{ item.kamer=e.target.value; save(); updateVerlichtingVisual(item); });
     tr.querySelector(".ov-kamer").addEventListener("change", e=> ensureKamerInLijst(e.target.value));
-    tr.querySelector(".ov-aansl").addEventListener("change", e=>{ item.aansluiting=e.target.value; save(); });
+    const klemmenBij = ()=>{ try{ if(autoVerlichtingKlemmen()) toast(item.aansluiting==="klemmen" ? "Klemmen aangemaakt in Rijgklemmen" : "Klemmen bijgewerkt in Rijgklemmen"); }catch(_e){} };
+    tr.querySelector(".ov-aansl").addEventListener("change", e=>{ item.aansluiting=e.target.value; klemmenBij(); save(); });
+    tr.querySelector(".ov-automaat").addEventListener("change", e=>{ item.zekeringModuleId=e.target.value; save(); });
     tr.querySelector(".ov-typekabel").addEventListener("change", e=>{
       let v = e.target.value;
       if(v==="__ander"){ v = (prompt("Type kabel", item.typeKabel||"") || "").trim(); if(!v){ e.target.value = item.typeKabel||""; return; } e.target.innerHTML = kabelOpties(v); }
-      item.typeKabel = v; save(); updateVerlichtingVisual(item);
+      item.typeKabel = v; klemmenBij(); save(); updateVerlichtingVisual(item);
     });
-    tr.querySelector(".ov-kring").addEventListener("change", e=>{ item.kringId=e.target.value; save(); updateVerlichtingVisual(item); });
+    tr.querySelector(".ov-kring").addEventListener("change", e=>{ item.kringId=e.target.value; save(); updateVerlichtingVisual(item); if(herteken) herteken(); });
     tr.querySelector(".ov-info").addEventListener("input", e=>{ item.info=e.target.value; save(); });
-    const weg = tr.querySelector(".vl-weg");
-    weg.addEventListener("click", ()=>{
-      if(!weg.classList.contains("zeker")){ weg.classList.add("zeker"); weg.textContent = "Zeker?"; setTimeout(()=>{ if(weg.isConnected){ weg.classList.remove("zeker"); weg.textContent = "🗑"; } }, 3000); return; }
-      verlVerwijder(item); save();
-      if(herteken) herteken(); else selectTab("verlichting");
-      toast("Lichtpunt " + (codes[item.id]||"") + " verwijderd — de andere nummers blijven");
+    tr.querySelector(".ov-aantal").addEventListener("change", e=>{
+      const n = Math.max(1, parseInt(e.target.value)||1); e.target.value = n;
+      item.aantal = n > 1 ? n : ""; save(); updateVerlichtingVisual(item);
     });
+    // 26/11/2026 (Peter): verwijderen gebeurt meteen, zoals overal (geen "Zeker?"); twee varianten.
+    const verwijder = (behoud)=>{
+      const nr = codes[item.id]||"";
+      if(behoud) verlVerwijder(item); else verlVerwijderGewoon(item);
+      try{ autoVerlichtingKlemmen(); }catch(_e){}
+      save();
+      if(herteken) herteken(); else selectTab("verlichting");
+      toast("Lichtpunt " + nr + " verwijderd" + (behoud ? " — de andere nummers blijven" : " — de volgende nummers schuiven op"));
+    };
+    tr.querySelector(".vl-weg").addEventListener("click", ()=> verwijder(false));
+    tr.querySelector(".vl-weg-behoud").addEventListener("click", ()=> verwijder(true));
     tbody.appendChild(tr);
   });
   return wrap;
@@ -12418,7 +12444,7 @@ function renderVerlichting(){
         insertPt.addEventListener("click", ()=> placeAt(idx));
         rack.appendChild(insertPt);
       }
-      const onDelete = ()=> verlVerwijder(item);
+      const onDelete = ()=>{ verlVerwijderGewoon(item); try{ autoVerlichtingKlemmen(); }catch(_e){} }; // "−" op het blokje: gewoon verwijderen, zoals bij de andere tabbladen
       rack.appendChild(renderVerlichtingChip(item, rebuild, editingId===item.id, selectItem, onDelete, codes[item.id], startMoving, copyItem, !!movingRef));
       if(!movingRef && editingId===item.id){
         rack.appendChild(renderVerlichtingEditor(item, rebuild, selectItem, codes[item.id], onDelete));
@@ -12510,6 +12536,7 @@ function renderVerlichtingEditor(item, rebuildAll, selectItem, code, onDelete){
     </div>
     <div class="field-grid">
       <div class="field wide"><label>Armatuur (uit catalogus)</label><input class="ve-naam" list="dl-verl-armaturen" value="${escapeHtml(item.naam)}" placeholder="typ of kies uit de lijst"></div>
+      <div class="field"><label>Aantal armaturen op deze kabel</label><input class="ve-aantal" type="number" min="1" step="1" value="${vlAantal(item)}"></div>
       <div class="field"><label>Kamer</label><input class="ve-kamer" list="dl-verl-kamers" value="${escapeHtml(item.kamer)}"></div>
       <div class="field"><label>Type kabel</label><input class="ve-typekabel" value="${escapeHtml(item.typeKabel)}" placeholder="bv. XVB 3G1.5"></div>
       <div class="field wide"><label>Extra info</label><input class="ve-info" value="${escapeHtml(item.info)}"></div>
@@ -12519,12 +12546,18 @@ function renderVerlichtingEditor(item, rebuildAll, selectItem, code, onDelete){
     <div class="ak-cs-slot"></div>
     <div class="field-grid"><div class="field wide"><label>Gevoed door automaat</label><select class="ve-zekering"><option value="">${(()=>{ const k = azKring(item.kringId); return k && k.zekeringModuleId ? "via kring: "+escapeHtml(azAutomaatLabel(k.zekeringModuleId)) : "— geen —"; })()}</option>${alleZekeringAutomaten().map(a=>`<option value="${a.id}" ${item.zekeringModuleId===a.id?"selected":""}>${escapeHtml([a.code, a.naam, a.A, a.polen].filter(Boolean).join(" "))}</option>`).join("")}</select></div></div>
     <div class="hint" style="margin:6px 0 2px;">Laat leeg voor automatische nummering (telt door vanaf het vorige item). Vul je hier iets in, dan tellen alle volgende items automatisch verder vanaf dát nummer.</div>
-    <button class="btn small ghost me-delete" style="margin-top:10px;">Verwijderen</button>
+    <button class="btn small ghost me-delete" style="margin-top:10px;" title="De volgende lichtpunten schuiven één nummer op">Verwijderen</button>
+    <button class="btn small ghost me-delete-behoud" style="margin-top:10px;" title="De andere lichtpunten houden hun nummer">Verwijderen met behoud van nummer</button>
   </div>`);
+  box.querySelector(".ve-aantal").addEventListener("change", e=>{
+    const n = Math.max(1, parseInt(e.target.value)||1); e.target.value = n;
+    item.aantal = n > 1 ? n : ""; save(); updateVerlichtingVisual(item); rebuildAll();
+  });
+  box.querySelector(".me-delete-behoud").addEventListener("click", ()=>{ verlVerwijder(item); try{ autoVerlichtingKlemmen(); }catch(_e){} selectItem(item.id); save(); rebuildAll(); });
   box.querySelector(".ve-zekering").addEventListener("change", e=>{ item.zekeringModuleId=e.target.value; save(); });
   box.querySelector(".ve-kring").addEventListener("change", e=>{ item.kringId=e.target.value; save(); rebuildAll(); });
   box.querySelector(".me-close").addEventListener("click", ()=> selectItem(item.id));
-  box.querySelector(".me-delete").addEventListener("click", ()=>{ onDelete(); selectItem(item.id); save(); rebuildAll(); });
+  box.querySelector(".me-delete").addEventListener("click", ()=>{ verlVerwijderGewoon(item); try{ autoVerlichtingKlemmen(); }catch(_e){} selectItem(item.id); save(); rebuildAll(); });
   const csTekenV = akCatalogusSlot(box.querySelector(".ak-cs-slot"), ()=> item.naam, {
     info: ()=> "230V", zet: (n)=>{ item.naam = n; }, klaar: ()=>{ rebuildAll(); } });
   box.querySelector(".ve-naam").addEventListener("input", e=>{ item.naam=e.target.value; save(); updateVerlichtingVisual(item); csTekenV(); });
@@ -21876,6 +21909,73 @@ function autoZekeringKlemmen(){
     }
     gewijzigd = true;
   });
+  if(typeof autoVerlichtingKlemmen==="function" && autoVerlichtingKlemmen()) gewijzigd = true;
+  return gewijzigd;
+}
+// 26/11/2026 (Peter: "aan te duiden of het op klemmen moet komen al dan niet? En dan ook te koppelen eenvoudig
+// aan de klemmen module."): een 230V-lichtpunt met aansluiting "Op klemmen" krijgt automatisch zijn klemmen
+// (één per ader van de kabel) op de rijgklemmenmodule van de kast waar zijn automaat zit. Andere aansluiting
+// of lichtpunt weg -> die automatische klemmen verdwijnen. Snelmodus-klemmen (zonder autoVl) blijven staan.
+function vlAutomaatId(it){
+  if(it.zekeringModuleId) return it.zekeringModuleId;
+  const k = it.kringId ? state.kringen.items.find(x=> x.id===it.kringId) : null;
+  return k && k.zekeringModuleId || "";
+}
+function autoVerlichtingKlemmen(){
+  const il = state.interlex;
+  if(!il || !Array.isArray(il.items) || !state.verlichting || !Array.isArray(state.verlichting.items)) return false;
+  if(!Array.isArray(il.gebruikteBronnen)) il.gebruikteBronnen = [];
+  let gewijzigd = false;
+  const bronLijst = snelmodusBronnen("verlichting");
+  const perId = new Map(bronLijst.map(b=> [b.id, b]));
+  const gewenst = new Map(state.verlichting.items.filter(it=> !it.leeg && it.aansluiting==="klemmen").map(it=> [it.id, it]));
+  const rkVan = (kast)=> kast && kast.rijen.flatMap(r=> r.items).find(m=> m.categorie==="Rijgklemmenmodule");
+  const haalVanModules = (ids)=> state.zekeringen.kasten.forEach(kast=> kast.rijen.forEach(r=> r.items.forEach(m=>{
+    if(m.categorie==="Rijgklemmenmodule" && Array.isArray(m.rijgklemKlemIds) && m.rijgklemKlemIds.some(id=> ids.has(id))){
+      m.rijgklemKlemIds = m.rijgklemKlemIds.filter(id=> !ids.has(id));
+      if(typeof berekenRijgklemBreedte==="function") m.breedte = berekenRijgklemBreedte(m.rijgklemKlemIds.length);
+    }
+  })));
+  // 1. automatische klemmen die niet meer kloppen (niet meer op klemmen, weg, of ander kabeltype): weg
+  const weg = il.items.filter(k=> k.autoVl && (!gewenst.has(k.bronId) || (gewenst.get(k.bronId).typeKabel||"") !== (k.kabeltype||"")));
+  if(weg.length){
+    const ids = new Set(weg.map(k=> k.id)), bronIds = new Set(weg.map(k=> k.bronId));
+    il.items = il.items.filter(k=> !ids.has(k.id));
+    il.gebruikteBronnen = il.gebruikteBronnen.filter(g=> !(g.bronType==="verlichting" && bronIds.has(g.bronId) && !il.items.some(k=> k.bronType==="verlichting" && k.bronId===g.bronId)));
+    haalVanModules(ids);
+    gewijzigd = true;
+  }
+  // 2. nieuwe lichtpunten op klemmen: klemmen aanmaken
+  const dubbel = il.type === "dubbel";
+  gewenst.forEach((it, id)=>{
+    if(il.items.some(k=> k.bronType==="verlichting" && k.bronId===id)) return; // al klemmen (automatisch of via Snelmodus)
+    const b = perId.get(id); if(!b) return;
+    const n = parseAderAantalUitKabel(it.typeKabel) || 3;
+    const nieuw = []; let klem = null;
+    for(let i=1; i<=n; i++){
+      const zijde = (dubbel && i%2===0) ? "boven" : "onder";
+      if(zijde==="onder"){
+        klem = newKlem();
+        klem.kamer = b.kamer || ""; klem.info = b.info || "";
+        klem.bronType = "verlichting"; klem.bronId = id; klem.autoVl = true; klem.kabeltype = it.typeKabel || "";
+        nieuw.push(klem);
+      }
+      klem[zijde].watwaar = [b.label, "ader " + i].filter(Boolean).join(" - ");
+      klem[zijde].kleur = (il.standaardKleuren || [])[i-1] || "";
+      klem[zijde].aderNr = i;
+    }
+    il.items.push(...nieuw);
+    if(!il.gebruikteBronnen.some(g=> g.bronType==="verlichting" && g.bronId===id)) il.gebruikteBronnen.push({bronType: "verlichting", bronId: id});
+    // op de rijgklemmenmodule van de kast met de automaat van dit lichtpunt, anders de eerste kast met een rijgklemmenmodule
+    const autId = vlAutomaatId(it);
+    const kastA = autId && state.zekeringen.kasten.find(k=> k.rijen.some(r=> r.items.some(m=> m.id===autId)));
+    const rk = rkVan(kastA) || state.zekeringen.kasten.map(rkVan).find(Boolean);
+    if(rk){
+      rk.rijgklemKlemIds = (rk.rijgklemKlemIds || []).concat(nieuw.map(k=> k.id));
+      if(typeof berekenRijgklemBreedte==="function") rk.breedte = berekenRijgklemBreedte(rk.rijgklemKlemIds.length);
+    }
+    gewijzigd = true;
+  });
   return gewijzigd;
 }
 
@@ -26969,7 +27069,7 @@ function akOngekoppeld(){
     if(waar==="driver") g.drivers++; else g.lichtpunten++;
   };
   state.driverkast.kasten.forEach(k=> k.items.forEach(d=> (d.armaturen||[]).forEach(a=> voeg(a.naam, a.aantal, a.ruimte, "driver"))));
-  state.verlichting.items.forEach(v=> voeg(v.naam, 1, v.kamer, "verlichting"));
+  state.verlichting.items.forEach(v=> voeg(v.naam, vlAantal(v), v.kamer, "verlichting"));
   return [...map.values()].sort((a,b)=> b.stuks-a.stuks);
 }
 function akPasNamenToe(koppelingen){ // {offerteNaam: catalogusNaam}

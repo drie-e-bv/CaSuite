@@ -38,7 +38,7 @@ await p.selectOption('.vl-tabel tbody tr:nth-child(1) .ov-aansl', 'schakelcontac
 await p.selectOption('.vl-tabel tbody tr:nth-child(1) .ov-typekabel', 'XVB 3G1,5');
 ok(await E(`state.verlichting.items.filter(i=>!i.leeg)[0].aansluiting==='schakelcontact' && state.verlichting.items.filter(i=>!i.leeg)[0].typeKabel==='XVB 3G1,5'`), 'aansluiting + kabel bewaard');
 const tweede = await E(`state.verlichting.items.filter(i=>!i.leeg)[1].id`);
-await p.click('.vl-tabel tbody tr:nth-child(2) .vl-weg'); await p.click('.vl-tabel tbody tr:nth-child(2) .vl-weg'); await p.waitForTimeout(500);
+await p.click('.vl-tabel tbody tr:nth-child(2) .vl-weg-behoud'); await p.waitForTimeout(500); // 26/11: meteen, geen "Zeker?" meer
 const na = await E(`(()=>{ const c=computeVerlichtingCodes(); return state.verlichting.items.map(i=>c[i.id]); })()`);
 ok(!(await E(`state.verlichting.items.some(i=>i.id==='${tweede}')`)), 'verwijderd');
 ok(JSON.stringify(na)===JSON.stringify(voor.filter((_,i)=>i!==1)), 'nummers behouden: '+voor.join(',')+' -> '+na.join(','));
