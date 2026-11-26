@@ -11672,8 +11672,18 @@ function renderDriverkast(){
     const slot = document.createElement("div");
     wrap.querySelector("#dkHerkies").after(slot);
     slot.innerHTML = `<div class="conflict-banner" style="margin:10px 0;background:#fff4e6;border-color:#e07a12;"><div class="conflict-head">🟧 ${lijst.length} kamer(s) verspreid over meerdere kasten — de drivers die niet bij de rest van hun kamer zitten zijn oranje.</div>
-      ${lijst.map(([r,set])=>`<div class="conflict-item" data-kamer="${escapeHtml(r)}" style="cursor:pointer;">${escapeHtml(r)}: ${[...set].map(i=>"Kast "+(i+1)).join(" + ")} — tik om samen te zetten</div>`).join("")}</div>`;
-    slot.querySelectorAll(".conflict-item").forEach(it=> it.addEventListener("click", ()=> dkVerdeelOpen(it.dataset.kamer)));
+      ${lijst.map(([r,set])=>`<div class="conflict-item dk-versp" data-kamer="${escapeHtml(r)}" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;"><span>${escapeHtml(r)}: ${[...set].map(i=>"Kast "+(i+1)).join(" + ")}</span>
+        <span style="margin-left:auto;display:flex;gap:6px;"><button type="button" class="btn small dk-versp-ok" title="Deze kamer is bewust gesplitst — melding en oranje markering niet meer tonen">✓ Bevestigen</button>
+        <button type="button" class="btn small ghost dk-versp-los" title="Drivers van deze kamer samen in één kast zetten">Oplossen</button></span></div>`).join("")}</div>`;
+    slot.querySelectorAll(".dk-versp").forEach(it=>{
+      const r = it.dataset.kamer;
+      it.querySelector(".dk-versp-los").addEventListener("click", ()=> dkVerdeelOpen(r));
+      it.querySelector(".dk-versp-ok").addEventListener("click", ()=>{
+        const set = m[r]; if(!set) return;
+        state.driverkast.verspreidOk = Object.assign({}, state.driverkast.verspreidOk, {[r]: dkVerspreidSig(set)});
+        save(); selectTab("driverkast"); toast(r+": splitsing bevestigd");
+      });
+    });
   })();
   // 19/11/2026: maximum drivers per kast
   if(!cadosInstGeladen) laadCadosInst().then(()=>{ if(currentTab==="driverkast" && dkMaxDrivers()) selectTab("driverkast"); }).catch(()=>{});
@@ -11726,8 +11736,13 @@ function dkKastIndexVan(driver){ return state.driverkast.kasten.findIndex(k=> k.
 function dkKamersPerKast(){ // kamer -> Set van kastindexen
   const m = {};
   state.driverkast.kasten.forEach((k,ki)=> k.items.forEach(d=>{ if(d.leeg) return; const r = dkKamerVanDriver(d); if(r) (m[r] = m[r] || new Set()).add(ki); }));
+  // 26/11/2026 (Peter): een bewust bevestigde splitsing telt niet meer als "verspreid" (geen melding, geen oranje).
+  // Verandert de verdeling (andere kasten), dan komt de melding gewoon terug.
+  const ok = state.driverkast.verspreidOk || {};
+  Object.keys(m).forEach(r=>{ if(m[r].size>1 && ok[r]===dkVerspreidSig(m[r])) m[r] = new Set([[...m[r]][0]]); });
   return m;
 }
+function dkVerspreidSig(set){ return [...set].map(i=> (state.driverkast.kasten[i]||{}).id || i).sort().join("|"); }
 function renderDriverKastCard(kast, ki, rebuildAll, editingId, selectItem, codes, movingRef, placeDriverAt, placeArmatuurAt, startMovingDriver, startMovingArmatuur, copyDriver, copyArmatuur){
   const nDriver = kast.items.length;
   const nArm = kast.items.reduce((s,d)=> s+d.armaturen.length, 0);
