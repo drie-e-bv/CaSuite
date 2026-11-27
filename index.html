@@ -7205,6 +7205,8 @@ body.print-patchkast #printExport{display:block !important;}
 /* 26/11 (laatste aanpassingen): kastkeuze driverkast in dezelfde werkbalkrij als bij de zekeringkast */
 #cados-app .kast-werkbalk > .dk-keuze{flex:1 1 auto;margin:0;}
 #cados-app .kast-werkbalk > .dk-keuze:empty{display:none;}
+#cados-app .dk-keuze button.actief .hint{color:inherit;opacity:.8;}
+#cados-app .zk-kastrij > #kastTabbar{flex:1 1 auto;flex-wrap:wrap !important;padding:0;margin:0;gap:6px;}
 #cados-app #panel-zekeringen .builder-layout:has(#moveBanner:empty):has(#stagingSlot:empty){grid-template-columns:minmax(0,1fr);}
 #cados-app #panel-zekeringen .builder-layout:has(#moveBanner:empty):has(#stagingSlot:empty) > .builder-side{display:none;}
 /* rails vullen de beschikbare breedte op pc (max. ~52px per module) */
@@ -9378,7 +9380,7 @@ function renderZekeringen(){
   const kast = huidigeZekeringKast();
   const wrap = el(`<div class="panel" id="panel-zekeringen">
     ${panelHeadHtml(
-      "Zekeringkast — opbouw",
+      "Zekeringkast",
       "Bouw je kast op: modules toevoegen, plaatsen met een tik, en automatisch genummerd.",
       `Kies het aantal modules per rij (18/24/36) — dit geldt voor de hele kast. Tik "+ module toevoegen", bouw de module op en tik daarna op een leeg vakje om ze te plaatsen (geen slepen nodig).
       Een differentieel krijgt automatisch een letter (A, B, C…); automaten die er aansluitend op volgen krijgen AA, AB, AC… Bij Automaat en Differentieel volgt de breedte automatisch uit het aantal polen (1 module per pool).
@@ -9386,7 +9388,8 @@ function renderZekeringen(){
       Meerdere fysieke kasten? Voeg er hieronder gerust bij — elke kast heeft zijn eigen, opnieuw startende lettering.`
     )}
     <!-- 23/11/2026: compacte werkbalk bovenaan (zelfde opbouw als de Driverkast), kast er direct onder -->
-    <div class="toolbar-card kast-werkbalk-kaart" style="margin-bottom:10px;"><div class="toolbar-row" id="kastTabbar" style="flex-wrap:wrap;"></div>
+    <!-- 27/11/2026 (Peter: "deze balk dezelfde layout als bij driverkast"): kastkeuze als pillen links, kastknoppen rechts -->
+    <div class="toolbar-card kast-werkbalk-kaart" style="margin-bottom:10px;"><div class="toolbar-row kast-werkbalk zk-kastrij" style="margin-top:0;padding-top:0;border-top:0;flex-wrap:wrap;"><div class="dk-keuze" id="kastTabbar"></div></div>
       <div class="toolbar-row kast-werkbalk">
         <input class="zk-kamer" list="dl-kamers-zekering" placeholder="Kamer" value="${escapeHtml(kast.kamer||"")}" title="kamer waar de kast hangt">
         ${verdiepingSelectHtml(kast.verdieping, "zk-verdieping")}
@@ -9418,27 +9421,31 @@ function renderZekeringen(){
   // Kast-wisselaar: elke fysieke zekeringkast is een eigen tabje, met zijn
   // eigen rijen/maat/lettering — schakelen herbouwt het hele paneel vers.
   const kastTabbar = wrap.querySelector("#kastTabbar");
+  const kastRij = wrap.querySelector(".zk-kastrij");
   state.zekeringen.kasten.forEach(k=>{
-    const btn = el(`<button class="btn small ${k.id===kast.id?'primary':'ghost'}">${escapeHtml(k.naam)}</button>`);
+    const n = k.rijen.reduce((t, r)=> t + r.items.filter(m=> m.categorie!=="Leeg").length, 0);
+    const btn = el(`<button type="button" class="${k.id===kast.id?'actief':''}">${escapeHtml(k.naam)}${k.kamer ? " · " + escapeHtml(k.kamer) : ""} <span class="hint">${n}</span></button>`);
     btn.addEventListener("click", ()=>{ zekeringHuidigeKastId = k.id; selectTab("zekeringen"); });
     kastTabbar.appendChild(btn);
   });
-  const addKastBtn = el(`<button class="btn small ghost" title="nieuwe fysieke kast toevoegen">+ Kast toevoegen</button>`);
+  // de knoppen hieronder komen rechts in dezelfde rij (zoals bij de Driverkast)
+  const kastTabbarIn = kastTabbar; void kastTabbarIn;
+  const addKastBtn = el(`<button class="addbtn" title="nieuwe fysieke kast toevoegen">+ Kast toevoegen</button>`);
   addKastBtn.addEventListener("click", ()=>{
     const nieuw = newZekeringKast("Zekeringkast "+(state.zekeringen.kasten.length+1));
     state.zekeringen.kasten.push(nieuw);
     zekeringHuidigeKastId = nieuw.id;
     save(); selectTab("zekeringen");
   });
-  kastTabbar.appendChild(addKastBtn);
-  const hernoemBtn = el(`<button class="btn small ghost" title="deze kast hernoemen">Hernoemen</button>`);
+  kastRij.appendChild(addKastBtn);
+  const hernoemBtn = el(`<button class="btn" title="deze kast hernoemen">✎ Hernoemen</button>`);
   hernoemBtn.addEventListener("click", ()=>{
     const nieuweNaam = prompt("Naam voor deze kast:", kast.naam);
     if(nieuweNaam && nieuweNaam.trim()){ kast.naam = nieuweNaam.trim(); save(); selectTab("zekeringen"); }
   });
-  kastTabbar.appendChild(hernoemBtn);
+  kastRij.appendChild(hernoemBtn);
   if(state.zekeringen.kasten.length>1){
-    const verwijderKastBtn = el(`<button class="btn small ghost" title="deze kast verwijderen">Kast verwijderen</button>`);
+    const verwijderKastBtn = el(`<button class="btn" title="deze kast verwijderen">🗑 Kast verwijderen</button>`);
     verwijderKastBtn.addEventListener("click", ()=>{
       const heeftIets = kast.rijen.some(r=>r.items.some(m=>m.categorie!=="Leeg"));
       if(heeftIets && !confirm("Deze kast bevat componenten. Toch verwijderen?")) return;
@@ -9447,7 +9454,7 @@ function renderZekeringen(){
       zekeringHuidigeKastId = state.zekeringen.kasten[0].id;
       save(); selectTab("zekeringen");
     });
-    kastTabbar.appendChild(verwijderKastBtn);
+    kastRij.appendChild(verwijderKastBtn);
   }
 
   const kastwrap = wrap.querySelector("#kastwrap");
@@ -19262,7 +19269,7 @@ function weergaveInKop(node, balk){
   else node.insertBefore(balk, node.firstChild);
 }
 function zkWeergaveBalk(actief){
-  const balk = el(`<div class="zk-weergaven" role="tablist" aria-label="Weergave zekeringkast">${ZK_WEERGAVEN.map(w=>`<button type="button" data-w="${w.id}" class="${w.id===actief?"actief":""}">${w.label}</button>`).join("")}<span class="zk-weergave-uitleg">${actief==="zekeringen" ? "modules plaatsen en bewerken" : actief==="uitvoering" ? "draden en kamgeleiders" : "eindweergave: bekijken en afdrukken"}</span></div>`);
+  const balk = el(`<div class="zk-weergaven" role="tablist" aria-label="Weergave zekeringkast">${ZK_WEERGAVEN.map(w=>`<button type="button" data-w="${w.id}" class="${w.id===actief?"actief":""}">${w.label}</button>`).join("")}</div>`);
   balk.querySelectorAll("button").forEach(b=> b.addEventListener("click", ()=>{ if(b.dataset.w!==currentTab) selectTab(b.dataset.w); }));
   return balk;
 }
