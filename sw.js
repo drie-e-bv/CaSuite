@@ -236,7 +236,8 @@
 // CaCalc-grondcorrecties (grondsoort, legging, IEC-buisfactor).
 // 2026-11-13 (c): CaCalc -- legging enkeladerig in het veld Kabeltype, label 'grond rond de buis'.
 // 2026-11-13 (middag): Materialen heet nu CaMat; extensie CaMat Mand 1.1.0.
-const CACHE_VERSION = 'casnap-v2026-11-27-titelblad';
+// 2026-11-27 (b): CaCalc -- EXVB/EXAVB = XLPE, keuze vochtige grond 1,0 K·m/W (Nexans).
+const CACHE_VERSION = 'casnap-v2026-11-27-exavb';
 const NETWORK_TIMEOUT_MS = 4000;
 
 self.addEventListener('install', () => {
