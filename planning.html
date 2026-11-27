@@ -10765,14 +10765,14 @@ function exportPatchkastVoorWerf(standalone=true){
             <div class="pe-meta">Kast ${ki+1} · ${it.poorten.length} poorten · codes ${escapeHtml(codeRange)}${it.type ? " · "+escapeHtml(it.type) : ""}</div>
           </div>
           <table class="pe-porttable">
-            <thead><tr><th>Code</th><th>Kamer</th><th>Functie</th><th>Aangesloten toestel</th><th>Switch-poort</th></tr></thead>
+            <thead><tr><th>Code</th><th>Kamer</th><th>Functie</th><th>Aangesloten toestel</th><th>Switch-poort</th><th>Notitie</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>`);
         const tbody = page.querySelector("tbody");
         it.poorten.forEach((p,i)=>{
           ppMigreer(p); const sw = ppSwitchVan(p);
-          tbody.appendChild(el(`<tr><td>${escapeHtml(pcodes[i]||"")}</td><td>${escapeHtml(p.kamer ? kamerLabel(p.kamer) : "")}</td><td>${escapeHtml(p.functie||"")}</td><td>${escapeHtml(p.toestel || (sw && sw.sp.toestelNaam) || "")}</td><td>${escapeHtml(sw ? sw.label : "")}</td></tr>`));
+          tbody.appendChild(el(`<tr><td>${escapeHtml(pcodes[i]||"")}</td><td>${escapeHtml(p.kamer ? kamerLabel(p.kamer) : "")}</td><td>${escapeHtml(p.functie||"")}</td><td>${escapeHtml(p.toestel || (sw && sw.sp.toestelNaam) || "")}</td><td>${escapeHtml(sw ? sw.label : "")}</td><td>${escapeHtml(p.notitie||"")}</td></tr>`));
         });
         container.appendChild(page);
       }
@@ -11328,7 +11328,7 @@ function renderPatchEditor(it, codes, rebuildAll, selectItem, onDelete, kast, st
         <strong>Aansluitingen</strong>
         <label>Aantal poorten <input type="number" min="1" class="pe-poorten-n" value="${it.poorten.length}"></label>
       </div>
-      <table class="grid ov-tabel pp-tabel"><thead><tr><th style="width:62px;">Code</th><th>Kamer</th><th>Functie</th><th title="toestel aan de kant van de kamer, bv. Wifi antenne">Aangesloten toestel</th><th title="switch-poort aan de kant van de kast">Switch-poort (kast)</th></tr></thead>
+      <table class="grid ov-tabel pp-tabel"><thead><tr><th style="width:62px;">Code</th><th>Kamer</th><th>Functie</th><th title="toestel aan de kant van de kamer, bv. Wifi antenne">Aangesloten toestel</th><th title="switch-poort aan de kant van de kast">Switch-poort (kast)</th><th title="bv. de benaming die op de werf op de kabel of poort geschreven is">Notitie</th></tr></thead>
       <tbody class="poorten-body"></tbody></table>
       <datalist id="pp-functies">${PP_FUNCTIES.map(f=>`<option value="${f}">`).join("")}</datalist>
     </div>` : ""}
@@ -11436,10 +11436,13 @@ function renderPatchEditor(it, codes, rebuildAll, selectItem, onDelete, kast, st
           <td><select class="ov-in pp-kamer"><option value="">— kamer —</option>${kamerOpts}</select></td>
           <td><input class="ov-in pp-functie" list="pp-functies" value="${escapeHtml(p.functie||"")}" placeholder="bv. Wifi"></td>
           <td><input class="ov-in pp-toestel" value="${escapeHtml(p.toestel||"")}" placeholder="bv. Wifi antenne"></td>
-          <td>${swAlle.length ? `<select class="ov-in pp-switch"><option value="">— geen —</option>${swOpts}</select>` : `<span class="hint">nog geen switch in de kast</span>`}</td></tr>`);
+          <td>${swAlle.length ? `<select class="ov-in pp-switch"><option value="">— geen —</option>${swOpts}</select>` : `<span class="hint">nog geen switch in de kast</span>`}</td>
+          <td><input class="ov-in pp-notitie" value="${escapeHtml(p.notitie||"")}" placeholder="bv. op de werf: 'bureau 2'"></td></tr>`);
         const zet = ()=>{ p.omschrijving = ppOmschrijving(p); save(); };
         tr.querySelector(".pp-kamer").addEventListener("change", e=>{ p.kamer = e.target.value; zet(); });
         tr.querySelector(".pp-functie").addEventListener("input", e=>{ p.functie = e.target.value; zet(); });
+        // 27/11/2026 (Peter): notitie per poort, bv. een benaming die op de werf anders geschreven werd
+        tr.querySelector(".pp-notitie").addEventListener("input", e=>{ p.notitie = e.target.value; save(); });
         tr.querySelector(".pp-toestel").addEventListener("input", e=>{
           const oud = p.toestel || ""; p.toestel = e.target.value;
           const s2 = ppSwitchVan(p); if(s2 && (!s2.sp.toestelNaam || s2.sp.toestelNaam===oud)) s2.sp.toestelNaam = p.toestel;   // zelfde toestel aan beide kanten

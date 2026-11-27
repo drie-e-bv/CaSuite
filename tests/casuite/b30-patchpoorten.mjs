@@ -45,6 +45,11 @@ ok(await p.evaluate(()=> document.activeElement.closest('tr').dataset.i)==='6', 
 // afdruk
 r = await J(`JSON.stringify((()=>{ const c = document.getElementById('printExport'); c.innerHTML=''; exportPatchkastVoorWerf(false); const t = c.textContent; c.innerHTML=''; return {k: t.includes('Master › Master badkamer'), sw: t.includes('Core · poort 2'), t: t.includes('Wifi antenne')}; })())`);
 ok(r.k && r.sw && r.t, 'afdruk patchpaneel: kamer, functie, toestel en switch-poort');
+// 27/11/2026: kolom Notitie (benaming van de werf)
+ok(await p.evaluate(()=> [...document.querySelectorAll('#panel-data .pp-tabel thead th')].map(t=>t.textContent).includes('Notitie')), 'kolom Notitie naast Switch-poort');
+await (await (await rij(4)).$('.pp-notitie')).fill('op de werf: bureau 2'); await p.waitForTimeout(300);
+r = await J(`JSON.stringify((()=>{ const x = __pp.poorten[4]; const c = document.getElementById('printExport'); c.innerHTML=''; exportPatchkastVoorWerf(false); const t = c.textContent; c.innerHTML=''; return {n: x.notitie, oms: x.omschrijving, druk: t.includes('op de werf: bureau 2')}; })())`);
+ok(r.n==='op de werf: bureau 2' && r.oms==='Master badkamer — Wifi · Wifi antenne' && r.druk, 'notitie bewaard, verandert de omschrijving niet en staat in de afdruk');
 await p.screenshot({path:'/tmp/pp.png'});
 ok(errs.length===0, 'geen JS-fouten '+errs.join(' | '));
 await b.close();
