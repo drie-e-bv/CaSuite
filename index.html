@@ -23058,13 +23058,32 @@ function dkKlemLijst(d, p){
   if(dkKlemExtra(p, d)) lijst.push({sp: 0, pol: "s"});
   return lijst;
 }
-function dkRailBreedte(dk, p){
+function dkRailBreedte(dk, p, blokken){
   const drivers = dkDrivers(dk);
   const n = drivers.length;
   const phx = 2 + (dk.sturing !== "PUSH" ? 2 : dkPushKringen(dk).length);
-  let mm = DK_SCHAK_MM + 3 + (dk.sturing !== "PUSH" ? 2*DK_KLEM_MM + 3 : 0) + phx * (dkPhoenixBreedte(n + 1) + 3);
+  const B = blokken || dkPhoenixB(dk, p);
+  let mm = DK_SCHAK_MM + 3 + (dk.sturing !== "PUSH" ? 2*DK_KLEM_MM + 3 : 0) + phx * (B*DK_PTFIX_MM + (B-1)*2 + 3);
   drivers.filter(d=> !dk5gA(d)).forEach(d=>{ mm += dkRijgBreedte(dkKlemLijst(d, p), p) + dkKlemGap(p); });
   return mm - (drivers.length ? dkKlemGap(p) : 3) + (drivers.length ? DK_EINDPLAAT_MM : 0);
+}
+/* 27/11/2026 (Peter): "wanneer we 3 Phoenix blokken hebben ... dubbel adereindhuls gebruiken zodat er maar 2 blokjes
+   nodig zijn. Als de DIN-rail niet meer past: automatisch samenvoegen." Past de rail niet op de montageplaat, dan krijgt
+   elk verdeelblok een blok minder (zolang 2 drivers per punt volstaan); de laatste punten krijgen dan 2 drivers
+   (dubbele adereindhuls). */
+function dkPhoenixB(dk, p){
+  const n = dkDrivers(dk).length;
+  const b0 = dkPhoenixBlokken(n), bMin = Math.max(1, Math.ceil(n / (2*DK_PTFIX_UIT)));
+  if(!p || !(p.breedte > 0)) return b0;
+  for(let b = b0; b > bMin; b--) if(dkRailBreedte(dk, p, b) + 2*DK_RAND_MM <= p.breedte) return b;
+  return bMin;
+}
+// punt op het verdeelblok voor de j-de driver (1..n) bij B blokken; > 18·B drivers: de laatste punten dubbel
+function dkPhoenixPunt(j, n, B){
+  const cap = B*DK_PTFIX_UIT;
+  if(n <= cap) return j;
+  const e = n - cap;
+  return j <= cap - e ? j : cap - e + Math.ceil((j - (cap - e))/2);
 }
 // klemmen op de driver zelf: aan de kant(en) van de aansluitingen, verdeeld over de breedte (B)
 /* 27/11/2026 (Peter): 230V 5G1,5 vanuit de driverkast naar een 230V-lichtpunt, armatuur nog niet gekend.
@@ -23347,11 +23366,12 @@ function dkPlanKast(dk){
   const phx = [["L","L","L"], ["N","N","N"]];
   if(dk.sturing === "PUSH"){ const kc = dkKringCodes(); dkPushKringen(dk).forEach(kid=> phx.push(["P" + kid, "push", "P " + (kc[kid]||"")])); }
   else phx.push(["DA+","DA+","DA+"], ["DA-","DA-","DA−"]);
+  const phB = dkPhoenixB(dk, p), phCap = phB*DK_PTFIX_UIT, phDubbel = Math.max(0, n - phCap);
   phx.forEach(([sl, f, lab])=>{
     const klemmen = [];
-    const tot = n + 1;
+    const tot = Math.min(n, phCap) + 1;
     // punten in een raster per blok (4 breed): de voeding bovenaan (aan de kabelkant), de 18 uitgangen eronder
-    const nBlok = dkPhoenixBlokken(n), bw = 1/nBlok;
+    const nBlok = phB, bw = 1/nBlok;
     for(let i=0; i<tot; i++){
       // de voeding van het blok komt binnen in de kast (van de werkschakelaar of de DALI-ingang)
       if(!i){ klemmen.push({id: "i", label: "in", functie: f, zijde: zijKast, x: bw*0.5, y: boven ? 0.2 : 0.8, rijgSoort: "kast", tip: `verdeelblok ${lab} · voeding (ingang)`}); continue; }
@@ -23359,11 +23379,12 @@ function dkPlanKast(dk){
       const kol = j % 4, rij = Math.floor(j / 4);
       const xr = blokNr*bw + bw*(0.14 + kol*0.24);
       const yr = boven ? 0.36 + rij*0.14 : 0.64 - rij*0.14;
-      klemmen.push({id: "p" + i, label: String(i), functie: f, zijde: zijKast, x: Math.round(xr*1000)/1000, y: Math.round(yr*1000)/1000, rijgSoort: "kast", geenLabel: true, tip: `verdeelblok ${lab} · punt ${i}`});
+      const dub = phDubbel && i > phCap - phDubbel;
+      klemmen.push({id: "p" + i, label: String(i), functie: f, zijde: zijKast, x: Math.round(xr*1000)/1000, y: Math.round(yr*1000)/1000, rijgSoort: "kast", geenLabel: true, tip: `verdeelblok ${lab} · punt ${i}` + (dub ? " · 2 drivers (dubbele adereindhuls)" : "")});
     }
     const id = "dkp_" + sl + "_" + dk.id;
     codes[id] = lab;
-    railModule(id, "Verdeelblok " + lab, dkPhoenixBreedte(tot), "phoenix", klemmen, {lab, f, kleur: DK_PTFIX_KLEUR[f] || "grijs", blokken: dkPhoenixBlokken(n)});
+    railModule(id, "Verdeelblok " + lab, phB*DK_PTFIX_MM + (phB-1)*2, "phoenix", klemmen, {lab, f, kleur: DK_PTFIX_KLEUR[f] || "grijs", blokken: phB, dubbel: phDubbel, normaal: dkPhoenixBlokken(n)});
   });
   dkOpNummer(cols.flat().concat(onderDrv)).forEach(d=>{
     const lijst = dkKlemLijst(d, p);
@@ -23723,7 +23744,7 @@ function dkModuleSvg(md){
   const d = info.driver;
   const tip = soort==="schakelaar" ? "Werkschakelaar — voeding van de driverkast uitschakelen" + (info.voeding && info.voeding.codes.length ? "\nGevoed door zekering " + info.voeding.tekst : "\nZekering nog niet gekend — klik om ze te kiezen") :
     soort==="dali" ? "DALI-ingang — 2 rijgklemmen: DALI-kabel DA+ (zwart) en DA− (grijs), doorverbonden naar de verdeelblokken" :
-    soort==="phoenix" ? `Phoenix ${DK_PTFIX_ART} (${info.kleur}) — verdeelblok ${info.lab}, ${info.blokken} blok(ken) van 1 voeding + 18 aansluitingen` :
+    soort==="phoenix" ? `Phoenix ${DK_PTFIX_ART} (${info.kleur}) — verdeelblok ${info.lab}, ${info.blokken} blok(ken) van 1 voeding + 18 aansluitingen` + (info.dubbel ? `\nSamengevoegd (DIN-rail te kort voor ${info.normaal} blokken): de laatste ${info.dubbel} punten krijgen 2 drivers met een dubbele adereindhuls` : "") :
     [code + " — " + (d.naam||""), info.extra ? "1 kabel (+ en −) + 1 extra klem" : "1 kabel (+ en −)", `${info.spots} spot(s)/strip(s) — serie of parallel in de armatuur`, [...new Set((d.armaturen||[]).map(a=> a.ruimte).filter(Boolean))].join(", ")].filter(Boolean).join("\n");
   let s = `<g class="uv-mod dk-blok${sel} ${soort}" data-mod="${m.id}" data-tip="${escapeHtml(tip)}">`;
   s += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="3" class="dk-blok-body"/>`;
@@ -23777,8 +23798,9 @@ function dkOmzet(p){
     draad({m: "dkd_" + dk.id, k: "k1"}, {m: blok("DA-"), k: "i"});
   }
   // elke driver op zijn eigen punt van de verdeelblokken
+  const phB = dkPhoenixB(dk, p), phN = dkDrivers(dk).length;
   drivers.forEach((d, i)=>{
-    const pt = "p" + (i+1);
+    const pt = "p" + dkPhoenixPunt(i+1, phN, phB);
     draad({m: blok("L"), k: pt}, {m: d.id, k: "L"});
     draad({m: blok("N"), k: pt}, {m: d.id, k: "N"});
     if(dk.sturing === "PUSH"){ if(d.kringId) draad({m: blok("P" + d.kringId), k: pt}, {m: d.id, k: "P"}); }
@@ -24380,7 +24402,7 @@ const UV_CTX_DK = {
     }
     if(info.soort==="phoenix"){
       zone.appendChild(el(`<div class="card uv-detail"><div class="card-body uv-sidebody"><strong>${info.soort==="schakelaar" ? "Werkschakelaar" : "Phoenix-verdeelblok " + escapeHtml(info.lab)}</strong>
-        <div class="hint">${info.soort==="schakelaar" ? "De voedingskabel (L/N) komt toe op de werkschakelaar; daarna naar de verdeelblokken L en N." : `Phoenix ${DK_PTFIX_ART}, ${info.kleur}: ${info.blokken} blok(ken) met geïntegreerde voeding en 18 push-in-aansluitingen (0,14–4 mm², 28,6 × 28,7 mm) — elke driver op zijn eigen punt (${dkDrivers(dk).length} nodig).`}</div></div></div>`));
+        <div class="hint">${info.soort==="schakelaar" ? "De voedingskabel (L/N) komt toe op de werkschakelaar; daarna naar de verdeelblokken L en N." : `Phoenix ${DK_PTFIX_ART}, ${info.kleur}: ${info.blokken} blok(ken) met geïntegreerde voeding en 18 push-in-aansluitingen (0,14–4 mm², 28,6 × 28,7 mm) — elke driver op zijn eigen punt (${dkDrivers(dk).length} nodig).${info.dubbel ? ` <b>Samengevoegd:</b> de DIN-rail is te kort voor ${info.normaal} blokken, dus ${info.blokken} blokken en de laatste ${info.dubbel} punten met 2 drivers (dubbele adereindhuls).` : ""}`}</div></div></div>`));
       return;
     }
     const d = info.driver;
