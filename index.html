@@ -3752,6 +3752,7 @@
 #cados-app .uv-side{display:flex;flex-direction:column;gap:8px;overflow:visible;}
 #cados-app .uv-werk .uv-side, #cados-app .uv-werk.kc-breed .uv-side{max-height:none !important;}
 #cados-app .uv-werk > .uv-canvas-box{position:sticky;top:8px;}
+#cados-app .uv-werk > .uv-canvas-box.uv-lang{position:relative;top:auto;}
 #cados-app .uv-canvas-wrap{scrollbar-width:thin;}
 /* 20/11/2026: zolang er een nieuwe module klaarstaat, blijft de werkbalk niet plakken (anders verdween de
    module-kiezer eronder) */
@@ -11633,11 +11634,13 @@ function renderDriverkast(){
     const keuze = wrap.querySelector("#dkKeuze");
     const tabel = state.driverkast.lijstWeergave === "tabel";
     // 27/11/2026 (Peter): vinkjes zoals in Plan -- meerdere kasten tegelijk tonen
-    keuze.innerHTML = fk.map(v=>`<span class="uv-kastvink"><input type="checkbox" data-v="${v.id}" title="tonen (vink meerdere kasten aan)" ${fk.length>1 && dkVinkAan(v.id) ? "checked" : ""}${fk.length>1?"":" hidden"}><button type="button" data-k="${v.id}" class="${huidig && v.id===huidig.id ? "actief" : ""}">${escapeHtml(dkFysiekNaam(v))} <span class="hint">${dkDrivers(v).length}</span></button></span>`).join("")
+    keuze.innerHTML = fk.map(v=>`<span class="uv-kastvink"><input type="checkbox" data-v="${v.id}" title="tonen (vink meerdere kasten aan)" ${fk.length>1 && dkVinkAan(v.id) ? "checked" : ""}${fk.length>1?"":" hidden"}><button type="button" data-k="${v.id}" class="${fk.length>1 ? (dkVinkAan(v.id) ? "actief" : "") : (huidig && v.id===huidig.id ? "actief" : "")}">${escapeHtml(dkFysiekNaam(v))} <span class="hint">${dkDrivers(v).length}</span></button></span>`).join("")
       + (fk.length>1 ? `<button type="button" data-k="__alle" class="${!huidig ? "actief" : ""}">Alle kasten</button>` : "")
       + `<span class="dk-weergave"><button type="button" data-w="blok" class="${tabel?"":"actief"}">▦ Blokjes</button><button type="button" data-w="tabel" class="${tabel?"actief":""}">☰ Tabel</button></span>`;
     keuze.querySelectorAll("button[data-k]").forEach(b=> b.addEventListener("click", ()=>{
-      if(b.dataset.k==="__alle"){ dkOverzicht = true; dkAlleSel = null; } else { dkOverzicht = false; dkHuidigId = b.dataset.k; }
+      if(b.dataset.k==="__alle"){ dkOverzicht = true; dkAlleSel = null; }
+      else if(fk.length > 1) dkVinkKast(b.dataset.k, !dkVinkAan(b.dataset.k));   // 27/11/2026: naam = vinkje omzetten
+      else { dkOverzicht = false; dkHuidigId = b.dataset.k; }
       rebuild();
     }));
     keuze.querySelectorAll("input[data-v]").forEach(c=> c.addEventListener("change", ()=>{ dkVinkKast(c.dataset.v, c.checked); rebuild(); }));
@@ -11649,14 +11652,18 @@ function renderDriverkast(){
       state.driverkast.kasten.forEach((kast, ki)=>{
         const delen = zichtbaar.filter(v=> v._bron===kast);
         if(!delen.length) return;
-        const card = renderDriverKastCard(kast, ki, rebuild, editingId, selectItem, codes,
-          movingRef, placeDriverAt, placeArmatuurAt, startMovingDriver, startMovingArmatuur, copyDriver, copyArmatuur);
-        if(huidig && (kast.planDelen||[]).length){
-          const toon = new Set(huidig.items.map(d=> d.id));
+        // 27/11/2026: een gesplitste ontwerpkast = één kaart per fysieke kast (vroeger één kaart voor alle delen samen)
+        (kast.planDelen||[]).length ? delen.forEach(deel=>{
+          const card = renderDriverKastCard(kast, ki, rebuild, editingId, selectItem, codes,
+            movingRef, placeDriverAt, placeArmatuurAt, startMovingDriver, startMovingArmatuur, copyDriver, copyArmatuur);
+          const toon = new Set(deel.items.map(d=> d.id));
           card.querySelectorAll(".rack > *").forEach(elx=>{ const id = elx.dataset.id || (elx.querySelector(".rackitem.cat-driver")||{dataset:{}}).dataset.id; if(id && !toon.has(id)) elx.style.display = "none"; });
-          const t = card.querySelector(".rij-title"); if(t) t.lastChild.textContent = dkFysiekNaam(huidig);
-        }
-        kastenwrap.appendChild(card);
+          const t = card.querySelector(".rij-title"); if(t) t.lastChild.textContent = dkFysiekNaam(deel);
+          kastenwrap.appendChild(card);
+        }) : (()=>{ const card = renderDriverKastCard(kast, ki, rebuild, editingId, selectItem, codes,
+          movingRef, placeDriverAt, placeArmatuurAt, startMovingDriver, startMovingArmatuur, copyDriver, copyArmatuur);
+          const t = card.querySelector(".rij-title"); if(t && t.lastChild && state.driverkast.kasten.some(x=> (x.planDelen||[]).length)) t.lastChild.textContent = dkFysiekNaam(delen[0]);   // nummering zoals in Plan
+          kastenwrap.appendChild(card); })();
       });
     }
     overzichtSlot.innerHTML="";
@@ -19182,6 +19189,13 @@ function renderUitvoeringsplan(ctxArg){
     if(metVink && k.id!=="__alle"){
       const grp = el(`<span class="uv-kastvink"><input type="checkbox" title="naast elkaar tonen (vink 2 of meer kasten aan)" ${ctx.vinkAan(k.id)?"checked":""}></span>`);
       grp.querySelector("input").addEventListener("change", e=>{ ctx.vinkKast(k.id, e.target.checked); uvReset(); selectTab(ctx.tab); });
+      // 27/11/2026 (Peter: "wanneer ik beide aanklik komt er maar 1 zichtbaar"): de naam aantikken zet ook het vinkje om
+      btn.className = "btn small " + (ctx.vinkAan(k.id) ? "primary" : "ghost");
+      btn.title = "aantikken = deze kast mee tonen of verbergen (zoals het vinkje)";
+      const btn2 = btn.cloneNode(true);
+      btn2.addEventListener("click", ()=>{ ctx.vinkKast(k.id, !ctx.vinkAan(k.id)); uvReset(); selectTab(ctx.tab); });
+      grp.appendChild(btn2); kastbar.appendChild(grp);
+      return;
       grp.appendChild(btn); kastbar.appendChild(grp);
     } else kastbar.appendChild(btn);
   });
@@ -19307,7 +19321,13 @@ function renderUitvoeringsplan(ctxArg){
     const top = canvasBox.getBoundingClientRect().top;
     const lint = document.querySelector(".casuite-testlint");
     const h = Math.max(420, Math.round(window.innerHeight - Math.max(0, top) - 14 - (lint ? lint.offsetHeight : 0)));
-    canvasBox.style.height = h + "px";
+    // 27/11/2026 (Peter: "het bewerkingsscherm is niet groot genoeg ... hoeft geen beperkingen in lengte te hebben"):
+    // bij zoom "Breedte" of vrij zoomen wordt het werkvlak zo lang als de tekening (de pagina scrolt), enkel bij "Kast" past alles in het scherm
+    let nodig = 0;
+    const svg = canvas.querySelector("svg");
+    if(svg && uvZoomModus !== "kast"){ const sh = parseFloat(svg.getAttribute("height")) || 0; if(sh) nodig = Math.round(sh + 14 + (canvasBox.offsetHeight - canvas.clientHeight)); }
+    canvasBox.style.height = Math.max(h, nodig) + "px";
+    canvasBox.classList.toggle("uv-lang", nodig > h);
     // 20/11/2026 (Peter: "daar zitten te veel scrollbalken"): de zijkolom scrolt mee met de pagina,
     // het werkvlak blijft bovenaan staan (sticky) -- geen aparte scrollbalk meer in de zijkolom
     side.style.maxHeight = "";
@@ -19326,6 +19346,7 @@ function renderUitvoeringsplan(ctxArg){
     svg.setAttribute("height", Math.round(vb.height*huidigeSchaal));
     const lbl = wrap.querySelector(".uv-zoomval");
     if(lbl) lbl.textContent = Math.round(huidigeSchaal*100) + "%";
+    if(uvZoomModus !== "vrij") pasHoogteAan();
     wrap.querySelector(".uv-zoom-kast").classList.toggle("actief", uvZoomModus==="kast");
     wrap.querySelector(".uv-zoom-breedte").classList.toggle("actief", uvZoomModus==="breedte");
   }
@@ -19937,7 +19958,9 @@ function renderUitvoeringsplan(ctxArg){
     if(s.soort==="pan"){ if(s.bewogen) negeerVolgendeKlik(); return; }
     if(s.soort==="mod"){
       const svgM = canvas.querySelector("svg"); if(svgM) svgM.classList.remove("sleept-mod");
-      if(!s.bewogen) return;   // gewone klik: selecteren
+      // gewone klik: selecteren. 27/11/2026 (Peter: driver aantikken toonde de zijkolom niet): door de pointer-capture
+      // komt de "click" op het werkvlak zelf terecht en niet op de driver -- dus hier rechtstreeks selecteren
+      if(!s.bewogen){ negeerVolgendeKlik(); uvSelMod = s.id; uvSelWire = null; uvSelKam = null; uvSelExtra = null; teken(); return; }
       negeerVolgendeKlik();
       if(ctx.moduleSleep.drop(kast, s.id, s.p, s.p0)){ save(); selectTab(ctx.tab); } else teken();
       return;
