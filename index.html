@@ -22805,6 +22805,7 @@ function dkPlanKast(dk){
   if(vrijeBreedte > 2 && autoKokers){ legUit(Math.floor(vrijeBreedte / (2*autoKokers))); breedteNodig = x + DK_RAND_MM; }
   const ondY0 = hk1 + spH.r;
   let hoogteNodig = ondY0 + DK_RAND_MM;
+  const kolEind = [];   // per kolom: waar de laatste driver eindigt (mm vanaf de railkant)
   cols.forEach((c, ci)=>{
     let y = ondY0;
     c.forEach(d=>{
@@ -22821,49 +22822,70 @@ function dkPlanKast(dk){
       mods.push({m, x: X0 + kx*PX, y: Y0 + yTop*PX, w: maat.l*PX, h: maat.b*PX, code: codes[d.id] || ""});
       y += maat.b + DK_TUSSEN_MM;
     });
+    kolEind[ci] = c.length ? y - DK_TUSSEN_MM : ondY0;
     hoogteNodig = Math.max(hoogteNodig, y - DK_TUSSEN_MM + DK_RAND_MM);
   });
-  // onderaan centraal: één rij naast elkaar, gecentreerd op de plaat, tegen de rand tegenover de rail
-  let kokerEinde = null;
+  // onderaan centraal, tegen de rand tegenover de rail -- naast elkaar (één rij) of, 27/11/2026 (Peter: "die onderste
+  // drivers moeten ook boven elkaar geplaatst kunnen worden ... die koker wordt dan ook ingekort om de plaat niet langer te
+  // moeten maken"), boven elkaar onder de meest logische verticale koker. Enkel de kolommen en kokers die echt boven het
+  // blok liggen, bepalen hoe hoog het blok mag komen; enkel díe kokers worden ingekort.
+  let onderBlok = null;
   if(onderDrv.length){
     // 90° gedraaid (Peter): lengte en breedte wisselen, de aansluitingen komen aan de bovenkant (naar de rail)
     const rot = (d)=> !!(p.roteer && p.roteer[d.id]);
     const maten = onderDrv.map(d=>{ const m = dkDriverMaat(d); return rot(d) ? Object.assign({}, m, {l: m.b, b: m.l}) : m; });
-    const rijB = maten.reduce((t, m)=> t + m.l, 0) + DK_TUSSEN_MM*(maten.length - 1);
-    const rijH = Math.max(...maten.map(m=> m.b));
-    const kolOnder = hoogteNodig - DK_RAND_MM;            // einde van de kolommen
-    const y0 = Math.max(kolOnder + DK_TUSSEN_MM, H - DK_RAND_MM - rijH);
-    kokerEinde = y0 - DK_TUSSEN_MM;
+    const stapel = !!p.onderStapel && onderDrv.length > 1;
     const plaatB = Math.max(p.breedte, breedteNodig);
-    let xo = Math.max(DK_RAND_MM, (plaatB - rijB)/2);
+    const vk = Object.entries(vKoker).map(([ci, v])=> Object.assign({ci: +ci}, v));
+    // meest logische koker: die het dichtst bij het midden van de plaat
+    const midKoker = vk.slice().sort((a, b)=> Math.abs((a.x0+a.x1)/2 - plaatB/2) - Math.abs((b.x0+b.x1)/2 - plaatB/2))[0] || null;
+    const blokB = stapel ? Math.max(...maten.map(m=> m.l)) : maten.reduce((t, m)=> t + m.l, 0) + DK_TUSSEN_MM*(maten.length - 1);
+    const blokH = stapel ? maten.reduce((t, m)=> t + m.b, 0) + DK_TUSSEN_MM*(maten.length - 1) : Math.max(...maten.map(m=> m.b));
+    const cxBlok = stapel && midKoker ? (midKoker.x0 + midKoker.x1)/2 : plaatB/2;
+    const bx0 = Math.min(Math.max(DK_RAND_MM, cxBlok - blokB/2), Math.max(DK_RAND_MM, plaatB - DK_RAND_MM - blokB)), bx1 = bx0 + blokB;
+    const overlapt = (a0, a1)=> a1 > bx0 - 1 && a0 < bx1 + 1;
+    // einde van de kolommen die boven het blok liggen
+    let kolOnder = ondY0 - DK_TUSSEN_MM;
+    cols.forEach((c, ci)=>{ if(kolX[ci] && c.length && overlapt(kolX[ci].x0, kolX[ci].x1)) kolOnder = Math.max(kolOnder, kolEind[ci]); });
+    const y0 = Math.max(kolOnder + DK_TUSSEN_MM, H - DK_RAND_MM - blokH);
+    const ingekort = new Set(vk.filter(v=> overlapt(v.x0, v.x1)).map(v=> v.ci));
+    onderBlok = {x0: bx0, x1: bx1, y0, y1: y0 + blokH, kokerEinde: y0 - DK_TUSSEN_MM, ingekort, stapel,
+      koker: (midKoker && ingekort.has(midKoker.ci)) ? "V" + midKoker.ci : (vk.filter(v=> ingekort.has(v.ci))[0] ? "V" + vk.filter(v=> ingekort.has(v.ci))[0].ci : (midKoker ? "V" + midKoker.ci : ""))};
     const midden = (ci)=> kolX[ci] ? (kolX[ci].x0 + kolX[ci].x1)/2 : 0;
+    let xo = bx0, yo = y0;
     onderDrv.forEach((d, i)=>{
-      const maat = maten[i], cx = xo + maat.l/2;
+      const maat = maten[i];
+      const xd = stapel ? bx0 + (blokB - maat.l)/2 : xo;
+      const cx = xd + maat.l/2;
       let ci = 0; for(let q=1; q<k; q++) if(Math.abs(midden(q) - cx) < Math.abs(midden(ci) - cx)) ci = q;
       const kant = dkKant(p, d, ci, k);
-      const yTop = boven ? y0 + (rijH - maat.b) : H - y0 - rijH;
+      const yTop = stapel ? (boven ? yo : H - yo - maat.b) : (boven ? y0 + (blokH - maat.b) : H - y0 - blokH);
       let klemmen = dkDriverKlemmen(d, dk.sturing, kant);
       if(rot(d)) klemmen = klemmen.map(q=>{ const x = parseFloat(q.x)||0, y = parseFloat(q.y)||0;
         return boven ? Object.assign({}, q, {x: 1 - y, y: x, zijde: x < 0.5 ? "boven" : "onder"}) : Object.assign({}, q, {x: y, y: 1 - x, zijde: x < 0.5 ? "onder" : "boven"}); });
-      const m = {id: d.id, categorie: "Driver", naam: d.naam, breedte: 1, _dk: {soort: "driver", driver: d, maat, spanning: dkIsSpanning(d), kant, kolom: ci, onderaan: true, geroteerd: rot(d)},
+      const m = {id: d.id, categorie: "Driver", naam: d.naam, breedte: 1, _dk: {soort: "driver", driver: d, maat, spanning: dkIsSpanning(d), kant, kolom: ci, onderaan: true, geroteerd: rot(d), stapel},
         klemmenEigen: klemmen};
-      mods.push({m, x: X0 + xo*PX, y: Y0 + yTop*PX, w: maat.l*PX, h: maat.b*PX, code: codes[d.id] || ""});
-      xo += maat.l + DK_TUSSEN_MM;
+      mods.push({m, x: X0 + xd*PX, y: Y0 + yTop*PX, w: maat.l*PX, h: maat.b*PX, code: codes[d.id] || ""});
+      xo += maat.l + DK_TUSSEN_MM; yo += maat.b + DK_TUSSEN_MM;
     });
-    hoogteNodig = Math.max(hoogteNodig, y0 + rijH + DK_RAND_MM);
-    breedteNodig = Math.max(breedteNodig, rijB + 2*DK_RAND_MM);
+    hoogteNodig = Math.max(hoogteNodig, y0 + blokH + DK_RAND_MM);
+    breedteNodig = Math.max(breedteNodig, blokB + 2*DK_RAND_MM);
   }
   const totB = Math.max(p.breedte, breedteNodig, railLengte), totH = Math.max(H, hoogteNodig);
   const hkY0 = Math.min(yMM(hk0), yMM(hk1)), hkY1 = Math.max(yMM(hk0), yMM(hk1));
   kokers.push({id: "H", soort: "h", x0: X0 + DK_RAND_MM*PX, x1: X0 + (totB - DK_RAND_MM)*PX, y0: Y0 + hkY0*PX, y1: Y0 + hkY1*PX, mm: dkKokerMM(p, "H")});
-  let vA = boven ? hk1 : (totH - (H - DK_RAND_MM)), vB = boven ? totH - DK_RAND_MM : H - hk1;
-  if(kokerEinde != null){ if(boven) vB = kokerEinde; else vA = H - kokerEinde; }   // kokers stoppen boven de onderste drivers
-  Object.entries(vKoker).forEach(([ci, v])=> kokers.push({id: "V" + ci, soort: "v", kol: +ci, x0: X0 + v.x0*PX, x1: X0 + v.x1*PX, y0: Y0 + Math.min(vA, vB)*PX, y1: Y0 + Math.max(vA, vB)*PX, mm: v.mm}));
+  const vA0 = boven ? hk1 : (totH - (H - DK_RAND_MM)), vB0 = boven ? totH - DK_RAND_MM : H - hk1;
+  Object.entries(vKoker).forEach(([ci, v])=>{
+    let vA = vA0, vB = vB0;
+    // enkel de kokers boven het onderste blok stoppen erboven ("die koker wordt dan ook ingekort")
+    if(onderBlok && onderBlok.ingekort.has(+ci)){ if(boven) vB = onderBlok.kokerEinde; else vA = H - onderBlok.kokerEinde; }
+    kokers.push({id: "V" + ci, soort: "v", kol: +ci, x0: X0 + v.x0*PX, x1: X0 + v.x1*PX, y0: Y0 + Math.min(vA, vB)*PX, y1: Y0 + Math.max(vA, vB)*PX, mm: v.mm, ingekort: !!(onderBlok && onderBlok.ingekort.has(+ci))});
+  });
   const idx = dkFysiekeKasten().findIndex(x=> x.id === dk.id);
   dkEigen(p, {
     rijen: [{id: "dk-alle", items: mods.map(md=> md.m)}],
     maat: Math.ceil(p.breedte/18), naam: "Driverkast " + (idx+1), _dk: dk, _codes: codes, _breedtePx: p.breedte*PX,
-    _layout: {mods, kokers, breedteNodig, hoogteNodig, railLengte, boven},
+    _layout: {mods, kokers, breedteNodig, hoogteNodig, railLengte, boven, onderKoker: onderBlok ? onderBlok.koker : ""},
     _geometrie: dkGeometrie, _dkAchtergrond: (geo)=> dkAchtergrondSvg(p, geo), _dxfExtra: (d, geo)=> dkDxfExtra(p, d, geo)
   });
   return p;
@@ -22882,13 +22904,14 @@ function dkGeometrie(p){
   const height = DK_TOP_PX + Math.max(p.hoogte, L.hoogteNodig)*PX + 20;
   return {mods: L.mods, klemPos, width, height, codes: p._codes, gootTop: [], hoogte: [], kamBand: [], rijY: [], rijH: [],
     plan: {perDraad: {}, banen: [], zijN: {L: 0, R: 0}}, padL: UV.PADX, padR: UV.PADX, kastR: UV.PADX + p.breedte*PX,
-    _eigen: true, _absoluut: true, _router: dkRoutes, kokers: L.kokers};
+    _eigen: true, _absoluut: true, _router: dkRoutes, kokers: L.kokers, onderKoker: L.onderKoker, boven: L.boven};
 }
 // In welke koker komt een klem uit?
 function dkKokerVoorKlem(geo, pos){
   const ks = geo.kokers;
   const H = ks.find(k=> k.soort==="h");
   const info = pos.m._dk || {};
+  if(info.soort === "driver" && info.onderaan && geo.onderKoker){ const ok = ks.find(k=> k.id===geo.onderKoker); if(ok) return ok; }
   if(info.soort === "driver"){
     const kant = pos.k.zijde === "links" ? info.kolom : info.kolom + 1;
     const v = ks.filter(k=> k.soort==="v");
@@ -22907,14 +22930,39 @@ function dkRoutes(kast, geo){
     return 3 + ((n - 1) % max)*stap + (Math.floor((n-1)/max) % 2)*stap/2;
   };
   const H = geo.kokers.find(k=> k.soort==="h");
+  // 27/11/2026: een driver "onderaan centraal" staat onder het einde van de koker -- de draad gaat eerst opzij naast de
+  // driver (zijn eigen baan), dan recht naar het einde van de koker en pas daar de koker in.
+  const zij = {};
+  const mdVan = (id)=> geo.mods.find(md=> md.m.id===id);
+  const onderIn = (P)=>{
+    const info = P.m._dk || {};
+    if(info.soort !== "driver" || !info.onderaan) return null;
+    const K = dkKokerVoorKlem(geo, P), md = mdVan(P.m.id);
+    if(!K || K.soort !== "v" || !K.ingekort || !md) return null;
+    const links = P.x < md.x + md.w/2;
+    const sl = (info.stapel ? "stapel" : md.m.id) + (links ? "L" : "R");   // gestapeld: één gedeelde baan per zijkant
+    zij[sl] = (zij[sl]||0) + 1;
+    const off = 4 + (zij[sl]-1)*2.6;
+    const sx = links ? md.x - off : md.x + md.w + off;
+    const ey = geo.boven ? K.y1 + 4 : K.y0 - 4;          // net onder (of boven) het einde van de koker
+    // aansluiting aan de boven-/onderkant (90° gedraaid): eerst even verticaal weg van de driver
+    const binnen = P.x > md.x + 2 && P.x < md.x + md.w - 2;
+    const pts = binnen ? [{x: P.x, y: P.y}, {x: P.x, y: geo.boven ? md.y - 3 : md.y + md.h + 3}, {x: sx, y: geo.boven ? md.y - 3 : md.y + md.h + 3}, {x: sx, y: ey}]
+                       : [{x: P.x, y: P.y}, {x: sx, y: P.y}, {x: sx, y: ey}];
+    return {K, pts, entry: {x: sx, y: ey}};
+  };
   return kast.bedrading.map(w=>{
-    const A = geo.klemPos[uvKlemKey(w.a.m, w.a.k)], B = geo.klemPos[uvKlemKey(w.b.m, w.b.k)];
-    if(!A || !B) return null;
+    const A0 = geo.klemPos[uvKlemKey(w.a.m, w.a.k)], B0 = geo.klemPos[uvKlemKey(w.b.m, w.b.k)];
+    if(!A0 || !B0) return null;
+    let A = A0, B = B0;
     let verts;
     if(Array.isArray(w.punten) && w.punten.length){
       verts = uvVertsVoor(A, B, w.punten.map(q=> uvDecodeerPunt(q, geo)));
     } else {
-      const ka = dkKokerVoorKlem(geo, A), kb = dkKokerVoorKlem(geo, B);
+      const oa = onderIn(A0), ob = onderIn(B0);
+      if(oa) A = Object.assign({}, A0, oa.entry);
+      if(ob) B = Object.assign({}, B0, ob.entry);
+      const ka = oa ? oa.K : dkKokerVoorKlem(geo, A), kb = ob ? ob.K : dkKokerVoorKlem(geo, B);
       const hy = H.y0 + baan(H);
       if(ka===kb && ka.soort==="v"){
         const lx = ka.x0 + baan(ka);
@@ -22931,9 +22979,11 @@ function dkRoutes(kast, geo){
         const la = ka.x0 + baan(ka), lb = kb.x0 + baan(kb);
         verts = [{x: A.x, y: A.y}, {x: la, y: A.y}, {x: la, y: hy}, {x: lb, y: hy}, {x: lb, y: B.y}, {x: B.x, y: B.y}];
       }
+      if(oa) verts = oa.pts.slice(0, -1).concat(verts);
+      if(ob) verts = verts.concat(ob.pts.slice(0, -1).reverse());
       verts = uvVereenvoudig(verts);
     }
-    return {w, A, B, verts, d: uvPad(verts), handmatig: !!(w.punten && w.punten.length), tussen: false};
+    return {w, A: A0, B: B0, verts, d: uvPad(verts), handmatig: !!(w.punten && w.punten.length), tussen: false};
   }).filter(Boolean);
 }
 function dkAchtergrondSvg(p, geo){
@@ -23126,7 +23176,7 @@ function dkPastOp(dk, plaatB, plaatH){
 }
 function dkKastAdvies(dk){
   const p = dkPlan(dk);
-  const sig = JSON.stringify([dkDrivers(dk).map(d=> [d.naam, d.armaturen && d.armaturen.map(a=> a.aantal)]), p.klemExtra, p.draai, p.onderaan, p.roteer, p.kokerV, p.kokerH, p.kokerBreedte, p.kokerSpatie, p.rkDubbel, p.klemMM, p.eindplaatPerDriver, p.railKoker, p.sorteer, p.vulling, p.formaatVast, p.vasteKolommen, dk.sturing,
+  const sig = JSON.stringify([dkDrivers(dk).map(d=> [d.naam, d.armaturen && d.armaturen.map(a=> a.aantal)]), p.klemExtra, p.draai, p.onderaan, p.onderStapel, p.roteer, p.kokerV, p.kokerH, p.kokerBreedte, p.kokerSpatie, p.rkDubbel, p.klemMM, p.eindplaatPerDriver, p.railKoker, p.sorteer, p.vulling, p.formaatVast, p.vasteKolommen, dk.sturing,
     Object.keys(cadosInst).filter(k=> k.startsWith("driver_maat:")).map(k=> JSON.stringify(cadosInst[k]))]);
   if(dkAdviesCache.has(sig)) return dkAdviesCache.get(sig);
   const lijst = RITTAL_AX.map(k=> Object.assign({}, k, dkPastOp(dk, k.pb, k.ph)));
@@ -23686,7 +23736,9 @@ const UV_CTX_DK = {
         <button class="btn small ghost dk-mv" data-r="op" title="hoger in de kolom">↑</button><button class="btn small ghost dk-mv" data-r="neer" title="lager in de kolom">↓</button>
         <button class="btn small ghost dk-mv" data-r="links" title="naar de kolom links">← kolom</button><button class="btn small ghost dk-mv" data-r="rechts" title="naar de kolom rechts (of een nieuwe)">kolom →</button></div>
         <div class="uv-knoprij" style="margin-top:6px;">${info.onderaan
-          ? `<button class="btn small primary dk-mv" data-r="kolom" title="terug in zijn kolom zetten">⤒ Terug in kolom</button><button class="btn small ${info.geroteerd?"primary":"ghost"} dk-rot" title="driver 90° draaien zodat hij beter past">⟳ 90°</button><span class="hint">onderaan centraal, zonder kabelkoker</span>`
+          ? `<button class="btn small primary dk-mv" data-r="kolom" title="terug in zijn kolom zetten">⤒ Terug in kolom</button><button class="btn small ${info.geroteerd?"primary":"ghost"} dk-rot" title="driver 90° draaien zodat hij beter past">⟳ 90°</button>
+             <span style="flex-basis:100%;height:0"></span><span class="hint" style="align-self:center">Drivers onderaan:</span><button class="btn small ${!p.onderStapel?"primary":"ghost"} dk-stapel" data-s="0" title="alle drivers onderaan naast elkaar, in één rij">▤ naast elkaar</button><button class="btn small ${p.onderStapel?"primary":"ghost"} dk-stapel" data-s="1" title="boven elkaar onder de middelste koker; die koker wordt ingekort en de draden lopen erdoor">▥ boven elkaar</button>
+             <span class="hint" style="flex-basis:100%">onderaan centraal, zonder kabelkoker; de draden lopen naast de driver naar het einde van de koker erboven</span>`
           : `<button class="btn small ghost dk-mv" data-r="onder" title="driver centraal onderaan de plaat, zonder kabelkoker">⤓ Onderaan centraal</button>`}</div></div>` : ""}
       ${isDriver ? `<label class="uv-veld">Kast<select class="dk-naarkast">
         ${dkFysiekeKasten().filter(k=> k._bron === dk._bron).map(k=> `<option value="${k.id}" ${k.id===dk.id?"selected":""}>${escapeHtml(dkFysiekNaam(k))}</option>`).join("")}
@@ -23695,6 +23747,7 @@ const UV_CTX_DK = {
     </div></div>`);
     box.querySelector(".dk-ps").addEventListener("change", e=>{ if(e.target.value==="1") p.klemExtra[d.id] = true; else delete p.klemExtra[d.id]; save(); h.rerender(); });
     box.querySelectorAll(".dk-mv").forEach(b=> b.addEventListener("click", ()=>{ dkVerplaats(p, d.id, b.dataset.r); save(); h.rerender(); }));
+    box.querySelectorAll(".dk-stapel").forEach(b=> b.addEventListener("click", ()=>{ p.onderStapel = b.dataset.s==="1"; save(); h.rerender(); }));
     const rb = box.querySelector(".dk-rot");
     if(rb) rb.addEventListener("click", ()=>{ p.roteer = Object.assign({}, p.roteer); if(p.roteer[d.id]) delete p.roteer[d.id]; else p.roteer[d.id] = true; save(); h.rerender(); });
     box.querySelectorAll(".dk-kant").forEach(b=> b.addEventListener("click", ()=>{ p.draai[d.id] = b.dataset.k; save(); h.rerender(); }));
@@ -27501,12 +27554,36 @@ function dkKringHerstelVoorstel(){
   state.verlichting.items.forEach(v=>{ if(v.kringId) krijgt.add(v.kringId); });
   const leeg = kr.filter(k=> !krijgt.has(k.id) && !gebruikt.has(k.id) && !k.zekeringModuleId && /^(Spots|Ledstrip|DALI track)\b/.test(k.info||"")
     && kr.some(x=> x!==k && x.kamer===k.kamer && x.info===k.info && krijgt.has(x.id)));
-  return {koppel, leeg};
+  // 27/11/2026 (Peter: "Er blijven ook problemen met gekoppelde automaten"): dubbele kringen (zelfde kamer + zelfde
+  // omschrijving, uit een offerte die in delen ingelezen werd) die nog aan een knop hangen maar zelf geen verbruiker,
+  // automaat of relaisuitgang hebben. De knop gaat over naar de kring mét verbruikers, daarna mag de kopie weg.
+  // Ook volledig ongebruikte kopieën van andere kringen (bv. "Stopcontact geschakeld") gaan weg.
+  const relaisDoel = new Set(); try{ alleZekeringUitgangen().forEach(e=>{ if(e.uitgang && e.uitgang.targetId) relaisDoel.add(e.uitgang.targetId); }); }catch(_e){}
+  const knopDoel = new Set(); state.knoppen.items.forEach(k=> (k.gangen||[]).forEach(g=>{ if(g.kringId) knopDoel.add(g.kringId); }));
+  const heeftVerbr = (k)=> krijgt.has(k.id);
+  const losKopie = (k)=> !heeftVerbr(k) && !k.zekeringModuleId && !relaisDoel.has(k.id);
+  const leegIds = new Set(leeg.map(k=> k.id));
+  const dubbel = []; // {weg, naar}
+  const groepen = new Map();
+  kr.forEach(k=>{ if(!k.info) return; const s = (k.kamer||"") + "|" + k.info; if(!groepen.has(s)) groepen.set(s, []); groepen.get(s).push(k); });
+  groepen.forEach(g=>{
+    if(g.length < 2) return;
+    const houder = g.find(heeftVerbr) || g.find(k=> k.zekeringModuleId) || g.find(k=> knopDoel.has(k.id)) || g[0];
+    g.forEach(k=>{
+      if(k===houder || leegIds.has(k.id) || !losKopie(k)) return;
+      if(knopDoel.has(k.id)){ if(heeftVerbr(houder) || houder.zekeringModuleId) dubbel.push({weg: k, naar: houder}); }
+      else dubbel.push({weg: k, naar: houder});
+    });
+  });
+  return {koppel, leeg, dubbel};
 }
 function dkKringHerstel(){
   const v = dkKringHerstelVoorstel();
   v.koppel.forEach(({d, k})=>{ d.kringId = k.id; });
   const weg = new Set(v.leeg.map(k=> k.id));
+  const naar = new Map((v.dubbel||[]).map(x=> [x.weg.id, x.naar.id]));
+  state.knoppen.items.forEach(kn=> (kn.gangen||[]).forEach(g=>{ if(g.kringId && naar.has(g.kringId)) g.kringId = naar.get(g.kringId); }));
+  naar.forEach((_n, id)=> weg.add(id));
   state.kringen.items = state.kringen.items.filter(k=> !weg.has(k.id));
   return {gekoppeld: v.koppel.length, weg: weg.size};
 }
@@ -27527,13 +27604,19 @@ function renderKoppelenPagina(){
   const extra = wrap.querySelector(".kp-extra");
   try{
     const hv = dkKringHerstelVoorstel();
-    if(hv.koppel.length){
-      const b = el(`<div class="conflict-banner" style="margin:0 0 12px;"><div class="conflict-title">🔧 ${hv.koppel.length} driver(s) zijn hun verlichtingskring kwijt</div>
-        <div class="hint" style="margin:4px 0 8px;">Hun voeding is in orde (via de automaat van de driverkast), maar de kring waarmee knoppen ze aansturen hangt los. Daardoor staan die kringen hier als "zonder automaat".${hv.leeg.length ? ` Daarnaast ${hv.leeg.length} lege dubbele driverkring(en) die nergens gebruikt worden.` : ""}</div>
-        <button type="button" class="btn small btn-primary">Drivers terug aan hun kring koppelen${hv.leeg.length ? " + dubbels opruimen" : ""}</button></div>`);
-      b.querySelector("button").addEventListener("click", ()=> vlBevestig("Drivers terug aan hun kring koppelen?",
-        `${hv.koppel.length} driver(s) krijgen opnieuw de kring met dezelfde kamer en hetzelfde soort (bv. "Spots 350mA 15W"); bij dubbele kringen die van de knop.` + (hv.leeg.length ? `<br>${hv.leeg.length} lege dubbele kring(en) worden verwijderd (geen knop, automaat of verbruiker eraan).` : ""),
-        "🔧 Herstellen", ()=>{ const r = dkKringHerstel(); save(); selectTab("koppelen"); toast(`${r.gekoppeld} driver(s) gekoppeld` + (r.weg ? `, ${r.weg} lege kring(en) opgeruimd` : "")); }));
+    const nDub = (hv.dubbel||[]).length, nWeg = hv.leeg.length + nDub;
+    if(hv.koppel.length || nDub){
+      const kc = computeKringCodes();
+      const dubLijst = (hv.dubbel||[]).slice(0, 12).map(x=> `${escapeHtml(kc[x.weg.id]||"?")} → ${escapeHtml(kc[x.naar.id]||"?")} (${escapeHtml(x.weg.kamer||"")} — ${escapeHtml(x.weg.info||"")})`).join("<br>") + (nDub > 12 ? `<br>… en nog ${nDub-12}` : "");
+      const titel = hv.koppel.length ? `🔧 ${hv.koppel.length} driver(s) zijn hun verlichtingskring kwijt` : `🔧 ${nDub} dubbele kring(en) zonder verbruiker`;
+      const b = el(`<div class="conflict-banner" style="margin:0 0 12px;"><div class="conflict-title">${titel}</div>
+        <div class="hint" style="margin:4px 0 8px;">${hv.koppel.length ? `Hun voeding is in orde (via de automaat van de driverkast), maar de kring waarmee knoppen ze aansturen hangt los. Daardoor staan die kringen hier als "zonder automaat". ` : ""}${nWeg ? `${nWeg} dubbele kring(en) (zelfde kamer en omschrijving, zonder eigen verbruiker of automaat) kunnen weg; knoppen die eraan hangen gaan over naar de kring met de drivers.` : ""}</div>
+        <button type="button" class="btn small btn-primary">${hv.koppel.length ? "Drivers terug aan hun kring koppelen" : "Dubbele kringen opruimen"}${hv.koppel.length && nWeg ? " + dubbels opruimen" : ""}</button></div>`);
+      b.querySelector("button").addEventListener("click", ()=> vlBevestig(hv.koppel.length ? "Drivers terug aan hun kring koppelen?" : "Dubbele kringen opruimen?",
+        (hv.koppel.length ? `${hv.koppel.length} driver(s) krijgen opnieuw de kring met dezelfde kamer en hetzelfde soort (bv. "Spots 350mA 15W"); bij dubbele kringen die van de knop.<br>` : "") +
+        (hv.leeg.length ? `${hv.leeg.length} lege dubbele driverkring(en) worden verwijderd (geen knop, automaat of verbruiker eraan).<br>` : "") +
+        (nDub ? `${nDub} dubbele kring(en) gaan weg; een knop die eraan hangt, gaat over naar de andere kring:<br><span style="font-size:12px">${dubLijst}</span>` : ""),
+        "🔧 Herstellen", ()=>{ const r = dkKringHerstel(); save(); selectTab("koppelen"); toast((r.gekoppeld ? `${r.gekoppeld} driver(s) gekoppeld` : "Opgeruimd") + (r.weg ? `, ${r.weg} dubbele kring(en) weg` : "")); }));
       wrap.querySelector(".kp-pagina-tabs").insertAdjacentElement("beforebegin", b);
     }
   }catch(e){ console.warn("CaDos: kringherstel", e); }
@@ -27744,6 +27827,62 @@ function kvBereken(){
     const u = vrijSchak.shift(); if(!u) return;
     wijz.push({soort:"230V-kringen → schakelactor", tekst:`kring ${kc[k.id]||""} ${k.kamer||""} ${k.info||""} → ${u.module.naam||"actor"} uitgang ${u.module.uitgangen.indexOf(u.uitgang)+1}`, doe:()=>{ u.uitgang.type="kring"; u.uitgang.targetId=k.id; }});
   });
+  // f. 27/11/2026 (Peter: "Er blijven ook problemen met gekoppelde automaten"): kringen en 230V-lichtpunten zonder
+  // automaat -> de automaat die er volgens naam, kamer en verdieping bij hoort (zoals de AREI-verdeling ze maakt):
+  //   "Stopcontacten X" -> STOPCONTACTEN X; "Stopcontact geschakeld" -> GESCHAKELDE STOPCONTACTEN ... <KAMER> ...;
+  //   kastverlichting -> KASTVERLICHTING <verdieping>; lichtpunt 230V -> VERLICHTING DALI 230V <verdieping> (DALI) of
+  //   SCHAKELACTOR VERLICHTING / VERLICHTING <verdieping>. Enkel als er precies één passende automaat is.
+  try{
+    const auts = alleZekeringAutomaten();
+    const nm = (a)=> String(a.naam||"").toUpperCase();
+    const verdRe = (kamer)=>{
+      const c = String(kamerVerdieping(kamer)||"").toUpperCase();
+      if(/TUIN|BUITEN/i.test(kamer||"") || c==="B") return /TUIN|BUITEN/;
+      if(c==="G" || c==="GV") return /GELIJKVLOERS|\bGV\b/;
+      if(/^V\d*$|^V$|^\d+$/.test(c)) return /VERDIEP/;
+      return null;
+    };
+    const kies = (kand, kamer)=>{
+      if(kand.length===1) return kand[0];
+      const re = verdRe(kamer); if(!re) return null;
+      const v = kand.filter(a=> re.test(nm(a)));
+      if(v.length===1) return v[0];
+      return null;
+    };
+    const lichtAut = (kamer, dali)=>{
+      if(/TUIN|BUITEN/i.test(kamer||"") || String(kamerVerdieping(kamer)||"").toUpperCase()==="B"){ const t = auts.filter(a=> /VERLICHTING\s+(TUIN|BUITEN)/.test(nm(a))); if(t.length===1) return t[0]; }
+      if(dali){ const d = kies(auts.filter(a=> /VERLICHTING/.test(nm(a)) && /DALI/.test(nm(a))), kamer); if(d) return d; }
+      const s = auts.filter(a=> /SCHAKELACTOR\s+VERLICHTING/.test(nm(a))); if(s.length===1) return s[0];
+      return kies(auts.filter(a=> /^VERLICHTING\b/.test(nm(a)) && !/TUIN|BUITEN/.test(nm(a))), kamer);
+    };
+    const autVoorKring = (k)=>{
+      const info = String(k.info||""), K = String(k.kamer||"").toUpperCase();
+      let m = info.match(/^stopcontacten\s+(.+?)\s*(\(|$)/i);
+      if(m){ const want = "STOPCONTACTEN " + m[1].toUpperCase(); const t = auts.filter(a=> nm(a)===want); return t.length===1 ? t[0] : null; }
+      if(/stopcontact.*geschakeld|geschakeld.*stopcontact/i.test(info)){ const t = auts.filter(a=> /GESCHAKELDE\s+STOPCONTACTEN/.test(nm(a)) && K && nm(a).includes(K)); return t.length===1 ? t[0] : null; }
+      if(/kastverlichting/i.test(info)) return kies(auts.filter(a=> /KASTVERLICHTING/.test(nm(a))), k.kamer);
+      const leden = state.verlichting.items.filter(v=> !v.leeg && v.kringId===k.id);
+      if(/lichtpunt\s*230/i.test(info) || leden.length){
+        const dali = leden.length ? leden.every(v=> v.aansluiting==="dali") : /dali/i.test(info);
+        return lichtAut(k.kamer, dali);
+      }
+      return null;
+    };
+    const ac = (a)=> [a.code, a.naam].filter(Boolean).join(" ");
+    state.kringen.items.forEach(k=>{
+      if(k.leeg || k.zekeringModuleId || driversInKring(k.id).length) return;
+      if(azKetenRond(k)) return;
+      const a = autVoorKring(k); if(!a) return;
+      wijz.push({soort:"Kringen → automaat (op naam)", tekst:`kring ${kc[k.id]||""} ${k.kamer||""} ${k.info||""} → ${ac(a)}`, doe:()=>{ k.zekeringModuleId = a.id; }});
+    });
+    const vc = computeVerlichtingCodes();
+    state.verlichting.items.forEach(v=>{
+      if(v.leeg || v.zekeringModuleId || v.kringId) return; // met kring: volgt de kring
+      if(azKetenRond(v)) return;
+      const a = lichtAut(v.kamer, v.aansluiting==="dali"); if(!a) return;
+      wijz.push({soort:"Kringen → automaat (op naam)", tekst:`lichtpunt ${vc[v.id]||""} ${v.kamer||""} ${v.naam||""} → ${ac(a)}`, doe:()=>{ v.zekeringModuleId = a.id; }});
+    });
+  }catch(e){ console.warn("koppelvoorstel automaten", e); }
   // opkuis: kastverlichting die (uit een vroegere import) toch op een actor staat, terug losmaken
   alleZekeringUitgangen().filter(e=> e.uitgang.type==="kring" && e.uitgang.targetId).forEach(e=>{
     const k = state.kringen.items.find(x=> x.id===e.uitgang.targetId);
