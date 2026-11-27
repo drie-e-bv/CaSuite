@@ -3931,6 +3931,9 @@
 
 .uv-svg .uv-mod.versleept{opacity:.75;pointer-events:none;filter:drop-shadow(0 4px 6px rgba(0,0,0,.3));}
 .uv-svg .dk-driver{cursor:grab;}
+.uv-svg .dk-kabel5g{cursor:pointer;}
+.uv-svg .dk-kabel5g-body{fill:#fff7ef;stroke:#bb5e26;stroke-width:1.2;stroke-dasharray:4 2;}
+.uv-svg .dk-kabel5g.sel .dk-kabel5g-body{stroke-width:3;stroke-dasharray:none;}
 .uv-svg .dk-drop{fill:none;stroke:#2F7A4D;stroke-width:3;stroke-dasharray:6 4;pointer-events:none;}
 
 #cados-app .uv-werk.met-links{grid-template-columns:250px minmax(0,1fr) 260px;}
@@ -8032,8 +8035,17 @@ function computeDriverCodes(){
   const codes = {};
   let huidig = 0;
   const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  let vc = null;
   state.driverkast.kasten.forEach(kast=>{
     kast.items.forEach(driver=>{
+      // 27/11/2026 (Peter): een 5G1,5-kabel (configuratie A) behoudt het nummer van zijn 230V-lichtpunt (100-reeks)
+      // en telt niet mee in de D-nummering
+      if(driver.vijfG === "A" && driver.lichtpuntId){
+        if(!vc) vc = computeVerlichtingCodes();
+        const c5 = vc[driver.lichtpuntId] || "5G";
+        codes[driver.id] = c5; (driver.armaturen||[]).forEach(arm=>{ codes[arm.id] = c5; });
+        return;
+      }
       const override = parseInt(driver.manueelNummer);
       const nummer = (driver.manueelNummer!=="" && !Number.isNaN(override)) ? override : huidig+1;
       huidig = nummer;
@@ -8849,7 +8861,7 @@ function crDriverRapport(v, o){
   const rijen = drivers.slice().sort((a, b)=> rang(a) - rang(b)).map(d=>{
     const arms = (d.armaturen || []).filter(a=> a.naam || a.aantal);
     const w = arms.reduce((t, a)=>{ const c = armatuurLookup(a.naam); return t + (c ? c.wattage*(parseFloat(a.aantal)||0) : 0); }, 0);
-    return {cellen: [pos[d.id] || "", dc[d.id] || "", dkKamerVanDriver(d) || "", d.naam || "", d.type || "", w > 0 ? Math.round(w*10)/10 + " W" : "",
+    return {cellen: [pos[d.id] || (dk5gA(d) ? "5G onder kast" : ""), dc[d.id] || "", dkKamerVanDriver(d) || "", d.naam || "", d.type || "", w > 0 ? Math.round(w*10)/10 + " W" : "",
       arms.map(a=> `${a.aantal || 1}× ${a.naam || "armatuur"}`).join("; "), kc[d.kringId] || "", d.zekeringModuleId ? crAutLabel(d.zekeringModuleId, aut) : (voedCode ? voedCode + " (kast)" : "")]};
   });
   const pl = p || {};
@@ -22993,6 +23005,10 @@ function dkVoedingZekVan(v){ return (v && v.plan && v.plan.voedingZek) || (v && 
 function dkFysiekVanDriver(d){ const ks = dkFysiekeKasten(); const i = ks.findIndex(v=> (v.items||[]).includes(d)); return i < 0 ? null : {v: ks[i], nr: i + 1}; }
 function dkFysiekNaam(v){ const n = dkFysiekNr(v); return "Driverkast " + n + (v.kamer && !(v._bron.planDelen||[]).length ? " · " + v.kamer : ""); }
 function dkDrivers(dk){ return (dk.items||[]).filter(d=> !d.leeg && (d.categorie||"Driver")==="Driver"); }
+// 27/11/2026 (Peter): 5G1,5-kabels (configuratie A) nemen geen plaats in de kast in en krijgen geen rijgklemmen:
+// ze worden onder de kast getekend en komen enkel op de Phoenix-verdeelblokken.
+function dkInKast(dk){ return dkDrivers(dk).filter(d=> !dk5gA(d)); }
+function dk5gKabels(dk){ return dkDrivers(dk).filter(d=> dk5gA(d)); }
 // Volgorde op de rail en de verdeelblokken: op drivernummer (D1, D2, ... D30), niet op plaats in de kast
 function dkOpNummer(drivers){
   const codes = computeDriverCodes();
@@ -23048,7 +23064,7 @@ function dkRailBreedte(dk, p){
   const n = drivers.length;
   const phx = 2 + (dk.sturing !== "PUSH" ? 2 : dkPushKringen(dk).length);
   let mm = DK_SCHAK_MM + 3 + (dk.sturing !== "PUSH" ? 2*DK_KLEM_MM + 3 : 0) + phx * (dkPhoenixBreedte(n + 1) + 3);
-  drivers.forEach(d=>{ mm += dkRijgBreedte(dkKlemLijst(d, p), p) + dkKlemGap(p); });
+  drivers.filter(d=> !dk5gA(d)).forEach(d=>{ mm += dkRijgBreedte(dkKlemLijst(d, p), p) + dkKlemGap(p); });
   return mm - (drivers.length ? dkKlemGap(p) : 3) + (drivers.length ? DK_EINDPLAAT_MM : 0);
 }
 // klemmen op de driver zelf: aan de kant(en) van de aansluitingen, verdeeld over de breedte (B)
@@ -23243,7 +23259,7 @@ function dkMeetIndeling(dk, p, cols){
   };
 }
 function dkAutoKolommen(dk, p){
-  const drivers = dkDrivers(dk);
+  const drivers = dkInKast(dk);
   if(!drivers.length) return [];
   const gemengd = drivers.some(d=> dkTweeKanten(d)) && drivers.some(d=> !dkTweeKanten(d));
   // alle aantallen kolommen proberen: eerst wat past, dan (bij gemengd) de 24V in een middenkolom,
@@ -23263,7 +23279,7 @@ function dkAutoKolommen(dk, p){
 }
 function dkVulIndeling(dk, opnieuw){
   const p = dkPlan(dk);
-  const drivers = dkDrivers(dk);
+  const drivers = dkInKast(dk);
   const byId = Object.fromEntries(drivers.map(x=> [x.id, x]));
   if(opnieuw || !p.kolommen.length){ p.kolommen = dkAutoKolommen(dk, p); return p; }
   p.kolommen = p.kolommen.map(c=> c.filter(id=> byId[id]));
@@ -23289,7 +23305,7 @@ function dkPlanKast(dk){
   const byId = Object.fromEntries(drivers.map(d=> [d.id, d]));
   const codes = Object.assign({}, computeDriverCodes());
   // 26/11/2026 (Peter): drivers "onderaan centraal" -- buiten de kolommen, zonder kabelkoker
-  const onderIds = (p.onderaan||[]).filter(id=> byId[id]);
+  const onderIds = (p.onderaan||[]).filter(id=> byId[id] && !dk5gA(byId[id]));
   const cols = p.kolommen.map(c=> c.filter(id=> !onderIds.includes(id)).map(id=> byId[id]).filter(Boolean));
   const onderDrv = onderIds.map(id=> byId[id]);
   const k = cols.length;
@@ -23469,6 +23485,23 @@ function dkPlanKast(dk){
     breedteNodig = Math.max(breedteNodig, blokB + 2*DK_RAND_MM);
   }
   const totB = Math.max(p.breedte, breedteNodig, railLengte), totH = Math.max(H, hoogteNodig);
+  // 27/11/2026 (Peter): 5G1,5-kabels (configuratie A) onder de kast, verbonden met de Phoenix-verdeelblokken
+  let kabelOnderPx = 0;
+  const kabels = dkOpNummer(dk5gKabels(dk));
+  if(kabels.length){
+    const KW = 62, KH = 34, KG = 8, ky0 = totH + 26;
+    let kx = DK_RAND_MM, ky = ky0;
+    kabels.forEach(d=>{
+      if(kx > DK_RAND_MM && kx + KW > totB - DK_RAND_MM){ kx = DK_RAND_MM; ky += KH + 22; }
+      const lp = dk5gLichtpunt(d);
+      const klemmen = [["L","L","L","Bruin"],["N","N","N","Blauw"],["DA1","DA+","DA+","Grijs"],["DA2","DA-","DA−","Zwart"],["PE","PE","PE","Geel/Groen"]]
+        .map(([id, f, lab, kleur], i)=> ({id, label: lab, functie: f, kleur, zijde: "boven", x: Math.round((0.1 + 0.2*i)*1000)/1000, y: 0, geenLabel: true, tip: "5G1,5 " + kleur.toLowerCase() + " → " + (f==="PE" ? "aarding" : "verdeelblok " + lab)}));
+      const m = {id: d.id, categorie: "Driver", naam: d.naam, breedte: 1, _dk: {soort: "kabel5g", driver: d, lichtpunt: lp}, klemmenEigen: klemmen};
+      mods.push({m, x: X0 + kx*PX, y: Y0 + ky*PX, w: KW*PX, h: KH*PX, code: codes[d.id] || ""});
+      kx += KW + KG;
+    });
+    kabelOnderPx = (ky + KH + 14 - totH)*PX;
+  }
   const hkY0 = Math.min(yMM(hk0), yMM(hk1)), hkY1 = Math.max(yMM(hk0), yMM(hk1));
   kokers.push({id: "H", soort: "h", x0: X0 + DK_RAND_MM*PX, x1: X0 + (totB - DK_RAND_MM)*PX, y0: Y0 + hkY0*PX, y1: Y0 + hkY1*PX, mm: dkKokerMM(p, "H")});
   const vA0 = boven ? hk1 : (totH - (H - DK_RAND_MM)), vB0 = boven ? totH - DK_RAND_MM : H - hk1;
@@ -23482,7 +23515,7 @@ function dkPlanKast(dk){
   dkEigen(p, {
     rijen: [{id: "dk-alle", items: mods.map(md=> md.m)}],
     maat: Math.ceil(p.breedte/18), naam: "Driverkast " + (idx+1), _dk: dk, _codes: codes, _breedtePx: p.breedte*PX,
-    _layout: {mods, kokers, breedteNodig, hoogteNodig, railLengte, boven, onderKoker: onderBlok ? onderBlok.koker : ""},
+    _layout: {mods, kokers, breedteNodig, hoogteNodig, railLengte, boven, onderKoker: onderBlok ? onderBlok.koker : "", kabelOnderPx, plaatOnderPx: Y0 + totH*PX},
     _geometrie: dkGeometrie, _dkAchtergrond: (geo)=> dkAchtergrondSvg(p, geo), _dxfExtra: (d, geo)=> dkDxfExtra(p, d, geo)
   });
   return p;
@@ -23498,16 +23531,22 @@ function dkGeometrie(p){
   });
   const PX = DK_PXMM;
   const width = UV.PADX*2 + Math.max(p.breedte, L.breedteNodig, L.railLengte)*PX;
-  const height = DK_TOP_PX + Math.max(p.hoogte, L.hoogteNodig)*PX + 20;
+  const height = DK_TOP_PX + Math.max(p.hoogte, L.hoogteNodig)*PX + 20 + (L.kabelOnderPx || 0);
   return {mods: L.mods, klemPos, width, height, codes: p._codes, gootTop: [], hoogte: [], kamBand: [], rijY: [], rijH: [],
     plan: {perDraad: {}, banen: [], zijN: {L: 0, R: 0}}, padL: UV.PADX, padR: UV.PADX, kastR: UV.PADX + p.breedte*PX,
-    _eigen: true, _absoluut: true, _router: dkRoutes, kokers: L.kokers, onderKoker: L.onderKoker, boven: L.boven};
+    _eigen: true, _absoluut: true, _router: dkRoutes, kokers: L.kokers, onderKoker: L.onderKoker, boven: L.boven, plaatOnderPx: L.plaatOnderPx};
 }
 // In welke koker komt een klem uit?
 function dkKokerVoorKlem(geo, pos){
   const ks = geo.kokers;
   const H = ks.find(k=> k.soort==="h");
   const info = pos.m._dk || {};
+  if(info.soort === "kabel5g"){
+    // de 5G1,5 komt van onder de kast binnen langs de dichtste verticale koker die tot onderaan loopt
+    const v = ks.filter(k=> k.soort==="v" && !k.ingekort);
+    if(!geo.boven || !v.length) return H;
+    return v.slice().sort((a, b)=> Math.abs((a.x0+a.x1)/2 - pos.x) - Math.abs((b.x0+b.x1)/2 - pos.x))[0];
+  }
   if(info.soort === "driver" && info.onderaan && geo.onderKoker){ const ok = ks.find(k=> k.id===geo.onderKoker); if(ok) return ok; }
   if(info.soort === "driver"){
     const kant = pos.k.zijde === "links" ? info.kolom : info.kolom + 1;
@@ -23548,6 +23587,13 @@ function dkRoutes(kast, geo){
                        : [{x: P.x, y: P.y}, {x: sx, y: P.y}, {x: sx, y: ey}];
     return {K, pts, entry: {x: sx, y: ey}};
   };
+  let kabelTel = 0;
+  const kabelIn = (P)=>{
+    if(!P.m._dk || P.m._dk.soort !== "kabel5g" || !geo.plaatOnderPx) return null;
+    const K = dkKokerVoorKlem(geo, P);
+    const ey = geo.plaatOnderPx + 6 + (kabelTel++ % 6)*2.4;
+    return {K, pts: [{x: P.x, y: P.y}, {x: P.x, y: ey}], entry: {x: P.x, y: ey}};
+  };
   return kast.bedrading.map(w=>{
     const A0 = geo.klemPos[uvKlemKey(w.a.m, w.a.k)], B0 = geo.klemPos[uvKlemKey(w.b.m, w.b.k)];
     if(!A0 || !B0) return null;
@@ -23556,7 +23602,7 @@ function dkRoutes(kast, geo){
     if(Array.isArray(w.punten) && w.punten.length){
       verts = uvVertsVoor(A, B, w.punten.map(q=> uvDecodeerPunt(q, geo)));
     } else {
-      const oa = onderIn(A0), ob = onderIn(B0);
+      const oa = onderIn(A0) || kabelIn(A0), ob = onderIn(B0) || kabelIn(B0);
       if(oa) A = Object.assign({}, A0, oa.entry);
       if(ob) B = Object.assign({}, B0, ob.entry);
       const ka = oa ? oa.K : dkKokerVoorKlem(geo, A), kb = ob ? ob.K : dkKokerVoorKlem(geo, B);
@@ -23609,6 +23655,18 @@ function dkModuleSvg(md){
   const {m, x, y, w, h, code} = md;
   const info = m._dk;
   const sel = uvSelMod===m.id ? " sel" : "";
+  if(info.soort==="kabel5g"){
+    const lp = info.lichtpunt;
+    const tip = `${code} — kabel 5G1,5 naar ${(lp && lp.naam) || "230V-lichtpunt"}${lp && lp.kamer ? " (" + lp.kamer + ")" : ""}\nbruin/blauw/grijs/zwart rechtstreeks op de verdeelblokken L/N/DA+/DA−, geel/groen op de aarding\nGeen plaats in de kast en geen rijgklemmen.\nKlik om er een driver + armatuur van te maken (optie B).`;
+    let s = `<g class="uv-mod dk-kabel5g${sel}" data-mod="${m.id}" data-tip="${escapeHtml(tip)}">`;
+    s += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" class="dk-kabel5g-body"/>`;
+    (m.klemmenEigen||[]).forEach(k=>{ s += `<text x="${x + k.x*w}" y="${y + 13}" class="dk-kl" text-anchor="middle">${escapeHtml(k.label)}</text>`; });
+    s += `<text x="${x + w/2}" y="${y + h*0.62}" class="uv-code">${escapeHtml(code)}</text>`;
+    const t = ["5G1,5", (lp && lp.naam) || "", (lp && lp.kamer) || ""].filter(Boolean).join(" · ");
+    const max = Math.max(6, Math.floor(w/4.6));
+    s += `<text x="${x + w/2}" y="${y + h - 4}" class="dk-ruimte" text-anchor="middle">${escapeHtml(t.length > max ? t.slice(0, max-1) + "…" : t)}</text>`;
+    return s + `</g>`;
+  }
   if(info.soort==="driver"){
     const d = info.driver, maat = info.maat;
     const arm = (d.armaturen||[]).filter(a=> a.naam).map(a=> (parseInt(a.aantal)||1) + "× " + a.naam).join(", ");
@@ -23708,7 +23766,7 @@ function dkOmzet(p){
   const dk = p._dk;
   p.bedrading = p.bedrading.filter(w=> !w.auto);
   const byId = Object.fromEntries(dkDrivers(dk).map(d=> [d.id, d]));
-  const drivers = dkOpNummer(p.kolommen.flat().map(id=> byId[id]).filter(Boolean));
+  const drivers = dkOpNummer(p.kolommen.flat().map(id=> byId[id]).filter(d=> d && !dk5gA(d)).concat(dk5gKabels(dk)));
   const nieuw = [];
   const draad = (a, b, sectie)=>{ if(a && b) nieuw.push({id: cryptoId(), a, b, kleur: "Bruin", kleurAuto: true, sectie: sectie || "1.5", label: "", auto: true}); };
   const blok = (sl)=> "dkp_" + sl + "_" + dk.id;
@@ -23771,7 +23829,7 @@ const dkAdviesCache = new Map();
 function dkPastOp(dk, plaatB, plaatH){
   const p = dkPlan(dk);
   const kopie = Object.assign({}, p, {breedte: plaatB, hoogte: plaatH});
-  const byId = Object.fromEntries(dkDrivers(dk).map(d=> [d.id, d]));
+  const byId = Object.fromEntries(dkInKast(dk).map(d=> [d.id, d]));
   const cols = dkAutoKolommen(dk, kopie).map(c=> c.map(id=> byId[id]));
   const m = dkMeetIndeling(dk, kopie, cols);
   return {past: m.breedte <= plaatB && m.hoogte <= plaatH && m.rail <= plaatB, maat: m};
@@ -24130,8 +24188,8 @@ const UV_CTX_DK = {
   voorTeken: (p)=>{ if(p._dk && !p._alle) dkPlanKast(p._dk); },
   moduleSleep: {
     mag: (id)=>{
-      if(dkOverzicht) return dkFysiekeKasten().some(k=> dkDrivers(k).some(d=> d.id===id));
-      const dk = dkHuidig(); return !!(dk && dkDrivers(dk).some(d=> d.id===id));
+      if(dkOverzicht) return dkFysiekeKasten().some(k=> dkInKast(k).some(d=> d.id===id));
+      const dk = dkHuidig(); return !!(dk && dkInKast(dk).some(d=> d.id===id));
     },
     voorbeeld: (p, id, pt, svg)=> p._alle ? dkAlleVoorbeeld(p, id, pt, svg) : dkDropVoorbeeld(p, id, pt, svg),
     drop: (p, id, pt)=> p._alle ? dkAlleDrop(p, id, pt) : dkDrop(p, id, pt),
@@ -24280,6 +24338,27 @@ const UV_CTX_DK = {
     }
     const p = h.kast, dk = p._dk, info = md._dk;   // md = de (pseudo)module zelf
     const codes = p._codes;
+    if(info.soort==="kabel5g"){
+      const d = info.driver, lp = dk5gLichtpunt(d);
+      const box = el(`<div class="card uv-detail"><div class="card-body uv-sidebody">
+        <div class="uv-detail-kop"><strong>${escapeHtml(codes[d.id]||"")} · kabel 5G1,5</strong></div>
+        <div class="hint">Naar ${escapeHtml((lp && lp.naam) || "230V-lichtpunt")}${lp && lp.kamer ? " (" + escapeHtml(lp.kamer) + ")" : ""}. Bruin → L, blauw → N, grijs → DA+, zwart → DA−, geel/groen → aarding, rechtstreeks op de Phoenix-verdeelblokken. Neemt geen plaats in de kast in en heeft geen rijgklemmen.</div>
+        <label class="uv-veld">Armatuur<input class="dk-5g-arm" value="${escapeHtml((lp && lp.naam) || "")}" placeholder="armatuur (uit de catalogus)" list="dk-5g-armlijst"></label>
+        <datalist id="dk-5g-armlijst">${(()=>{ try{ return (state.armaturen||[]).map(a=> `<option value="${escapeHtml(a.naam)}">`).join(""); }catch(_e){ return ""; } })()}</datalist>
+        <button class="btn small primary dk-5g-b">Driver + armatuur maken (optie B)</button>
+        <div class="hint">Er komt een driver in de kast (daarna versleepbaar), met 2 rijgklemmen: bruin/blauw van de 5G1,5 op de rijgklemmen, grijs en zwart geïsoleerd.</div>
+      </div></div>`);
+      box.querySelector(".dk-5g-b").addEventListener("click", ()=>{
+        if(!lp){ toast("Lichtpunt niet gevonden."); return; }
+        const arm = box.querySelector(".dk-5g-arm").value.trim();
+        if(arm) lp.naam = arm;
+        dk5gZetConfig(lp, "B");
+        save(); uvSelMod = d.id; h.rerender();
+        toast(`${codes[d.id]||"Lichtpunt"}: driver${d.naam ? " " + d.naam : ""} in de kast gezet (optie B) — versleep hem naar de juiste plaats.`);
+      });
+      zone.appendChild(box);
+      return;
+    }
     if(info.soort==="dali"){
       zone.appendChild(el(`<div class="card uv-detail"><div class="card-body uv-sidebody"><strong>DALI-ingang</strong>
         <div class="hint">2 rijgklemmen naast de werkschakelaar: de DALI-kabel komt toe op DA+ (zwarte ader) en DA− (grijze ader) en wordt doorverbonden naar de grijze verdeelblokken.</div></div></div>`));
