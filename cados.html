@@ -8882,6 +8882,101 @@ function crPatchRapport(kast, ki, o){
   return [plan, lijst];
 }
 
+
+/* ---- titelblad (27/11/2026, Peter: "Professioneel titelblad voor het afdrukdossier") ----
+   Wordt bij elke afdruk uit #printExport automatisch als eerste pagina gemaakt, op basis van het project en de
+   pagina's die effectief in deze afdruk zitten. Enkel ingevulde gegevens; lege velden worden niet getoond. */
+const CR_SLOGAN = "The art of smart living / working";
+function crProjectInfo(){
+  let p = null; try{ p = window.casuiteProject ? window.casuiteProject() : null; }catch(_e){}
+  const I = state.instellingen || {};
+  let cp = p && p.contactpersonen; if(typeof cp === "string"){ try{ cp = JSON.parse(cp); }catch(_e){ cp = []; } }
+  if(!Array.isArray(cp)) cp = [];
+  const persoon = (c)=> c ? [c.naam, c.bedrijf ? "(" + c.bedrijf + ")" : ""].filter(Boolean).join(" ") : "";
+  const rolVan = (re)=> cp.filter(c=> c && re.test(c.rol || "")).map(persoon).filter(Boolean).join(", ");
+  const adres = I.adres || (p && p.locatie) || "";
+  // "Straat 7 - 9870 Olsene" of "Straat 7, 9870 Olsene" -> straat + postcode/gemeente
+  const m = /^(.*?)[\s,\-–]+(\d{4})\s+(.+)$/.exec(adres.trim());
+  return {
+    naam: I.project || (p && p.naam) || "",
+    klant: I.klant || (p && p.klant) || rolVan(/klant|bouwheer|opdrachtgever/i),
+    straat: m ? m[1].trim() : adres,
+    gemeente: m ? m[2] + " " + m[3].trim() : "",
+    nr: (p && p.projectnummer) || "",
+    architect: rolVan(/architect|studiebureau|ingenieur/i),
+    projectleider: (p && p.projectleider_naam) || persoon(cp.find(c=> c && c.isProjectleider)) || rolVan(/projectleider/i),
+    versie: crVersie(),
+  };
+}
+function crVersie(){ const I = state.instellingen || {}; return String(I.dossierVersie || (I.dossierAfdrukNr ? I.dossierAfdrukNr : "") || "").trim(); }
+function crVolgendeVersie(){
+  // afdruk vanuit het Printcentrum = nieuwe versie (tenzij je zelf een versie ingevuld hebt)
+  const I = state.instellingen; if(!I || I.dossierVersie) return;
+  I.dossierAfdrukNr = (parseInt(I.dossierAfdrukNr) || 0) + 1; try{ save(); }catch(_e){}
+}
+function crInhoudVan(kids){
+  const kasten = {}, overige = [];
+  let schemas = 0, lijsten = 0, eerstePlan = null;
+  kids.forEach(P=>{
+    const soort = crSoortVan(P);
+    if(P.classList.contains("cr-plan") && /^(Zekeringkast|Driverkast|Patchkast)$/.test(soort)){ kasten[soort] = (kasten[soort] || 0) + 1; if(!eerstePlan) eerstePlan = P; }
+    else if(soort && !/^(Zekeringkast|Driverkast|Patchkast)$/.test(soort) && !overige.includes(soort)) overige.push(soort);
+    if(P.dataset.content === "schema") schemas++; else if(P.dataset.content === "lijst") lijsten++;
+  });
+  return {kasten, overige, schemas, lijsten, eerstePlan};
+}
+function crSubtitel(inh){
+  const ov = inh.overige.join(" ").toLowerCase();
+  const elektro = /kring|verlichting|laadpal|rijgklem|uitvoering|eendraad|zonnepan/.test(ov);
+  const domo = /knop|muziek|verwarming|motor/.test(ov);
+  const data = /camera|alarm|toegang|patch/.test(ov) || inh.kasten.Patchkast;
+  const nKast = Object.keys(inh.kasten).length;
+  if(!inh.overige.length && nKast) return "Technisch kastendossier";
+  if(elektro && !domo && !data) return "Elektrisch dossier";
+  if(domo && !elektro && !data) return "Domotica- en sturingsdossier";
+  return "Installatie- en aansluitdocumentatie";
+}
+function crTitelblad(kids){
+  const B = crBedrijf(), P = crProjectInfo(), inh = crInhoudVan(kids);
+  const logo = crLogo ? crLogo.data : (B.logo_url || "");
+  const rij = (k, w)=> w ? `<div class="tb-veld"><span>${escapeHtml(k)}</span><b>${escapeHtml(w)}</b></div>` : "";
+  const KAST = {Zekeringkast: ["Elektrische zekeringkast", "Elektrische zekeringkasten"], Driverkast: ["Driverkast (verlichting)", "Driverkasten (verlichting)"], Patchkast: ["Patchkast (data)", "Patchkasten (data)"]};
+  const inhoud = [];
+  Object.entries(inh.kasten).forEach(([k, n])=> inhoud.push(`<li><b>${n}</b>${escapeHtml(KAST[k][n > 1 ? 1 : 0])}<i>kastweergave + componentenlijst</i></li>`));
+  inh.overige.forEach(o=> inhoud.push(`<li><b>•</b>${escapeHtml(o)}</li>`));
+  const extra = [inh.schemas ? "Technische schema's (" + inh.schemas + ")" : "", inh.lijsten ? "Componenten- en aansluitlijsten (" + inh.lijsten + ")" : ""].filter(Boolean);
+  let beeld = "";
+  if(inh.eerstePlan){ const svg = inh.eerstePlan.querySelector(".cr-tekening svg"); if(svg){ const k = svg.cloneNode(true); k.removeAttribute("style"); k.setAttribute("width", "100%"); k.setAttribute("height", "100%"); beeld = k.outerHTML; } }
+  const voet = [B.naam || "Casentis BV", B.website, B.email || "info@casentis.be", CR_TEL].filter(Boolean);
+  const blad = document.createElement("section");
+  blad.className = "cr-blad cr-titelblad";
+  blad.innerHTML = `<div class="tb">
+    <div class="tb-top">
+      <div class="tb-logo">${logo ? `<img src="${escapeHtml(logo)}" alt="${escapeHtml(B.naam || "Casentis")}">` : `<span class="cr-woordmerk">CASENTIS</span>`}<div class="tb-slogan">${escapeHtml(CR_SLOGAN)}</div></div>
+      <svg class="tb-bollen" viewBox="0 0 120 40" aria-hidden="true">${Array.from({length: 24}, (_, i)=> `<circle cx="${6 + (i%12)*10}" cy="${10 + Math.floor(i/12)*18}" r="${2.2 + ((i*7)%5)*0.5}" fill="#D9531E" opacity="${0.15 + ((i*3)%5)*0.12}"/>`).join("")}</svg>
+    </div>
+    <div class="tb-titel">
+      <div class="tb-doc">Technisch installatiedossier</div>
+      <div class="tb-sub">${escapeHtml(crSubtitel(inh))}</div>
+      ${P.naam ? `<div class="tb-project">${escapeHtml(P.naam)}</div>` : ""}
+    </div>
+    <div class="tb-midden">
+      <div class="tb-blok tb-gegevens"><h3>Projectgegevens</h3>
+        ${rij("Project", P.naam)}${rij("Opdrachtgever", P.klant)}${rij("Adres", P.straat)}${rij("Postcode en gemeente", P.gemeente)}
+        ${rij("Projectnummer", P.nr)}${rij("Architect / studiebureau", P.architect)}${rij("Projectleider", P.projectleider)}
+        ${rij("Datum van opmaak", crDatum())}${rij("Versie", P.versie)}
+      </div>
+      ${beeld ? `<div class="tb-beeld">${beeld}</div>` : ""}
+    </div>
+    <div class="tb-blok tb-inhoud"><h3>Inhoud van dit dossier</h3>
+      <ul>${inhoud.join("")}</ul>
+      ${extra.length ? `<div class="tb-extra">${extra.map(escapeHtml).join("   ·   ")}</div>` : ""}
+    </div>
+    <div class="tb-voet"><span>${voet.map(escapeHtml).join("   ·   ")}</span><span>${P.versie ? "Versie " + escapeHtml(P.versie) + "   ·   " : ""}gegenereerd op ${crDatum()}</span></div>
+  </div>`;
+  return blad;
+}
+
 /* ---- kader + paginastijl, toegepast op ELKE afdruk uit #printExport ---- */
 function crSoortVan(P){
   if(P.dataset && P.dataset.soort) return P.dataset.soort;
@@ -8891,6 +8986,7 @@ function crSoortVan(P){
 function crKader(c){
   const kids = [...c.children].filter(x=> !x.classList.contains("cr-blad"));
   if(!kids.length) return false;
+  const titel = c.querySelector(".cr-titelblad") ? null : crTitelblad(kids);
   kids.forEach(P=>{
     const soort = crSoortVan(P);
     P.querySelectorAll(":scope > .pe-title").forEach(x=> x.remove());
@@ -8898,11 +8994,13 @@ function crKader(c){
     P.style.pageBreakBefore = "";
     const blad = document.createElement("section");
     blad.className = "cr-blad";
-    if(P.dataset.crPagina) blad.style.page = P.dataset.crPagina;
+    // A4 staand = gewone pagina (geen naam): een benoemde pagina forceert anders een extra (lege) pagina vooraan
+    if(P.dataset.crPagina && P.dataset.crPagina !== "cr_A4_p") blad.style.page = P.dataset.crPagina;
     blad.innerHTML = `<table class="cr-kader"><thead><tr><td>${crKopHtml(soort)}</td></tr></thead><tbody><tr><td class="cr-inhoud"></td></tr></tbody></table>`;
     P.replaceWith(blad);
     blad.querySelector(".cr-inhoud").appendChild(P);
   });
+  if(titel) c.insertBefore(titel, c.firstChild);
   c.classList.add("cr-rapport");
   return true;
 }
@@ -8919,8 +9017,40 @@ function crStijl(c){
   @bottom-left{content:"${css(voet)}";${fnt}font-size:6.8pt;color:#6B7280;vertical-align:top;padding-top:3.5mm;}
   @bottom-right{content:"Pagina " counter(page) " / " counter(pages);${fnt}font-size:7.5pt;font-weight:600;color:#1C2430;vertical-align:top;padding-top:3.5mm;}}
 ${namen.map(n=>{ const m = /^cr_(A\d)_(l|p)$/.exec(n); return m ? `@page ${n}{size:${m[1]} ${m[2] === "l" ? "landscape" : "portrait"};}` : ""; }).join("\n")}
+@page :first{@bottom-left{content:none;} @bottom-right{content:none;}}
 @media print{
-  html, body{background:#fff !important;}
+  html, body{background:#fff !important;margin:0 !important;padding:0 !important;}
+  /* enkel #printExport afdrukken: alle zussen langs de weg ernaartoe verbergen, geen marges/hoogtes erboven */
+  body.print-patchkast *:has(#printExport) > *:not(#printExport):not(:has(#printExport)){display:none !important;}
+  body.print-patchkast *:has(#printExport){margin:0 !important;padding:0 !important;border:0 !important;min-height:0 !important;height:auto !important;box-shadow:none !important;background:#fff !important;}
+  #printExport .cr-titelblad{break-before:auto;page-break-before:auto;}
+  #printExport .tb{position:relative;height:${297 - CR_M.boven - CR_M.onder - 1}mm;display:flex;flex-direction:column;overflow:hidden;${fnt}color:#1C2430;}
+  #printExport .tb-top{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:6mm;border-bottom:0.8mm solid #D9531E;}
+  #printExport .tb-logo img{max-height:16mm;max-width:75mm;display:block;object-fit:contain;}
+  #printExport .tb-logo .cr-woordmerk{font-size:22pt;}
+  #printExport .tb-slogan{font-size:9pt;color:#6B7280;font-style:italic;margin-top:2.5mm;letter-spacing:.02em;}
+  #printExport .tb-bollen{width:48mm;height:16mm;}
+  #printExport .tb-titel{margin:16mm 0 10mm;}
+  #printExport .tb-doc{font-size:24pt;font-weight:800;letter-spacing:.12em;text-transform:uppercase;line-height:1.1;}
+  #printExport .tb-sub{font-size:13pt;font-weight:600;color:#D9531E;margin-top:3mm;letter-spacing:.03em;}
+  #printExport .tb-project{font-size:19pt;font-weight:700;margin-top:9mm;padding-left:4mm;border-left:1.6mm solid #1C2430;line-height:1.2;}
+  #printExport .tb-midden{display:flex;gap:8mm;align-items:stretch;}
+  #printExport .tb-blok{background:#F6F7F9;border-radius:2mm;padding:6mm 7mm;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  #printExport .tb-blok h3{margin:0 0 4mm;font-size:8pt;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#D9531E;}
+  #printExport .tb-gegevens{flex:1 1 auto;}
+  #printExport .tb-veld{display:grid;grid-template-columns:44mm 1fr;gap:3mm;padding:1.6mm 0;border-bottom:0.2mm solid #E3E6EA;font-size:9.5pt;}
+  #printExport .tb-veld:last-child{border-bottom:0;}
+  #printExport .tb-veld span{color:#6B7280;font-size:8pt;text-transform:uppercase;letter-spacing:.05em;padding-top:.6mm;}
+  #printExport .tb-veld b{font-weight:600;}
+  #printExport .tb-beeld{flex:0 0 58mm;background:#fff;border:0.3mm solid #E3E6EA;border-radius:2mm;padding:3mm;display:flex;align-items:center;justify-content:center;max-height:95mm;overflow:hidden;}
+  #printExport .tb-beeld svg{max-width:100%;max-height:89mm;}
+  #printExport .tb-inhoud{margin-top:8mm;}
+  #printExport .tb-inhoud ul{list-style:none;margin:0;padding:0;columns:2;column-gap:8mm;}
+  #printExport .tb-inhoud li{break-inside:avoid;display:grid;grid-template-columns:7mm 1fr;column-gap:3mm;align-items:baseline;padding:1.3mm 0;font-size:10pt;font-weight:600;}
+  #printExport .tb-inhoud li b{flex:0 0 7mm;text-align:right;color:#D9531E;font-weight:800;}
+  #printExport .tb-inhoud li i{grid-column:2;font-style:normal;font-weight:400;color:#6B7280;font-size:8pt;}
+  #printExport .tb-extra{margin-top:3mm;font-size:8pt;color:#6B7280;}
+  #printExport .tb-voet{margin-top:auto;display:flex;justify-content:space-between;gap:6mm;padding-top:3mm;border-top:0.3mm solid #D9DDE3;font-size:7pt;color:#6B7280;}
   #printExport.cr-rapport{${fnt}color:#1C2430;background:#fff;}
   #printExport.cr-rapport .cr-blad{break-before:page;page-break-before:always;}
   #printExport.cr-rapport .cr-blad:first-child{break-before:auto;page-break-before:auto;}
@@ -8975,6 +9105,7 @@ ${namen.map(n=>{ const m = /^cr_(A\d)_(l|p)$/.exec(n); return m ? `@page ${n}{si
 function exportMetSelectie(selectie){
   const container = document.getElementById("printExport");
   container.innerHTML = "";
+  crVolgendeVersie();
   EXPORT_SECTIES.forEach(s=>{
     const sel = selectie[s.key];
     if(!sel || (!sel.schema && !sel.lijst)) return;
@@ -9155,6 +9286,7 @@ function exportAllesAlsExcel(){
 function exportVolledigDossier(){
   const container = document.getElementById("printExport");
   container.innerHTML = "";
+  crVolgendeVersie();
   const voor = container.children.length;
   exportZekeringVoorWerf(false);
   exportDriverkastVoorWerf(false);
@@ -9209,7 +9341,8 @@ function renderExportTab(){
       <p>Alle documenten van dit dossier op één plek: alles in één keer, of zelf samengesteld.</p>
     </div>
     <div class="card pc-blok"><div class="card-body">
-      <div class="pc-blok-kop"><span class="pc-nr">1</span><div><strong>Volledig dossier</strong><div class="hint">Alle ingevulde onderdelen in één document — lege onderdelen worden overgeslagen.</div></div></div>
+      <div class="pc-blok-kop"><span class="pc-nr">1</span><div><strong>Volledig dossier</strong><div class="hint">Alle ingevulde onderdelen in één document — lege onderdelen worden overgeslagen. Elke afdruk begint met een titelblad (project, inhoud, versie).</div></div></div>
+      <label class="pc-versie" title="Versie op het titelblad. Leeg = automatisch: elke afdruk vanuit het Printcentrum telt één op.">Versie <input type="text" id="pcVersie" placeholder="${escapeHtml(state.instellingen.dossierAfdrukNr ? "auto (" + state.instellingen.dossierAfdrukNr + " → " + (state.instellingen.dossierAfdrukNr + 1) + ")" : "auto (1)")}" value="${escapeHtml(state.instellingen.dossierVersie || "")}" style="width:150px;"></label>
       <div class="pc-knoppen">
         <button class="btn primary" id="exportVolledig">🖨 Alles afdrukken (PDF)</button>
         <button class="btn ghost" id="exportExcel">⬇ Alle lijsten (Excel)</button>
@@ -9248,7 +9381,8 @@ function renderExportTab(){
     #cados-app .pc-rij{display:grid;grid-template-columns:1fr 90px 90px;align-items:center;padding:5px 0;gap:6px;}
     #cados-app .pc-rij label{display:inline-flex;gap:6px;align-items:center;font-size:13px;cursor:pointer;}
     #cados-app .pc-rij input{width:auto;}
-    #cados-app .pc-rij.leeg{opacity:.5;}`;
+    #cados-app .pc-rij.leeg{opacity:.5;}
+    #cados-app .pc-versie{display:inline-flex;gap:8px;align-items:center;font-size:13px;margin:0 0 6px 38px;}`;
     document.head.appendChild(st); }
   const checklijstBox = wrap.querySelector("#exportChecklijst");
   function rebuildChecklijst(){
@@ -9321,6 +9455,7 @@ function renderExportTab(){
   wrap.querySelector("#exportSelectie").addEventListener("click", ()=> exportMetSelectie(huidigeSelectie()));
   wrap.querySelector("#pcLijstKringen").addEventListener("click", ()=> zkPrintLijst());
   wrap.querySelector("#exportVolledig").addEventListener("click", exportVolledigDossier);
+  wrap.querySelector("#pcVersie").addEventListener("change", e=>{ const v = e.target.value.trim(); if(v) state.instellingen.dossierVersie = v; else delete state.instellingen.dossierVersie; save(); });
   wrap.querySelector("#exportExcel").addEventListener("click", exportAllesAlsExcel);
 
   return wrap;
@@ -10542,7 +10677,10 @@ function exportPatchkastVoorWerf(standalone=true){
 
   // 27/11/2026: per kast een rapport in Casentis-huisstijl (rack + componentenlijst); de detailpagina's per component volgen
   void projectNaam; void adres;
+  const pkVoor = container.children.length;
   state.patchkast.kasten.forEach((kast, ki)=>{ if(kast.items.length) crPatchRapport(kast, ki).forEach(pg=> container.appendChild(pg)); });
+  // de detailpagina's (patchpaneel, switch, ...) horen bij de patchkast
+  container.__pkVoor = pkVoor;
 
   // --- Vervolgpagina's: 1 per component met eigen detail (Patchpaneel,
   // Switch, Recorder, Muziek) — niet enkel het patchpaneel.
@@ -10642,6 +10780,7 @@ function exportPatchkastVoorWerf(standalone=true){
     });
   });
 
+  [...container.children].slice(container.__pkVoor || 0).forEach(pg=>{ if(!pg.dataset.soort) pg.dataset.soort = "Patchkast"; });
   if(standalone){
     document.body.classList.add("print-patchkast");
     window.print();

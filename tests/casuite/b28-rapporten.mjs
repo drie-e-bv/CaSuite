@@ -1,8 +1,8 @@
-// Vereist een testkopie van index.html met 'window.__cdEval = (c)=> eval(c);' vóór 'function vlAantal(item){', geserveerd op poort 8790, en stub3.js in de cwd. Schrijft /tmp/rapport.pdf (A4, Casentis-kader) om na te kijken.
+// Vereist een testkopie van index.html met 'window.__cdEval = (c)=> eval(c);' vóór 'function vlAantal(item){', geserveerd op poort 8790, en stub3.js in de cwd. Schrijft /tmp/rapport.pdf (titelblad + kasten, Casentis-kader) om na te kijken.
 import { chromium } from '/opt/npm-tools/node_modules/playwright/index.mjs';
 const b=await chromium.launch({executablePath:'/usr/bin/google-chrome',args:['--no-sandbox']});
 const p=await b.newPage({viewport:{width:1400,height:900}});
-const errs=[]; p.on('pageerror',e=>errs.push(e.message)); p.on('dialog',d=>d.accept());
+const errs=[]; p.on('console', m=>{ if(m.text().startsWith('PARENTS')) console.log(m.text()); }); p.on('pageerror',e=>errs.push(e.message)); p.on('dialog',d=>d.accept());
 await p.route(/^https?:\/\/(?!localhost)/,r=>{const u=r.request().url();
  if(/supabase/.test(u))return r.fulfill({path:'stub3.js',contentType:'text/javascript'});
  return r.fulfill({body:'',contentType:'text/javascript'})});
@@ -12,7 +12,7 @@ await p.goto('http://localhost:8790/index.html');await p.waitForTimeout(2500);
 await p.click('#main-nav-btn-cados');await p.waitForTimeout(600);
 const r = await E(`(()=>{
   window.casuiteBedrijf = ()=> ({naam:'BV CASENTIS', adres:'Léon Bekaertlaan 3/K - 9880 AALTER', email:'info@casentis.be', website:'www.casentis.be'});
-  window.casuiteProject = ()=> ({naam:'De Jaegher', projectnummer:'2600124'});
+  window.casuiteProject = ()=> ({naam:'De Jaegher', projectnummer:'2600124', projectleider_naam:'Peter Bral', contactpersonen:[{rol:'Architect', naam:'Jan Peeters', bedrijf:'Atelier P'}]}); state.instellingen.klant = 'Fam. De Jaegher'; state.instellingen.dossierAfdrukNr = 3;
   state.instellingen.project = 'De Jaegher'; state.instellingen.adres = 'Ponteputstraat 7 - 9870 Olsene'; state.instellingen.spanning = '400V 3N~';
   state.modules.driverkast = true; state.modules.data = true;
   const zk = state.zekeringen.kasten[0]; zk.naam = 'Zekeringkast 1'; zk.kamer = 'Berging'; zk.maat = 36; zk.rijen = [];
@@ -41,7 +41,7 @@ const r = await E(`(()=>{
   return JSON.stringify({bladen: c.querySelectorAll('.cr-blad').length, paginas: [...c.querySelectorAll('.cr-blad')].map(b=> (b.style.page||'-') + ':' + (b.querySelector('[data-soort]')||{dataset:{}}).dataset.soort)});
 })()`);
 console.log(r);
-await p.emulateMedia({media:'print'});
+await p.evaluate(()=>{ const h=document.getElementById('cados-project-hint-card'); if(h) h.style.display='none'; document.getElementById('cados-app-wrap').style.display=''; console.log('PARENTS', (()=>{let e=document.getElementById('printExport'), out=[]; while(e){ out.push(e.id||e.tagName); e=e.parentElement;} return out.join('<');})()); }); await p.emulateMedia({media:'print'});
 await p.pdf({path:'/tmp/rapport.pdf', preferCSSPageSize:true, printBackground:true});
 // Uitvoering-afdruk (A3) en printcentrum-selectie via de echte window.print-omhulling
 const u = await E(`(()=>{ const pr = []; const org = window.print; 
@@ -51,7 +51,7 @@ const u = await E(`(()=>{ const pr = []; const org = window.print;
   return JSON.stringify({bladen: c.querySelectorAll('.cr-blad').length, kop: !!c.querySelector('.cr-kop'), pagina: [...c.querySelectorAll('.cr-blad')].map(b=>b.style.page), stijl: (document.getElementById('crStijl')||{}).textContent ? document.getElementById('crStijl').textContent.includes('cr_A3_l') : false});
 })()`);
 console.log('uitvoering', u); const U = JSON.parse(u);
-ok(U.bladen===2 && U.kop && U.stijl, 'Uitvoering-afdruk: plan op A3 liggend + lijst, met Casentis-kop');
+ok(U.bladen===3 && U.kop && U.stijl, 'Uitvoering-afdruk: titelblad + plan op A3 liggend + lijst, met Casentis-kop');
 await p.waitForTimeout(600);
 const s2 = await E(`(()=>{ const sel = {}; EXPORT_SECTIES.forEach(x=> sel[x.key] = {schema:true, lijst:true}); exportMetSelectie(sel); const c = document.getElementById('printExport');
   return JSON.stringify({bladen: c.querySelectorAll('.cr-blad').length, soorten: [...new Set([...c.querySelectorAll('.cr-kop-type')].map(x=>x.textContent))]}); })()`);
