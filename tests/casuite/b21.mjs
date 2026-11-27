@@ -29,7 +29,7 @@ await p.setViewportSize({width:1024,height:768});
 await E(`selectTab('uitvoering')`); await p.waitForTimeout(1200);
 const r = await p.evaluate(()=>{ const g=document.querySelector('#tabgroups').getBoundingClientRect(), t=document.querySelector('#tabbar').getBoundingClientRect();
  return {zelfdeRij: Math.abs(g.top-t.top)<8, slim: document.querySelector('#dossierverloop').classList.contains('dv-slim'),
-  wInKop: !!document.querySelector('.uv-kop .zk-weergaven.in-kop'), zijDicht: !!document.querySelector('.uv-werk.zij-dicht'),
+  wInKop: !!document.querySelector('.uv-kop-titel .zk-weergaven.in-kop'), zijDicht: !!document.querySelector('.uv-werk.zij-dicht'),
   bannerStatic: getComputedStyle(document.querySelector('#uvBanner')).position==='static', label: document.querySelector('.uv-undo').textContent.includes('Ongedaan')}; });
 for(const [k,v] of Object.entries(r)) ok(v, k);
 await p.click('.uv-zij'); await p.waitForTimeout(300); ok(!await p.$('.uv-werk.zij-dicht'), 'zijkolom open');
