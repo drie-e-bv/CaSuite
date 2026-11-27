@@ -8681,13 +8681,13 @@ function exportAllesAlsExcel(){
   // Driverkast
   {
     const codes = computeDriverCodes();
-    const rows = [["Code","Type","Naam","Ruimte","Aantal","Specs"]];
-    state.driverkast.kasten.forEach(kast=> kast.items.forEach(driver=>{
-      rows.push([codes[driver.id]||"", "Driver", driver.naam||"", "", "", driverItemSpecText(driver)]);
-      driver.armaturen.forEach(arm=>{
-        rows.push([codes[arm.id]||"", "Armatuur", arm.naam||"", arm.ruimte||"", arm.aantal||"", driverArmatuurSpecText(arm)]);
+    const rows = [["Kast","Code","Type","Naam","Ruimte","Aantal","Specs"]];
+    dkFysiekeKasten().forEach(kast=>{ const kn = dkFysiekNaam(kast); kast.items.forEach(driver=>{
+      rows.push([kn, codes[driver.id]||"", "Driver", driver.naam||"", "", "", driverItemSpecText(driver)]);
+      (driver.armaturen||[]).forEach(arm=>{
+        rows.push([kn, codes[arm.id]||"", "Armatuur", arm.naam||"", arm.ruimte||"", arm.aantal||"", driverArmatuurSpecText(arm)]);
       });
-    }));
+    }); });
     addSheet("Driverkast", rows);
   }
   // Patchkast
@@ -11321,9 +11321,13 @@ function exportDriverkastVoorWerf(standalone=true){
     <div class="pe-kasten pe-rijen"></div>
   </div>`);
   const kastenBox = page1.querySelector(".pe-kasten");
-  state.driverkast.kasten.forEach((kast, ki)=>{
+  // 27/11/2026 (Peter: "bij afdruk komt de gesplitste driverkast er niet bij"): per fysieke kast, zoals in Lijst/Plan
+  let autLijst = []; try{ autLijst = alleZekeringAutomaten(); }catch(_e){}
+  const autLab = (v)=>{ const a = autLijst.find(x=> x.id===dkVoedingZekVan(v)); return a ? " · automaat " + [a.code, a.naam].filter(Boolean).join(" ") : ""; };
+  const fysiek = dkFysiekeKasten().filter(v=> (v.items||[]).length);
+  fysiek.forEach((kast, ki)=>{
     const kastBox = el(`<div class="pe-kast" style="min-width:280px;">
-      <div class="pe-kast-head">Kast ${ki+1} — sturing ${kast.sturing}</div>
+      <div class="pe-kast-head">${escapeHtml(dkFysiekNaam(kast))} — sturing ${escapeHtml(kast.sturing||"")}${escapeHtml(autLab(kast))}</div>
       <div class="pe-rack"></div>
     </div>`);
     const rackBox = kastBox.querySelector(".pe-rack");
@@ -11373,15 +11377,16 @@ function exportDriverkastVoorWerf(standalone=true){
     </table>
   </div>`);
   const tbody2 = page2.querySelector("tbody");
-  state.driverkast.kasten.forEach((kast, ki)=>{
+  fysiek.forEach((kast, ki)=>{
+    const ki1 = dkFysiekNr(kast) - 1;
     kast.items.forEach(driver=>{
       tbody2.appendChild(el(`<tr>
-        <td>${escapeHtml(codes[driver.id]||"")}</td><td>${ki+1}</td><td>Driver</td><td>${escapeHtml(driver.naam)}</td><td></td><td></td>
+        <td>${escapeHtml(codes[driver.id]||"")}</td><td>${ki1+1}</td><td>Driver</td><td>${escapeHtml(driver.naam)}</td><td></td><td></td>
         <td>${escapeHtml(driverItemSpecText(driver))}</td>
       </tr>`));
       driver.armaturen.forEach(arm=>{
         tbody2.appendChild(el(`<tr>
-          <td>${escapeHtml(codes[arm.id]||"")}</td><td>${ki+1}</td><td>↳ Armatuur</td><td>${escapeHtml(arm.naam)}</td>
+          <td>${escapeHtml(codes[arm.id]||"")}</td><td>${ki1+1}</td><td>↳ Armatuur</td><td>${escapeHtml(arm.naam)}</td>
           <td>${escapeHtml(arm.ruimte)}</td><td>${escapeHtml(arm.aantal)}</td>
           <td>${escapeHtml(driverArmatuurSpecText(arm))}</td>
         </tr>`));
@@ -11467,7 +11472,7 @@ function renderDriverkastOverzicht(codes, rebuildAll){
     const code = codes[r.obj.id] || "—";
     const tr = el(`<tr>
       <td class="codecell">${escapeHtml(code)}</td>
-      <td>${(()=>{ const ki = dkKastIndexVan(r.driver); return ki>=0 ? `<span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${dkKastKleur(ki)};margin-right:4px;"></span>${ki+1}` : ""; })()}</td>
+      <td>${(()=>{ const ki = dkKastIndexVan(r.driver); const f = dkFysiekVanDriver(r.driver); return ki>=0 ? `<span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${dkKastKleur(ki)};margin-right:4px;"></span>${f ? f.nr : ki+1}` : ""; })()}</td>
       <td>${isDriver ? "Driver" : "↳ Armatuur"}</td>
       <td><input class="ov-naam" list="${isDriver?"dl-drivernamen":"dl-armaturen"}" value="${escapeHtml(r.obj.naam)}" style="min-width:160px;" ${isDriver?"disabled title=\"volgt automatisch uit de gekoppelde armaturen\"":""}></td>
       <td>${isDriver ? `<select class="ov-kring"><option value="">— geen —</option>${(()=>{ const k = r.obj.kringId && state.kringen.items.find(x=>x.id===r.obj.kringId); return k ? `<option value="${k.id}" selected>${escapeHtml(kringLabel(k, kringCodes[k.id]))}</option>` : ""; })()}</select>` : ""}</td>
@@ -20237,10 +20242,10 @@ function uvComponentenTabel(ctx, id){
   const dc = computeDriverCodes();
   let aut = []; try{ aut = alleZekeringAutomaten(); }catch(_e){}
   const lab = (aid)=> { const a = aut.find(x=> x.id===aid); return a ? [a.code, a.naam].filter(Boolean).join(" ") : ""; };
-  const voed = dk.plan && dk.plan.voedingZek ? lab(dk.plan.voedingZek) : "";
+  const voed = dkVoedingZekVan(dk) ? lab(dkVoedingZekVan(dk)) : "";
   const rijen = dkDrivers(dk).map(d=> `<tr><td><b>${escapeHtml(dc[d.id]||"")}</b></td><td>${escapeHtml(d.naam||d.type||"Driver")}</td>
     <td>${escapeHtml((d.armaturen||[]).filter(a=> a.naam||a.aantal).map(a=> (a.aantal||1)+"× "+(a.naam||"armatuur")).join(", "))}</td>
-    <td>${escapeHtml(dkKamerVanDriver(d))}</td><td>${escapeHtml(lab(azAutomaatVan(d)) || (voed ? "via kast: "+voed : ""))}</td></tr>`);
+    <td>${escapeHtml(dkKamerVanDriver(d))}</td><td>${escapeHtml(lab(d.zekeringModuleId) || (voed ? "via kast: "+voed : "") || lab(azAutomaatVan(d)))}</td></tr>`);
   return (voed ? `<p style="margin:0 0 6px;font-size:12px;">Voedende automaat driverkast: <b>${escapeHtml(voed)}</b> · sturing ${escapeHtml(dk.sturing||"")}</p>` : "") +
     `<table class="pe-porttable">${th(["Code","Driver","Armaturen","Kamer","Automaat"])}<tbody>${rijen.join("") || `<tr><td colspan="5">Geen drivers.</td></tr>`}</tbody></table>`;
 }
@@ -22462,6 +22467,9 @@ function dkFysiekeKasten(){
   return uit;
 }
 function dkFysiekNr(v){ return dkFysiekeKasten().findIndex(x=> x.id === v.id) + 1; }
+// 27/11/2026: voedende automaat van een (gesplitste) kast — eigen keuze, anders die van de ontwerpkast waaruit hij gesplitst is
+function dkVoedingZekVan(v){ return (v && v.plan && v.plan.voedingZek) || (v && v._bron && v._bron.plan && v._bron.plan.voedingZek) || ""; }
+function dkFysiekVanDriver(d){ const ks = dkFysiekeKasten(); const i = ks.findIndex(v=> (v.items||[]).includes(d)); return i < 0 ? null : {v: ks[i], nr: i + 1}; }
 function dkFysiekNaam(v){ const n = dkFysiekNr(v); return "Driverkast " + n + (v.kamer && !(v._bron.planDelen||[]).length ? " · " + v.kamer : ""); }
 function dkDrivers(dk){ return (dk.items||[]).filter(d=> !d.leeg && (d.categorie||"Driver")==="Driver"); }
 // Volgorde op de rail en de verdeelblokken: op drivernummer (D1, D2, ... D30), niet op plaats in de kast
@@ -22499,7 +22507,8 @@ function dkVoeding(dk, p){
   let lijst = [];
   try{ lijst = alleZekeringAutomaten(); }catch(_e){}
   const van = (id)=> lijst.find(a=> a.id===id);
-  if(p && p.voedingZek && van(p.voedingZek)) { const a = van(p.voedingZek); return {codes: [a.code], tekst: a.code + (a.naam ? " — " + a.naam : ""), eigen: true}; }
+  const vz = (p && p.voedingZek) || (dk && dk._bron && dk._bron.plan && dk._bron.plan.voedingZek) || "";
+  if(vz && van(vz)) { const a = van(vz); return {codes: [a.code], tekst: a.code + (a.naam ? " — " + a.naam : ""), eigen: true}; }
   const ids = [...new Set(dkDrivers(dk).map(d=> d.zekeringModuleId).filter(Boolean))].filter(id=> van(id));
   const as = ids.map(van);
   return {codes: as.map(a=> a.code), tekst: as.map(a=> a.code + (a.naam ? " — " + a.naam : "")).join(", "), eigen: false};
@@ -23255,7 +23264,7 @@ function dkNaarKast(dk, d, doelId){
     if(!Array.isArray(bron.planDelen)) bron.planDelen = [];
     const id = "dkd" + Math.random().toString(36).slice(2, 9);
     const basis = dkPlan(dk);
-    bron.planDelen.push({id, plan: {breedte: basis.breedte, hoogte: basis.hoogte, kast: basis.kast ? Object.assign({}, basis.kast) : undefined, kokerV: basis.kokerV, kokerH: basis.kokerH, rkDubbel: basis.rkDubbel, rkPositie: basis.rkPositie}});
+    bron.planDelen.push({id, plan: {breedte: basis.breedte, hoogte: basis.hoogte, kast: basis.kast ? Object.assign({}, basis.kast) : undefined, kokerV: basis.kokerV, kokerH: basis.kokerH, rkDubbel: basis.rkDubbel, rkPositie: basis.rkPositie, voedingZek: dkVoedingZekVan(dk) || undefined}});
     if(!bron.planVan) bron.planVan = {};
     bron.planVan[d.id] = id;
     doel = dkFysiekeKasten().find(k=> k.id===id);
@@ -27391,12 +27400,15 @@ function azKeten(obj){
   if(!obj) return null;
   const eigen = azAutomaatVan(obj);
   let aut = null; try{ aut = new Set(alleZekeringAutomaten().map(a=> a.id)); }catch(_e){ aut = new Set(); }
-  if(eigen) return {id: eigen, via: obj.zekeringModuleId ? "" : "kring"};
+  if(obj.zekeringModuleId) return {id: obj.zekeringModuleId, via: ""};
+  // 27/11/2026: een driver hangt fysiek aan de automaat van zijn (eventueel gesplitste) driverkast — die gaat vóór
+  // een automaat die (soms verkeerd) op de groeperende kring staat
   try{
     for(const v of dkFysiekeKasten()){
-      if((v.items||[]).includes(obj)){ const p = v.plan; if(p && p.voedingZek && aut.has(p.voedingZek)) return {id: p.voedingZek, via: "driverkast"}; break; }
+      if((v.items||[]).includes(obj)){ const vz = dkVoedingZekVan(v); if(vz && aut.has(vz)) return {id: vz, via: "driverkast"}; break; }
     }
   }catch(_e){}
+  if(eigen) return {id: eigen, via: "kring"};
   const kringId = state.kringen.items.includes(obj) ? obj.id : obj.kringId;
   if(kringId){
     let hit = null;
@@ -28208,6 +28220,7 @@ function dkVerdeelKast(kast, max){
   const nieuwe = bakken.slice(1).map(b=>{
     const k = newDriverKast();
     k.sturing = kast.sturing; k.verdieping = kast.verdieping || "";
+    if(kast.plan && kast.plan.voedingZek) k.plan = {voedingZek: kast.plan.voedingZek};   // zelfde voedende automaat als de kast waaruit hij komt
     b.forEach(d=>{ d.manueelNummer = ""; });
     k.items = b;
     return k;
@@ -28286,7 +28299,7 @@ function dkHerreken(max){
     const gebruikt = [];
     bakken.forEach((b, i)=>{
       let k = groep[i];
-      if(!k){ k = newDriverKast(); k.sturing = sturing; }
+      if(!k){ k = newDriverKast(); k.sturing = sturing; const vz = groep.map(x=> x.plan && x.plan.voedingZek).filter(Boolean).pop(); if(vz) k.plan = {voedingZek: vz}; }
       k.items = b.slice(); gebruikt.push(k);
     });
     groep.forEach((k, i)=>{
