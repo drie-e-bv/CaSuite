@@ -7222,6 +7222,10 @@ body.print-patchkast #printExport{display:block !important;}
 #cados-app .gc-gevaar{color:#B42318;}
 #cados-app .pk-eigen-badge{color:#B54708;font-weight:700;}
 #cados-app .kast-voeding{max-width:260px;}
+#cados-app .pp-tabel{width:100%;}
+#cados-app .pp-tabel td{padding:6px 8px;vertical-align:middle;}
+#cados-app .pp-tabel .ov-in{width:100%;min-width:0;}
+#cados-app .pp-tabel td:nth-child(2){min-width:170px;} #cados-app .pp-tabel td:nth-child(5){min-width:170px;}
 #cados-app .zk-kastrij > #kastTabbar{flex:1 1 auto;flex-wrap:wrap !important;padding:0;margin:0;gap:6px;}
 #cados-app #panel-zekeringen .builder-layout:has(#moveBanner:empty):has(#stagingSlot:empty){grid-template-columns:minmax(0,1fr);}
 #cados-app #panel-zekeringen .builder-layout:has(#moveBanner:empty):has(#stagingSlot:empty) > .builder-side{display:none;}
@@ -7986,6 +7990,27 @@ function allePatchpaneelPoorten(){
   });
   return out;
 }
+
+/* 27/11/2026 (Peter): patchpaneel-poorten zoals het overzicht van de automaten — per poort Kamer (met subkamers),
+   Functie, Aangesloten toestel (kamerzijde) en de switch-poort (kastzijde). p.omschrijving blijft bestaan en wordt
+   automatisch "Kamer — Functie · Toestel", zodat afdrukken, zoeken en camera/laadpaal-koppelingen blijven werken. */
+const PP_FUNCTIES = ["Data", "Wifi", "Multimedia", "TV", "Airco", "Camera", "Domotica", "Videofoon", "Toegangscontrole", "Alarm", "Printer", "Laadpaal", "Omvormer", "Reserve"];
+function ppMigreer(p){
+  if(p.kamer !== undefined) return;
+  const t = String(p.omschrijving || "").trim();
+  const k = [...(state.kamers || [])].filter(Boolean).sort((a, b)=> b.length - a.length).find(x=> t === x || t.startsWith(x + " ") || t.startsWith(x + "-") || t.startsWith(x + "—") || t.startsWith(x + "–"));
+  p.kamer = k || "";
+  p.functie = k ? t.slice(k.length).replace(/^[\s\-—–:]+/, "").trim() : t;
+  p.toestel = p.toestel || "";
+}
+function ppOmschrijving(p){ return [[p.kamer, p.functie].filter(Boolean).join(" — "), p.toestel].filter(Boolean).join(" · "); }
+function ppSwitchPoorten(){
+  const out = [];
+  state.patchkast.kasten.forEach(k=> k.items.forEach(it=>{ if(it.categorie === "Switch") (it.poorten || []).forEach((sp, i)=> out.push({sw: it, sp, i, label: `${it.naam || "Switch"} · poort ${i + 1}`})); }));
+  return out;
+}
+function ppSwitchVan(p){ return ppSwitchPoorten().find(x=> x.sp.koppelType !== "toestel" && x.sp.patchpaneelPoortId === p.id) || null; }
+
 function switchPoortOpties(poort){
   const opties = allePatchpaneelPoorten().map(p=>{
     const label = [p.code, p.omschrijving||p.paneelNaam].filter(Boolean).join(" — ");
@@ -10728,13 +10753,14 @@ function exportPatchkastVoorWerf(standalone=true){
             <div class="pe-meta">Kast ${ki+1} · ${it.poorten.length} poorten · codes ${escapeHtml(codeRange)}${it.type ? " · "+escapeHtml(it.type) : ""}</div>
           </div>
           <table class="pe-porttable">
-            <thead><tr><th>Code</th><th>Omschrijving</th></tr></thead>
+            <thead><tr><th>Code</th><th>Kamer</th><th>Functie</th><th>Aangesloten toestel</th><th>Switch-poort</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>`);
         const tbody = page.querySelector("tbody");
         it.poorten.forEach((p,i)=>{
-          tbody.appendChild(el(`<tr><td>${escapeHtml(pcodes[i]||"")}</td><td>${escapeHtml(p.omschrijving)}</td></tr>`));
+          ppMigreer(p); const sw = ppSwitchVan(p);
+          tbody.appendChild(el(`<tr><td>${escapeHtml(pcodes[i]||"")}</td><td>${escapeHtml(p.kamer ? kamerLabel(p.kamer) : "")}</td><td>${escapeHtml(p.functie||"")}</td><td>${escapeHtml(p.toestel || (sw && sw.sp.toestelNaam) || "")}</td><td>${escapeHtml(sw ? sw.label : "")}</td></tr>`));
         });
         container.appendChild(page);
       }
@@ -11290,8 +11316,9 @@ function renderPatchEditor(it, codes, rebuildAll, selectItem, onDelete, kast, st
         <strong>Aansluitingen</strong>
         <label>Aantal poorten <input type="number" min="1" class="pe-poorten-n" value="${it.poorten.length}"></label>
       </div>
-      <table class="grid"><thead><tr><th style="width:70px;">Code</th><th>Omschrijving</th></tr></thead>
+      <table class="grid ov-tabel pp-tabel"><thead><tr><th style="width:62px;">Code</th><th>Kamer</th><th>Functie</th><th title="toestel aan de kant van de kamer, bv. Wifi antenne">Aangesloten toestel</th><th title="switch-poort aan de kant van de kast">Switch-poort (kast)</th></tr></thead>
       <tbody class="poorten-body"></tbody></table>
+      <datalist id="pp-functies">${PP_FUNCTIES.map(f=>`<option value="${f}">`).join("")}</datalist>
     </div>` : ""}
     ${(cat==="Switch" && kast) ? `<div class="poorten-sectie">
       <div class="poorten-head">
@@ -11384,10 +11411,40 @@ function renderPatchEditor(it, codes, rebuildAll, selectItem, onDelete, kast, st
     function rebuildPoorten(){
       tbody.innerHTML="";
       const pcodes = codes[it.id] || [];
+      const kamers = kamersGeordend();
+      const swAlle = ppSwitchPoorten();
       it.poorten.forEach((p,i)=>{
-        const tr = el(`<tr><td class="codecell">${escapeHtml(pcodes[i]||"")}</td>
-          <td><input value="${escapeHtml(p.omschrijving)}" placeholder="bv. Data TV Living"></td></tr>`);
-        tr.querySelector("input").addEventListener("input", e=>{ p.omschrijving=e.target.value; save(); });
+        ppMigreer(p);
+        const sw = ppSwitchVan(p);
+        if(!p.toestel && sw && sw.sp.toestelNaam) p.toestel = sw.sp.toestelNaam;
+        const kamerOpts = kamers.map(k=>`<option value="${escapeHtml(k)}" ${p.kamer===k?"selected":""}>${escapeHtml(kamerLabel(k))}</option>`).join("") + (p.kamer && !kamers.includes(p.kamer) ? `<option selected value="${escapeHtml(p.kamer)}">${escapeHtml(p.kamer)} (bestaat niet meer)</option>` : "");
+        const swOpts = swAlle.map(x=>{ const bezet = x.sp.koppelType!=="toestel" && x.sp.patchpaneelPoortId && x.sp.patchpaneelPoortId!==p.id;
+          return `<option value="${x.sw.id}|${x.i}" ${sw && sw.sp===x.sp ? "selected" : ""}>${escapeHtml(x.label)}${bezet ? " (bezet)" : ""}</option>`; }).join("");
+        const tr = el(`<tr data-i="${i}"><td class="codecell">${escapeHtml(pcodes[i]||"")}</td>
+          <td><select class="ov-in pp-kamer"><option value="">— kamer —</option>${kamerOpts}</select></td>
+          <td><input class="ov-in pp-functie" list="pp-functies" value="${escapeHtml(p.functie||"")}" placeholder="bv. Wifi"></td>
+          <td><input class="ov-in pp-toestel" value="${escapeHtml(p.toestel||"")}" placeholder="bv. Wifi antenne"></td>
+          <td>${swAlle.length ? `<select class="ov-in pp-switch"><option value="">— geen —</option>${swOpts}</select>` : `<span class="hint">nog geen switch in de kast</span>`}</td></tr>`);
+        const zet = ()=>{ p.omschrijving = ppOmschrijving(p); save(); };
+        tr.querySelector(".pp-kamer").addEventListener("change", e=>{ p.kamer = e.target.value; zet(); });
+        tr.querySelector(".pp-functie").addEventListener("input", e=>{ p.functie = e.target.value; zet(); });
+        tr.querySelector(".pp-toestel").addEventListener("input", e=>{
+          const oud = p.toestel || ""; p.toestel = e.target.value;
+          const s2 = ppSwitchVan(p); if(s2 && (!s2.sp.toestelNaam || s2.sp.toestelNaam===oud)) s2.sp.toestelNaam = p.toestel;   // zelfde toestel aan beide kanten
+          zet(); });
+        const swSel = tr.querySelector(".pp-switch");
+        if(swSel) swSel.addEventListener("change", e=>{
+          // vorige switch-poort loskoppelen, nieuwe koppelen (één switch-poort per patchpoort)
+          ppSwitchPoorten().forEach(x=>{ if(x.sp.patchpaneelPoortId===p.id) x.sp.patchpaneelPoortId = ""; });
+          if(e.target.value){ const [sid, si] = e.target.value.split("|"); const x = ppSwitchPoorten().find(y=> y.sw.id===sid && String(y.i)===si);
+            if(x){ x.sp.koppelType = "patchpaneel"; x.sp.patchpaneelPoortId = p.id; if(!x.sp.toestelNaam && p.toestel) x.sp.toestelNaam = p.toestel; } }
+          save(); rebuildPoorten(); });
+        // Enter = zelfde veld, volgende poort (zoals in het overzicht van de automaten)
+        tr.querySelectorAll("input.ov-in").forEach(inp=> inp.addEventListener("keydown", e=>{
+          if(e.key!=="Enter") return; e.preventDefault();
+          const cls = [...inp.classList].find(c=> c.startsWith("pp-"));
+          const volg = tbody.querySelector(`tr[data-i="${i+1}"] .${cls}`); if(volg){ volg.focus(); if(volg.select) volg.select(); }
+        }));
         tbody.appendChild(tr);
       });
     }
@@ -11395,7 +11452,7 @@ function renderPatchEditor(it, codes, rebuildAll, selectItem, onDelete, kast, st
     box.querySelector(".pe-poorten-n").addEventListener("input", e=>{
       const n = Math.max(1, parseInt(e.target.value)||1);
       if(n > it.poorten.length){
-        while(it.poorten.length < n) it.poorten.push({id:cryptoId(), omschrijving:""});
+        while(it.poorten.length < n) it.poorten.push({id:cryptoId(), omschrijving:"", kamer:"", functie:"", toestel:""});
       } else if(n < it.poorten.length){
         it.poorten.length = n;
       }
