@@ -28400,7 +28400,10 @@ async function gcHerstel(wat, fn){
       await window.dbBackupCadosDossier(currentProjectId, "CaDos: voor gegevenscontrole-herstel");
       gcLaatsteBackup = Date.now();
     }
-  }catch(e){ console.warn("back-up mislukt", e); if(!confirm("De back-up is mislukt. Toch herstellen?")) return; }
+  }catch(e){ console.warn("back-up mislukt", e);
+    if(!confirm("De back-up is mislukt" + (e && e.message ? " (" + e.message + ")" : "") + ". Toch herstellen?")) return;
+    gcLaatsteBackup = Date.now();   // niet bij elke klik opnieuw vragen
+  }
   fn(); save(); selectTab("controle"); toast("Hersteld: " + wat.slice(0, 60) + (wat.length > 60 ? "…" : ""));
 }
 function gcAantalProblemen(){ try{ return gcControles().filter(r=> r.cat === "verweesd" || r.cat === "verouderd" || r.cat === "onvolledig").length; }catch(_e){ return 0; } }
