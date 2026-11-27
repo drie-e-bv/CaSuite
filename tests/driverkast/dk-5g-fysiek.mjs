@@ -1,0 +1,40 @@
+// Vereist een testkopie van index.html met 'window.__cdEval = (c)=> eval(c);' vóór 'function vlAantal(item){', geserveerd op poort 8790, en stub3.js in de cwd. 230V 5G1,5: keuze per fysieke (gesplitste) driverkast.
+import { chromium } from '/opt/npm-tools/node_modules/playwright/index.mjs';
+const b=await chromium.launch({executablePath:'/usr/bin/google-chrome',args:['--no-sandbox']});
+const p=await b.newPage({viewport:{width:1500,height:1000}});
+const errs=[]; p.on('pageerror',e=>errs.push(e.message)); p.on('dialog',d=>d.accept());
+await p.route(/^https?:\/\/(?!localhost)/,r=>{const u=r.request().url();
+ if(/supabase/.test(u))return r.fulfill({path:'stub3.js',contentType:'text/javascript'});
+ return r.fulfill({body:'',contentType:'text/javascript'})});
+const E=(c)=> p.evaluate((c)=> window.__cdEval(c), c);
+const J=async(c)=> JSON.parse(await E(c));
+const ok=(c,m)=>console.log((c?'OK  ':'FOUT')+' '+m);
+await p.goto('http://localhost:8790/index.html');await p.waitForTimeout(2500);
+await p.click('#main-nav-btn-cados');await p.waitForTimeout(600);
+await E(`(()=>{ document.getElementById('cados-project-hint-card').style.display='none'; document.getElementById('cados-app-wrap').style.display='';
+  state.modules.driverkast = true; state.modules.verlichting = true;
+  const mk = (n, kamer)=>{ const k = newDriverKast(); k.kamer=kamer; for(let i=0;i<n;i++){ const d = newDriverItem(); d.naam='TCI'; d.armaturen=[{id:cryptoId(), naam:'Prado', aantal:2, ruimte:kamer}]; k.items.push(d);} return k; };
+  state.driverkast.kasten = [mk(6,'Slaapkamer 2 Dressing'), mk(4,'Master Badkamer')];
+  dkNaarKast(dkFysiekeKasten()[0], state.driverkast.kasten[0].items[5], null);
+  const v = newVerlichtingItem ? newVerlichtingItem() : {id: cryptoId(), naam:'', kamer:''}; v.naam='Wand badkamer'; v.kamer='Master Badkamer'; state.verlichting.items = [v];
+  save(); window.__v = v; return 1; })()`);
+let r = await J(`JSON.stringify(dkFysiekeKasten().map(x=> dkFysiekNaam(x)))`); console.log(JSON.stringify(r));
+await E(`selectTab('verlichting')`); await p.waitForTimeout(800);
+const opts = await p.$$eval('.ov-5g option', os=> os.map(o=> o.textContent));
+console.log(JSON.stringify(opts));
+ok(opts.length===4 && /Driverkast 3/.test(opts[3]), 'keuzelijst toont 3 fysieke kasten, zoals in Lijst/Plan');
+// kies Driverkast 2 (gesplitst deel van ontwerpkast 1)
+await p.$eval('.ov-5g', (s)=>{ s.value = s.options[2].value; s.dispatchEvent(new Event('change',{bubbles:true})); }); await p.waitForTimeout(600);
+r = await J(`JSON.stringify((()=>{ const f = dkFysiekeKasten(); const i = f.findIndex(x=> (x.items||[]).some(d=> d.lichtpuntId===__v.id)); return {i, n: f.map(x=> (x.items||[]).length)}; })())`);
+console.log(JSON.stringify(r)); ok(r.i===1, '5G1,5 komt in Driverkast 2 (het gesplitste deel), niet in de hele ontwerpkast');
+ok(await p.$eval('.ov-5g', s=> s.options[s.selectedIndex].textContent.startsWith('Driverkast 2')), 'keuzelijst toont na herladen Driverkast 2 als gekozen');
+// naar Driverkast 1 (zelfde ontwerpkast) en daarna Driverkast 3
+await p.$eval('.ov-5g', (s)=>{ s.value = s.options[1].value; s.dispatchEvent(new Event('change',{bubbles:true})); }); await p.waitForTimeout(500);
+r = await J(`JSON.stringify(dkFysiekeKasten().findIndex(x=> (x.items||[]).some(d=> d.lichtpuntId===__v.id)))`); ok(r===0, 'verplaatsen naar Driverkast 1 (zelfde ontwerpkast)');
+await p.$eval('.ov-5g', (s)=>{ s.value = s.options[3].value; s.dispatchEvent(new Event('change',{bubbles:true})); }); await p.waitForTimeout(500);
+r = await J(`JSON.stringify({i: dkFysiekeKasten().findIndex(x=> (x.items||[]).some(d=> d.lichtpuntId===__v.id)), tel: state.driverkast.kasten.map(k=> k.items.filter(d=> d.lichtpuntId===__v.id).length)})`);
+ok(r.i===2 && r.tel[0]===0 && r.tel[1]===1, 'verplaatsen naar Driverkast 3: geen kopie achtergebleven');
+await p.$eval('.ov-5g', (s)=>{ s.value = ''; s.dispatchEvent(new Event('change',{bubbles:true})); }); await p.waitForTimeout(500);
+r = await J(`JSON.stringify(state.driverkast.kasten.reduce((t,k)=> t + k.items.filter(d=> d.lichtpuntId===__v.id).length, 0))`); ok(r===0, 'terug naar standaard: item weg');
+ok(errs.length===0, 'geen JS-fouten '+errs.join(' | '));
+await b.close();

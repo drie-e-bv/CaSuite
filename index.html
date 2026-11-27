@@ -12814,8 +12814,10 @@ function renderVerlichtingOverzicht(codes, herteken){
       <td><select class="ov-typekabel">${kabelOpties(item.typeKabel||"")}</select></td>
       <td><select class="ov-kring"><option value="">— geen —</option>${state.kringen.items.map(k=>`<option value="${k.id}" ${item.kringId===k.id?"selected":""}>${escapeHtml(kringLabel(k, kringCodes[k.id]))}</option>`).join("")}</select></td>
       <td><select class="ov-automaat" style="min-width:150px;">${autOpties(item)}</select></td>
-      <td class="vl-5g-cel">${(()=>{ const r5 = dk5gItemVan(item); const kid = r5 ? r5.kast.id : "";
-        const opts = state.driverkast.kasten.map((k, ki)=>`<option value="${k.id}" ${kid===k.id?"selected":""}>Driverkast ${ki+1}${k.kamer ? " · " + escapeHtml(k.kamer) : ""} (5G1,5)</option>`).join("");
+      <td class="vl-5g-cel">${(()=>{ const r5 = dk5gItemVan(item); const f5 = r5 ? dk5gFysiekVan(r5.d) : null; const kid = f5 ? f5.id : (r5 ? r5.kast.id : "");
+        // 27/11/2026 (Peter): fysieke kasten zoals in Lijst/Plan (een gesplitste kast telt als 2 kasten)
+        let fk = []; try{ fk = dkFysiekeKasten(); }catch(_e){}
+        const opts = fk.map(v=>`<option value="${v.id}" ${kid===v.id?"selected":""}>${escapeHtml(dkFysiekNaam(v))} (5G1,5)</option>`).join("");
         return `<select class="ov-5g"><option value="">standaard (kring)</option>${opts}</select>` + (r5 ? `<select class="ov-5gcfg" title="A = bruin/blauw op 230V-blok, grijs/zwart op DALI · B = aparte driver: bruin/blauw op rijgklemmen, grijs+zwart isoleren"><option value="A" ${r5.d.vijfG!=="B"?"selected":""}>A · 230V + DALI</option><option value="B" ${r5.d.vijfG==="B"?"selected":""}>B · aparte driver</option></select>` : ""); })()}</td>
       <td><input class="ov-info" value="${escapeHtml(item.info||"")}" style="min-width:140px;"></td>
       <td style="white-space:nowrap;"><button type="button" class="btn small ghost vl-weg" title="Verwijderen — de volgende lichtpunten schuiven één nummer op">🗑</button> <button type="button" class="btn small ghost vl-weg-behoud" title="Verwijderen met behoud van nummer — de andere lichtpunten houden hun nummer">🗑 #</button></td>
@@ -23070,21 +23072,35 @@ function dk5gSync(v, d, kast){
   if(d.vijfG === "A") d.naam = DK_5G_NAAM;
   else if(!d.naam || d.naam === DK_5G_NAAM){ try{ d.naam = computeDriverMatch(d, kast.sturing).naam || ""; }catch(_e){ d.naam = ""; } }
 }
+function dk5gFysiekVan(d){ try{ return dkFysiekeKasten().find(v=> (v.items||[]).includes(d)) || null; }catch(_e){ return null; } }
+// 27/11/2026: kastId = id van een FYSIEKE kast (Driverkast 1, 2, ... zoals in Lijst/Plan; een gesplitst deel telt mee).
+// Het item staat in zijn ontwerpkast; planVan bepaalt in welk deel het fysiek hangt.
 function dk5gZetKast(v, kastId){
   const huidig = dk5gItemVan(v);
-  if(huidig && (!kastId || huidig.kast.id !== kastId)){
-    huidig.kast.items = huidig.kast.items.filter(x=> x !== huidig.d);
-    if(huidig.kast.plan) huidig.kast.plan.bedrading = (huidig.kast.plan.bedrading||[]).filter(w=> ![w.a.m, w.b.m].some(m=> m===huidig.d.id || m==="dkk_" + huidig.d.id));
+  let fk = []; try{ fk = dkFysiekeKasten(); }catch(_e){}
+  const doel = kastId ? (fk.find(x=> x.id===kastId) || null) : null;
+  const bronDoel = doel ? (doel._bron || state.driverkast.kasten.find(k=> k.id===doel.id)) : (kastId ? state.driverkast.kasten.find(k=> k.id===kastId) : null);
+  const doelId = doel ? doel.id : (bronDoel ? bronDoel.id : "");
+  const oudF = huidig ? dk5gFysiekVan(huidig.d) : null;
+  if(huidig && (!bronDoel || !oudF || oudF.id !== doelId)){
+    // weg uit de vorige fysieke kast: draden en plaats in het plan
+    const pl = oudF && oudF.plan ? oudF.plan : huidig.kast.plan;
+    if(pl){ pl.bedrading = (pl.bedrading||[]).filter(w=> ![w.a.m, w.b.m].some(m=> m===huidig.d.id || m==="dkk_" + huidig.d.id));
+      if(pl.draai) delete pl.draai[huidig.d.id];
+      pl.kolommen = (pl.kolommen||[]).map(c=> c.filter(x=> x !== huidig.d.id)).filter(c=> c.length);
+      if(Array.isArray(pl.onderaan)) pl.onderaan = pl.onderaan.filter(x=> x !== huidig.d.id); }
+    if(huidig.kast !== bronDoel){ huidig.kast.items = huidig.kast.items.filter(x=> x !== huidig.d); if(huidig.kast.planVan) delete huidig.kast.planVan[huidig.d.id]; }
     dk5gHerbedraad(huidig.kast);
   }
-  v.dkVoeding = kastId || "";
-  if(!kastId) return;
-  const kast = state.driverkast.kasten.find(k=> k.id===kastId); if(!kast) return;
-  let d = huidig && huidig.kast.id===kastId ? huidig.d : null;
-  if(!d){ d = newDriverItem(); d.vijfG = "A"; d.lichtpuntId = v.id; kast.items.push(d); }
-  dk5gSync(v, d, kast);
+  v.dkVoeding = bronDoel ? doelId : "";
+  if(!bronDoel) return;
+  let d = huidig && huidig.kast === bronDoel ? huidig.d : null;
+  if(!d){ d = newDriverItem(); d.vijfG = "A"; d.lichtpuntId = v.id; bronDoel.items.push(d); }
+  if(!bronDoel.planVan) bronDoel.planVan = {};
+  if(doelId !== bronDoel.id) bronDoel.planVan[d.id] = doelId; else delete bronDoel.planVan[d.id];
+  dk5gSync(v, d, bronDoel);
   if(state.modules) state.modules.driverkast = true;
-  dk5gHerbedraad(kast);
+  dk5gHerbedraad(bronDoel);
 }
 function dk5gZetConfig(v, cfg){
   const r = dk5gItemVan(v); if(!r) return;
