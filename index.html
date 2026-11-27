@@ -7206,6 +7206,21 @@ body.print-patchkast #printExport{display:block !important;}
 #cados-app .kast-werkbalk > .dk-keuze{flex:1 1 auto;margin:0;}
 #cados-app .kast-werkbalk > .dk-keuze:empty{display:none;}
 #cados-app .dk-keuze button.actief .hint{color:inherit;opacity:.8;}
+#cados-app .gc-tellers{flex-wrap:wrap;gap:6px;}
+#cados-app .gc-chip{border:1px solid var(--line,#dde3e0);background:#fff;border-radius:999px;padding:5px 12px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;color:var(--gc,var(--ink));}
+#cados-app .gc-chip b{margin-left:4px;}
+#cados-app .gc-chip.actief{background:var(--gc,var(--app-dossier,#1e6b43));border-color:var(--gc,var(--app-dossier,#1e6b43));color:#fff;}
+#cados-app .gc-groep{margin-top:10px;}
+#cados-app .gc-rij{display:flex;gap:12px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--line,#eef0ee);}
+#cados-app .gc-rij:last-child{border-bottom:0;}
+#cados-app .gc-cat{flex:0 0 auto;font-size:11px;font-weight:700;color:var(--gc);border:1px solid var(--gc);border-radius:999px;padding:2px 8px;white-space:nowrap;margin-top:2px;}
+#cados-app .gc-tekst{flex:1 1 auto;min-width:0;}
+#cados-app .gc-titel{font-weight:600;}
+#cados-app .gc-acties{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;align-items:center;flex:0 0 auto;max-width:48%;}
+#cados-app .gc-keuze{max-width:200px;}
+#cados-app .gc-gevaar{color:#B42318;}
+#cados-app .pk-eigen-badge{color:#B54708;font-weight:700;}
+#cados-app .kast-voeding{max-width:260px;}
 #cados-app .zk-kastrij > #kastTabbar{flex:1 1 auto;flex-wrap:wrap !important;padding:0;margin:0;gap:6px;}
 #cados-app #panel-zekeringen .builder-layout:has(#moveBanner:empty):has(#stagingSlot:empty){grid-template-columns:minmax(0,1fr);}
 #cados-app #panel-zekeringen .builder-layout:has(#moveBanner:empty):has(#stagingSlot:empty) > .builder-side{display:none;}
@@ -7595,7 +7610,7 @@ function ontkoppelZekeringModule(moduleId){
   // 23/11/2026: relais/actoren onthouden hun voedende automaat (keten lichtpunt → relais → automaat)
   state.zekeringen.kasten.forEach(k=> k.rijen.forEach(r=> r.items.forEach(x=>{ if(x.zekeringModuleId===moduleId) x.zekeringModuleId=""; })));
   alleDrivers().forEach(d=>{ if(d.zekeringModuleId===moduleId) d.zekeringModuleId=""; });
-  state.patchkast.kasten.forEach(kast=> kast.items.forEach(it=>{ if(it.zekeringModuleId===moduleId) it.zekeringModuleId=""; }));
+  state.patchkast.kasten.forEach(kast=>{ if(kast.zekeringModuleId===moduleId) kast.zekeringModuleId=""; kast.items.forEach(it=>{ if(it.zekeringModuleId===moduleId) it.zekeringModuleId=""; }); });
   state.laadpalen.items.forEach(lp=>{ if(lp.zekeringModuleId===moduleId) lp.zekeringModuleId=""; });
   state.verwarming.items.forEach(z=>{ if(z.zekeringModuleId===moduleId) z.zekeringModuleId=""; });
   if(state.alarmCentrale.zekeringModuleId===moduleId) state.alarmCentrale.zekeringModuleId="";
@@ -8073,6 +8088,8 @@ const TABS = [
   // die twee horen inhoudelijk bij elkaar.
   {grp:"Project", id:"keuring", label:"Keuring"},
   {grp:"Project", id:"oplevering", label:"Oplevering"},
+  // 27/11/2026: Gegevenscontrole (verweesde, dubbele en onvolledige gegevens opsporen en herstellen)
+  {grp:"Project", id:"controle", label:"Gegevenscontrole"},
 ];
 // Vaste, altijd-geldige eerste tab (nooit achter een toggle) -- gebruikt als veilige terugval
 // overal waar vroeger "instellingen" stond (die tab bestaat niet meer, zie hierboven).
@@ -8435,6 +8452,7 @@ function migrate(s){
   s.zekeringen.kasten.forEach(k=>{ if(k.kamer===undefined) k.kamer=""; if(k.verdieping===undefined) k.verdieping=""; if(!ZEKERING_MAAT_OPTIES.includes(k.maat)) k.maat=24; });
   s.driverkast.kasten.forEach(k=>{ if(k.kamer===undefined) k.kamer=""; if(k.verdieping===undefined) k.verdieping=""; });
   s.patchkast.kasten.forEach(k=>{ if(k.kamer===undefined) k.kamer=""; if(k.verdieping===undefined) k.verdieping=""; });
+  try{ pkVoedingMigratie(s); }catch(e){ console.warn("patchkast-voeding migratie", e); }
   if(!Array.isArray(s.armaturen) || !s.armaturen.length) s.armaturen = ARMATUREN_DEFAULT.map(a=>({...a}));
   if(!Array.isArray(s.driver) || !s.driver.length) s.driver = DRIVER_DEFAULT.map(d=>({...d}));
   // Patchkast: oudere versie had één kast als {maxU, items:[...]} rechtstreeks;
@@ -8527,6 +8545,7 @@ function migrate(s){
 let __cadosSaveTimer = null;
 let __cadosSaveDirty = false;
 function save(){
+  try{ pkSyncVoeding(); }catch(_e){}
   updateTopbar();
   try{ renderDossierverloopUitgesteld(); }catch(e){}
   if(!currentProjectId) return; // nog geen project gekozen -- niets om te bewaren
@@ -8846,7 +8865,7 @@ function crPatchSvg(kast){
       const c = codes[it.id], rng = c && c.length ? `${c[0]}–${c[c.length-1]}` : "";
       const y0 = KOP + y*U + 2, hh = h*U - 4;
       s += `<rect x="${LX + 6}" y="${y0}" width="${B - 12}" height="${hh}" rx="3" fill="${CR_PK_KLEUR[cat] || "#F2F2F2"}" stroke="#5B6168" stroke-width="1"/>`;
-      const sub = [it.type, patchSpecText(it), rng ? "codes " + rng : ""].filter(Boolean).join("  ·  ");
+      const sub = [it.type, patchSpecText(it), rng ? "codes " + rng : "", pkHeeftStroom(it) && it.eigenVoeding ? "⚡ eigen voeding" : ""].filter(Boolean).join("  ·  ");
       const titel = escapeHtml(label) + (it.naam ? " — " + escapeHtml(it.naam) : "");
       if(h === 1){   // 1U: alles op één regel
         s += `<text x="${LX + 16}" y="${y0 + hh/2 + 5}" font-size="14" fill="#1C2430"><tspan font-weight="700">${titel}</tspan>${sub ? `<tspan font-size="11" fill="#4B5563">   ${escapeHtml(sub)}</tspan>` : ""}</text>`;
@@ -8875,14 +8894,16 @@ function crPatchRapport(kast, ki, o){
     const cat = it.categorie || "Overig";
     const c = codes[it.id], rng = c && c.length ? `${c[0]}–${c[c.length-1]}` : "";
     const ups = it.upsId ? alleItems.find(x=> x.id === it.upsId) : null;
-    const voeding = [it.zekeringModuleId ? crAutLabel(it.zekeringModuleId, aut) : "", ups ? "UPS " + (ups.naam || "") : ""].filter(Boolean).join(" · ");
+    const voeding = [pkHeeftStroom(it) ? (it.eigenVoeding ? (it.zekeringModuleId ? "eigen: " + crAutLabel(it.zekeringModuleId, aut) : "eigen: nog te kiezen") : (kast.zekeringModuleId ? "algemeen (" + ((aut.find(a=> a.id===kast.zekeringModuleId)||{}).code || "") + ")" : "")) : "", ups ? "UPS " + (ups.naam || "") : ""].filter(Boolean).join(" · ");
     rijen.push({cellen: [`U${van}${h > 1 ? "–" + (van + h - 1) : ""}`, (PATCH_CATEGORIEEN[cat] || {}).label || cat, it.naam || "", it.type || "", patchSpecText(it), rng, it.ipAdres || "", voeding, it.info || ""]});
   });
   const naam = `Patchkast ${ki+1}` + (kast.kamer ? " — " + kast.kamer : "") + (kast.verdieping ? " (" + kast.verdieping + ")" : "");
   const used = kast.items.reduce((t, it)=> t + (parseInt(it.hoogte) || 1), 0);
   const ip = state.patchkast.internetProvider;
+  const nEigen = kast.items.filter(it=> pkHeeftStroom(it) && it.eigenVoeding).length;
   const plan = crPlanPagina({soort: "Patchkast", titel: naam, svg: crPatchSvg(kast), fmt: o.fmt, info: [
     ["Rack", (kast.maxU || "") + "U · 19\""], ["Bezet", used + "U"], ["Componenten", rijen.length],
+    ["Algemene voeding", kast.zekeringModuleId ? crAutLabel(kast.zekeringModuleId, aut) : ""], ["Eigen voeding", nEigen ? nEigen + " toestel(len)" : ""],
     ["Internetprovider", ip ? [ip.naam, ip.gebruikersnaam ? "gebruiker " + ip.gebruikersnaam : ""].filter(Boolean).join(" · ") : ""]]});
   const lijst = crLijstPagina({soort: "Patchkast", titel: "Componentenlijst — " + naam, fmt: o.fmt, sub: "Van boven naar onder (U-positie in het rack).",
     kolommen: [{t: "Pos.", b: "7%", cls: "cr-mono"}, {t: "Component", b: "12%"}, {t: "Benoeming", b: "15%"}, {t: "Merk / type", b: "13%"}, {t: "Gegevens", b: "15%"},
@@ -11062,6 +11083,8 @@ function renderPatchKastCard(kast, ki, rebuildAll, codes, editingId, selectItem,
       <div class="kast-locatie">
         <input class="kast-kamer" list="dl-kamers-algemeen" placeholder="Kamer" value="${escapeHtml(kast.kamer||"")}">
         ${verdiepingSelectHtml(kast.verdieping, "kast-verdieping")}
+        <select class="kast-voeding" title="Algemene voeding van deze patchkast: alle toestellen zonder 'Eigen voeding' hangen hieraan"><option value="">⚡ algemene voeding — kies automaat</option>${alleZekeringAutomaten().map(a=>`<option value="${a.id}" ${kast.zekeringModuleId===a.id?"selected":""}>⚡ ${escapeHtml(a.code)}${a.naam?" — "+escapeHtml(a.naam):""}</option>`).join("")}</select>
+        <span class="hint pk-voed-tel">${(()=>{ const st = kast.items.filter(pkHeeftStroom); const alg = st.filter(x=> !x.eigenVoeding).length, eig = st.length - alg; return st.length ? `voedt ${alg} toestel(len)${eig ? ` · ${eig} met eigen voeding` : ""}` : ""; })()}</span>
       </div>
       <div class="rij-stats ${used>kast.maxU?'over':''}">
         <input type="number" class="kast-maxu" min="${PATCH_MAXU_MIN}" max="${PATCH_MAXU_MAX}" value="${kast.maxU}" style="width:52px;"> U
@@ -11080,6 +11103,7 @@ function renderPatchKastCard(kast, ki, rebuildAll, codes, editingId, selectItem,
   });
   card.querySelector(".kast-kamer").addEventListener("input", e=>{ kast.kamer=e.target.value; save(); });
   card.querySelector(".kast-verdieping").addEventListener("change", e=>{ kast.verdieping=e.target.value; save(); });
+  card.querySelector(".kast-voeding").addEventListener("change", e=>{ kast.zekeringModuleId = e.target.value; save(); rebuildAll(); });
   card.querySelector(".kastdel").addEventListener("click", ()=>{
     if(kast.items.length && !confirm("Deze kast bevat componenten. Toch verwijderen?")) return;
     const idx = state.patchkast.kasten.indexOf(kast);
@@ -11153,6 +11177,7 @@ function renderPatchItem(it, kast, rebuildAll, selected, selectItem, onDelete, s
       <strong>${escapeHtml(PATCH_CATEGORIEEN[cat].label)}${isStaging?" (nieuw)":""}</strong>
       ${spec ? `<span class="rackitem-spec">${escapeHtml(spec)}</span>` : ""}
       ${it.naam ? `<span class="rackitem-naam">${escapeHtml(it.naam)}</span>` : ""}
+      ${it.eigenVoeding && pkHeeftStroom(it) ? `<span class="rackitem-spec pk-eigen-badge" title="eigen voeding">⚡ eigen voeding${it.zekeringModuleId ? " " + escapeHtml((alleZekeringAutomaten().find(a=> a.id===it.zekeringModuleId)||{}).code || "") : " — nog te kiezen"}</span>` : ""}
     </span>
     <span class="rackitem-btns">
       <button class="rb-remove" title="verwijderen">−</button>
@@ -11205,6 +11230,34 @@ function toestellenOpUPS(upsId){
   state.patchkast.kasten.forEach(kast=> kast.items.forEach(it=>{ if(it.categorie!=="UPS" && it.upsId===upsId) out.push(it); }));
   return out;
 }
+
+/* 27/11/2026 (Peter: "voedingsstructuur patchkasten uitbreiden"): één ALGEMENE voeding per patchkast
+   (kast.zekeringModuleId). Een toestel volgt die standaard; met "Eigen voeding" (it.eigenVoeding) kies je
+   een eigen automaat. it.zekeringModuleId blijft de EFFECTIEVE voeding van het toestel (pkSyncVoeding bij elke
+   save), zodat Koppelen, verbruikers per automaat, schema's en afdrukken ongewijzigd blijven werken.
+   Passieve onderdelen (patchpaneel, kabelgoot, leeg) hebben geen voeding. */
+const PK_PASSIEF = new Set(["Leeg", "Kabelgoot", "Patchpaneel"]);
+function pkHeeftStroom(it){ return !!it && !PK_PASSIEF.has(it.categorie || "Overig"); }
+function pkSyncVoeding(s){
+  s = s || state;
+  ((s.patchkast && s.patchkast.kasten) || []).forEach(kast=>{
+    if(kast.zekeringModuleId === undefined) kast.zekeringModuleId = "";
+    (kast.items || []).forEach(it=>{ if(pkHeeftStroom(it) && !it.eigenVoeding) it.zekeringModuleId = kast.zekeringModuleId || ""; });
+  });
+}
+// bestaande dossiers: meest gebruikte automaat in de kast wordt de algemene voeding, afwijkende toestellen krijgen "Eigen voeding"
+function pkVoedingMigratie(s){
+  ((s.patchkast && s.patchkast.kasten) || []).forEach(kast=>{
+    if(kast.zekeringModuleId !== undefined) return;
+    const stroom = (kast.items || []).filter(pkHeeftStroom), tel = {};
+    stroom.forEach(it=>{ if(it.zekeringModuleId) tel[it.zekeringModuleId] = (tel[it.zekeringModuleId] || 0) + 1; });
+    const alg = Object.keys(tel).sort((a, b)=> tel[b] - tel[a])[0] || "";
+    kast.zekeringModuleId = alg;
+    stroom.forEach(it=>{ it.eigenVoeding = !!(it.zekeringModuleId && it.zekeringModuleId !== alg); });
+  });
+}
+function pkVoedingLabel(id){ if(!id) return ""; const a = alleZekeringAutomaten().find(x=> x.id === id); return a ? [a.code, a.naam].filter(Boolean).join(" — ") : ""; }
+
 function findKastByItem(it){
   return state.patchkast.kasten.find(k=>k.items.includes(it));
 }
@@ -11222,7 +11275,9 @@ function renderPatchEditor(it, codes, rebuildAll, selectItem, onDelete, kast, st
       <div class="field"><label>Hoogte (U)</label><input type="number" min="1" max="${PATCH_MAXU_MAX}" class="pe-hoogte" value="${it.hoogte}"></div>
       ${cat!=="Leeg" ? `<div class="field wide"><label>Merk / type</label><input class="pe-type" value="${escapeHtml(it.type)}" placeholder="bv. Panduit 24-poorts Cat6"></div>` : ""}
       <div class="field wide"><label>Benoeming</label><input class="pe-naam" value="${escapeHtml(it.naam)}" placeholder="bv. Patchkast bureau"></div>
-      ${cat!=="Leeg" ? `<div class="field"><label>Gevoed door automaat</label><select class="pe-zekering"><option value="">— geen —</option>${alleZekeringAutomaten().map(a=>`<option value="${a.id}" ${it.zekeringModuleId===a.id?"selected":""}>${escapeHtml(a.code)}${a.naam?" — "+escapeHtml(a.naam):""}</option>`).join("")}</select></div>` : ""}
+      ${pkHeeftStroom(it) ? `<div class="field pe-voeding"><label class="pe-eigen-l" title="Standaard hangt een toestel aan de algemene voeding van de patchkast. Vink aan voor een afzonderlijke automaat (bv. een zware versterker)."><input type="checkbox" class="pe-eigen" ${it.eigenVoeding?"checked":""} style="width:auto;margin-right:6px;">Eigen voeding</label>
+        ${it.eigenVoeding ? `<select class="pe-zekering"><option value="">— kies de eigen automaat —</option>${alleZekeringAutomaten().map(a=>`<option value="${a.id}" ${it.zekeringModuleId===a.id?"selected":""}>${escapeHtml(a.code)}${a.naam?" — "+escapeHtml(a.naam):""}</option>`).join("")}</select>`
+          : `<div class="hint">volgt de algemene voeding van de kast${(()=>{ const k = kast || findKastByItem(it); const l = k ? pkVoedingLabel(k.zekeringModuleId) : ""; return l ? ": <b>" + escapeHtml(l) + "</b>" : " (nog niet gekozen — kies die bovenaan de kast)"; })()}</div>`}</div>` : ""}
       ${(cat!=="Leeg" && cat!=="UPS") ? `<div class="field"><label>Via UPS</label><select class="pe-ups"><option value="">— geen —</option>${alleUPSToestellen().filter(u=>u.id!==it.id).map(u=>`<option value="${u.id}" ${it.upsId===u.id?"selected":""}>${escapeHtml(u.naam||"UPS")}</option>`).join("")}</select></div>` : ""}
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -11312,7 +11367,14 @@ function renderPatchEditor(it, codes, rebuildAll, selectItem, onDelete, kast, st
   if(typeInp) typeInp.addEventListener("input", e=>{ it.type=e.target.value; save(); updateRackItemVisual(it); });
   box.querySelector(".pe-naam").addEventListener("input", e=>{ it.naam=e.target.value; save(); updateRackItemVisual(it); });
   const zekSel = box.querySelector(".pe-zekering");
-  if(zekSel) zekSel.addEventListener("change", e=>{ it.zekeringModuleId=e.target.value; save(); });
+  if(zekSel) zekSel.addEventListener("change", e=>{ it.zekeringModuleId=e.target.value; save(); rebuildAll(); });
+  const eigenCb = box.querySelector(".pe-eigen");
+  if(eigenCb) eigenCb.addEventListener("change", e=>{
+    // aan: eigen automaat kiezen (start leeg, zodat er nooit stilletjes twee keer dezelfde voeding staat); uit: terug naar de algemene voeding
+    it.eigenVoeding = e.target.checked;
+    it.zekeringModuleId = it.eigenVoeding ? "" : (((kast || findKastByItem(it)) || {}).zekeringModuleId || "");
+    save(); rebuildAll();
+  });
   const upsSel = box.querySelector(".pe-ups");
   if(upsSel) upsSel.addEventListener("change", e=>{ it.upsId=e.target.value; save(); rebuildAll(); });
 
@@ -16776,11 +16838,23 @@ function renderKamersVerdiepingenTab(){
       ${!isSub && k ? `<button class="btn small ghost km-subadd" title="subkamer toevoegen onder ${escapeHtml(k)}">+ subkamer</button>` : ""}
       <button class="rowdel" title="verwijderen">✕</button>
     </div>`);
+    // 27/11/2026 (Gegevenscontrole): bij hernoemen volgen ALLE koppelingen (driverkast, kringen, lichtpunten, knoppen, ...)
+    // de nieuwe naam -- bij het verlaten van het veld, zodat tussenstappen tijdens het typen niets omzetten
+    let kmVoor = state.kamers[idx];
+    row.querySelector('.km-naam').addEventListener('focus', () => { kmVoor = state.kamers[idx]; });
     row.querySelector('.km-naam').addEventListener('input', e => {
       const oud = state.kamers[idx], nieuw = e.target.value;
       state.kamers[idx] = nieuw; hernoemKamer(oud, nieuw); save();
     });
-    row.querySelector('.km-naam').addEventListener('change', () => renderKamersRows());
+    row.querySelector('.km-naam').addEventListener('change', e => {
+      const nieuw = e.target.value;
+      if(kmVoor && nieuw && kmVoor !== nieuw && !state.kamers.some((x, i)=> i !== idx && x === kmVoor)){
+        const n = kamerNaamOveral(kmVoor, nieuw);
+        if(n) toast(`${n} koppeling(en) volgen de nieuwe naam "${nieuw}"`);
+        save();
+      }
+      kmVoor = nieuw; renderKamersRows();
+    });
     row.querySelector('.km-vd').addEventListener('change', e => {
       if(!state.kamerVerdieping || typeof state.kamerVerdieping!=="object") state.kamerVerdieping = {};
       if(e.target.value) state.kamerVerdieping[state.kamers[idx]] = e.target.value; else delete state.kamerVerdieping[state.kamers[idx]];
@@ -16809,7 +16883,9 @@ function renderKamersVerdiepingenTab(){
         Object.keys(state.kamerOuder).forEach(x=>{ if(state.kamerOuder[x]===naam) delete state.kamerOuder[x]; }); // subkamers worden gewone kamers
         state.kamers.splice(idx, 1); save(); renderKamersRows();
       };
-      if(naam && subs.length && typeof vlBevestig==="function") vlBevestig("Hoofdruimte verwijderen?", `"${escapeHtml(naam)}" verwijderen? De ${subs.length} subkamer(s) blijven bestaan als gewone kamers.`, "✕ Verwijderen", doe);
+      const nGebruik = naam ? kamerGebruik(naam) : 0;   // 27/11/2026: gevolgen tonen vóór verwijderen
+      const extraTekst = nGebruik ? ` Let op: ${nGebruik} onderdeel/onderdelen gebruiken deze kamer nog; ze houden de naam en verschijnen dan in de Gegevenscontrole (daar kan je ze naar een andere kamer verplaatsen).` : "";
+      if(naam && (subs.length || nGebruik) && typeof vlBevestig==="function") vlBevestig(subs.length ? "Hoofdruimte verwijderen?" : "Kamer verwijderen?", `"${escapeHtml(naam)}" verwijderen?${subs.length ? ` De ${subs.length} subkamer(s) blijven bestaan als gewone kamers.` : ""}${escapeHtml(extraTekst)}`, "✕ Verwijderen", doe);
       else doe();
     });
     return row;
@@ -24401,6 +24477,7 @@ const RENDERERS = {
   driverplan: ()=> metFamilieBalk("driverplan", renderDriverplan),
   dktekening: ()=> metFamilieBalk("dktekening", renderDriverUitvoering),
   koppelen: renderKoppelenPagina,
+  controle: renderGegevenscontrole,
   kabels: renderKabelsPagina,
   schema: renderSchemaPagina,
   kamers: renderKamersVerdiepingenTab,
@@ -27055,7 +27132,7 @@ function zkPasToe(O){
     } else if(k.ref){
       const r = k.ref;
       if(r.type==="driverkast"){ const dk = state.driverkast.kasten.find(x=>x.id===r.kastId); if(dk) dk.items.forEach(d=>{ if(leeg(d.zekeringModuleId)) d.zekeringModuleId = m.id; }); }
-      if(r.type==="patchkast"){ const pk = state.patchkast.kasten.find(x=>x.id===r.kastId); if(pk) pk.items.forEach(it=>{ if(["Switch","Overig","Router","Muziek"].includes(it.categorie) && leeg(it.zekeringModuleId)) it.zekeringModuleId = m.id; }); }
+      if(r.type==="patchkast"){ const pk = state.patchkast.kasten.find(x=>x.id===r.kastId); if(pk && leeg(pk.zekeringModuleId)) pk.zekeringModuleId = m.id; }   // 27/11/2026: algemene voeding van de kast
       if(r.type==="laadpaal"){ const lp = state.laadpalen.items.find(x=>x.id===r.laadpaalId); if(lp) lp.zekeringModuleId = m.id; }
       if(r.type==="alarm" && leeg(state.alarmCentrale.zekeringModuleId)) state.alarmCentrale.zekeringModuleId = m.id;
       if(r.type==="verwarming") state.verwarming.items.forEach(z=>{ if(leeg(z.zekeringModuleId)) z.zekeringModuleId = m.id; });
@@ -27887,7 +27964,8 @@ function azLijstMetStroom(){
   const groepeert = new Set();
   alleDrivers().forEach(d=>{ if(!d.leeg && d.kringId) groepeert.add(d.kringId); });
   state.verlichting.items.forEach(v=>{ if(!v.leeg && v.kringId) groepeert.add(v.kringId); });
-  state.kringen.items.forEach(k=>{ if(!k.leeg && !groepeert.has(k.id)) rijen.push({soort:"Kring", code:kc[k.id], naam:k.info||"", kamer:k.kamer, obj:k}); });
+  // 27/11/2026 (Gegevenscontrole): een drivers-kring zonder één driver is geen verbruiker -- die staat in Gegevenscontrole
+  state.kringen.items.forEach(k=>{ if(!k.leeg && !groepeert.has(k.id) && !gcDriverKring(k)) rijen.push({soort:"Kring", code:kc[k.id], naam:k.info||"", kamer:k.kamer, obj:k}); });
   state.driverkast.kasten.forEach(kast=> kast.items.forEach(d=>{ if(d.leeg) return;
     const kamer = (d.armaturen||[]).map(a=>a.ruimte).find(Boolean) || kast.kamer || "";
     rijen.push({soort:"Driver", code:dc[d.id], naam:d.naam || d.type || "", kamer, obj:d, viaKring:true}); }));
@@ -27898,8 +27976,12 @@ function azLijstMetStroom(){
   state.zonnepanelen.items.forEach(p=>{ if(!p.leeg) rijen.push({soort:"Zonnepanelen", code:"", naam:p.naam, kamer:p.kamer, obj:p}); });
   { const zc = computeZekeringCodes(); state.zekeringen.kasten.forEach(kast=> kast.rijen.forEach(rij=> rij.items.forEach(m=>{
     if(m.categorie==="Relais" && !(m.uitgangen||[]).some(u=> u.type==="motor")) rijen.push({soort:"Relais", code:zc[m.id]||"", naam:m.naam||"Relais", kamer:kast.naam||"Zekeringkast", obj:m}); }))); }
-  state.patchkast.kasten.forEach((kast,ki)=> kast.items.forEach(it=>{ if(it.categorie==="Leeg" || it.categorie==="Kabelgoot") return;
-    rijen.push({soort:"Patchkast", code:"", naam:it.naam || it.categorie, kamer:kast.kamer || "Patchkast "+(ki+1), obj:it}); }));
+  // 27/11/2026: patchkast = één verbruiker voor de algemene voeding + elk toestel met "Eigen voeding" (geen dubbele aansluitingen)
+  state.patchkast.kasten.forEach((kast,ki)=>{
+    const st = kast.items.filter(pkHeeftStroom), alg = st.filter(it=> !it.eigenVoeding);
+    if(alg.length) rijen.push({soort:"Patchkast", code:"", naam:`Patchkast ${ki+1} — algemene voeding (${alg.length} toestel${alg.length>1?"len":""})`, kamer:kast.kamer || "Patchkast "+(ki+1), obj:kast});
+    st.filter(it=> it.eigenVoeding).forEach(it=> rijen.push({soort:"Patchkast", code:"", naam:(it.naam || it.categorie) + " — eigen voeding", kamer:kast.kamer || "Patchkast "+(ki+1), obj:it}));
+  });
   return rijen;
 }
 // nieuwe automaat in de zekeringkast; onder een differentieel = in diens rij als er plaats is, anders nieuwe rij met linkedDiffId
@@ -28040,6 +28122,231 @@ function dkKringHerstel(){
   state.kringen.items = state.kringen.items.filter(k=> !weg.has(k.id));
   return {gekoppeld: v.koppel.length, weg: weg.size};
 }
+/* =========================================================================
+   GEGEVENSCONTROLE (27/11/2026, Peter: "Grondige database-audit, opruiming van verweesde gegevens")
+   Controleert het dossier op: verwijzingen naar onderdelen die niet meer bestaan, kamers/verdiepingen
+   die niet (meer) kloppen, kringen zonder verbruikers, dubbels, ongebruikte zekeringen/rijgklemmen en
+   onvolledige configuraties. Elke vondst krijgt een categorie (zoals Peter ze opsomde) en waar het
+   veilig kan een herstelknop. Vóór elk herstel: back-up van het dossier in dossier_backups.
+   Niets wordt automatisch verwijderd.
+   ========================================================================= */
+const GC_CAT = {
+  verweesd:   {t: "Verweesd", kleur: "#B42318", uitleg: "verwijst naar iets dat niet meer bestaat"},
+  verouderd:  {t: "Verouderd / dubbel", kleur: "#B54708", uitleg: "oude of dubbele gegevens"},
+  onvolledig: {t: "Onvolledig", kleur: "#B54708", uitleg: "configuratie niet af"},
+  open:       {t: "Nog niet gekoppeld", kleur: "#175CD3", uitleg: "geldig, maar nog niet toegewezen"},
+  bewust:     {t: "Bewust niet gekoppeld", kleur: "#667085", uitleg: "bv. reserve — geen actie nodig"},
+};
+const GC_TAB = {zekeringen: "zekeringen", driverkast: "driverkast", kringen: "kringen", verlichting: "verlichting", knoppen: "knoppen",
+  patchkast: "data", muziek: "muziek", verwarming: "verwarming", laadpalen: "laadpalen", motoren: "motoren", camerabewaking: "camerabewaking",
+  interlex: "interlex", zonnepanelen: "zonnepanelen", alarmCentrale: "alarm", zkOntwerp: "zekeringen", kamers: "kamers"};
+const GC_TOP_NAAM = {zekeringen: "zekeringkast", driverkast: "driverkast", kringen: "kringen", verlichting: "230V-lichtpunten", knoppen: "knoppen",
+  patchkast: "patchkast", muziek: "muziek", verwarming: "verwarming", laadpalen: "laadpalen", motoren: "motoren", camerabewaking: "camera's",
+  interlex: "rijgklemmen", zonnepanelen: "zonnepanelen", alarmCentrale: "alarm", zkOntwerp: "AREI-ontwerp", alarm: "alarm"};
+const GC_OVERSLAAN = new Set(["armaturen", "driver", "planAnalyse", "offerteImports", "modules", "extra", "instellingen", "zkBron", "materialen", "oplevering", "keuring", "kamers", "kamerVerdieping", "kamerOuder", "verdiepingen"]);
+const GC_REF = ["kringId", "zekeringModuleId", "linkedDiffId", "targetId", "upsId", "recorderId", "voedingZek", "lichtpuntId", "patchpaneelPoortId", "collectorId", "laadpaalId", "zoneId", "kastId", "moduleId", "bronId"];
+// wandel door het dossier; cb(obj, sleutel, waarde, top, pad)
+function gcWandel(cb){
+  Object.keys(state).forEach(top=>{
+    if(GC_OVERSLAAN.has(top)) return;
+    const stap = (o, pad)=>{
+      if(!o || typeof o !== "object") return;
+      if(Array.isArray(o)){ o.forEach((x, i)=> stap(x, pad + "[" + i + "]")); return; }
+      Object.keys(o).forEach(k=>{ const v = o[k]; cb(o, k, v, top, pad); if(v && typeof v === "object") stap(v, pad + "." + k); });
+    };
+    stap(state[top], top);
+  });
+}
+function gcIdSet(){ const s = new Set(); gcWandel((o, k, v)=>{ if(k === "id" && (typeof v === "string" || typeof v === "number")) s.add(String(v)); }); return s; }
+function gcDriverKring(k){ const t = (k && k.info) || ""; return /\(\s*\d+\s*drivers?\s*\)/i.test(t) || (/\b\d+\s*mA\b|ledstrip|24\s*v(dc)?\b/i.test(t) && !/230\s*v/i.test(t)); }
+function gcKringLeden(k){ return alleDrivers().filter(d=> !d.leeg && d.kringId === k.id).length + state.verlichting.items.filter(v=> !v.leeg && v.kringId === k.id).length; }
+function gcKringVerwijder(kring){
+  // zelfde ontkoppeling als de ✕ in Kringen
+  const i = state.kringen.items.indexOf(kring); if(i >= 0) state.kringen.items.splice(i, 1);
+  alleDrivers().forEach(d=>{ if(d.kringId === kring.id) d.kringId = ""; });
+  state.verlichting.items.forEach(v=>{ if(v.kringId === kring.id) v.kringId = ""; });
+  state.knoppen.items.forEach(k=> (k.gangen||[]).forEach(g=>{ if(g.kringId === kring.id) g.kringId = ""; }));
+  alleZekeringUitgangen().forEach(e=>{ if(e.uitgang.type === "kring" && e.uitgang.targetId === kring.id) e.uitgang.targetId = ""; });
+}
+// kamernaam overal vervangen (kamer- en ruimtevelden, kamerVerdieping, kamerOuder) -- gebruikt bij hernoemen en herstel
+function kamerNaamOveral(oud, nieuw){
+  if(!oud || oud === nieuw) return 0;
+  let n = 0;
+  gcWandel((o, k, v)=>{ if((k === "kamer" || k === "ruimte") && v === oud){ o[k] = nieuw; n++; } });
+  if(state.kamerVerdieping && oud in state.kamerVerdieping){ if(!state.kamerVerdieping[nieuw]) state.kamerVerdieping[nieuw] = state.kamerVerdieping[oud]; delete state.kamerVerdieping[oud]; }
+  if(state.kamerOuder){ if(oud in state.kamerOuder){ if(!state.kamerOuder[nieuw]) state.kamerOuder[nieuw] = state.kamerOuder[oud]; delete state.kamerOuder[oud]; }
+    Object.keys(state.kamerOuder).forEach(x=>{ if(state.kamerOuder[x] === oud) state.kamerOuder[x] = nieuw; }); }
+  return n;
+}
+function kamerGebruik(naam){ let n = 0; gcWandel((o, k, v)=>{ if((k === "kamer" || k === "ruimte") && v === naam) n++; }); return n; }
+
+function gcControles(){
+  const R = [];   // {id, groep, cat, titel, detail, tab, acties:[{t, fn, gevaarlijk, keuze}]}
+  const add = (x)=> R.push(x);
+  const ids = gcIdSet();
+  // 1. verwijzingen naar onderdelen die niet meer bestaan
+  gcWandel((o, k, v, top, pad)=>{
+    if(!GC_REF.includes(k) || typeof v !== "string" || !v) return;
+    const basis = k === "bronId" ? v.split("::")[0] : v;
+    if(ids.has(basis)) return;
+    if(k === "kastId" || k === "moduleId"){ if(top !== "zkOntwerp") return; }
+    const oud = top === "zkOntwerp";
+    let naam = o.naam || o.info || o.omschrijving || o.watwaar || "";
+    try{ const dc0 = computeDriverCodes(); if(dc0[o.id]) naam = dc0[o.id] + (naam ? " " + naam : ""); }catch(_e){}
+    add({groep: "Ongeldige relaties", cat: oud ? "verouderd" : "verweesd", tab: GC_TAB[top],
+      titel: `${GC_TOP_NAAM[top] || top}: ${naam ? "\"" + naam + "\" " : ""}verwijst via ${k} naar een onderdeel dat niet meer bestaat`,
+      detail: oud ? "Oude verwijzing in het AREI-zekeringkastontwerp (naar een kast/module van een vroegere indeling). Heeft geen invloed op de huidige kast." : "Het gekoppelde onderdeel is verwijderd. Wis de verwijzing en koppel daarna opnieuw (plaats: " + pad.replace(/\[(\d+)\]/g, (m, i)=> " " + (+i + 1)).replace(/\./g, " › ") + ").",
+      acties: [{t: oud ? "Oude verwijzing opruimen" : "Verwijzing wissen", fn: ()=>{ if(oud && o.type && (o.kastId || o.moduleId || o.laadpaalId)) { o[k] = ""; } else o[k] = ""; }}]});
+  });
+  // 2. kamers en verdiepingen
+  const kamers = Array.isArray(state.kamers) ? state.kamers : [];
+  const kamerSet = new Set(kamers.filter(Boolean));
+  const leeg = kamers.filter(k=> !k || !String(k).trim()).length;
+  if(leeg) add({groep: "Kamers en verdiepingen", cat: "verouderd", tab: "kamers", titel: `${leeg} lege kamernaam/-namen in de kamerlijst`, detail: "Lege regels in Kamers & verdiepingen.",
+    acties: [{t: "Lege kamers verwijderen", fn: ()=>{ state.kamers = state.kamers.filter(k=> k && String(k).trim()); }}]});
+  const gebruikt = new Map();
+  gcWandel((o, k, v, top)=>{ if((k === "kamer" || k === "ruimte") && typeof v === "string" && v.trim() && top !== "zkOntwerp"){ const g = gebruikt.get(v) || {n: 0, tops: new Set()}; g.n++; g.tops.add(GC_TOP_NAAM[top] || top); gebruikt.set(v, g); } });
+  gebruikt.forEach((g, naam)=>{
+    if(kamerSet.has(naam)) return;
+    add({groep: "Kamers en verdiepingen", cat: "verweesd", tab: "kamers", titel: `Kamer "${naam}" bestaat niet (meer) maar wordt gebruikt door ${g.n} onderdeel/onderdelen`,
+      detail: "Gebruikt in: " + [...g.tops].join(", ") + ". Zet ze terug in de kamerlijst, of verplaats alles naar een bestaande kamer.",
+      acties: [{t: "＋ Terug als kamer", fn: ()=>{ state.kamers.push(naam); }},
+        {t: "Vervangen door…", keuze: kamersGeordend(), fn: (nieuw)=>{ if(nieuw) kamerNaamOveral(naam, nieuw); }}]});
+  });
+  const kv = state.kamerVerdieping || {};
+  const codes = new Set((state.verdiepingen || []).map(v=> v && v.code).filter(Boolean));
+  Object.keys(kv).forEach(naam=>{
+    if(!kamerSet.has(naam) && !gebruikt.has(naam)) add({groep: "Kamers en verdiepingen", cat: "verouderd", tab: "kamers", titel: `Verdieping bewaard voor kamer "${naam}" die niet meer bestaat`, detail: "Restant van een verwijderde of hernoemde kamer.",
+      acties: [{t: "Opruimen", fn: ()=>{ delete state.kamerVerdieping[naam]; }}]});
+  });
+  const fouteCodes = {};
+  kamers.filter(Boolean).forEach(naam=>{ const c = kv[naam]; if(c && !codes.has(c)) (fouteCodes[c] = fouteCodes[c] || []).push(naam); });
+  Object.entries(fouteCodes).forEach(([c, lijst])=>{
+    const voorstel = [...codes].find(x=> x[0] === c[0]) || "";
+    add({groep: "Kamers en verdiepingen", cat: "verweesd", tab: "kamers", titel: `${lijst.length} kamer(s) staan op verdieping "${c}", die niet (meer) bestaat`,
+      detail: lijst.join(", ") + (voorstel ? `. Waarschijnlijk bedoeld: "${voorstel}".` : "."),
+      acties: [{t: "Koppel aan verdieping…", keuze: [...codes], voorstel, fn: (nieuw)=>{ if(nieuw) lijst.forEach(n=>{ state.kamerVerdieping[n] = nieuw; }); }}]});
+  });
+  const zonder = kamers.filter(n=> n && !kamerVerdieping(n));
+  if(zonder.length) add({groep: "Kamers en verdiepingen", cat: "open", tab: "kamers", titel: `${zonder.length} kamer(s) zonder verdieping`, detail: zonder.join(", ")});
+  Object.keys(state.kamerOuder || {}).forEach(sub=>{
+    const h = state.kamerOuder[sub];
+    if(!kamerSet.has(sub) || !kamerSet.has(h)) add({groep: "Kamers en verdiepingen", cat: "verouderd", tab: "kamers", titel: `Subkamer-koppeling "${sub}" → "${h}" verwijst naar een kamer die niet bestaat`, detail: "",
+      acties: [{t: "Opruimen", fn: ()=>{ delete state.kamerOuder[sub]; }}]});
+  });
+  // 3. kringen
+  const kc = computeKringCodes();
+  let gcDubbelIds = new Set(); try{ const hv0 = dkKringHerstelVoorstel(); gcDubbelIds = new Set((hv0.dubbel||[]).map(d=> d.weg.id).concat((hv0.leeg||[]).map(k=> k.id))); }catch(_e){}
+  state.kringen.items.forEach(k=>{
+    if(k.leeg) return;
+    const leden = gcKringLeden(k);
+    const knopRefs = state.knoppen.items.reduce((t, kn)=> t + (kn.gangen||[]).filter(g=> g.kringId === k.id).length, 0);
+    const lab = `Kring ${kc[k.id] || ""} — ${k.kamer || "(geen kamer)"} — ${k.info || ""}`;
+    if(gcDriverKring(k) && !leden && !gcDubbelIds.has(k.id)){
+      const m = /\(\s*(\d+)\s*drivers?/i.exec(k.info || "");
+      add({groep: "Kringen", cat: "onvolledig", tab: "koppelen", titel: `${lab}: geen drivers${m ? " (" + m[1] + " verwacht)" : ""}`,
+        detail: `Een kring voor drivers zonder één driver. Hij staat daardoor als "nog geen automaat" in Koppelen.${knopRefs ? ` ${knopRefs} knop-gang(en) sturen deze kring.` : ""} Koppel de drivers aan deze kring (Driverkast), of verwijder hem als hij overbodig is.`,
+        acties: [{t: "Kring verwijderen", gevaarlijk: true, vraag: `Kring ${kc[k.id] || ""} verwijderen?${knopRefs ? ` ${knopRefs} knop-gang(en) worden losgekoppeld.` : ""}`, fn: ()=> gcKringVerwijder(k)}]});
+    }
+  });
+  try{ const hv = dkKringHerstelVoorstel(); const dl = (hv.dubbel||[]).map(d=> d.weg).concat(hv.leeg||[]); const nd = dl.length;
+    if(nd) add({groep: "Kringen", cat: "verouderd", tab: "koppelen", titel: `${nd} dubbele kring(en) (zelfde kamer en omschrijving)`, detail: dl.slice(0, 8).map(k=> `${kc[k.id]||"?"} (${k.kamer} — ${k.info})`).join("; ") + ". Samenvoegen verplaatst knoppen naar de kring met verbruikers en verwijdert de lege kopie.",
+      acties: [{t: "Dubbels samenvoegen", fn: ()=>{ dkKringHerstel(); }}]}); }catch(_e){}
+  // 4. zekeringen zonder verbruiker
+  const gevoed = new Set();
+  gcWandel((o, k, v)=>{ if((k === "zekeringModuleId" || k === "voedingZek") && v) gevoed.add(v); });
+  try{ dkFysiekeKasten().forEach(v=>{ const z = dkVoedingZekVan(v); if(z) gevoed.add(z); }); }catch(_e){}
+  const zc = computeZekeringCodes();
+  const ongebruikt = [], reserve = [];
+  alleZekeringAutomaten().forEach(a=>{ if(gevoed.has(a.id)) return; (/reserve/i.test(a.naam || "") ? reserve : ongebruikt).push(a); });
+  if(ongebruikt.length) add({groep: "Zekeringen", cat: "open", tab: "koppelen", titel: `${ongebruikt.length} automaat/automaten waar niets aan gekoppeld is`,
+    detail: ongebruikt.map(a=> [zc[a.id] || a.code, a.naam].filter(Boolean).join(" ")).join(" · ")});
+  if(reserve.length) add({groep: "Zekeringen", cat: "bewust", tab: "zekeringen", titel: `${reserve.length} reserve-automaat/automaten`, detail: reserve.map(a=> zc[a.id] || a.code).join(", ")});
+  // 5. rijgklemmen
+  const klemmen = (state.interlex && state.interlex.items) || [];
+  const vrij = klemmen.filter(k=> !k.bronId && !(k.onder && (k.onder.watwaar || k.onder.kleur)) && !(k.boven && (k.boven.watwaar || k.boven.kleur)));
+  if(vrij.length) add({groep: "Rijgklemmen", cat: "open", tab: "interlex", titel: `${vrij.length} rijgklem(men) zonder aansluiting`, detail: "Vrije klemmen (reserve of nog in te vullen)."});
+  // 6. onvolledige configuraties
+  const dc = computeDriverCodes();
+  const zonderKring = alleDrivers().filter(d=> !d.leeg && !d.kringId);
+  if(zonderKring.length) add({groep: "Onvolledige configuraties", cat: "open", tab: "driverkast", titel: `${zonderKring.length} driver(s) zonder kring`, detail: zonderKring.map(d=> dc[d.id] || d.naam).join(", ")});
+  const zonderVoeding = (()=>{ try{ return dkFysiekeKasten().filter(v=> (v.items||[]).some(d=> !d.leeg) && !dkVoedingZekVan(v)); }catch(_e){ return []; } })();
+  if(zonderVoeding.length) add({groep: "Onvolledige configuraties", cat: "onvolledig", tab: "driverkast", titel: `${zonderVoeding.length} driverkast(en) zonder voedende automaat`, detail: zonderVoeding.map(v=> dkFysiekNaam(v)).join(", ")});
+  (state.patchkast.kasten || []).forEach((k, i)=>{
+    const stroom = k.items.filter(pkHeeftStroom);
+    if(stroom.some(it=> !it.eigenVoeding) && !k.zekeringModuleId) add({groep: "Onvolledige configuraties", cat: "onvolledig", tab: "data", titel: `Patchkast ${i+1}: geen algemene voeding gekozen`, detail: `${stroom.filter(it=> !it.eigenVoeding).length} toestel(len) volgen de algemene voeding.`});
+    stroom.filter(it=> it.eigenVoeding && !it.zekeringModuleId).forEach(it=> add({groep: "Onvolledige configuraties", cat: "onvolledig", tab: "data", titel: `Patchkast ${i+1}: "${it.naam || it.categorie}" heeft "Eigen voeding" maar nog geen automaat`, detail: ""}));
+  });
+  return R;
+}
+
+// ---- pagina ----
+let gcFilter = "";
+function renderGegevenscontrole(){
+  const R = gcControles();
+  const tel = (c)=> R.filter(r=> r.cat === c).length;
+  const wrap = el(`<div class="panel" id="panel-controle">
+    ${panelHeadHtml("Gegevenscontrole", "Zoekt verweesde, dubbele en onvolledige gegevens in dit dossier — met een herstelknop waar dat veilig kan.",
+      `Niets wordt automatisch verwijderd. Vóór elk herstel bewaart CaDos een kopie van het dossier (back-up), zodat je altijd terug kan.
+      Categorieën: <b>Verweesd</b> = verwijst naar iets dat niet meer bestaat; <b>Verouderd / dubbel</b> = oude of dubbele gegevens; <b>Onvolledig</b> = configuratie niet af;
+      <b>Nog niet gekoppeld</b> = geldig, maar nog niet toegewezen (geen fout); <b>Bewust niet gekoppeld</b> = bv. reserve. "Ga naar" opent het onderdeel.`)}
+    <div class="toolbar-card"><div class="toolbar-row gc-tellers">
+      <button type="button" class="gc-chip ${!gcFilter?"actief":""}" data-c="">Alles <b>${R.length}</b></button>
+      ${Object.entries(GC_CAT).map(([c, v])=> `<button type="button" class="gc-chip ${gcFilter===c?"actief":""}" data-c="${c}" style="--gc:${v.kleur}">${v.t} <b>${tel(c)}</b></button>`).join("")}
+      <button type="button" class="btn small" id="gcOpnieuw" style="margin-left:auto">⟳ Opnieuw controleren</button>
+    </div></div>
+    <div id="gcLijst"></div>
+  </div>`);
+  wireHintToggle(wrap);
+  wrap.querySelectorAll(".gc-chip").forEach(b=> b.addEventListener("click", ()=>{ gcFilter = b.dataset.c; selectTab("controle"); }));
+  wrap.querySelector("#gcOpnieuw").addEventListener("click", ()=> selectTab("controle"));
+  const lijst = wrap.querySelector("#gcLijst");
+  const zicht = R.filter(r=> !gcFilter || r.cat === gcFilter);
+  if(!zicht.length){ lijst.innerHTML = `<div class="card"><div class="card-body hint">Geen problemen gevonden${gcFilter ? " in deze categorie" : ""} 👍</div></div>`; return wrap; }
+  const groepen = [...new Set(zicht.map(r=> r.groep))];
+  groepen.forEach(g=>{
+    const kaart = el(`<div class="card gc-groep"><div class="card-head"><strong>${escapeHtml(g)}</strong></div><div class="card-body"></div></div>`);
+    const body = kaart.querySelector(".card-body");
+    zicht.filter(r=> r.groep === g).forEach(r=>{
+      const c = GC_CAT[r.cat];
+      const rij = el(`<div class="gc-rij">
+        <span class="gc-cat" style="--gc:${c.kleur}" title="${escapeHtml(c.uitleg)}">${escapeHtml(c.t)}</span>
+        <div class="gc-tekst"><div class="gc-titel">${escapeHtml(r.titel)}</div>${r.detail ? `<div class="hint">${escapeHtml(r.detail)}</div>` : ""}</div>
+        <div class="gc-acties"></div></div>`);
+      const acties = rij.querySelector(".gc-acties");
+      (r.acties || []).forEach(a=>{
+        let sel = null;
+        if(a.keuze){ sel = el(`<select class="gc-keuze"><option value="">— kies —</option>${a.keuze.map(x=> `<option value="${escapeHtml(x)}" ${a.voorstel===x?"selected":""}>${escapeHtml(x)}</option>`).join("")}</select>`); acties.appendChild(sel); }
+        const b = el(`<button type="button" class="btn small ${a.gevaarlijk ? "ghost gc-gevaar" : "primary"}">${escapeHtml(a.t)}</button>`);
+        b.addEventListener("click", ()=>{
+          const waarde = sel ? sel.value : undefined;
+          if(sel && !waarde){ toast("Kies eerst een waarde."); return; }
+          const doe = ()=> gcHerstel(r.titel, ()=> a.fn(waarde));
+          if(a.gevaarlijk && typeof vlBevestig === "function") vlBevestig("Zeker?", escapeHtml(a.vraag || a.t), escapeHtml(a.t), doe); else doe();
+        });
+        acties.appendChild(b);
+      });
+      if(r.tab && tabZichtbaarRuw(r.tab)){ const ga = el(`<button type="button" class="btn small ghost">Ga naar →</button>`); ga.addEventListener("click", ()=> selectTab(r.tab)); acties.appendChild(ga); }
+      body.appendChild(rij);
+    });
+    lijst.appendChild(kaart);
+  });
+  return wrap;
+}
+// herstel: eerst back-up (één keer per sessie-minuut), dan wijzigen + bewaren
+let gcLaatsteBackup = 0;
+async function gcHerstel(wat, fn){
+  try{
+    if(Date.now() - gcLaatsteBackup > 60000 && window.dbBackupCadosDossier && currentProjectId){
+      try{ await flushSave(); }catch(_e){}
+      await window.dbBackupCadosDossier(currentProjectId, "CaDos: voor gegevenscontrole-herstel");
+      gcLaatsteBackup = Date.now();
+    }
+  }catch(e){ console.warn("back-up mislukt", e); if(!confirm("De back-up is mislukt. Toch herstellen?")) return; }
+  fn(); save(); selectTab("controle"); toast("Hersteld: " + wat.slice(0, 60) + (wat.length > 60 ? "…" : ""));
+}
+function gcAantalProblemen(){ try{ return gcControles().filter(r=> r.cat === "verweesd" || r.cat === "verouderd" || r.cat === "onvolledig").length; }catch(_e){ return 0; } }
+
 function renderKoppelenPagina(){
   const wrap = el(`<div class="panel" id="panel-koppelen">
     ${panelHeadHtml("Koppelen", "Elke verbruiker aan zijn automaat: rechtstreeks, via zijn kring, via de driverkast of via een relais.",
@@ -28055,6 +28362,9 @@ function renderKoppelenPagina(){
   tabsEl.innerHTML = `<button type="button" data-t="lijst" class="${kpPaginaTab==="lijst"?"actief":""}">Open lijst${n ? ` <span class="ak-badge">${n}</span>` : ""}</button><button type="button" data-t="voorstel" class="${kpPaginaTab==="voorstel"?"actief":""}">Voorstel</button>`;
   tabsEl.querySelectorAll("button").forEach(b=> b.addEventListener("click", ()=>{ kpPaginaTab = b.dataset.t; selectTab("koppelen"); }));
   const extra = wrap.querySelector(".kp-extra");
+  { const ng = gcAantalProblemen();   // 27/11/2026: verweesde/onvolledige gegevens horen niet in de open lijst, wel in Gegevenscontrole
+    if(ng){ const b = el(`<div class="kp-herstel" style="border-color:#f3c9a8;background:#fff7f0"><div><b>${ng} punt(en) in de Gegevenscontrole</b> — bv. kringen voor drivers zonder één driver, kamers die niet meer bestaan. Die staan niet in de open lijst.</div><button type="button" class="btn small">Naar Gegevenscontrole →</button></div>`);
+      b.querySelector("button").addEventListener("click", ()=> selectTab("controle")); extra.appendChild(b); } }
   try{
     const hv = dkKringHerstelVoorstel();
     const nDub = (hv.dubbel||[]).length, nWeg = hv.leeg.length + nDub;
