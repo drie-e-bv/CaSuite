@@ -24,11 +24,11 @@ await E(`(()=>{ document.getElementById('cados-project-hint-card').style.display
   save(); return 1; })()`);
 let r = await J(`JSON.stringify((()=>{ const k = state.driverkast.kasten[0]; const c = computeDriverCodes(); const a = k.items.find(d=> d.vijfG); const p = dkPlanKast(dkFysiekeKasten()[0]); dkOmzet(p);
   return {codes: k.items.map(d=> c[d.id]), inKol: p.kolommen.flat().includes(a.id), mod: (p._layout.mods.find(m=> m.m.id===a.id)||{m:{_dk:{}}}).m._dk.soort, rk: p._layout.mods.some(m=> m.m.id==="dkk_"+a.id),
-    draden: p.bedrading.filter(w=> w.a.m===a.id || w.b.m===a.id).map(w=> w.a.k+"-"+w.b.k), onder: (p._layout.mods.find(m=> m.m.id===a.id)||{}).y > p._layout.plaatOnderPx, phx: p._layout.mods.find(m=> m.m.id.startsWith('dkp_L_')).m.klemmenEigen.length }; })())`);
+    draden: p.bedrading.filter(w=> w.a.m===a.id || w.b.m===a.id).map(w=> w.a.k+"-"+w.b.k), onder: (()=>{ const md = p._layout.mods.find(m=> m.m.id===a.id)||{}; return md.y + md.h < p._layout.topPx; })(), onderRail: (()=>{ dkPlan(dkFysiekeKasten()[0]).rkPositie="onder"; const q = dkPlanKast(dkFysiekeKasten()[0]); const md = q._layout.mods.find(m=> m.m.id===a.id); const r = md.y > q._layout.plaatOnderPx; dkPlan(dkFysiekeKasten()[0]).rkPositie="boven"; dkPlanKast(dkFysiekeKasten()[0]); return r; })(), phx: p._layout.mods.find(m=> m.m.id.startsWith('dkp_L_')).m.klemmenEigen.length }; })())`);
 console.log(JSON.stringify(r));
 ok(r.codes.join()==="D1,D2,D3,D4,D5,101,D6", 'kabel houdt zijn 100-nummer (101), D-nummers lopen door zonder sprong');
 ok(!r.inKol && r.mod==="kabel5g" && !r.rk, 'kabel niet in de kast, geen rijgklemmen, als blok getekend');
-ok(r.onder, 'blok staat onder de montageplaat');
+ok(r.onder && r.onderRail, "blokjes aan de railkant: rail boven = boven de plaat, rail onder = onder de plaat");
 ok(r.draden.length===4 && r.phx===8, 'kabel op de verdeelblokken L/N/DA+/DA− (punt voorzien op de Phoenix)');
 await E(`(()=>{ dkOverzicht=false; dkAlleSel=null; selectTab('driverplan'); return 1; })()`); await p.waitForTimeout(900);
 const bv = await p.$('[data-mod]'); 

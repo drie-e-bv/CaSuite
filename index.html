@@ -12173,6 +12173,7 @@ function renderDriverkast(){
   if(!cadosInstGeladen) laadCadosInst().then(()=>{ if(currentTab==="driverkast" && dkMaxDrivers()) selectTab("driverkast"); }).catch(()=>{});
   wrap.querySelector("#dkHerreken").addEventListener("click", ()=> dkHerrekenOpen());
   wrap.querySelector("#dkKoppel").addEventListener("click", ()=> akOpen());
+  akBadgeVers("driverkast");
   wrap.querySelector("#dkVerdeel").addEventListener("click", ()=> dkVerdeelOpen());
 
   return wrap;
@@ -12992,6 +12993,7 @@ function renderVerlichting(){
     if(el2 && el2.scrollIntoView) el2.scrollIntoView({behavior:"smooth", block:"center", inline:"center"});
   });
   wrap.querySelector("#vlKoppel").addEventListener("click", ()=> akOpen());
+  akBadgeVers("verlichting");
   wrap.querySelector("#vlHernummer").addEventListener("click", ()=>{
     const n = state.verlichting.items.filter(it=> !it.leeg).length, vast = state.verlichting.items.filter(it=> it.manueelNummer!=="" && it.manueelNummer!=null).length;
     vlBevestig("Opnieuw nummeren?", `Alle ${n} lichtpunten krijgen opnieuw een doorlopend nummer vanaf <b>100</b>, in de volgorde van de lijst.` +
@@ -23327,8 +23329,14 @@ function dkPlanKast(dk){
   const cols = p.kolommen.map(c=> c.filter(id=> !onderIds.includes(id)).map(id=> byId[id]).filter(Boolean));
   const onderDrv = onderIds.map(id=> byId[id]);
   const k = cols.length;
-  const PX = DK_PXMM, X0 = UV.PADX, Y0 = DK_TOP_PX;
   const boven = p.rkPositie !== "onder";
+  // 27/11/2026 (Peter): de 5G1,5-blokjes aan de kant van de DIN-rail -- rail bovenaan = blokjes boven de kast
+  const K5 = {W: 62, H: 34, G: 8, RIJ: 22, AF: 26};
+  const k5Aantal = dkDrivers(dk).filter(d=> dk5gA(d)).length;
+  const k5PerRij = Math.max(1, Math.floor((Math.max(p.breedte, 200) - 2*DK_RAND_MM + K5.G) / (K5.W + K5.G)));
+  const k5Rijen = Math.ceil(k5Aantal / k5PerRij);
+  const k5BovenMM = boven && k5Aantal ? k5Rijen*K5.H + (k5Rijen-1)*K5.RIJ + K5.AF : 0;
+  const PX = DK_PXMM, X0 = UV.PADX, Y0 = DK_TOP_PX + k5BovenMM*PX;
   const H = p.hoogte;
   const yMM = (mm)=> boven ? mm : H - mm;
   const mods = [], kokers = [];
@@ -23509,18 +23517,22 @@ function dkPlanKast(dk){
   let kabelOnderPx = 0;
   const kabels = dkOpNummer(dk5gKabels(dk));
   if(kabels.length){
-    const KW = 62, KH = 34, KG = 8, ky0 = totH + 26;
-    let kx = DK_RAND_MM, ky = ky0;
+    const KW = K5.W, KH = K5.H, KG = K5.G;
+    // rail bovenaan: rijen boven de plaat (de onderste rij het dichtst bij de kast); rail onderaan: onder de plaat
+    let kx = DK_RAND_MM, rij = 0, inRij = 0;
+    const yRij = (r)=> boven ? -K5.AF - KH - r*(KH + K5.RIJ) : totH + K5.AF + r*(KH + K5.RIJ);
+    let ky = yRij(0);
     kabels.forEach(d=>{
-      if(kx > DK_RAND_MM && kx + KW > totB - DK_RAND_MM){ kx = DK_RAND_MM; ky += KH + 22; }
+      if(inRij >= k5PerRij){ kx = DK_RAND_MM; rij++; inRij = 0; ky = yRij(rij); }
+      inRij++;
       const lp = dk5gLichtpunt(d);
       const klemmen = [["L","L","L","Bruin"],["N","N","N","Blauw"],["DA1","DA+","DA+","Grijs"],["DA2","DA-","DA−","Zwart"],["PE","PE","PE","Geel/Groen"]]
-        .map(([id, f, lab, kleur], i)=> ({id, label: lab, functie: f, kleur, zijde: "boven", x: Math.round((0.1 + 0.2*i)*1000)/1000, y: 0, geenLabel: true, tip: "5G1,5 " + kleur.toLowerCase() + " → " + (f==="PE" ? "aarding" : "verdeelblok " + lab)}));
+        .map(([id, f, lab, kleur], i)=> ({id, label: lab, functie: f, kleur, zijde: boven ? "onder" : "boven", x: Math.round((0.1 + 0.2*i)*1000)/1000, y: boven ? 1 : 0, geenLabel: true, tip: "5G1,5 " + kleur.toLowerCase() + " → " + (f==="PE" ? "aarding" : "verdeelblok " + lab)}));
       const m = {id: d.id, categorie: "Driver", naam: d.naam, breedte: 1, _dk: {soort: "kabel5g", driver: d, lichtpunt: lp}, klemmenEigen: klemmen};
       mods.push({m, x: X0 + kx*PX, y: Y0 + ky*PX, w: KW*PX, h: KH*PX, code: codes[d.id] || ""});
       kx += KW + KG;
     });
-    kabelOnderPx = (ky + KH + 14 - totH)*PX;
+    if(!boven) kabelOnderPx = (yRij(rij) + KH + 14 - totH)*PX;
   }
   const hkY0 = Math.min(yMM(hk0), yMM(hk1)), hkY1 = Math.max(yMM(hk0), yMM(hk1));
   kokers.push({id: "H", soort: "h", x0: X0 + DK_RAND_MM*PX, x1: X0 + (totB - DK_RAND_MM)*PX, y0: Y0 + hkY0*PX, y1: Y0 + hkY1*PX, mm: dkKokerMM(p, "H")});
@@ -23535,7 +23547,7 @@ function dkPlanKast(dk){
   dkEigen(p, {
     rijen: [{id: "dk-alle", items: mods.map(md=> md.m)}],
     maat: Math.ceil(p.breedte/18), naam: "Driverkast " + (idx+1), _dk: dk, _codes: codes, _breedtePx: p.breedte*PX,
-    _layout: {mods, kokers, breedteNodig, hoogteNodig, railLengte, boven, onderKoker: onderBlok ? onderBlok.koker : "", kabelOnderPx, plaatOnderPx: Y0 + totH*PX},
+    _layout: {mods, kokers, breedteNodig, hoogteNodig, railLengte, boven, onderKoker: onderBlok ? onderBlok.koker : "", kabelOnderPx, plaatOnderPx: Y0 + totH*PX, topPx: Y0},
     _geometrie: dkGeometrie, _dkAchtergrond: (geo)=> dkAchtergrondSvg(p, geo), _dxfExtra: (d, geo)=> dkDxfExtra(p, d, geo)
   });
   return p;
@@ -23551,7 +23563,7 @@ function dkGeometrie(p){
   });
   const PX = DK_PXMM;
   const width = UV.PADX*2 + Math.max(p.breedte, L.breedteNodig, L.railLengte)*PX;
-  const height = DK_TOP_PX + Math.max(p.hoogte, L.hoogteNodig)*PX + 20 + (L.kabelOnderPx || 0);
+  const height = (L.topPx || DK_TOP_PX) + Math.max(p.hoogte, L.hoogteNodig)*PX + 20 + (L.kabelOnderPx || 0);
   return {mods: L.mods, klemPos, width, height, codes: p._codes, gootTop: [], hoogte: [], kamBand: [], rijY: [], rijH: [],
     plan: {perDraad: {}, banen: [], zijN: {L: 0, R: 0}}, padL: UV.PADX, padR: UV.PADX, kastR: UV.PADX + p.breedte*PX,
     _eigen: true, _absoluut: true, _router: dkRoutes, kokers: L.kokers, onderKoker: L.onderKoker, boven: L.boven, plaatOnderPx: L.plaatOnderPx};
@@ -23561,12 +23573,7 @@ function dkKokerVoorKlem(geo, pos){
   const ks = geo.kokers;
   const H = ks.find(k=> k.soort==="h");
   const info = pos.m._dk || {};
-  if(info.soort === "kabel5g"){
-    // de 5G1,5 komt van onder de kast binnen langs de dichtste verticale koker die tot onderaan loopt
-    const v = ks.filter(k=> k.soort==="v" && !k.ingekort);
-    if(!geo.boven || !v.length) return H;
-    return v.slice().sort((a, b)=> Math.abs((a.x0+a.x1)/2 - pos.x) - Math.abs((b.x0+b.x1)/2 - pos.x))[0];
-  }
+  if(info.soort === "kabel5g") return H;   // blokjes staan aan de railkant: recht de koker bij de rail in
   if(info.soort === "driver" && info.onderaan && geo.onderKoker){ const ok = ks.find(k=> k.id===geo.onderKoker); if(ok) return ok; }
   if(info.soort === "driver"){
     const kant = pos.k.zijde === "links" ? info.kolom : info.kolom + 1;
@@ -23609,7 +23616,7 @@ function dkRoutes(kast, geo){
   };
   let kabelTel = 0;
   const kabelIn = (P)=>{
-    if(!P.m._dk || P.m._dk.soort !== "kabel5g" || !geo.plaatOnderPx) return null;
+    if(!P.m._dk || P.m._dk.soort !== "kabel5g" || !geo.plaatOnderPx || dkKokerVoorKlem(geo, P).soort === "h") return null;
     const K = dkKokerVoorKlem(geo, P);
     const ey = geo.plaatOnderPx + 6 + (kabelTel++ % 6)*2.4;
     return {K, pts: [{x: P.x, y: P.y}, {x: P.x, y: ey}], entry: {x: P.x, y: ey}};
@@ -23651,7 +23658,7 @@ function dkRoutes(kast, geo){
 }
 function dkAchtergrondSvg(p, geo){
   const L = p._layout, PX = DK_PXMM;
-  const x = UV.PADX, w = p.breedte*PX, h = p.hoogte*PX, y = DK_TOP_PX;
+  const x = UV.PADX, w = p.breedte*PX, h = p.hoogte*PX, y = L.topPx || DK_TOP_PX;
   const nodigB = Math.max(L.breedteNodig, L.railLengte);
   const teH = L.hoogteNodig > p.hoogte + 0.5, teB = nodigB > p.breedte + 0.5;
   // Peter (29/10): altijd tekenen op de montageplaat, niet op de buitenmaten van de kast. Wat er niet op
@@ -23680,11 +23687,12 @@ function dkModuleSvg(md){
     const tip = `${code} — kabel 5G1,5 naar ${(lp && lp.naam) || "230V-lichtpunt"}${lp && lp.kamer ? " (" + lp.kamer + ")" : ""}\nbruin/blauw/grijs/zwart rechtstreeks op de verdeelblokken L/N/DA+/DA−, geel/groen op de aarding\nGeen plaats in de kast en geen rijgklemmen.\nKlik om er een driver + armatuur van te maken (optie B).`;
     let s = `<g class="uv-mod dk-kabel5g${sel}" data-mod="${m.id}" data-tip="${escapeHtml(tip)}">`;
     s += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" class="dk-kabel5g-body"/>`;
-    (m.klemmenEigen||[]).forEach(k=>{ s += `<text x="${x + k.x*w}" y="${y + 13}" class="dk-kl" text-anchor="middle">${escapeHtml(k.label)}</text>`; });
-    s += `<text x="${x + w/2}" y="${y + h*0.62}" class="uv-code">${escapeHtml(code)}</text>`;
+    (m.klemmenEigen||[]).forEach(k=>{ s += `<text x="${x + k.x*w}" y="${k.y >= 0.5 ? y + h - 8 : y + 13}" class="dk-kl" text-anchor="middle">${escapeHtml(k.label)}</text>`; });
+    const kOnder = (m.klemmenEigen||[])[0] && m.klemmenEigen[0].y >= 0.5;
+    s += `<text x="${x + w/2}" y="${y + (kOnder ? h*0.42 : h*0.62)}" class="uv-code">${escapeHtml(code)}</text>`;
     const t = ["5G1,5", (lp && lp.naam) || "", (lp && lp.kamer) || ""].filter(Boolean).join(" · ");
     const max = Math.max(6, Math.floor(w/4.6));
-    s += `<text x="${x + w/2}" y="${y + h - 4}" class="dk-ruimte" text-anchor="middle">${escapeHtml(t.length > max ? t.slice(0, max-1) + "…" : t)}</text>`;
+    s += `<text x="${x + w/2}" y="${(m.klemmenEigen||[])[0] && m.klemmenEigen[0].y >= 0.5 ? y + 10 : y + h - 4}" class="dk-ruimte" text-anchor="middle">${escapeHtml(t.length > max ? t.slice(0, max-1) + "…" : t)}</text>`;
     return s + `</g>`;
   }
   if(info.soort==="driver"){
@@ -23775,8 +23783,9 @@ function dkModuleSvg(md){
 }
 function dkDxfExtra(p, d, geo){
   const L = p._layout, PX = DK_PXMM;
-  d.rect(UV.PADX, DK_TOP_PX, p.breedte*PX, p.hoogte*PX, "KAST");
-  const ry = DK_TOP_PX + (L.boven ? DK_RAND_MM + DK_RAIL_H_MM/2 - 17.5 : p.hoogte - DK_RAND_MM - DK_RAIL_H_MM/2 - 17.5)*PX;
+  const T = L.topPx || DK_TOP_PX;
+  d.rect(UV.PADX, T, p.breedte*PX, p.hoogte*PX, "KAST");
+  const ry = T + (L.boven ? DK_RAND_MM + DK_RAIL_H_MM/2 - 17.5 : p.hoogte - DK_RAND_MM - DK_RAIL_H_MM/2 - 17.5)*PX;
   d.rect(UV.PADX + 4, ry, (Math.max(p.breedte, L.railLengte) - 8)*PX, 35*PX, "RAILS");
   L.kokers.forEach(k=>{ d.rect(k.x0, k.y0, k.x1-k.x0, k.y1-k.y0, "GOTEN"); });
 }
@@ -24070,7 +24079,7 @@ function dkAlleKast(){
     Object.assign(codes, p._codes);
     const naam = dkFysiekNaam(dk);
     achter += `<g transform="translate(${ox} ${oy})">${dkAchtergrondSvg(p, g).replace(/ data-koker="[^"]*"/g, "")}</g>`;
-    achter += `<text x="${ox + UV.PADX}" y="${oy + DK_TOP_PX - 22}" class="dk-kasttitel">${escapeHtml(naam)} — ${dkDrivers(dk).length} drivers</text>`;
+    achter += `<text x="${ox + UV.PADX}" y="${oy + (p._layout.topPx || DK_TOP_PX) - 22}" class="dk-kasttitel">${escapeHtml(naam)} — ${dkDrivers(dk).length} drivers</text>`;
     delen.push({dk, p, ox, oy, x0: ox, x1: ox + g.width, nr: i+1, naam});
     width = ox + g.width; height = Math.max(height, g.height + oy);
     ox += g.width + DK_ALLE_GAP;
@@ -27931,6 +27940,20 @@ function akCss(){
   document.head.appendChild(st);
 }
 function akSluit(){ const m = document.getElementById("ak-modal"); if(m) m.remove(); }
+/* 27/11/2026 (Peter): de teller op "Armaturen koppelen" toonde 3, maar het venster zei "alles heeft een match".
+   De teller rekende met de catalogus die in het geheugen zat; het venster haalt de gedeelde catalogus eerst vers op.
+   Toont de teller iets, dan wordt de catalogus op de achtergrond vers opgehaald (max. 1× per 30 s) en de knop bijgewerkt. */
+let akVersTijd = 0;
+function akBadgeVers(tab){
+  if(!akOngekoppeld().length || !window.dbListCatalogArmaturen || Date.now() - akVersTijd < 30000) return;
+  akVersTijd = Date.now();
+  const voor = akOngekoppeld().length;
+  window.dbListCatalogArmaturen().then(lijst=>{
+    if(!Array.isArray(lijst) || !lijst.length) return;
+    state.armaturen = lijst;
+    if(akOngekoppeld().length !== voor && currentTab === tab && !document.getElementById("ak-modal")) selectTab(tab);
+  }).catch(()=>{});
+}
 async function akOpen(){
   if(!currentProjectId){ toast("Kies eerst een project."); return; }
   // vers uit de gedeelde catalogus (kan intussen door iemand anders aangevuld zijn)
@@ -27944,7 +27967,8 @@ async function akOpen(){
     ov.innerHTML = `<div class="modal-box"><h2>Armaturen koppelen</h2><div class="modal-body"><p>Alle armaturen in de driverkast en verlichting 230V hebben al een match in de catalogus. 👍</p></div>
       <div class="modal-actions"><button class="btn btn-primary" id="ak-ok">Sluiten</button></div></div>`;
     document.body.appendChild(ov);
-    ov.querySelector("#ak-ok").addEventListener("click", akSluit);
+    // de teller op de knop kan nog met de oude catalogus gerekend zijn: meteen bijwerken
+    ov.querySelector("#ak-ok").addEventListener("click", ()=>{ akSluit(); if(currentTab) selectTab(currentTab); });
     return;
   }
   const catOpties = (state.armaturen||[]).filter(a=>a.naam && a.naam!=="None")
