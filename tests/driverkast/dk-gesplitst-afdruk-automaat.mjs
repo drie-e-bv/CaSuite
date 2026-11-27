@@ -35,8 +35,8 @@ const r = JSON.parse(await E(`(()=>{
   const kv = tweede ? azKeten(tweede.items[0]) : null;
   exportDriverkastVoorWerf(true);
   const pe = document.getElementById('printExport');
-  const koppen = [...pe.querySelectorAll('.pe-kast-head')].map(x=>x.textContent);
-  const kastKol = [...new Set([...pe.querySelectorAll('.pe-porttable tbody tr td:nth-child(2)')].map(t=>t.textContent))];
+  const koppen = [...pe.querySelectorAll('.cr-plan .cr-titel')].map(x=>x.textContent + ' | ' + x.parentNode.querySelector('.cr-feiten').textContent);
+  const kastKol = [...pe.querySelectorAll('.cr-lijst h2')].map(t=>t.textContent);
   return JSON.stringify({n, k5: !!k5, k5b: !!k5b, nv, kv: !!kv, koppen, kastKol, voed: autIds.length});
 })()`));
 console.log(JSON.stringify(r));
